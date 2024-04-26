@@ -118,6 +118,127 @@ class IslandsBase:
             yield island
             island = []
 
+    @staticmethod
+    def calc_with_markseam_iter_ex(bm, uv_layer):
+        island: list[BMFace] = []
+
+        for face in bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            parts_of_island = [face]
+            temp = []
+
+            while parts_of_island:
+                for f in parts_of_island:
+                    for l in f.loops:
+                        link_face = l.link_loop_radial_next.face
+                        if not link_face.tag:
+                            continue
+                        if l.edge.seam:  # Skip if seam
+                            continue
+
+                        for ll in link_face.loops:
+                            if not ll.face.tag:
+                                continue
+                            if ll[uv_layer].uv != l[uv_layer].uv:
+                                continue
+                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
+                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
+                                temp.append(ll.face)
+                                ll.face.tag = False
+
+                island.extend(parts_of_island)
+                parts_of_island = temp
+                temp = []
+
+            yield island
+            island = []
+
+    @staticmethod
+    def calc_with_markseam_material_iter_ex(bm, uv_layer):
+        island: list[BMFace] = []
+
+        for face in bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            parts_of_island = [face]
+            temp = []
+
+            while parts_of_island:
+                for f in parts_of_island:
+                    for l in f.loops:
+                        link_face = l.link_loop_radial_next.face
+                        if not link_face.tag:
+                            continue
+                        if l.edge.seam:  # Skip if seam
+                            continue
+                        if link_face.material_index != f.material_index:  # Skip if other material
+                            continue
+
+                        for ll in link_face.loops:
+                            if not ll.face.tag:
+                                continue
+                            if ll[uv_layer].uv != l[uv_layer].uv:
+                                continue
+                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
+                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
+                                temp.append(ll.face)
+                                ll.face.tag = False
+
+                island.extend(parts_of_island)
+                parts_of_island = temp
+                temp = []
+
+            yield island
+            island = []
+
+    @staticmethod
+    def calc_with_markseam_material_edgeangle_iter_ex(bm, uv_layer, angle, sharp=True):
+        island: list[BMFace] = []
+
+        for face in bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            parts_of_island = [face]
+            temp = []
+
+            while parts_of_island:
+                for f in parts_of_island:
+                    for l in f.loops:
+                        link_face = l.link_loop_radial_next.face
+                        if not link_face.tag:
+                            continue
+                        if sharp and not l.edge.smooth:  # Skip by sharp
+                            continue
+                        if l.edge.calc_face_angle() >= angle:  # Skip by angle
+                            continue
+                        if l.edge.seam:  # Skip if seam
+                            continue
+                        if link_face.material_index != f.material_index:  # Skip if other material
+                            continue
+
+                        for ll in link_face.loops:
+                            if not ll.face.tag:
+                                continue
+                            if ll[uv_layer].uv != l[uv_layer].uv:
+                                continue
+                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
+                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
+                                temp.append(ll.face)
+                                ll.face.tag = False
+
+                island.extend(parts_of_island)
+                parts_of_island = temp
+                temp = []
+
+            yield island
+            island = []
 
 class Islands(IslandsBase):
     def __init__(self, islands, bm, uv_layer):
@@ -159,6 +280,9 @@ class Islands(IslandsBase):
 
     def __iter__(self):
         return iter(self.islands)
+
+    def __getitem__(self, idx):
+        return self.islands[idx]
 
     def __str__(self):
         return f'Islands count = {len(self.islands)}'
@@ -222,8 +346,32 @@ class FaceIsland:
                 loop[self.uv_layer].uv *= scale
         return True
 
+    def __select_ex(self, state, force, sync):
+        if sync or force:
+            for face in self.faces:
+                face.select = state
+                for e in face.edges:
+                    e.select = state
+                for v in face.verts:
+                    v.select = state
+        if not sync or force:
+            for face in self.faces:
+                for l in face.loops:
+                    luv = l[self.uv_layer]
+                    luv.select = state
+                    luv.select_edge = state
+
+    def select(self, force=False, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+        self.__select_ex(True, force, sync)
+
+    def deselect(self, force=False, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+        self.__select_ex(False, force, sync)
+
     def __iter__(self):
         return iter(self.faces)
+
+    def __getitem__(self, idx):
+        return self.faces[idx]
 
     def __str__(self):
         return f'Faces count = {len(self.faces)}'
