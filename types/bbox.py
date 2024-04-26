@@ -80,6 +80,9 @@ class BBox:
     def is_valid(self) -> bool:
         return (self.xmin <= self.xmax) and (self.ymin <= self.ymax)
 
+    def is_valid_for_div(self) -> bool:
+        return self.min_length > 0
+
     @property
     def max(self):
         return Vector((self.xmax, self.ymax))
@@ -168,6 +171,30 @@ class BBox:
     def is_empty(self) -> bool:
         return (self.xmax <= self.xmin) or (self.ymax <= self.ymin)
 
+    @property
+    def cent_x(self) -> float:
+        return (self.xmin + self.xmax) / 2.0
+
+    @property
+    def cent_y(self) -> float:
+        return (self.ymin + self.ymax) / 2.0
+
+    @property
+    def half_size_x(self) -> float:
+        return (self.xmax - self.xmin) * 0.5
+
+    @property
+    def half_size_y(self) -> float:
+        return (self.ymax - self.ymin) * 0.5
+
+    @property
+    def perimetr(self):
+        return self.width * 2 + self.height * 2
+
+    @property
+    def diagonal(self):
+        return math.sqrt(self.width ** 2 + self.height ** 2)
+
     def union(self, other):
         if self.xmin > other.xmin:
             self.xmin = other.xmin
@@ -249,53 +276,6 @@ class BBox:
             if y > self.ymax:
                 self.ymax = y
 
-    @property
-    def cent_x(self) -> float:
-        return (self.xmin + self.xmax) / 2.0
-
-    @property
-    def cent_y(self) -> float:
-        return (self.ymin + self.ymax) / 2.0
-
-    @property
-    def size_x(self) -> float:
-        return self.xmax - self.xmin
-
-    @property
-    def size_y(self) -> float:
-        return self.ymax - self.ymin
-
-    @property
-    def max_size(self):
-        return max(self.size_x, self.size_y)
-
-    @property
-    def half_size_x(self) -> float:
-        return (self.xmax - self.xmin) * 0.5
-
-    @property
-    def half_size_y(self) -> float:
-        return (self.ymax - self.ymin) * 0.5
-
-    @property
-    def perimetr(self):
-        return self.size_x * 2 + self.size_y * 2
-
-    @property
-    def diagonal(self):
-        return math.sqrt(self.size_x ** 2 + self.size_y ** 2)
-
-    @staticmethod
-    def isect_segments(v1: Vector, v2: Vector, v3: Vector, v4: Vector) -> int:
-        div = ((v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]))
-        if div == 0.0:
-            return 1  # co-linear
-
-        lmd = ((v1[1] - v3[1]) * (v4[0] - v3[0]) - (v1[0] - v3[0]) * (v4[1] - v3[1])) / div
-        mu = ((v1[1] - v3[1]) * (v2[0] - v1[0]) - (v1[0] - v3[0]) * (v2[1] - v1[1])) / div
-
-        return (lmd >= 0.0) & (lmd <= 1.0) & (mu >= 0.0) & (mu <= 1.0)
-
     def isect_x(self, x) -> bool:
         if x < self.xmin:
             return False
@@ -336,36 +316,11 @@ class BBox:
         return 0
 
     def isect_segment(self, s1: Vector, s2: Vector) -> bool:
-        # first do outside - bounds check for both points of the segment
-        if s1[0] < self.xmin and s2[0] < self.xmin:
-            return False
-        if s1[0] > self.xmax and s2[0] > self.xmax:
-            return False
-        if s1[1] < self.ymin and s2[1] < self.ymin:
-            return False
-        if s1[1] > self.ymax and s2[1] > self.ymax:
-            return False
-
-        # if either points intersect then we definitely intersect
-        if self.isect_pt_v(s1) or self.isect_pt_v(s2):
-            return True
-
-        # both points are outside but may intersect the rect
-        tvec1 = Vector((self.xmin, self.ymin))
-        tvec2 = Vector((self.xmax, self.ymax))
-        # diagonal: [ /]
-
-        if self.isect_segments(s1, s2, tvec1, tvec2):
-            return True
-
-        # *diagonal: [\]
-        tvec1[:] = self.xmin, self.ymax
-        tvec2[:] = self.xmax, self.ymin
-        if self.isect_segments(s1, s2, tvec1, tvec2):
-            return True
-
-        # no intersection
-        return False
+        from mathutils.geometry import intersect_line_line_2d as ll_isect
+        return any((ll_isect(s1, s2, self.left_bottom, self.left_upper),
+                    ll_isect(s1, s2, self.left_upper, self.right_upper),
+                    ll_isect(s1, s2, self.right_upper, self.right_bottom),
+                    ll_isect(s1, s2, self.right_bottom, self.left_bottom)))
 
     def isect_circle(self, xy: Vector, radius: float) -> bool:
         if self.xmin <= xy.x <= self.xmax:
@@ -392,8 +347,8 @@ class BBox:
 
     def transform_calc_m4_pivot_min(self, dst: 'BBox') -> Matrix:
         matrix = Matrix.Identity(4)
-        matrix[0][0] = self.size_x / dst.size_x
-        matrix[1][1] = self.size_y / dst.size_y
+        matrix[0][0] = self.width / dst.width
+        matrix[1][1] = self.height / dst.height
         matrix[3][0] = (self.xmin - dst.xmin) * matrix[0][0]
         matrix[3][1] = (self.ymin - dst.ymin) * matrix[1][1]
         return matrix
@@ -413,7 +368,7 @@ class BBox:
         if total_pad == 0.0:
             return
 
-        total_extend = self.size_y * total_pad / (boundary_size - total_pad)
+        total_extend = self.width * total_pad / (boundary_size - total_pad)
         self.ymax += total_extend * (pad_max / total_pad)
         self.ymin -= total_extend * (pad_min / total_pad)
 
@@ -460,41 +415,41 @@ class BBox:
 
         return changed
 
-    # def clamp(self, rect_bounds: 'BBox', r_xy: list[float, float]):
-    #     changed = False
-    #
-    #     r_xy[0] = 0.0
-    #     r_xy[1] = 0.0
-    #
-    #     if self.xmax > rect_bounds.xmax:
-    #         ofs = rect_bounds.xmax - self.xmax
-    #         self.xmin += ofs
-    #         self.xmax += ofs
-    #         r_xy[0] += ofs
-    #         changed = True
-    #
-    #     if self.xmin < rect_bounds.xmin:
-    #         ofs = rect_bounds.xmin - self.xmin
-    #         self.xmin += ofs
-    #         self.xmax += ofs
-    #         r_xy[0] += ofs
-    #         changed = True
-    #
-    #     if self.ymin < rect_bounds.ymin:
-    #         ofs = rect_bounds.ymin - self.ymin
-    #         self.ymin += ofs
-    #         self.ymax += ofs
-    #         r_xy[1] += ofs
-    #         changed = True
-    #
-    #     if self.ymax > rect_bounds.ymax:
-    #         ofs = rect_bounds.ymax - self.ymax
-    #         self.ymin += ofs
-    #         self.ymax += ofs
-    #         r_xy[1] += ofs
-    #         changed = True
-    #
-    #     return changed
+    def clamp_other(self, rect_bounds: 'BBox', r_xy: list[float, float]):
+        changed = False
+
+        r_xy[0] = 0.0
+        r_xy[1] = 0.0
+
+        if self.xmax > rect_bounds.xmax:
+            ofs = rect_bounds.xmax - self.xmax
+            self.xmin += ofs
+            self.xmax += ofs
+            r_xy[0] += ofs
+            changed = True
+
+        if self.xmin < rect_bounds.xmin:
+            ofs = rect_bounds.xmin - self.xmin
+            self.xmin += ofs
+            self.xmax += ofs
+            r_xy[0] += ofs
+            changed = True
+
+        if self.ymin < rect_bounds.ymin:
+            ofs = rect_bounds.ymin - self.ymin
+            self.ymin += ofs
+            self.ymax += ofs
+            r_xy[1] += ofs
+            changed = True
+
+        if self.ymax > rect_bounds.ymax:
+            ofs = rect_bounds.ymax - self.ymax
+            self.ymin += ofs
+            self.ymax += ofs
+            r_xy[1] += ofs
+            changed = True
+
+        return changed
 
     def compare(self, other: 'BBox', threshold):
         if abs(self.xmin - other.xmin) < threshold:
@@ -536,3 +491,12 @@ class BBox:
         x, y = pt_or_bbox
         return self.xmin <= x <= self.xmax and \
                self.ymin <= y <= self.ymax  # noqa
+
+    def __eq__(self, other: 'BBox'):
+        return self.min == other.min and self.max == other.max
+
+    def __and__(self, other: 'BBox'):
+        self.isect(other)
+
+    def __or__(self, other: 'BBox'):
+        self.union(other)
