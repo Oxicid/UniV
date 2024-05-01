@@ -476,8 +476,8 @@ class BBox:
             return ymin, ymax
 
     def isect_rect_x(self, other: 'BBox') -> 'tuple[float, float] | None':
-        xmin = self.xmin if self.xmin > other.xmin else other.xmin
-        xmax = self.xmax if self.xmax < other.xmax else other.xmax
+        xmin = self.xmin if (self.xmin > other.xmin) else other.xmin
+        xmax = self.xmax if (self.xmax < other.xmax) else other.xmax
 
         if xmax >= xmin:
             return xmin, xmax
