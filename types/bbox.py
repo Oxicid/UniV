@@ -43,7 +43,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_uv_loops(cls, group, uv_layers):
+    def calc_bbox_uv_corners(cls, group, uv_layers):
         xmin = math.inf
         xmax = -math.inf
         ymin = math.inf
@@ -496,7 +496,7 @@ class BBox:
         return self.min == other.min and self.max == other.max
 
     def __and__(self, other: 'BBox'):
-        self.isect(other)
+        return self.isect(other)
 
     def __or__(self, other: 'BBox'):
-        self.union(other)
+        return self.union(other)
