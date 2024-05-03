@@ -1,10 +1,11 @@
 import bpy
 import math
 import bmesh
+import typing
 from collections import defaultdict
+from ..types import PyBMesh
 
-
-class UBMesh:
+class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True):
         self.bm: bmesh.types.BMesh = bm
         self.obj: bpy.types.Object = obj
@@ -34,9 +35,9 @@ class UBMesh:
             self.bm.free()
 
 
-class UBMeshSeq:
-    def __init__(self, bmeshes):
-        self.bmeshes = bmeshes
+class UMeshes:
+    def __init__(self, umeshes):
+        self.umeshes = umeshes
 
     @classmethod
     def sel_ob_with_uv(cls):
@@ -45,7 +46,7 @@ class UBMeshSeq:
             for obj in bpy.context.objects_in_mode_unique_data:
                 if obj.type == 'MESH' and obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UBMesh(bm, obj))
+                    bmeshes.append(UMesh(bm, obj))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
@@ -56,15 +57,71 @@ class UBMeshSeq:
             for data, obj in data_and_objects.items():
                 bm = bmesh.new()
                 bm.from_mesh(data)
-                bmeshes.append(UBMesh(bm, obj, False))
+                bmeshes.append(UMesh(bm, obj, False))
 
         return cls(bmeshes)
 
     def __iter__(self):
-        return iter(self.bmeshes)
+        return iter(self.umeshes)
 
     def __len__(self):
-        return len(self.bmeshes)
+        return len(self.umeshes)
+
+
+def selected_uv_faces(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Sequence[bmesh.types.BMFace]:
+    if PyBMesh.is_full_face_deselected(bm):
+        return []
+
+    if sync:
+        if PyBMesh.is_full_face_selected(bm):
+            return bm.faces
+        return [f for f in bm.faces if f.select]
+
+    if PyBMesh.is_full_face_selected(bm):
+        return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops)]
+    return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
+
+def selected_uv_faces_iter(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Generator[bmesh.types.BMFace] | tuple:
+    if PyBMesh.is_full_face_deselected(bm):
+        return ()
+
+    if sync:
+        if PyBMesh.is_full_face_selected(bm):
+            return bm.faces
+        return (f for f in bm.faces if f.select)
+
+    if PyBMesh.is_full_face_selected(bm):
+        return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
+    return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
+
+def selected_uv_corners(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Sequence[bmesh.types.BMLoop]:
+    if PyBMesh.is_full_face_deselected(bm):
+        return []
+
+    if sync:
+        if PyBMesh.is_full_vert_selected(bm):
+            return [luv for f in bm.faces for luv in f.loops]
+        return [luv for f in bm.faces if f.select for luv in f.loops]
+
+    if PyBMesh.is_full_face_selected(bm):
+        return [luv for f in bm.faces for luv in f.loops if luv[uv_layer].select]
+    return [luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select]
+
+
+# TODO: Test with different mode
+def selected_uv_corners_iter(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Generator[bmesh.types.BMLoop] | tuple:
+    if sync:
+        if PyBMesh.is_full_vert_deselected(bm):
+            return ()
+        if PyBMesh.is_full_vert_selected(bm):
+            return (luv for f in bm.faces for luv in f.loops)
+        return (luv for f in bm.faces if not f.hide for luv in f.loops if luv.vert.select)
+
+    if PyBMesh.is_full_face_deselected(bm):
+        return ()
+    if PyBMesh.is_full_face_selected(bm):
+        return (luv for f in bm.faces for luv in f.loops if luv[uv_layer].select)
+    return (luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select)
 
 
 def find_min_rotate_angle(angle):
