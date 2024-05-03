@@ -299,6 +299,9 @@ class Islands(IslandsBase):
     def __getitem__(self, idx):
         return self.islands[idx]
 
+    def __bool__(self):
+        return bool(self.islands)
+
     def __str__(self):
         return f'Islands count = {len(self.islands)}'
 
