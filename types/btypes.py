@@ -374,6 +374,24 @@ class PyBMesh(StructBase):
         return cls.fields(bm).totfacesel == 0
 
     @classmethod
+    def is_full_edge_selected(cls, bm):
+        bm = cls.fields(bm)
+        return bm.totedgesel == bm.totedge
+
+    @classmethod
+    def is_full_edge_deselected(cls, bm):
+        return cls.fields(bm).totedgesel == 0
+
+    @classmethod
+    def is_full_vert_selected(cls, bm):
+        bm = cls.fields(bm)
+        return bm.totvertsel == bm.totvert
+
+    @classmethod
+    def is_full_vert_deselected(cls, bm):
+        return cls.fields(bm).totvertsel == 0
+
+    @classmethod
     def total_face_sel(cls, bm):
         return cls.fields(bm).totfacesel
 
