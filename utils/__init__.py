@@ -6,9 +6,9 @@ from collections import defaultdict
 
 class UBMesh:
     def __init__(self, bm, obj, is_edit_bm=True):
-        self.bm = bm
-        self.obj = obj
-        self.is_edit_bm = is_edit_bm
+        self.bm: bmesh.types.BMesh = bm
+        self.obj: bpy.types.Object = obj
+        self.is_edit_bm: bool = is_edit_bm
 
     def update(self, force=False):
         if self.is_edit_bm:
@@ -18,6 +18,16 @@ class UBMesh:
 
     def free(self):
         self.bm.free()
+
+    def ensure(self, face=True, edge=False, vert=False, force=False):
+        if self.is_edit_bm or not force:
+            return
+        if face:
+            self.bm.faces.ensure_lookup_table()
+        if edge:
+            self.bm.edges.ensure_lookup_table()
+        if vert:
+            self.bm.verts.ensure_lookup_table()
 
     def __del__(self):
         if not self.is_edit_bm:
