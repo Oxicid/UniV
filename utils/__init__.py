@@ -1,7 +1,7 @@
 import bpy
 import math
 import bmesh
-import typing
+# import typing
 from collections import defaultdict
 from ..types import PyBMesh
 
@@ -67,8 +67,11 @@ class UMeshes:
     def __len__(self):
         return len(self.umeshes)
 
+    def __bool__(self):
+        return bool(self.umeshes)
 
-def selected_uv_faces(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Sequence[bmesh.types.BMFace]:
+
+def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
     if PyBMesh.is_full_face_deselected(bm):
         return []
 
@@ -81,7 +84,7 @@ def selected_uv_faces(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_
         return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops)]
     return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
 
-def selected_uv_faces_iter(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Generator[bmesh.types.BMFace] | tuple:
+def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMFace] | tuple':
     if PyBMesh.is_full_face_deselected(bm):
         return ()
 
@@ -94,8 +97,8 @@ def selected_uv_faces_iter(bm, uv_layer, sync=bpy.context.scene.tool_settings.us
         return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
     return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
 
-def selected_uv_corners(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Sequence[bmesh.types.BMLoop]:
-    if PyBMesh.is_full_face_deselected(bm):
+def calc_selected_uv_corners(bm, uv_layer, sync) -> list[bmesh.types.BMLoop]:
+    if PyBMesh.is_full_vert_deselected(bm):
         return []
 
     if sync:
@@ -109,19 +112,26 @@ def selected_uv_corners(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_u
 
 
 # TODO: Test with different mode
-def selected_uv_corners_iter(bm, uv_layer, sync=bpy.context.scene.tool_settings.use_uv_select_sync) -> typing.Generator[bmesh.types.BMLoop] | tuple:
+
+def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMLoop] | tuple':
+    if PyBMesh.is_full_vert_deselected(bm):
+        return ()
+
     if sync:
-        if PyBMesh.is_full_vert_deselected(bm):
-            return ()
         if PyBMesh.is_full_vert_selected(bm):
             return (luv for f in bm.faces for luv in f.loops)
-        return (luv for f in bm.faces if not f.hide for luv in f.loops if luv.vert.select)
+        return (luv for f in bm.faces if f.select for luv in f.loops)
 
-    if PyBMesh.is_full_face_deselected(bm):
-        return ()
     if PyBMesh.is_full_face_selected(bm):
         return (luv for f in bm.faces for luv in f.loops if luv[uv_layer].select)
     return (luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select)
+
+def calc_visible_uv_corners(bm, sync) -> list[bmesh.types.BMLoop]:
+    if sync:
+        return [luv for f in bm.faces if not f.hide for luv in f.loops]
+    if PyBMesh.fields(bm).totfacesel == 0:
+        return []
+    return [luv for f in bm.faces if (f.select and not f.hide) for luv in f.loops]
 
 
 def find_min_rotate_angle(angle):

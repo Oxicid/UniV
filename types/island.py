@@ -17,9 +17,7 @@ class IslandsBase:
             face.tag = tag
 
     @staticmethod
-    def tag_filter_selected(bm: BMesh,
-                            uv_layer: BMLayerItem,
-                            sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def tag_filter_selected(bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if sync:
             for face in bm.faces:
                 face.tag = face.select
@@ -28,8 +26,7 @@ class IslandsBase:
                 face.tag = all(l[uv_layer].select_edge for l in face.loops) and face.select
 
     @staticmethod
-    def tag_filter_visible(bm: BMesh,
-                           sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def tag_filter_visible(bm: BMesh, sync: bool):
         if sync:
             for face in bm.faces:
                 face.tag = not face.hide
@@ -38,9 +35,7 @@ class IslandsBase:
                 face.tag = not face.hide and face.select
 
     @staticmethod
-    def island_filter_is_partial_face_selected(island: list[BMFace],
-                                           uv_layer: BMLayerItem,
-                                           sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync) -> bool:
+    def island_filter_is_partial_face_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         if sync:
             select = (face.select for face in island)
         else:
@@ -49,34 +44,26 @@ class IslandsBase:
         return any(first_check is not i for i in select)
 
     @staticmethod
-    def island_filter_is_all_face_selected(island: list[BMFace],
-                                           uv_layer: BMLayerItem,
-                                           sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync) -> bool:
+    def island_filter_is_all_face_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         if sync:
             return all(face.select for face in island)
         else:
             return all(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def island_filter_is_any_face_selected(island: list[BMFace],
-                                      uv_layer: BMLayerItem,
-                                      sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync) -> bool:
+    def island_filter_is_any_face_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         if sync:
             return any(face.select for face in island)
         else:
             return any(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def island_filter_is_all_corner_selected(island: list[BMFace],
-                                             uv_layer: 'bmesh.types.BMLayerItem',
-                                             sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync) -> bool:
+    def island_filter_is_all_corner_selected(island: list[BMFace], uv_layer: 'bmesh.types.BMLayerItem', sync: bool) -> bool:
         assert (sync is False)
         return all(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def island_filter_is_any_corner_selected(island: list[BMFace],
-                                             uv_layer: BMLayerItem,
-                                             sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync) -> bool:
+    def island_filter_is_any_corner_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         assert (sync is False)
         return any(any(l[uv_layer].select_edge for l in face.loops) for face in island)
 
@@ -250,7 +237,7 @@ class Islands(IslandsBase):
         # self.mesh: 'bpy.types.Mesh | None' = None
 
     @classmethod
-    def calc_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def calc_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
         cls.tag_filter_selected(bm, uv_layer, sync)
@@ -258,7 +245,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_full_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def calc_full_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
         cls.tag_filter_visible(bm, sync)
@@ -266,7 +253,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_partial_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def calc_partial_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
         cls.tag_filter_visible(bm, sync)
@@ -274,7 +261,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_extended(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def calc_extended(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
         cls.tag_filter_visible(bm, sync)
@@ -282,7 +269,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def calc_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         cls.tag_filter_visible(bm, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
@@ -365,6 +352,8 @@ class FaceIsland:
         return True
 
     def __select_ex(self, state, force, sync):
+        if sync is None:
+            sync = bpy.context.scene.tool_settings.use_uv_select_sync
         if sync or force:
             for face in self.faces:
                 face.select = state
@@ -379,10 +368,10 @@ class FaceIsland:
                     luv.select = state
                     luv.select_edge = state
 
-    def select(self, force=False, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def select(self, force=False, sync=None):
         self.__select_ex(True, force, sync)
 
-    def deselect(self, force=False, sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync):
+    def deselect(self, force=False, sync=None):
         self.__select_ex(False, force, sync)
 
     def __iter__(self):
