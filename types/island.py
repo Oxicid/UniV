@@ -8,6 +8,7 @@ from mathutils import Vector, Matrix
 from bmesh.types import BMesh, BMFace, BMLayerItem
 from ..utils import umath
 from . import btypes
+from. import BBox
 
 
 class IslandsBase:
@@ -230,7 +231,7 @@ class IslandsBase:
 
 class Islands(IslandsBase):
     def __init__(self, islands, bm, uv_layer):
-        self.islands = islands
+        self.islands: list[FaceIsland] = islands
         self.bm: BMesh = bm
         self.uv_layer: BMLayerItem = uv_layer
         # self.obj: 'bpy.types.Object | None' = None
@@ -275,6 +276,12 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
+    def calc(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, selected) -> 'Islands':
+        if selected:
+            return cls.calc_selected(bm, uv_layer, sync)
+        return cls.calc_visible(bm, uv_layer, sync)
+
+    @classmethod
     def calc_with_hidden(cls, bm: BMesh, uv_layer: BMLayerItem):
         cls.tag_filter_any(bm)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
@@ -295,19 +302,19 @@ class Islands(IslandsBase):
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
-        self.faces = faces
+        self.faces: list[BMFace] = faces
         self.bm: BMesh = bm
         self.uv_layer: BMLayerItem = uv_layer
 
-    def move(self, uv_layer, delta: Vector):
+    def move(self, delta: Vector) -> bool:
         if umath.vec_isclose_to_zero(delta):
             return False
         for face in self.faces:
             for loop in face.loops:
-                loop[uv_layer].uv += delta
+                loop[self.uv_layer].uv += delta
         return True
 
-    def rotate(self, angle: float, pivot: Vector):
+    def rotate(self, angle: float, pivot: Vector) -> bool:
         """Rotate a list of faces by angle (in radians) around a pivot"""
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
@@ -320,7 +327,7 @@ class FaceIsland:
                 uv.uv = (uv.uv - diff) @ rot_matrix
         return True
 
-    def rotate_simple(self, angle: float):
+    def rotate_simple(self, angle: float) -> bool:
         """Rotate a list of faces by angle (in radians) around a world center"""
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
@@ -331,7 +338,7 @@ class FaceIsland:
                 uv.uv = uv.uv @ rot_matrix
         return True
 
-    def scale(self, scale: Vector, pivot: Vector):
+    def scale(self, scale: Vector, pivot: Vector) -> bool:
         """Scale a list of faces by pivot"""
         if umath.vec_isclose_to_uniform(scale):
             return False
@@ -342,7 +349,7 @@ class FaceIsland:
                 uv.uv = (uv.uv * scale) + diff
         return True
 
-    def scale_simple(self, scale: Vector):
+    def scale_simple(self, scale: Vector) -> bool:
         """Scale a list of faces by world center"""
         if umath.vec_isclose_to_uniform(scale):
             return False
@@ -350,6 +357,9 @@ class FaceIsland:
             for loop in face.loops:
                 loop[self.uv_layer].uv *= scale
         return True
+
+    def calc_bbox(self) -> BBox:
+        return BBox.calc_bbox_uv(self.faces, self.uv_layer)
 
     def __select_ex(self, state, force, sync):
         if sync is None:
