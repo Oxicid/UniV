@@ -37,7 +37,15 @@ class UMesh:
 
 class UMeshes:
     def __init__(self, umeshes):
-        self.umeshes = umeshes
+        self.umeshes: list[UMesh] = umeshes
+
+    def update(self, force=False):
+        for umesh in self.umeshes:
+            umesh.update(force=force)
+
+    def ensure(self, face=True, edge=False, vert=False, force=False):
+        for umesh in self.umeshes:
+            umesh.ensure(face, edge, vert, force)
 
     @classmethod
     def sel_ob_with_uv(cls):
@@ -97,21 +105,30 @@ def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.t
         return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
     return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
 
+def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
+    if PyBMesh.is_full_face_selected(bm):
+        return bm.faces
+    if sync:
+        return [f for f in bm.faces if not f.hide]
+    return [f for f in bm.faces if f.select]
+
+def calc_uv_faces(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMFace]:
+    if selected:
+        return calc_selected_uv_faces(bm, uv_layer, sync)
+    return calc_visible_uv_faces(bm, uv_layer, sync)
+
 def calc_selected_uv_corners(bm, uv_layer, sync) -> list[bmesh.types.BMLoop]:
     if PyBMesh.is_full_vert_deselected(bm):
         return []
 
     if sync:
         if PyBMesh.is_full_vert_selected(bm):
-            return [luv for f in bm.faces for luv in f.loops]
-        return [luv for f in bm.faces if f.select for luv in f.loops]
+            return [l for f in bm.faces for l in f.loops]
+        return [l for f in bm.faces for l in f.loops if l.vert.select]
 
     if PyBMesh.is_full_face_selected(bm):
-        return [luv for f in bm.faces for luv in f.loops if luv[uv_layer].select]
-    return [luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select]
-
-
-# TODO: Test with different mode
+        return [l for f in bm.faces for l in f.loops if l[uv_layer].select]
+    return [l for f in bm.faces if f.select for l in f.loops if l[uv_layer].select]
 
 def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMLoop] | tuple':
     if PyBMesh.is_full_vert_deselected(bm):
@@ -119,8 +136,8 @@ def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh
 
     if sync:
         if PyBMesh.is_full_vert_selected(bm):
-            return (luv for f in bm.faces for luv in f.loops)
-        return (luv for f in bm.faces if f.select for luv in f.loops)
+            return (l for f in bm.faces for l in f.loops)
+        return (l for f in bm.faces for l in f.loops if l.vert.select)
 
     if PyBMesh.is_full_face_selected(bm):
         return (luv for f in bm.faces for luv in f.loops if luv[uv_layer].select)
@@ -133,6 +150,10 @@ def calc_visible_uv_corners(bm, sync) -> list[bmesh.types.BMLoop]:
         return []
     return [luv for f in bm.faces if (f.select and not f.hide) for luv in f.loops]
 
+def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMLoop]:
+    if selected:
+        return calc_selected_uv_corners(bm, uv_layer, sync)
+    return calc_visible_uv_corners(bm, sync)
 
 def find_min_rotate_angle(angle):
     return -(round(angle / (math.pi / 2)) * (math.pi / 2) - angle)
@@ -147,3 +168,22 @@ def calc_min_align_angle(selected_faces, uv_layers):
 def calc_min_align_angle_pt(points):
     align_angle_pre = mathutils.geometry.box_fit_2d(points)
     return find_min_rotate_angle(align_angle_pre)
+
+def get_cursor_location():
+    if bpy.context.area.ui_type == 'UV':
+        return bpy.context.space_data.cursor_location.copy()
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        for area in screen.areas:
+            if area.ui_type == 'UV':
+                return area.spaces.active.cursor_location.copy()
+
+def set_cursor_location(loc):
+    if bpy.context.area.ui_type == 'UV':
+        bpy.context.space_data.cursor_location = loc
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        for area in screen.areas:
+            if area.ui_type == 'UV':
+                area.spaces.active.cursor_location = loc
+                return

@@ -240,7 +240,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
-            return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
+            return cls([], None, None)
         cls.tag_filter_selected(bm, uv_layer, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
@@ -248,7 +248,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_full_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
-            return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
+            return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_all_face_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
@@ -256,7 +256,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_partial_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
-            return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
+            return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_partial_face_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
@@ -264,7 +264,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_extended(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
-            return cls(FaceIsland([], bm, uv_layer), bm, uv_layer)
+            return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
