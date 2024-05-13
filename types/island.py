@@ -276,6 +276,12 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
+    def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'Islands':
+        if extended:
+            return cls.calc_extended(bm, uv_layer, sync)
+        return cls.calc_visible(bm, uv_layer, sync)
+
+    @classmethod
     def calc(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, selected) -> 'Islands':
         if selected:
             return cls.calc_selected(bm, uv_layer, sync)
@@ -286,6 +292,21 @@ class Islands(IslandsBase):
         cls.tag_filter_any(bm)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
+
+    def move(self, delta: Vector) -> bool:
+        return bool(sum(island.move(delta) for island in self.islands))
+
+    def scale_simple(self, scale: Vector):
+        return bool(sum(island.scale_simple(scale) for island in self.islands))
+
+    def scale(self, scale: Vector, pivot: Vector) -> bool:
+        return bool(sum(island.scale(scale, pivot) for island in self.islands))
+
+    def calc_bbox(self) -> BBox:
+        general_bbox = BBox()
+        for island in self.islands:
+            general_bbox.union(island.calc_bbox())
+        return general_bbox
 
     def __iter__(self):
         return iter(self.islands)
