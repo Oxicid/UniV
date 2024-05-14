@@ -127,6 +127,10 @@ class BBox:
     def center(self):
         return Vector(((self.xmin + self.xmax) * 0.5, (self.ymin + self.ymax) * 0.5))
 
+    @property
+    def tile_from_center(self):
+        return Vector((math.floor(self.center_x), math.floor(self.center_y))).freeze()
+
     @center.setter
     def center(self, new_center):
         delta = new_center - self.center
@@ -172,12 +176,12 @@ class BBox:
         return (self.xmax <= self.xmin) or (self.ymax <= self.ymin)
 
     @property
-    def cent_x(self) -> float:
-        return (self.xmin + self.xmax) / 2.0
+    def center_x(self) -> float:
+        return (self.xmin + self.xmax) * 0.5
 
     @property
-    def cent_y(self) -> float:
-        return (self.ymin + self.ymax) / 2.0
+    def center_y(self) -> float:
+        return (self.ymin + self.ymax) * 0.5
 
     @property
     def half_size_x(self) -> float:
@@ -373,16 +377,16 @@ class BBox:
         self.ymin -= total_extend * (pad_min / total_pad)
 
     def resize_x(self, x):
-        self.xmin = self.cent_x - (x * 0.5)
+        self.xmin = self.center_x - (x * 0.5)
         self.xmax = self.xmin + x
 
     def resize_y(self, y):
-        self.ymin = self.cent_y - (y * 0.5)
+        self.ymin = self.center_y - (y * 0.5)
         self.ymax = self.ymin + y
 
     def resize(self, xy: Vector):
-        self.xmin = self.cent_x - (xy[0] * 0.5)
-        self.ymin = self.cent_y - (xy[1] * 0.5)
+        self.xmin = self.center_x - (xy[0] * 0.5)
+        self.ymin = self.center_y - (xy[1] * 0.5)
         self.xmax = self.xmin + xy[0]
         self.ymax = self.ymin + xy[1]
 
