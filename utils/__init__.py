@@ -1,8 +1,12 @@
 import bpy
 import math
 import bmesh
-# import typing
+
+from mathutils import Vector
 from collections import defaultdict
+
+from . import bench
+from . import umath
 from ..types import PyBMesh
 
 class UMesh:
@@ -105,7 +109,7 @@ def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.t
         return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
     return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
 
-def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
+def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:  # noqa
     if PyBMesh.is_full_face_selected(bm):
         return bm.faces
     if sync:
@@ -177,6 +181,10 @@ def get_cursor_location():
         for area in screen.areas:
             if area.ui_type == 'UV':
                 return area.spaces.active.cursor_location.copy()
+
+def get_tile_from_cursor():
+    if cursor := get_cursor_location():
+        return Vector((math.floor(val) for val in cursor))
 
 def set_cursor_location(loc):
     if bpy.context.area.ui_type == 'UV':
