@@ -37,6 +37,8 @@ from . import ui
 
 classes = (
     transform.UNIV_OT_Align,
+    transform.UNIV_OT_Fill,
+    transform.UNIV_OT_Crop,
     ui.UNIV_PT_General
 )
 

@@ -1,12 +1,10 @@
 from bpy.types import Panel
 
 class UNIV_PT_General(Panel):
-    bl_label = " "
+    bl_label = "UniV"
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "UniV"
-
-    # def draw_header(self, context):
 
     def draw(self, context):
         layout = self.layout
@@ -14,10 +12,18 @@ class UNIV_PT_General(Panel):
         box = layout.box()
         col = box.column(align=True)
 
-        # row = col.row(align=True)
-        # row.operator('uv.univ_crop', text="Crop")
-        # row.operator('uv.univ_fill', text="Fill")
-        #
+        split = col.split(factor=0.65, align=True)
+        split.operator('uv.univ_crop', text="Crop").axis = 'XY'
+        row = split.row(align=True)
+        row.operator('uv.univ_crop', text="X").axis = 'X'
+        row.operator('uv.univ_crop', text="Y").axis = 'Y'
+
+        split = col.split(factor=0.65, align=True)
+        split.operator('uv.univ_fill', text="Fill").axis = 'XY'
+        row = split.row(align=True)
+        row.operator('uv.univ_fill', text="X").axis = 'X'
+        row.operator('uv.univ_fill', text="Y").axis = 'Y'
+
         # row = col.row(align=True)
         # row.operator('uv.univ_align_edge', text="Align Edge")
         #
@@ -25,7 +31,7 @@ class UNIV_PT_General(Panel):
         # row.operator('uv.univ_align_world', text="Align World")
 
         col_align = col.column(align=True)
-
+        col_align.separator(factor=0.35)
         row = col_align.row(align=True)
         col = row.column(align=True)
         col.operator('uv.univ_align', text="↖").direction = 'LEFT_UPPER'

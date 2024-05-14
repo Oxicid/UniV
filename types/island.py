@@ -366,7 +366,7 @@ class FaceIsland:
         diff = pivot - pivot * scale
         for face in self.faces:
             for loop in face.loops:
-                uv = loop[self.uv_layer].uv
+                uv = loop[self.uv_layer]
                 uv.uv = (uv.uv * scale) + diff
         return True
 
