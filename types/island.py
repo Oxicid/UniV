@@ -306,6 +306,9 @@ class Islands(IslandsBase):
     def scale(self, scale: Vector, pivot: Vector) -> bool:
         return bool(sum(island.scale(scale, pivot) for island in self.islands))
 
+    def rotate(self, angle: float, pivot: Vector) -> bool:
+        return bool(sum(island.rotate(angle, pivot) for island in self.islands))
+
     def calc_bbox(self) -> BBox:
         general_bbox = BBox()
         for island in self.islands:
@@ -320,6 +323,9 @@ class Islands(IslandsBase):
 
     def __bool__(self):
         return bool(self.islands)
+
+    def __len__(self):
+        return len(self.islands)
 
     def __str__(self):
         return f'Islands count = {len(self.islands)}'
@@ -383,6 +389,32 @@ class FaceIsland:
                 loop[self.uv_layer].uv *= scale
         return True
 
+    def is_flipped(self) -> bool:
+        for f in self.faces:
+            area = 0.0
+            uvs = [l[self.uv_layer].uv for l in f.loops]
+            for i in range(len(uvs)):
+                area += uvs[i - 1].cross(uvs[i])
+            if area < 0:
+                return True
+        return False
+
+    def is_full_flipped(self, partial=False) -> bool:
+        counter = 0
+        for f in self.faces:
+            area = 0.0
+            uvs = [l[self.uv_layer].uv for l in f.loops]
+            for i in range(len(uvs)):
+                area += uvs[i - 1].cross(uvs[i])
+            if area < 0:
+                counter += 1
+
+        if partial:
+            if counter != 0 and counter != len(self):
+                return True
+            return False
+        return counter == len(self)
+
     def calc_bbox(self) -> BBox:
         return BBox.calc_bbox_uv(self.faces, self.uv_layer)
 
@@ -414,6 +446,9 @@ class FaceIsland:
 
     def __getitem__(self, idx):
         return self.faces[idx]
+
+    def __len__(self):
+        return len(self.faces)
 
     def __str__(self):
         return f'Faces count = {len(self.faces)}'
