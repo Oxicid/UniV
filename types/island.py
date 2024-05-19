@@ -22,6 +22,10 @@ class IslandsBase:
         if sync:
             for face in bm.faces:
                 face.tag = face.select
+            return
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            for face in bm.faces:
+                face.tag = all(l[uv_layer].select for l in face.loops) and face.select
         else:
             for face in bm.faces:
                 face.tag = all(l[uv_layer].select_edge for l in face.loops) and face.select

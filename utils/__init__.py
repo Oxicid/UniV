@@ -93,8 +93,14 @@ def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
         return [f for f in bm.faces if f.select]
 
     if PyBMesh.is_full_face_selected(bm):
-        return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops)]
-    return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops)]
+        else:
+            return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops)]
+    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
+    else:
+        return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select]
 
 def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMFace] | tuple':
     if PyBMesh.is_full_face_deselected(bm):
@@ -106,8 +112,14 @@ def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.t
         return (f for f in bm.faces if f.select)
 
     if PyBMesh.is_full_face_selected(bm):
-        return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
-    return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
+        else:
+            return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops))
+    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
+    else:
+        return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select)
 
 def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:  # noqa
     if PyBMesh.is_full_face_selected(bm):

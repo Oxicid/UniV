@@ -40,6 +40,7 @@ class timer:
         return wrapper_timer
 
 def profile(func):
+    #  https://osf.io/upav8
     @functools.wraps(func)
     def inner(*args, **qwargs):
         pr = cProfile.Profile()
