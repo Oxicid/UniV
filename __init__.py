@@ -10,17 +10,17 @@ bl_info = {
 
 import bpy
 
-from bpy.types import Menu, Operator, Panel, PropertyGroup
-from bpy.props import (
-    StringProperty,
-    BoolProperty,
-    IntProperty,
-    IntVectorProperty,
-    FloatProperty,
-    FloatVectorProperty,
-    EnumProperty,
-    PointerProperty,
-)
+# from bpy.types import Menu, Operator, Panel, PropertyGroup
+# from bpy.props import (
+#     StringProperty,
+#     BoolProperty,
+#     IntProperty,
+#     IntVectorProperty,
+#     FloatProperty,
+#     FloatVectorProperty,
+#     EnumProperty,
+#     PointerProperty,
+# )
 
 from . import preferences
 from .types import bbox
@@ -39,6 +39,8 @@ classes = (
     transform.UNIV_OT_Align,
     transform.UNIV_OT_Fill,
     transform.UNIV_OT_Crop,
+    transform.UNIV_OT_Flip,
+    transform.UNIV_OT_Rotate,
     ui.UNIV_PT_General
 )
 

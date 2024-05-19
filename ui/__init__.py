@@ -8,21 +8,21 @@ class UNIV_PT_General(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator_context = "INVOKE_DEFAULT"
+        layout.operator_context = 'INVOKE_DEFAULT'
         box = layout.box()
         col = box.column(align=True)
 
         split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_crop', text="Crop").axis = 'XY'
+        split.operator('uv.univ_crop', text='Crop').axis = 'XY'
         row = split.row(align=True)
-        row.operator('uv.univ_crop', text="X").axis = 'X'
-        row.operator('uv.univ_crop', text="Y").axis = 'Y'
+        row.operator('uv.univ_crop', text='X').axis = 'X'
+        row.operator('uv.univ_crop', text='Y').axis = 'Y'
 
         split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_fill', text="Fill").axis = 'XY'
+        split.operator('uv.univ_fill', text='Fill').axis = 'XY'
         row = split.row(align=True)
-        row.operator('uv.univ_fill', text="X").axis = 'X'
-        row.operator('uv.univ_fill', text="Y").axis = 'Y'
+        row.operator('uv.univ_fill', text='X').axis = 'X'
+        row.operator('uv.univ_fill', text='Y').axis = 'Y'
 
         # row = col.row(align=True)
         # row.operator('uv.univ_align_edge', text="Align Edge")
@@ -34,23 +34,36 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
         row = col_align.row(align=True)
         col = row.column(align=True)
-        col.operator('uv.univ_align', text="↖").direction = 'LEFT_UPPER'
-        col.operator('uv.univ_align', text="← ").direction = 'LEFT'
-        col.operator('uv.univ_align', text="↙").direction = 'LEFT_BOTTOM'
+        col.operator('uv.univ_align', text='↖').direction = 'LEFT_UPPER'
+        col.operator('uv.univ_align', text='← ').direction = 'LEFT'
+        col.operator('uv.univ_align', text='↙').direction = 'LEFT_BOTTOM'
 
         col = row.column(align=True)
-        col.operator('uv.univ_align', text="↑").direction = 'UPPER'
-        col.operator('uv.univ_align', text="+").direction = 'CENTER'
-        col.operator('uv.univ_align', text="↓").direction = 'BOTTOM'
+        col.operator('uv.univ_align', text='↑').direction = 'UPPER'
+        col.operator('uv.univ_align', text='+').direction = 'CENTER'
+        col.operator('uv.univ_align', text='↓').direction = 'BOTTOM'
 
         col = row.column(align=True)
-        col.operator('uv.univ_align', text="↗").direction = 'RIGHT_UPPER'
-        col.operator('uv.univ_align', text=" →").direction = 'RIGHT'
-        col.operator('uv.univ_align', text="↘").direction = 'RIGHT_BOTTOM'
+        col.operator('uv.univ_align', text='↗').direction = 'RIGHT_UPPER'
+        col.operator('uv.univ_align', text=' →').direction = 'RIGHT'
+        col.operator('uv.univ_align', text='↘').direction = 'RIGHT_BOTTOM'
 
         row_tr = col_align.row(align=True)
         col = row_tr.column(align=True)
-        # col.scale_x = 0.5
+
         row = col.row(align=True)
-        row.operator('uv.univ_align', text="—").direction = 'HORIZONTAL'
-        row.operator('uv.univ_align', text="|").direction = 'VERTICAL'
+        row.operator('uv.univ_align', text='—').direction = 'HORIZONTAL'
+        row.operator('uv.univ_align', text='|').direction = 'VERTICAL'
+
+        col_align = col.column(align=True)
+        col_align.separator(factor=0.35)
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_rotate', text='Rot CCW').rot_dir = 'CCW'
+        row = split.row(align=True)
+        row.operator('uv.univ_rotate', text='Rot CW').rot_dir = 'CW'
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_flip', text='Flip X').axis = 'X'
+        row = split.row(align=True)
+        row.operator('uv.univ_flip', text='Flip Y').axis = 'Y'

@@ -5,6 +5,7 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
+from math import pi
 from ..types import BBox, Islands, FaceIsland
 from .. import utils
 from .. import info
@@ -115,8 +116,7 @@ class UNIV_OT_Crop(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
-            if islands := Islands.calc_extended_or_visible(umesh.bm, uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
                 update_obj.umeshes.append(umesh)
@@ -129,8 +129,7 @@ class UNIV_OT_Crop(Operator):
     @staticmethod
     def crop_individual(axis, padding, umeshes, update_obj, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
-            if islands := Islands.calc_extended_or_visible(umesh.bm, uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     UNIV_OT_Crop.crop_ex(axis, island.calc_bbox(), inplace, (island, ), offset, padding, proportional)
                 update_obj.umeshes.append(umesh)
@@ -139,8 +138,7 @@ class UNIV_OT_Crop(Operator):
     def crop_inplace(axis, padding, umeshes, update_obj, proportional, sync, inplace=True, extended=True):
         islands_of_tile: dict[int | list[tuple[FaceIsland | BBox]]] = {}
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
-            if islands := Islands.calc_extended_or_visible(umesh.bm, uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     bbox = island.calc_bbox()
                     islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
@@ -361,16 +359,15 @@ class UNIV_OT_Align(Operator):
         island_mode = is_island_mode()
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
             if island_mode:
-                if islands := Islands.calc(umesh.bm, uv_layer, sync, selected=selected):
+                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
-                        all_groups.append((island, bbox, uv_layer))
+                        all_groups.append((island, bbox, umesh.uv_layer))
                     update_obj.umeshes.append(umesh)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, uv_layer, sync, selected=selected):
-                    all_groups.append((corners, uv_layer))
+                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                    all_groups.append((corners, umesh.uv_layer))
                     update_obj.umeshes.append(umesh)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox, invert=True)
@@ -383,13 +380,11 @@ class UNIV_OT_Align(Operator):
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
-
-            if faces := utils.calc_uv_faces(umesh.bm, uv_layer, sync, selected=selected):
-                island = FaceIsland(faces, umesh.bm, uv_layer)
+            if faces := utils.calc_uv_faces(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                island = FaceIsland(faces, umesh.bm, umesh.uv_layer)
                 bbox = island.calc_bbox()
                 general_bbox.union(bbox)
-                all_groups.append([island, bbox, uv_layer])
+                all_groups.append([island, bbox, umesh.uv_layer])
                 update_obj.umeshes.append(umesh)
         for group in all_groups:
             group[1] = general_bbox
@@ -400,10 +395,9 @@ class UNIV_OT_Align(Operator):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         general_bbox = BBox()
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
-            if corners := utils.calc_uv_corners(umesh.bm, uv_layer, sync, selected=selected):
-                all_groups.append((corners, uv_layer))
-                bbox = BBox.calc_bbox_uv_corners(corners, uv_layer)
+            if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                all_groups.append((corners, umesh.uv_layer))
+                bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
                 general_bbox.union(bbox)
         return general_bbox
 
@@ -413,21 +407,20 @@ class UNIV_OT_Align(Operator):
         general_bbox = BBox()
         island_mode = is_island_mode()
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
             if island_mode:
-                if islands := Islands.calc(umesh.bm, uv_layer, sync, selected=selected):
+                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         general_bbox.union(bbox)
 
-                        all_groups.append((island, bbox, uv_layer))
+                        all_groups.append((island, bbox, umesh.uv_layer))
                     update_obj.umeshes.append(umesh)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, uv_layer, sync, selected=selected):
-                    bbox = BBox.calc_bbox_uv_corners(corners, uv_layer)
+                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                    bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
                     general_bbox.union(bbox)
 
-                    all_groups.append((corners, uv_layer))
+                    all_groups.append((corners, umesh.uv_layer))
                     update_obj.umeshes.append(umesh)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox)
@@ -438,9 +431,8 @@ class UNIV_OT_Align(Operator):
     def move_ex(direction, sync, umeshes, update_obj, selected=True):
         island_mode = is_island_mode()
         for umesh in umeshes:
-            uv_layer = umesh.bm.loops.layers.uv.verify()
             if island_mode:
-                if islands := Islands.calc(umesh.bm, uv_layer, sync, selected=selected):
+                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     match direction:
                         case 'CENTER':
                             for island in islands:
@@ -463,21 +455,21 @@ class UNIV_OT_Align(Operator):
                                 island.move(move_value)
                     update_obj.umeshes.append(umesh)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, uv_layer, sync, selected=selected):
+                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     match direction:
                         case 'CENTER':
                             for corner in corners:
-                                corner[uv_layer].uv = 0.5, 0.5
+                                corner[umesh.uv_layer].uv = 0.5, 0.5
                         case 'HORIZONTAL':
                             for corner in corners:
-                                corner[uv_layer].uv.x = 0.5
+                                corner[umesh.uv_layer].uv.x = 0.5
                         case 'VERTICAL':
                             for corner in corners:
-                                corner[uv_layer].uv.y = 0.5
+                                corner[umesh.uv_layer].uv.y = 0.5
                         case _:
                             move_value = Vector(UNIV_OT_Align.get_move_value(direction))
                             for corner in corners:
-                                corner[uv_layer].uv += move_value
+                                corner[umesh.uv_layer].uv += move_value
                     update_obj.umeshes.append(umesh)
 
     @staticmethod
@@ -647,6 +639,283 @@ class UNIV_OT_Align(Operator):
             case _:
                 raise NotImplementedError(direction)
         return
+
+class UNIV_OT_Flip(Operator):
+    bl_idname = 'uv.univ_flip'
+    bl_label = 'Flip'
+    bl_description = 'FlipX and FlipY'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+        ('DEFAULT', 'Default', ''),
+        ('BY_CURSOR', 'By cursor', ''),
+        ('INDIVIDUAL', 'Individual', ''),
+        ('FLIPPED', 'Flipped', ''),
+        ('FLIPPED_INDIVIDUAL', 'Flipped Individual', ''),
+    ))
+
+    axis: bpy.props.EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case True, False, False:
+                self.mode = 'BY_CURSOR'
+            case False, True, False:
+                self.mode = 'INDIVIDUAL'
+            case False, False, True:
+                self.mode = 'FLIPPED'
+            case False, True, True:
+                self.mode = 'FLIPPED_INDIVIDUAL'
+            case _:
+                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                                      f"See all variations:\n\n")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def execute(self, context):
+        return self.flip(self.mode, self.axis, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+
+    @staticmethod
+    def flip(mode, axis, sync, report=None):
+        update_obj = utils.UMeshes([])
+        umeshes = utils.UMeshes.sel_ob_with_uv()
+        flip_args = (axis, sync,  umeshes,  update_obj)
+
+        match mode:
+            case 'DEFAULT':
+                UNIV_OT_Flip.flip_ex(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Flip.flip_ex(*flip_args, extended=False)
+
+            case 'BY_CURSOR':
+                if not (cursor_loc := utils.get_cursor_location()):
+                    if report:
+                        report({'INFO'}, "Cursor not found")
+                    return {'CANCELLED'}
+                UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
+                if not update_obj:
+                    UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
+
+            case 'INDIVIDUAL':
+                UNIV_OT_Flip.flip_individual(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Flip.flip_individual(*flip_args, extended=False)
+
+            case 'FLIPPED':
+                UNIV_OT_Flip.flip_flipped(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Flip.flip_flipped(*flip_args, extended=False)
+
+            case 'FLIPPED_INDIVIDUAL':
+                UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=False)
+            case _:
+                raise NotImplementedError(mode)
+
+        if not update_obj.update():
+            if report:
+                report({'INFO'}, "No faces/verts for manipulate")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def flip_ex(axis, sync,  umeshes,  update_obj, extended):
+        islands_of_mesh = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                general_bbox.union(islands.calc_bbox())
+                islands_of_mesh.append(islands)
+                update_obj.umeshes.append(umesh)
+
+        if not update_obj:
+            return
+
+        pivot = general_bbox.center
+        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        for islands in islands_of_mesh:
+            islands.scale(scale=scale, pivot=pivot)
+
+    @staticmethod
+    def flip_by_cursor(axis, sync,  umeshes,  update_obj, cursor, extended):
+        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                islands.scale(scale=scale, pivot=cursor)
+                update_obj.umeshes.append(umesh)
+
+    @staticmethod
+    def flip_individual(axis, sync,  umeshes,  update_obj, extended):
+        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    island.scale(scale=scale, pivot=island.calc_bbox().center)
+                update_obj.umeshes.append(umesh)
+
+    @staticmethod
+    def flip_flipped(axis, sync,  umeshes,  update_obj, extended):
+        flipped_islands_of_mesh = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                flipped_islands = Islands([isl for isl in islands if isl.is_flipped()], umesh.bm, umesh.uv_layer)
+                if flipped_islands:
+                    general_bbox.union(flipped_islands.calc_bbox())
+                    flipped_islands_of_mesh.append(flipped_islands)
+                else:
+                    umesh.update_flag = False
+                update_obj.umeshes.append(umesh)
+
+        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        pivot = general_bbox.center
+        for islands in flipped_islands_of_mesh:
+            islands.scale(scale, pivot)
+
+    @staticmethod
+    def flip_flipped_individual(axis, sync,  umeshes,  update_obj, extended):
+        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                flipped_islands = [isl for isl in islands if isl.is_flipped()]
+                for island in flipped_islands:
+                    island.scale(scale=scale, pivot=island.calc_bbox().center)
+                umesh.update_flag = bool(flipped_islands)
+                update_obj.umeshes.append(umesh)
+
+    @staticmethod
+    def get_flip_scale_from_axis(axis):
+        return Vector((-1, 1)) if axis == 'X' else Vector((1, -1))
+
+
+class UNIV_OT_Rotate(Operator):
+    bl_idname = 'uv.univ_rotate'
+    bl_label = 'Rotate'
+    bl_description = 'Rotate CW and Rotate CCW'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+        ('DEFAULT', 'Default', ''),
+        ('BY_CURSOR', 'By cursor', ''),
+        ('INDIVIDUAL', 'Individual', ''),
+        ('DOUBLE', 'Double', ''),
+        ('DOUBLE_INDIVIDUAL', 'Double Individual', ''),
+        ('DOUBLE_BY_CURSOR', 'Double by Cursor', '')
+    ))
+
+    rot_dir: bpy.props.EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
+    angle: bpy.props.FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case True, False, False:
+                self.mode = 'BY_CURSOR'
+            case False, True, False:
+                self.mode = 'INDIVIDUAL'
+            case False, False, True:
+                self.mode = 'DOUBLE'
+            case False, True, True:
+                self.mode = 'DOUBLE_INDIVIDUAL'
+            case True, True, True:
+                self.mode = 'DOUBLE_BY_CURSOR'
+            case _:
+                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                                      f"See all variations:\n\n")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def execute(self, context):
+        return self.rotate(self.mode, self.angle, self.rot_dir, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+
+    @staticmethod
+    def rotate(mode, angle, rot_dir, sync, report=None):
+        update_obj = utils.UMeshes([])
+        umeshes = utils.UMeshes.sel_ob_with_uv()
+        if 'DOUBLE' in mode:
+            angle *= 2.0
+        if rot_dir == 'CCW':
+            angle = -angle
+        flip_args = (angle, sync,  umeshes,  update_obj)
+
+        match mode:
+            case 'DEFAULT' | 'DOUBLE':
+                UNIV_OT_Rotate.rotate_ex(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Rotate.rotate_ex(*flip_args, extended=False)
+
+            case 'BY_CURSOR' | 'DOUBLE_BY_CURSOR':
+                if not (cursor_loc := utils.get_cursor_location()):
+                    if report:
+                        report({'INFO'}, "Cursor not found")
+                    return {'CANCELLED'}
+                UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
+                if not update_obj:
+                    UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
+
+            case 'INDIVIDUAL' | 'DOUBLE_INDIVIDUAL':
+                UNIV_OT_Rotate.rotate_individual(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Rotate.rotate_individual(*flip_args, extended=False)
+            case _:
+                raise NotImplementedError(mode)
+
+        if not update_obj.update():
+            if report:
+                report({'INFO'}, "No faces/verts for manipulate")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def rotate_ex(angle, sync,  umeshes,  update_obj, extended):
+        islands_of_mesh = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                general_bbox.union(islands.calc_bbox())
+                islands_of_mesh.append(islands)
+                update_obj.umeshes.append(umesh)
+
+        pivot = general_bbox.center
+        for islands in islands_of_mesh:
+            islands.rotate(angle, pivot=pivot)
+
+    @staticmethod
+    def rotate_by_cursor(angle, sync,  umeshes,  update_obj, cursor, extended):
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                islands.rotate(angle, pivot=cursor)
+                update_obj.umeshes.append(umesh)
+
+    @staticmethod
+    def rotate_individual(angle, sync,  umeshes,  update_obj, extended):
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    island.rotate(angle, pivot=island.calc_bbox().center)
+                update_obj.umeshes.append(umesh)
 
 
 def is_island_mode():
