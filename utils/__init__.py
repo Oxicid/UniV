@@ -13,13 +13,18 @@ class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True):
         self.bm: bmesh.types.BMesh = bm
         self.obj: bpy.types.Object = obj
+        self.uv_layer: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
         self.is_edit_bm: bool = is_edit_bm
+        self.update_flag: bool = True
 
     def update(self, force=False):
+        if not self.update_flag:
+            return False
         if self.is_edit_bm:
             bmesh.update_edit_mesh(self.obj.data, loop_triangles=force, destructive=force)
         else:
             self.bm.to_mesh(self.obj.data)
+        return True
 
     def free(self):
         self.bm.free()
@@ -44,8 +49,7 @@ class UMeshes:
         self.umeshes: list[UMesh] = umeshes
 
     def update(self, force=False):
-        for umesh in self.umeshes:
-            umesh.update(force=force)
+        return bool(sum(umesh.update(force=force) for umesh in self.umeshes))
 
     def ensure(self, face=True, edge=False, vert=False, force=False):
         for umesh in self.umeshes:
@@ -185,7 +189,7 @@ def calc_min_align_angle_pt(points):
     align_angle_pre = mathutils.geometry.box_fit_2d(points)
     return find_min_rotate_angle(align_angle_pre)
 
-def get_cursor_location():
+def get_cursor_location() -> Vector:
     if bpy.context.area.ui_type == 'UV':
         return bpy.context.space_data.cursor_location.copy()
     for window in bpy.context.window_manager.windows:
@@ -194,7 +198,7 @@ def get_cursor_location():
             if area.ui_type == 'UV':
                 return area.spaces.active.cursor_location.copy()
 
-def get_tile_from_cursor():
+def get_tile_from_cursor() -> Vector:
     if cursor := get_cursor_location():
         return Vector((math.floor(val) for val in cursor))
 
