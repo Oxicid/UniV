@@ -1057,13 +1057,13 @@ class UNIV_OT_Sort(Operator):
                 island.set_position(margin)
                 margin.y += padding + height
 
-def calc_rotate_simple_bbox(coords, angle):
-    rot_matrix = Matrix.Rotation(-angle, 2)
-    bbox = BBox()
-    # rotated_co = (co @ rot_matrix for co in coords)
-    rotated_co = (rot_matrix @ co for co in coords)
-    bbox.update(rotated_co)
-    return bbox
+# def calc_rotate_simple_bbox(coords, angle):
+#     rot_matrix = Matrix.Rotation(-angle, 2)
+#     bbox = BBox()
+#     # rotated_co = (co @ rot_matrix for co in coords)
+#     rotated_co = (rot_matrix @ co for co in coords)
+#     bbox.update(rotated_co)
+#     return bbox
 
 
 def is_island_mode():
