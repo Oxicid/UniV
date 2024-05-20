@@ -9,7 +9,7 @@ from math import pi
 from ..types import BBox, Islands, FaceIsland
 from .. import utils
 from .. import info
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 
 class UNIV_OT_Crop(Operator):
@@ -425,7 +425,7 @@ class UNIV_OT_Align(Operator):
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox)
         else:  # Vertices or Edges UV selection mode
-            UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)
+            UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
 
     @staticmethod
     def move_ex(direction, sync, umeshes, update_obj, selected=True):
@@ -813,6 +813,7 @@ class UNIV_OT_Rotate(Operator):
         ('DOUBLE', 'Double', ''),
         ('DOUBLE_INDIVIDUAL', 'Double Individual', ''),
         ('DOUBLE_BY_CURSOR', 'Double by Cursor', '')
+        # ('EXPAND', 'Double by Cursor', '')  # by tile
     ))
 
     rot_dir: bpy.props.EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
@@ -918,10 +919,157 @@ class UNIV_OT_Rotate(Operator):
                 update_obj.umeshes.append(umesh)
 
 
+class UNIV_OT_Sort(Operator):
+    bl_idname = 'uv.univ_sort'
+    bl_label = 'Sort'
+    bl_description = 'Sort'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+        ('DEFAULT', 'Default', ''),
+        ('DEFAULT_ALIGN', 'Default Align', ''),
+        ('TO_CURSOR', 'To Cursor', ''),
+        ('TO_CURSOR_ALIGN', 'To Cursor Align', ''),
+        ('OVERLAPPED', 'Overlapped', ''),
+        ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', ''),
+        ('OVERLAPPED_TO_CURSOR_ALIGN', 'Overlapped to Cursor Align', '')
+    ))
+
+    axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    # align: bpy.props.BoolProperty(name='Align', default=False)
+    padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
+    reverse: bpy.props.BoolProperty(name='Reverse', default=True)
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case False, False, True:
+                self.mode = 'DEFAULT_ALIGN'
+            case True, False, False:
+                self.mode = 'TO_CURSOR'
+            case True, False, True:
+                self.mode = 'TO_CURSOR_ALIGN'
+            case False, True, False:
+                self.mode = 'OVERLAPPED'
+            case False, True, True:
+                self.mode = 'OVERLAPPED_TO_CURSOR'
+            case True, True, True:
+                self.mode = 'OVERLAPPED_TO_CURSOR_ALIGN'
+            case _:
+                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                                      f"See all variations:\n\n")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def execute(self, context):
+        return UNIV_OT_Sort.sort(self.mode, self.axis, self.padding, self.reverse,
+                                 sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+
+    @staticmethod
+    def sort(mode, axis, padding, reverse, sync, report=None):
+        update_obj = utils.UMeshes([])
+        umeshes = utils.UMeshes.sel_ob_with_uv()
+        cursor_loc = None
+        align = 'ALIGN' in mode
+        if 'CURSOR' in mode:
+            if not (cursor_loc := utils.get_cursor_location()):
+                if report:
+                    report({'INFO'}, "Cursor not found")
+                return {'CANCELLED'}
+
+        flip_args = (axis, align, padding, reverse, sync,  umeshes,  update_obj, cursor_loc)
+
+        match mode:
+            case 'DEFAULT' | 'DEFAULT_ALIGN' | 'TO_CURSOR' | 'TO_CURSOR_ALIGN':
+                UNIV_OT_Sort.sort_ex(*flip_args, extended=True)
+                if not update_obj:
+                    UNIV_OT_Sort.sort_ex(*flip_args, extended=False)
+            #
+            # case 'OVERLAPPED' | 'OVERLAPPED_ALIGN':
+            #     UNIV_OT_Sort.sort_overlapped(*flip_args, extended=True)
+            #     if not update_obj:
+            #         UNIV_OT_Sort.sort_overlapped(*flip_args, extended=False)
+            case _:
+                raise NotImplementedError(mode)
+
+        if not update_obj.update():
+            if report:
+                report({'INFO'}, "No faces/verts for manipulate")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def sort_ex(axis, align, padding, reverse, sync,  umeshes,  update_obj, cursor=None, extended=True):
+        islands_bboxes_points = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    if align:
+                        isl_coords = island.calc_corner_points(convex=True)
+                        bbox = BBox.calc_bbox(isl_coords)
+                        general_bbox.union(bbox)
+
+                        angle = utils.calc_min_align_angle(isl_coords)
+                        if not math.isclose(angle, 0, abs_tol=0.0001):
+                            island.rotate_simple(angle)
+                            bbox = island.calc_bbox()
+                    else:
+                        bbox = island.calc_bbox()
+                        general_bbox.union(bbox)
+                    islands_bboxes_points.append((island, bbox))
+
+                update_obj.umeshes.append(umesh)
+
+        islands_bboxes_points.sort(key=lambda x: x[1].max_length, reverse=reverse)
+
+        if axis == 'AUTO':
+            horizontal_sort = general_bbox.width * 2 > general_bbox.height
+        else:
+            horizontal_sort = axis == 'X'
+
+        margin = general_bbox.min if cursor is None else cursor
+
+        if horizontal_sort:
+            for island, bbox in islands_bboxes_points:
+                width = bbox.width
+                if align and width > bbox.height:
+                    width = bbox.height
+                    island.rotate(pi*0.5, bbox.center)
+                island.set_position(margin)
+                margin.x += padding + width
+        else:
+            for island, bbox in islands_bboxes_points:
+                height = bbox.height
+                if align and bbox.width < height:
+                    height = bbox.width
+                    island.rotate(pi*0.5, bbox.center)
+                island.set_position(margin)
+                margin.y += padding + height
+
+def calc_rotate_simple_bbox(coords, angle):
+    rot_matrix = Matrix.Rotation(-angle, 2)
+    bbox = BBox()
+    # rotated_co = (co @ rot_matrix for co in coords)
+    rotated_co = (rot_matrix @ co for co in coords)
+    bbox.update(rotated_co)
+    return bbox
+
+
 def is_island_mode():
     scene = bpy.context.scene
     if scene.tool_settings.use_uv_select_sync:
-        selection_mode = 'FACE' if scene.tool_settings.mesh_select_mode[2] else 'VERTEX'
+        selection_mode = 'FACE' if scene.tool_settings.mesh_select_mode[2] else 'VERTEX_OR_EDGE'
     else:
         selection_mode = scene.tool_settings.uv_select_mode
     return selection_mode in ('FACE', 'ISLAND')
