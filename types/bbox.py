@@ -263,6 +263,17 @@ class BBox:
 
         return self
 
+    def rotate_cw(self):  # TODO: Test (not work)
+        center = self.center
+        x0 = self.xmin - center.x
+        y0 = self.ymin - center.y
+        x1 = self.xmax - center.x
+        y1 = self.ymax - center.y
+        self.xmin += center[0] + y0
+        self.ymin += center[1] - x0
+        self.xmax += center[0] + y1
+        self.ymax += center[1] - x1
+
     def scale(self, scale):
         center = self.center
         self.xmin, self.ymin = (self.min - center) * scale + center

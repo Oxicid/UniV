@@ -1,6 +1,7 @@
 import bpy
 import math
 import bmesh
+import mathutils
 
 from mathutils import Vector
 from collections import defaultdict
@@ -179,8 +180,7 @@ def find_min_rotate_angle(angle):
     return -(round(angle / (math.pi / 2)) * (math.pi / 2) - angle)
 
 
-def calc_min_align_angle(selected_faces, uv_layers):
-    points = [l[uv_layers].uv for f in selected_faces for l in f.loops]
+def calc_min_align_angle(points):
     align_angle_pre = mathutils.geometry.box_fit_2d(points)
     return find_min_rotate_angle(align_angle_pre)
 

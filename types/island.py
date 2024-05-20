@@ -1,7 +1,7 @@
 import bpy
 import bmesh
 import math
-# import mathutils
+import mathutils
 
 from mathutils import Vector, Matrix
 
@@ -345,6 +345,11 @@ class FaceIsland:
                 loop[self.uv_layer].uv += delta
         return True
 
+    def set_position(self, to: Vector, _from: Vector = None):
+        if _from is None:
+            _from = self.calc_bbox().min
+        return self.move(to - _from)
+
     def rotate(self, angle: float, pivot: Vector) -> bool:
         """Rotate a list of faces by angle (in radians) around a pivot"""
         if math.isclose(angle, 0, abs_tol=0.0001):
@@ -417,6 +422,12 @@ class FaceIsland:
 
     def calc_bbox(self) -> BBox:
         return BBox.calc_bbox_uv(self.faces, self.uv_layer)
+
+    def calc_corner_points(self, convex=True):
+        points = [l[self.uv_layer].uv for f in self.faces for l in f.loops]  # Warning: points referenced to uv
+        if convex:
+            return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
+        return points
 
     def __select_ex(self, state, force, sync):
         if sync is None:
