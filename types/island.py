@@ -306,8 +306,8 @@ class Islands(IslandsBase):
     def scale(self, scale: Vector, pivot: Vector) -> bool:
         return bool(sum(island.scale(scale, pivot) for island in self.islands))
 
-    def rotate(self, angle: float, pivot: Vector) -> bool:
-        return bool(sum(island.rotate(angle, pivot) for island in self.islands))
+    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
+        return bool(sum(island.rotate(angle, pivot, aspect) for island in self.islands))
 
     def calc_bbox(self) -> BBox:
         general_bbox = BBox()
@@ -350,17 +350,24 @@ class FaceIsland:
             _from = self.calc_bbox().min
         return self.move(to - _from)
 
-    def rotate(self, angle: float, pivot: Vector) -> bool:
-        """Rotate a list of faces by angle (in radians) around a pivot"""
+    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
+        """Rotate a list of faces by angle (in radians) around a pivot
+        :param angle: Angle in radians
+        :param pivot: Pivot
+        :param aspect: Aspect Ratio = Height / Width
+        """
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
         rot_matrix = Matrix.Rotation(angle, 2)
-        alpha, beta = rot_matrix.row[0]
-        diff = Vector(((1 - alpha) * pivot.x - beta * pivot.y, beta * pivot.x + (1 - alpha) * pivot.y))
+
+        rot_matrix[0][1] = rot_matrix[0][1] / aspect
+        rot_matrix[1][0] = aspect * rot_matrix[1][0]
+
+        diff = pivot-(pivot @ rot_matrix)
         for face in self.faces:
             for loop in face.loops:
                 uv = loop[self.uv_layer]
-                uv.uv = (uv.uv - diff) @ rot_matrix
+                uv.uv = uv.uv @ rot_matrix + diff
         return True
 
     def rotate_simple(self, angle: float) -> bool:
