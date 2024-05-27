@@ -3,11 +3,14 @@ import math
 import bmesh
 import mathutils
 
+import numpy as np
+
 from mathutils import Vector
 from collections import defaultdict
 
-from . import bench
+from .bench import timer, profile
 from . import umath
+from .umath import *
 from ..types import PyBMesh
 
 class UMesh:
@@ -175,6 +178,25 @@ def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMLoop]
     if selected:
         return calc_selected_uv_corners(bm, uv_layer, sync)
     return calc_visible_uv_corners(bm, sync)
+
+def calc_avg_normal():
+    umeshes = UMeshes.sel_ob_with_uv()
+    size = sum(len(umesh.bm.faces) for umesh in umeshes)
+
+    normals = np.empty(3 * size).reshape((-1, 3))
+    areas = np.empty(size)
+
+    i = 0
+    for umesh in umeshes:
+        for f in umesh.bm.faces:
+            normals[i] = f.normal.to_tuple()
+            areas[i] = f.calc_area()
+            i += 1
+
+    weighted_normals = normals * areas[:, np.newaxis]
+    summed_normals = np.sum(weighted_normals, axis=0)
+
+    return summed_normals / np.linalg.norm(summed_normals)
 
 def find_min_rotate_angle(angle):
     return -(round(angle / (math.pi / 2)) * (math.pi / 2) - angle)
