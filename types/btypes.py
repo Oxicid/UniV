@@ -16,7 +16,9 @@ from ctypes import (
     sizeof,
     # addressof
 )
-# bpy.ops.consoleclear.clear()
+
+from . import bbox
+
 version = bpy.app.version
 
 
@@ -231,67 +233,14 @@ class ListBase(Structure):
         return bool(self.first or self.last)
 
 
-class rectBase(StructBase):
-    """Base for rcti, rctf"""
-
-    @property
-    def size_x(self) -> float:
-        return self.xmax - self.xmin
-
-    @property
-    def size_y(self) -> float:
-        return self.ymax - self.ymin
-
-    @property
-    def cent_x(self) -> float:
-        return (self.xmin + self.xmax) / 2.0
-
-    @property
-    def cent_y(self) -> float:
-        return (self.ymin + self.ymax) / 2.0
-
-    def get_position(self):
-        return self.xmin, self.ymin
-
-    def set_position(self, x, y):
-        self.xmax -= self.xmin - x
-        self.ymax -= self.ymin - y
-        self.xmin = x
-        self.ymin = y
-
-    def translate(self, xy: typing.Sequence[float]):
-        self.xmin += xy[0]
-        self.ymin += xy[1]
-        self.xmax += xy[0]
-        self.ymax += xy[1]
-
-    def scale(self, scale: typing.Sequence[float]):
-        cent_x = self.cent_x
-        cent_y = self.cent_y
-        size_x_half = self.size_x * (scale[0] * 0.5)
-        size_y_half = self.size_y * (scale[1] * 0.5)
-        self.xmin = cent_x - size_x_half
-        self.ymin = cent_y - size_y_half
-        self.xmax = cent_x + size_x_half
-        self.ymax = cent_y + size_y_half
-
-    def __str__(self):
-        return f"{self.xmax=} {self.xmin=} {self.ymax=} {self.ymin=}"
-
-    def __contains__(self, pt):
-        x, y = pt
-        return self.xmin <= x <= self.xmax and \
-               self.ymin <= y <= self.ymax  # noqa
-
-
-class rctf(rectBase):
+class rctf(StructBase, bbox.BBox):
     xmin: c_float
     xmax: c_float
     ymin: c_float
     ymax: c_float
 
 
-class rcti(rectBase):
+class rcti(StructBase, bbox.BBox):
     xmin: c_int
     xmax: c_int
     ymin: c_int
@@ -331,8 +280,7 @@ class View2D(StructBase):
     alpha_vert: c_char
     alpha_hor: c_char
 
-    if version > (2, 92):
-        _pad6: c_char * 6
+    _pad6: c_char * 6
 
     sms: c_void_p  # SmoothView2DStore
     smooth_timer: c_void_p  # wmTimer

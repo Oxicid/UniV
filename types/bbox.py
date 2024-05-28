@@ -1,4 +1,6 @@
 import math
+import copy
+import typing
 from mathutils import Vector, Matrix
 
 
@@ -238,10 +240,18 @@ class BBox:
         if self.ymax > ymax:
             self.ymax = ymax
 
-    def translate(self, delta):
-        self.xmin, self.ymin = self.min + delta
-        self.xmax, self.ymax = self.max + delta
-        return self
+    def translate(self, xy: typing.Sequence[float]):
+        self.xmin += xy[0]
+        self.ymin += xy[1]
+        self.xmax += xy[0]
+        self.ymax += xy[1]
+
+    def set_position(self, pos):
+        x, y = pos
+        self.xmax -= self.xmin - x
+        self.ymax -= self.ymin - y
+        self.xmin = x
+        self.ymin = y
 
     def rotate_expand(self, angle):
         center = self.center
@@ -278,7 +288,20 @@ class BBox:
         center = self.center
         self.xmin, self.ymin = (self.min - center) * scale + center
         self.xmax, self.ymax = (self.max - center) * scale + center
-        return self.sanitize()
+
+    def resize_x(self, x):
+        self.xmin = self.center_x - (x * 0.5)
+        self.xmax = self.xmin + x
+
+    def resize_y(self, y):
+        self.ymin = self.center_y - (y * 0.5)
+        self.ymax = self.ymin + y
+
+    def resize(self, xy: Vector):
+        self.xmin = self.center_x - (xy[0] * 0.5)
+        self.ymin = self.center_y - (xy[1] * 0.5)
+        self.xmax = self.xmin + xy[0]
+        self.ymax = self.ymin + xy[1]
 
     def update(self, coords):
         for x, y in coords:
@@ -387,20 +410,6 @@ class BBox:
         self.ymax += total_extend * (pad_max / total_pad)
         self.ymin -= total_extend * (pad_min / total_pad)
 
-    def resize_x(self, x):
-        self.xmin = self.center_x - (x * 0.5)
-        self.xmax = self.xmin + x
-
-    def resize_y(self, y):
-        self.ymin = self.center_y - (y * 0.5)
-        self.ymax = self.ymin + y
-
-    def resize(self, xy: Vector):
-        self.xmin = self.center_x - (xy[0] * 0.5)
-        self.ymin = self.center_y - (xy[1] * 0.5)
-        self.xmax = self.xmin + xy[0]
-        self.ymax = self.ymin + xy[1]
-
     def interp(self, bbox_b: 'BBox', fac):
         ifac = 1.0 - fac
         bbox_r = BBox()
@@ -496,6 +505,26 @@ class BBox:
 
         if xmax >= xmin:
             return xmin, xmax
+
+    def draw_data_verts(self):
+        return [self.left_bottom, self.left_upper, self.right_upper, self.right_bottom]
+
+    def draw_data_edges(self):
+        lb = self.left_bottom
+        lu = self.left_upper
+        ru = self.right_upper
+        rb = self.right_bottom
+        return [lb, lu, lu, ru, ru, rb, rb, lb]
+
+    def draw_data_faces(self):
+        lb = self.left_bottom
+        lu = self.left_upper
+        ru = self.right_upper
+        rb = self.right_bottom
+        return [lu, lb, rb, lu, rb, ru]
+
+    def copy(self):
+        return copy.copy(self)
 
     def __contains__(self, pt_or_bbox) -> bool:
         if isinstance(BBox, pt_or_bbox):

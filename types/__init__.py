@@ -1,3 +1,3 @@
-from .btypes import PyBMesh
-from .bbox import BBox
-from .island import Islands, FaceIsland
+from .btypes import *
+from .bbox import *
+from .island import *
