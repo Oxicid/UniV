@@ -1,11 +1,11 @@
 import bpy
-import math
+# import math
 import bmesh
 import mathutils
 
 import numpy as np
 
-from mathutils import Vector
+# from mathutils import Vector
 from collections import defaultdict
 
 from .bench import timer, profile
@@ -83,6 +83,9 @@ class UMeshes:
 
     def __iter__(self):
         return iter(self.umeshes)
+
+    def __getitem__(self, item):
+        return self.umeshes[item]
 
     def __len__(self):
         return len(self.umeshes)

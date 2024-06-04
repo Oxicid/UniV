@@ -29,7 +29,7 @@ from .types import island
 from .utils import bench
 from .utils import other
 from .utils import text
-from .utils import udecorator
+from .utils import ubm
 from .utils import umath
 from .operators import transform
 from . import ui

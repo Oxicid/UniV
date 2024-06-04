@@ -3,6 +3,9 @@ from bl_math import lerp
 from mathutils import Vector
 
 
+def vec_isclose(a, b, abs_tol: float = 0.00001):
+    return all(math.isclose(a1, b1, abs_tol=abs_tol) for a1, b1 in zip(a, b))
+
 def vec_isclose_to_uniform(delta: Vector, abs_tol: float = 0.00001):
     return math.isclose(delta.x, 1.0, abs_tol=abs_tol) and math.isclose(delta.y, 1.0, abs_tol=abs_tol)
 
