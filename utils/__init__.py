@@ -11,6 +11,7 @@ from collections import defaultdict
 from .bench import timer, profile
 from . import umath
 from .umath import *
+from .other import *
 from ..types import PyBMesh
 
 class UMesh:
@@ -49,8 +50,11 @@ class UMesh:
 
 
 class UMeshes:
-    def __init__(self, umeshes):
-        self.umeshes: list[UMesh] = umeshes
+    def __init__(self, umeshes=None):
+        if umeshes is None:
+            self._sel_ob_with_uv()
+        else:
+            self.umeshes: list[UMesh] = umeshes
 
     def update(self, force=False):
         return bool(sum(umesh.update(force=force) for umesh in self.umeshes))
@@ -80,6 +84,27 @@ class UMeshes:
                 bmeshes.append(UMesh(bm, obj, False))
 
         return cls(bmeshes)
+
+    def _sel_ob_with_uv(self):
+        bmeshes = []
+        if bpy.context.mode == 'EDIT_MESH':
+            for obj in bpy.context.objects_in_mode_unique_data:
+                if obj.type == 'MESH' and obj.data.uv_layers:
+                    bm = bmesh.from_edit_mesh(obj.data)
+                    bmeshes.append(UMesh(bm, obj))
+        else:
+            data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+
+            for obj in bpy.context.selected_objects:
+                if obj.type == 'MESH' and obj.data.uv_layers:
+                    data_and_objects[obj.data].append(obj)
+
+            for data, obj in data_and_objects.items():
+                bm = bmesh.new()
+                bm.from_mesh(data)
+                bmeshes.append(UMesh(bm, obj, False))
+        self.umeshes = bmeshes
+        # return cls()
 
     def __iter__(self):
         return iter(self.umeshes)

@@ -356,7 +356,7 @@ class UNIV_OT_Align(Operator):
     @staticmethod
     def move_to_cursor_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=True):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
-        island_mode = is_island_mode()
+        island_mode = utils.is_island_mode()
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         for umesh in umeshes:
             if island_mode:
@@ -405,7 +405,7 @@ class UNIV_OT_Align(Operator):
     def align_ex(direction, sync, umeshes, update_obj, selected=True):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         general_bbox = BBox()
-        island_mode = is_island_mode()
+        island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
                 if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
@@ -429,7 +429,7 @@ class UNIV_OT_Align(Operator):
 
     @staticmethod
     def move_ex(direction, sync, umeshes, update_obj, selected=True):
-        island_mode = is_island_mode()
+        island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
                 if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
@@ -1057,19 +1057,79 @@ class UNIV_OT_Sort(Operator):
                 island.set_position(margin)
                 margin.y += padding + height
 
-# def calc_rotate_simple_bbox(coords, angle):
-#     rot_matrix = Matrix.Rotation(-angle, 2)
-#     bbox = BBox()
-#     # rotated_co = (co @ rot_matrix for co in coords)
-#     rotated_co = (rot_matrix @ co for co in coords)
-#     bbox.update(rotated_co)
-#     return bbox
 
+class UNIV_OT_Home(Operator):
+    bl_idname = 'uv.univ_home'
+    bl_label = 'Home'
+    bl_description = 'Home'
+    bl_options = {'REGISTER', 'UNDO'}
 
-def is_island_mode():
-    scene = bpy.context.scene
-    if scene.tool_settings.use_uv_select_sync:
-        selection_mode = 'FACE' if scene.tool_settings.mesh_select_mode[2] else 'VERTEX_OR_EDGE'
-    else:
-        selection_mode = scene.tool_settings.uv_select_mode
-    return selection_mode in ('FACE', 'ISLAND')
+    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+        ('DEFAULT', 'Default', ''),
+        ('TO_CURSOR', 'To Cursor', ''),
+    ))
+
+    # ('OVERLAPPED', 'Overlapped', '')
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case True, False, False:
+                self.mode = 'TO_CURSOR'
+            # case False, True, False:
+            #     self.mode = 'OVERLAPPED'
+            case _:
+                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                                      f"See all variations:\n\n")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def execute(self, context):
+        return UNIV_OT_Home.home(self.mode, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+
+    @staticmethod
+    def home(mode, sync, report):
+        umeshes = utils.UMeshes()
+        match mode:
+            case 'DEFAULT':
+                UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
+                if not umeshes.update():
+                    UNIV_OT_Home.home_ex(umeshes, sync, extended=False)
+
+            case 'TO_CURSOR':
+                if not (cursor_loc := utils.get_tile_from_cursor()):
+                    if report:
+                        report({'INFO'}, "Cursor not found")
+                    return {'CANCELLED'}
+                UNIV_OT_Home.home_ex(umeshes, sync, extended=True, cursor=cursor_loc)
+                if not umeshes.update():
+                    UNIV_OT_Home.home_ex(umeshes, sync, extended=False, cursor=cursor_loc)
+
+            case _:
+                raise NotImplementedError(mode)
+
+        if not umeshes.update():
+            if report:
+                report({'INFO'}, "No uv for manipulate")
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+    @staticmethod
+    def home_ex(umeshes, sync, extended, cursor=Vector((0, 0))):
+        for umesh in umeshes:
+            changed = False
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    center = island.calc_bbox().center
+                    delta = Vector(round(-i + 0.5) for i in center) + cursor
+                    changed |= island.move(delta)
+            umesh.update_flag = changed

@@ -64,11 +64,10 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_rotate', text='Rot CW').rot_dir = 'CW'
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_flip', text='Flip X').axis = 'X'
-        row = split.row(align=True)
-        row.operator('uv.univ_flip', text='Flip Y').axis = 'Y'
+        split.operator('uv.univ_flip', text='Flip')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_sort', text='Sort')#.axis = 'X'
-        # row = split.row(align=True)
-        # row.operator('uv.univ_flip', text='Flip Y').axis = 'Y'
+        split.operator('uv.univ_sort', text='Sort')
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_home', text='Home')
