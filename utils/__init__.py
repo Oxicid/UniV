@@ -1,4 +1,4 @@
-import bpy
+# import bpy
 # import math
 import bmesh
 import mathutils
@@ -50,24 +50,41 @@ class UMesh:
 
 
 class UMeshes:
-    def __init__(self, umeshes=None):
+    def __init__(self, umeshes=None, *, report=None):
         if umeshes is None:
             self._sel_ob_with_uv()
         else:
             self.umeshes: list[UMesh] = umeshes
-        self.report = ()
+        self._report_info = ()
+        self.report_obj = report
+
+    def report(self, info_type={'WARNING'}, info="No uv for manipulate"):  # noqa
+        if self.report_obj is None:
+            return
+        if self.report_info:
+            return self.report_obj(*self.report_info)
+        self.report_obj(info_type, info)
+
+    @property
+    def report_info(self):
+        return self._report_info
+
+    @report_info.setter
+    def report_info(self, info):
+        assert(isinstance(info[0], set) and isinstance(info[1], str))
+        self._report_info = info
 
     def update(self, force=False):
         return bool(sum(umesh.update(force=force) for umesh in self.umeshes))
 
     def has_update(self):
-        if self.report:
-            return False
-        return bool(sum(umesh.update_tag for umesh in self.umeshes))
+        if self.report_info:
+            return True
+        return any(umesh.update_tag for umesh in self.umeshes)
 
     @property
     def update_tag(self):
-        return bool(sum(umesh.update_tag for umesh in self.umeshes))
+        return any(umesh.update_tag for umesh in self.umeshes)
 
     @update_tag.setter
     def update_tag(self, tag: bool):

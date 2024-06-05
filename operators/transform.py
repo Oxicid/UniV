@@ -1106,7 +1106,7 @@ class UNIV_OT_Distribute(Operator):
 
     @staticmethod
     def distribute(mode, axis, padding, sync, report=None):
-        umeshes = utils.UMeshes()
+        umeshes = utils.UMeshes(report=report)
         cursor_loc = None
         if 'CURSOR' in mode:
             if not (cursor_loc := utils.get_cursor_location()):
@@ -1133,14 +1133,9 @@ class UNIV_OT_Distribute(Operator):
             case _:
                 raise NotImplementedError(mode)
 
-        if not umeshes.has_update():
-            if report:
-                if umeshes.report:
-                    report(*umeshes.report)
-                else:
-                    report({'INFO'}, "No faces/verts for manipulate")
+        if not umeshes.update():
+            umeshes.report({'INFO'}, "No faces/verts for manipulate")
             return {'CANCELLED'}
-        umeshes.update()
         return {'FINISHED'}
 
     @staticmethod
@@ -1157,7 +1152,8 @@ class UNIV_OT_Distribute(Operator):
 
         if len(islands_bboxes_points) <= 2:
             if len(islands_bboxes_points) != 0:
-                umeshes.report = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+                umeshes.update_tag = False
+                umeshes.report_info = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
             return
 
         if axis == 'AUTO':
@@ -1195,7 +1191,8 @@ class UNIV_OT_Distribute(Operator):
 
         if len(islands_bboxes_points) <= 2:
             if len(islands_bboxes_points) != 0:
-                umeshes.report = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+                umeshes.update_tag = False
+                umeshes.report_info = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
             return
 
         if axis == 'AUTO':
@@ -1210,6 +1207,7 @@ class UNIV_OT_Distribute(Operator):
             start_space = general_bbox.xmin + islands_bboxes_points[0][1].half_width
             end_space = general_bbox.xmax - islands_bboxes_points[-1][1].half_width
             if start_space == end_space:
+                umeshes.update_tag = False
                 umeshes.report = {'INFO'}, f"No distance to place UV"
                 return
             if cursor:
@@ -1225,6 +1223,7 @@ class UNIV_OT_Distribute(Operator):
             start_space = general_bbox.ymin + islands_bboxes_points[0][1].half_height
             end_space = general_bbox.ymax - islands_bboxes_points[-1][1].half_height
             if start_space == end_space:
+                umeshes.update_tag = False
                 umeshes.report = {'INFO'}, f"No distance to place UV"
                 return
             if cursor:
@@ -1275,7 +1274,7 @@ class UNIV_OT_Home(Operator):
 
     @staticmethod
     def home(mode, sync, report):
-        umeshes = utils.UMeshes()
+        umeshes = utils.UMeshes(report=report)
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
@@ -1284,8 +1283,7 @@ class UNIV_OT_Home(Operator):
 
             case 'TO_CURSOR':
                 if not (cursor_loc := utils.get_tile_from_cursor()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'WARNING'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True, cursor=cursor_loc)
                 if not umeshes.has_update():
@@ -1295,8 +1293,7 @@ class UNIV_OT_Home(Operator):
                 raise NotImplementedError(mode)
 
         if not umeshes.update():
-            if report:
-                report({'INFO'}, "No uv for manipulate")
+            umeshes.report({'INFO'}, "No uv for manipulate")
             return {'CANCELLED'}
         return {'FINISHED'}
 
