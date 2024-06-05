@@ -20,10 +20,10 @@ class UMesh:
         self.obj: bpy.types.Object = obj
         self.uv_layer: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
         self.is_edit_bm: bool = is_edit_bm
-        self.update_flag: bool = True
+        self.update_tag: bool = True
 
     def update(self, force=False):
-        if not self.update_flag:
+        if not self.update_tag:
             return False
         if self.is_edit_bm:
             bmesh.update_edit_mesh(self.obj.data, loop_triangles=force, destructive=force)
@@ -55,9 +55,24 @@ class UMeshes:
             self._sel_ob_with_uv()
         else:
             self.umeshes: list[UMesh] = umeshes
+        self.report = ()
 
     def update(self, force=False):
         return bool(sum(umesh.update(force=force) for umesh in self.umeshes))
+
+    def has_update(self):
+        if self.report:
+            return False
+        return bool(sum(umesh.update_tag for umesh in self.umeshes))
+
+    @property
+    def update_tag(self):
+        return bool(sum(umesh.update_tag for umesh in self.umeshes))
+
+    @update_tag.setter
+    def update_tag(self, tag: bool):
+        for umesh in self.umeshes:
+            umesh.update_tag = tag
 
     def ensure(self, face=True, edge=False, vert=False, force=False):
         for umesh in self.umeshes:

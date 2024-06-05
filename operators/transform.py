@@ -776,7 +776,7 @@ class UNIV_OT_Flip(Operator):
                     general_bbox.union(flipped_islands.calc_bbox())
                     flipped_islands_of_mesh.append(flipped_islands)
                 else:
-                    umesh.update_flag = False
+                    umesh.update_tag = False
                 update_obj.umeshes.append(umesh)
 
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
@@ -792,7 +792,7 @@ class UNIV_OT_Flip(Operator):
                 flipped_islands = [isl for isl in islands if isl.is_flipped()]
                 for island in flipped_islands:
                     island.scale(scale=scale, pivot=island.calc_bbox().center)
-                umesh.update_flag = bool(flipped_islands)
+                umesh.update_tag = bool(flipped_islands)
                 update_obj.umeshes.append(umesh)
 
     @staticmethod
@@ -927,7 +927,7 @@ class UNIV_OT_Sort(Operator):
 
     mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
-        ('DEFAULT_ALIGN', 'Default Align', ''),
+        ('ALIGN', 'Align', ''),
         ('TO_CURSOR', 'To Cursor', ''),
         ('TO_CURSOR_ALIGN', 'To Cursor Align', ''),
         ('OVERLAPPED', 'Overlapped', ''),
@@ -936,7 +936,6 @@ class UNIV_OT_Sort(Operator):
     ))
 
     axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    # align: bpy.props.BoolProperty(name='Align', default=False)
     padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     reverse: bpy.props.BoolProperty(name='Reverse', default=True)
 
@@ -953,7 +952,7 @@ class UNIV_OT_Sort(Operator):
             case False, False, False:
                 self.mode = 'DEFAULT'
             case False, False, True:
-                self.mode = 'DEFAULT_ALIGN'
+                self.mode = 'ALIGN'
             case True, False, False:
                 self.mode = 'TO_CURSOR'
             case True, False, True:
@@ -989,7 +988,7 @@ class UNIV_OT_Sort(Operator):
         flip_args = (axis, align, padding, reverse, sync,  umeshes,  update_obj, cursor_loc)
 
         match mode:
-            case 'DEFAULT' | 'DEFAULT_ALIGN' | 'TO_CURSOR' | 'TO_CURSOR_ALIGN':
+            case 'DEFAULT' | 'ALIGN' | 'TO_CURSOR' | 'TO_CURSOR_ALIGN':
                 UNIV_OT_Sort.sort_ex(*flip_args, extended=True)
                 if not update_obj:
                     UNIV_OT_Sort.sort_ex(*flip_args, extended=False)
@@ -1046,7 +1045,7 @@ class UNIV_OT_Sort(Operator):
                 if align and width > bbox.height:
                     width = bbox.height
                     island.rotate(pi*0.5, bbox.center)
-                island.set_position(margin)
+                island.set_position(margin, _from=bbox.min)
                 margin.x += padding + width
         else:
             for island, bbox in islands_bboxes_points:
@@ -1054,9 +1053,187 @@ class UNIV_OT_Sort(Operator):
                 if align and bbox.width < height:
                     height = bbox.width
                     island.rotate(pi*0.5, bbox.center)
-                island.set_position(margin)
+                island.set_position(margin, _from=bbox.minmn)
                 margin.y += padding + height
 
+
+class UNIV_OT_Distribute(Operator):
+    bl_idname = 'uv.univ_distribute'
+    bl_label = 'Distribute'
+    bl_description = 'Distribute'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+        ('DEFAULT', 'Default', ''),
+        ('TO_CURSOR', 'To Cursor', ''),
+        ('SPACE', 'Space', ''),
+        ('SPACE_TO_CURSOR', 'Space to Cursor', ''),
+    ))
+        # ('OVERLAPPED', 'Overlapped', ''),
+        # ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', '')
+
+    axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case True, False, False:
+                self.mode = 'TO_CURSOR'
+            case False, False, True:
+                self.mode = 'SPACE'
+            case False, False, True:
+                self.mode = 'SPACE_TO_CURSOR'
+            # case False, True, False:
+            #     self.mode = 'OVERLAPPED'
+            case _:
+                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                                      f"See all variations:\n\n")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def execute(self, context):
+        return UNIV_OT_Distribute.distribute(self.mode, self.axis, self.padding, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+
+    @staticmethod
+    def distribute(mode, axis, padding, sync, report=None):
+        umeshes = utils.UMeshes()
+        cursor_loc = None
+        if 'CURSOR' in mode:
+            if not (cursor_loc := utils.get_cursor_location()):
+                if report:
+                    report({'INFO'}, "Cursor not found")
+                return {'CANCELLED'}
+
+        distribute_args = (axis, padding, sync,  umeshes, cursor_loc)
+
+        match mode:
+            case 'DEFAULT' | 'TO_CURSOR':
+                UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=True)
+                if not umeshes.has_update():
+                    UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=False)
+            case 'SPACE' | 'SPACE_TO_CURSOR':
+                UNIV_OT_Distribute.distribute_space(*distribute_args, extended=True)
+                if not umeshes.has_update():
+                    UNIV_OT_Distribute.distribute_space(*distribute_args, extended=False)
+            #
+            # case 'OVERLAPPED':
+            #     UNIV_OT_Distribute.distribute_overlapped(*distribute_args, extended=True)
+            #     if not update_obj:
+            #         UNIV_OT_Distribute.distribute_overlapped(*distribute_args, extended=False)
+            case _:
+                raise NotImplementedError(mode)
+
+        if not umeshes.has_update():
+            if report:
+                if umeshes.report:
+                    report(*umeshes.report)
+                else:
+                    report({'INFO'}, "No faces/verts for manipulate")
+            return {'CANCELLED'}
+        umeshes.update()
+        return {'FINISHED'}
+
+    @staticmethod
+    def distribute_ex(axis, padding, sync,  umeshes, cursor, extended=True):
+        islands_bboxes_points = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    bbox = island.calc_bbox()
+                    general_bbox.union(bbox)
+                    islands_bboxes_points.append((island, bbox))
+            umesh.update_tag = bool(islands)
+
+        if len(islands_bboxes_points) <= 2:
+            if len(islands_bboxes_points) != 0:
+                umeshes.report = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+            return
+
+        if axis == 'AUTO':
+            horizontal_distribute = general_bbox.width * 2 > general_bbox.height
+        else:
+            horizontal_distribute = axis == 'X'
+
+        if horizontal_distribute:
+            islands_bboxes_points.sort(key=lambda a: a[1].xmin)
+
+            margin = general_bbox.min.x if cursor is None else cursor.x
+            for island, bbox in islands_bboxes_points:
+                width = bbox.width
+                island.set_position(Vector((margin, bbox.ymin)), _from=bbox.min)
+                margin += padding + width
+        else:
+            islands_bboxes_points.sort(key=lambda a: a[1].ymin)
+            margin = general_bbox.min.y if cursor is None else cursor.y
+            for island, bbox in islands_bboxes_points:
+                height = bbox.height
+                island.set_position(Vector((bbox.xmin, margin)), _from=bbox.min)
+                margin += padding + height
+
+    @staticmethod
+    def distribute_space(axis, padding, sync,  umeshes, cursor, extended=True):
+        islands_bboxes_points = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                for island in islands:
+                    bbox = island.calc_bbox()
+                    general_bbox.union(bbox)
+                    islands_bboxes_points.append((island, bbox))
+            umesh.update_tag = bool(islands)
+
+        if len(islands_bboxes_points) <= 2:
+            if len(islands_bboxes_points) != 0:
+                umeshes.report = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+            return
+
+        if axis == 'AUTO':
+            horizontal_distribute = general_bbox.width * 2 > general_bbox.height
+        else:
+            horizontal_distribute = axis == 'X'
+
+        if horizontal_distribute:
+            islands_bboxes_points.sort(key=lambda a: a[1].xmin)
+
+            general_bbox.xmax += padding * (len(islands_bboxes_points) - 1)
+            start_space = general_bbox.xmin + islands_bboxes_points[0][1].half_width
+            end_space = general_bbox.xmax - islands_bboxes_points[-1][1].half_width
+            if start_space == end_space:
+                umeshes.report = {'INFO'}, f"No distance to place UV"
+                return
+            if cursor:
+                start_space += start_space - cursor.x
+                end_space += end_space - cursor.x
+            space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
+
+            for (island, bbox), space_point in zip(islands_bboxes_points, space_points):
+                island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
+        else:
+            islands_bboxes_points.sort(key=lambda a: a[1].ymin)
+            general_bbox.ymax += padding * (len(islands_bboxes_points) - 1)
+            start_space = general_bbox.ymin + islands_bboxes_points[0][1].half_height
+            end_space = general_bbox.ymax - islands_bboxes_points[-1][1].half_height
+            if start_space == end_space:
+                umeshes.report = {'INFO'}, f"No distance to place UV"
+                return
+            if cursor:
+                start_space += start_space - cursor.y
+                end_space += end_space - cursor.y
+            space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
+
+            for (island, bbox), space_point in zip(*islands_bboxes_points, space_points):
+                island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
 
 class UNIV_OT_Home(Operator):
     bl_idname = 'uv.univ_home'
@@ -1102,7 +1279,7 @@ class UNIV_OT_Home(Operator):
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
-                if not umeshes.update():
+                if not umeshes.has_update():
                     UNIV_OT_Home.home_ex(umeshes, sync, extended=False)
 
             case 'TO_CURSOR':
@@ -1111,7 +1288,7 @@ class UNIV_OT_Home(Operator):
                         report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True, cursor=cursor_loc)
-                if not umeshes.update():
+                if not umeshes.has_update():
                     UNIV_OT_Home.home_ex(umeshes, sync, extended=False, cursor=cursor_loc)
 
             case _:
@@ -1132,4 +1309,4 @@ class UNIV_OT_Home(Operator):
                     center = island.calc_bbox().center
                     delta = Vector(round(-i + 0.5) for i in center) + cursor
                     changed |= island.move(delta)
-            umesh.update_flag = changed
+            umesh.update_tag = changed

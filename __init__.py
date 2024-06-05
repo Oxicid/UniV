@@ -42,6 +42,7 @@ classes = (
     transform.UNIV_OT_Flip,
     transform.UNIV_OT_Rotate,
     transform.UNIV_OT_Sort,
+    transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
     ui.UNIV_PT_General
 )
