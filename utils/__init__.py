@@ -55,41 +55,31 @@ class UMeshes:
             self._sel_ob_with_uv()
         else:
             self.umeshes: list[UMesh] = umeshes
-        self._report_info = ()
         self.report_obj = report
+        self._cancel = False
 
-    def report(self, info_type={'WARNING'}, info="No uv for manipulate"):  # noqa
+    def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self.report_obj is None:
+            print(info_type, info)
             return
-        if self.report_info:
-            return self.report_obj(*self.report_info)
         self.report_obj(info_type, info)
 
-    @property
-    def report_info(self):
-        return self._report_info
+    def cancel_with_report(self, info_type: set[str]={'INFO'}, info: str ="No uv for manipulate"): # noqa
+        self._cancel = True
+        self.report(info_type, info)
 
-    @report_info.setter
-    def report_info(self, info):
-        assert(isinstance(info[0], set) and isinstance(info[1], str))
-        self._report_info = info
+    def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
+        if self._cancel is True:
+            return {'CANCELLED'}
+        if any(umesh.update(force=force) for umesh in self.umeshes):
+            return {'FINISHED'}
+        self.report(info_type, info)
+        return {'CANCELLED'}
 
-    def update(self, force=False):
-        return bool(sum(umesh.update(force=force) for umesh in self.umeshes))
-
-    def has_update(self):
-        if self.report_info:
+    def final(self):
+        if self._cancel is True:
             return True
         return any(umesh.update_tag for umesh in self.umeshes)
-
-    @property
-    def update_tag(self):
-        return any(umesh.update_tag for umesh in self.umeshes)
-
-    @update_tag.setter
-    def update_tag(self, tag: bool):
-        for umesh in self.umeshes:
-            umesh.update_tag = tag
 
     def ensure(self, face=True, edge=False, vert=False, force=False):
         for umesh in self.umeshes:
@@ -136,7 +126,6 @@ class UMeshes:
                 bm.from_mesh(data)
                 bmeshes.append(UMesh(bm, obj, False))
         self.umeshes = bmeshes
-        # return cls()
 
     def __iter__(self):
         return iter(self.umeshes)

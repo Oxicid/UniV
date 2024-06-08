@@ -9,7 +9,7 @@ from math import pi
 from ..types import BBox, Islands, FaceIsland
 from .. import utils
 from .. import info
-from mathutils import Vector, Matrix
+from mathutils import Vector
 
 
 class UNIV_OT_Crop(Operator):
@@ -268,7 +268,7 @@ class UNIV_OT_Align(Operator):
             case False, True, False:
                 self.mode = 'MOVE'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n{info.operator.align_event_info_ex}")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -278,83 +278,69 @@ class UNIV_OT_Align(Operator):
 
     @staticmethod
     def align(mode, direction, sync, report=None):
-        update_obj = utils.UMeshes([])
-        umeshes = utils.UMeshes.sel_ob_with_uv()
+        umeshes = utils.UMeshes(report=report)
 
         match mode:
             case 'ALIGN':
-                UNIV_OT_Align.align_ex(direction, sync,  umeshes,  update_obj, selected=True)
-                if not update_obj:
-                    UNIV_OT_Align.align_ex(direction, sync,  umeshes,  update_obj, selected=False)
+                UNIV_OT_Align.align_ex(direction, sync,  umeshes, selected=True)
+                if not umeshes.final():
+                    UNIV_OT_Align.align_ex(direction, sync,  umeshes,  selected=False)
 
             case 'ALIGN_TO_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=True)
-                if not update_obj:
-                    UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=False)
+                UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=True)
+                if not umeshes.final():
+                    UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=False)
 
             case 'ALIGN_TO_CURSOR_UNION':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=True)
-                if not update_obj:
-                    UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=False)
+                UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=True)
+                if not umeshes.final():
+                    UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=False)
 
             case 'ALIGN_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, sync, selected=True)
                 if not general_bbox.is_valid:
                     general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, sync, selected=False)
                 if not general_bbox.is_valid:
-                    if report:
-                        report({'INFO'}, "No elements for manipulate")
+                    umeshes.report()
                     return {'CANCELLED'}
                 UNIV_OT_Align.align_cursor(direction, general_bbox, cursor_loc)
                 return {'FINISHED'}
 
             case 'CURSOR_TO_TILE':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Align.align_cursor_to_tile(direction, cursor_loc)
                 return {'FINISHED'}
 
             case 'MOVE_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
+                    umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Align.move_cursor(direction, cursor_loc)
                 return {'FINISHED'}
 
             case 'MOVE':
-                UNIV_OT_Align.move_ex(direction, sync, umeshes, update_obj, selected=True)
-                if not update_obj:
-                    UNIV_OT_Align.move_ex(direction, sync, umeshes, update_obj, selected=False)
+                UNIV_OT_Align.move_ex(direction, sync, umeshes, selected=True)
+                if not umeshes.final():
+                    UNIV_OT_Align.move_ex(direction, sync, umeshes, selected=False)
 
             case _:
                 raise NotImplementedError(mode)
 
-        if not update_obj:
-            if report:
-                report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
-
-        update_obj.update()
-
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
-    def move_to_cursor_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=True):
+    def move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=True):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         island_mode = utils.is_island_mode()
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
@@ -364,18 +350,18 @@ class UNIV_OT_Align(Operator):
                     for island in islands:
                         bbox = island.calc_bbox()
                         all_groups.append((island, bbox, umesh.uv_layer))
-                    update_obj.umeshes.append(umesh)
+                    umesh.update_tag = bool(islands)
             else:
                 if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     all_groups.append((corners, umesh.uv_layer))
-                    update_obj.umeshes.append(umesh)
+                umesh.update_tag = bool(corners)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox, invert=True)
         else:  # Vertices or Edges UV selection mode
             UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)
 
     @staticmethod
-    def move_to_cursor_union_ex(cursor_loc, direction, umeshes, update_obj, sync, selected=True):
+    def move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=True):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
@@ -385,7 +371,7 @@ class UNIV_OT_Align(Operator):
                 bbox = island.calc_bbox()
                 general_bbox.union(bbox)
                 all_groups.append([island, bbox, umesh.uv_layer])
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(faces)
         for group in all_groups:
             group[1] = general_bbox
         UNIV_OT_Align.align_islands(all_groups, direction, target_bbox, invert=True)
@@ -402,7 +388,7 @@ class UNIV_OT_Align(Operator):
         return general_bbox
 
     @staticmethod
-    def align_ex(direction, sync, umeshes, update_obj, selected=True):
+    def align_ex(direction, sync, umeshes, selected=True):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         general_bbox = BBox()
         island_mode = utils.is_island_mode()
@@ -414,21 +400,21 @@ class UNIV_OT_Align(Operator):
                         general_bbox.union(bbox)
 
                         all_groups.append((island, bbox, umesh.uv_layer))
-                    update_obj.umeshes.append(umesh)
+                umesh.update_tag = bool(islands)
             else:
                 if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
                     general_bbox.union(bbox)
 
                     all_groups.append((corners, umesh.uv_layer))
-                    update_obj.umeshes.append(umesh)
+                umesh.update_tag = bool(corners)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox)
         else:  # Vertices or Edges UV selection mode
             UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
 
     @staticmethod
-    def move_ex(direction, sync, umeshes, update_obj, selected=True):
+    def move_ex(direction, sync, umeshes, selected=True):
         island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
@@ -453,7 +439,7 @@ class UNIV_OT_Align(Operator):
                             move_value = Vector(UNIV_OT_Align.get_move_value(direction))
                             for island in islands:
                                 island.move(move_value)
-                    update_obj.umeshes.append(umesh)
+                umesh.update_tag = bool(islands)
             else:
                 if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     match direction:
@@ -470,7 +456,7 @@ class UNIV_OT_Align(Operator):
                             move_value = Vector(UNIV_OT_Align.get_move_value(direction))
                             for corner in corners:
                                 corner[umesh.uv_layer].uv += move_value
-                    update_obj.umeshes.append(umesh)
+                umesh.update_tag = bool(corners)
 
     @staticmethod
     def align_islands(groups, direction, general_bbox, invert=False):
@@ -677,7 +663,7 @@ class UNIV_OT_Flip(Operator):
             case False, True, True:
                 self.mode = 'FLIPPED_INDIVIDUAL'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -687,60 +673,52 @@ class UNIV_OT_Flip(Operator):
 
     @staticmethod
     def flip(mode, axis, sync, report=None):
-        update_obj = utils.UMeshes([])
-        umeshes = utils.UMeshes.sel_ob_with_uv()
-        flip_args = (axis, sync,  umeshes,  update_obj)
+        umeshes = utils.UMeshes(report=report)
+        flip_args = (axis, sync,  umeshes)
 
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Flip.flip_ex(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Flip.flip_ex(*flip_args, extended=False)
 
             case 'BY_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
+                    umeshes.report({'INFO'}, "Cursor not found")
                 UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
 
             case 'INDIVIDUAL':
                 UNIV_OT_Flip.flip_individual(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Flip.flip_individual(*flip_args, extended=False)
 
             case 'FLIPPED':
                 UNIV_OT_Flip.flip_flipped(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Flip.flip_flipped(*flip_args, extended=False)
 
             case 'FLIPPED_INDIVIDUAL':
                 UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=False)
             case _:
                 raise NotImplementedError(mode)
 
-        if not update_obj.update():
-            if report:
-                report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
-
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
-    def flip_ex(axis, sync,  umeshes,  update_obj, extended):
+    def flip_ex(axis, sync,  umeshes,  extended):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
-        if not update_obj:
+        if not islands_of_mesh:
             return
 
         pivot = general_bbox.center
@@ -749,35 +727,47 @@ class UNIV_OT_Flip(Operator):
             islands.scale(scale=scale, pivot=pivot)
 
     @staticmethod
-    def flip_by_cursor(axis, sync,  umeshes,  update_obj, cursor, extended):
+    def flip_by_cursor(axis, sync,  umeshes,  cursor, extended):
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 islands.scale(scale=scale, pivot=cursor)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
     @staticmethod
-    def flip_individual(axis, sync,  umeshes,  update_obj, extended):
+    def flip_individual(axis, sync,  umeshes,  extended):
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     island.scale(scale=scale, pivot=island.calc_bbox().center)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
     @staticmethod
-    def flip_flipped(axis, sync,  umeshes,  update_obj, extended):
+    def flip_flipped(axis, sync,  umeshes, extended):
         flipped_islands_of_mesh = []
         general_bbox = BBox()
+        umeshes_for_update = []
+        has_islands = False
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 flipped_islands = Islands([isl for isl in islands if isl.is_flipped()], umesh.bm, umesh.uv_layer)
                 if flipped_islands:
                     general_bbox.union(flipped_islands.calc_bbox())
                     flipped_islands_of_mesh.append(flipped_islands)
-                else:
-                    umesh.update_tag = False
-                update_obj.umeshes.append(umesh)
+                    umeshes_for_update.append(umesh)
+            umesh.update_tag = bool(islands)
+            has_islands |= bool(islands)
+
+        if umeshes_for_update and has_islands:
+            for umesh in umeshes:
+                umesh.update_tag = umesh in umeshes_for_update
+
+        if not has_islands:
+            return
+
+        if has_islands and len(flipped_islands_of_mesh) == 0:
+            return umeshes.cancel_with_report(info='Flipped islands not found')
 
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
         pivot = general_bbox.center
@@ -785,15 +775,28 @@ class UNIV_OT_Flip(Operator):
             islands.scale(scale, pivot)
 
     @staticmethod
-    def flip_flipped_individual(axis, sync,  umeshes,  update_obj, extended):
+    def flip_flipped_individual(axis, sync,  umeshes,  extended):
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
+        umeshes_for_update = []
+        has_islands = False
+        has_flipped_islands = False
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 flipped_islands = [isl for isl in islands if isl.is_flipped()]
                 for island in flipped_islands:
                     island.scale(scale=scale, pivot=island.calc_bbox().center)
-                umesh.update_tag = bool(flipped_islands)
-                update_obj.umeshes.append(umesh)
+                if flipped_islands:
+                    umeshes_for_update.append(umesh)
+                has_flipped_islands |= bool(flipped_islands)
+            umesh.update_tag = bool(islands)
+            has_islands |= bool(islands)
+
+        if umeshes_for_update and has_islands:
+            for umesh in umeshes:
+                umesh.update_tag = umesh in umeshes_for_update
+
+        if has_islands and not has_flipped_islands:
+            return umeshes.cancel_with_report(info='Flipped islands not found')
 
     @staticmethod
     def get_flip_scale_from_axis(axis):
@@ -842,7 +845,7 @@ class UNIV_OT_Rotate(Operator):
             case True, True, True:
                 self.mode = 'DOUBLE_BY_CURSOR'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -852,18 +855,17 @@ class UNIV_OT_Rotate(Operator):
 
     @staticmethod
     def rotate(mode, angle, rot_dir, sync, report=None):
-        update_obj = utils.UMeshes([])
-        umeshes = utils.UMeshes.sel_ob_with_uv()
+        umeshes = utils.UMeshes(report=report)
         if 'DOUBLE' in mode:
             angle *= 2.0
         if rot_dir == 'CCW':
             angle = -angle
-        flip_args = (angle, sync,  umeshes,  update_obj)
+        flip_args = (angle, sync, umeshes)
 
         match mode:
             case 'DEFAULT' | 'DOUBLE':
                 UNIV_OT_Rotate.rotate_ex(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Rotate.rotate_ex(*flip_args, extended=False)
 
             case 'BY_CURSOR' | 'DOUBLE_BY_CURSOR':
@@ -872,51 +874,46 @@ class UNIV_OT_Rotate(Operator):
                         report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
 
             case 'INDIVIDUAL' | 'DOUBLE_INDIVIDUAL':
                 UNIV_OT_Rotate.rotate_individual(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Rotate.rotate_individual(*flip_args, extended=False)
             case _:
                 raise NotImplementedError(mode)
 
-        if not update_obj.update():
-            if report:
-                report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
-
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
-    def rotate_ex(angle, sync,  umeshes,  update_obj, extended):
+    def rotate_ex(angle, sync,  umeshes,  extended):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
         pivot = general_bbox.center
         for islands in islands_of_mesh:
             islands.rotate(angle, pivot=pivot)
 
     @staticmethod
-    def rotate_by_cursor(angle, sync,  umeshes,  update_obj, cursor, extended):
+    def rotate_by_cursor(angle, sync,  umeshes, cursor, extended):
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 islands.rotate(angle, pivot=cursor)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
     @staticmethod
-    def rotate_individual(angle, sync,  umeshes,  update_obj, extended):
+    def rotate_individual(angle, sync,  umeshes,  extended):
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     island.rotate(angle, pivot=island.calc_bbox().center)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
 
 class UNIV_OT_Sort(Operator):
@@ -957,14 +954,14 @@ class UNIV_OT_Sort(Operator):
                 self.mode = 'TO_CURSOR'
             case True, False, True:
                 self.mode = 'TO_CURSOR_ALIGN'
-            case False, True, False:
-                self.mode = 'OVERLAPPED'
-            case False, True, True:
-                self.mode = 'OVERLAPPED_TO_CURSOR'
-            case True, True, True:
-                self.mode = 'OVERLAPPED_TO_CURSOR_ALIGN'
+            # case False, True, False:
+            #     self.mode = 'OVERLAPPED'
+            # case False, True, True:
+            #     self.mode = 'OVERLAPPED_TO_CURSOR'
+            # case True, True, True:
+            #     self.mode = 'OVERLAPPED_TO_CURSOR_ALIGN'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -975,22 +972,20 @@ class UNIV_OT_Sort(Operator):
 
     @staticmethod
     def sort(mode, axis, padding, reverse, sync, report=None):
-        update_obj = utils.UMeshes([])
-        umeshes = utils.UMeshes.sel_ob_with_uv()
+        umeshes = utils.UMeshes(report=report)
         cursor_loc = None
         align = 'ALIGN' in mode
         if 'CURSOR' in mode:
             if not (cursor_loc := utils.get_cursor_location()):
-                if report:
-                    report({'INFO'}, "Cursor not found")
+                umeshes.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
 
-        flip_args = (axis, align, padding, reverse, sync,  umeshes,  update_obj, cursor_loc)
+        flip_args = (axis, align, padding, reverse, sync,  umeshes, cursor_loc)
 
         match mode:
             case 'DEFAULT' | 'ALIGN' | 'TO_CURSOR' | 'TO_CURSOR_ALIGN':
                 UNIV_OT_Sort.sort_ex(*flip_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Sort.sort_ex(*flip_args, extended=False)
             #
             # case 'OVERLAPPED' | 'OVERLAPPED_ALIGN':
@@ -1000,15 +995,10 @@ class UNIV_OT_Sort(Operator):
             case _:
                 raise NotImplementedError(mode)
 
-        if not update_obj.update():
-            if report:
-                report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
-
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
-    def sort_ex(axis, align, padding, reverse, sync,  umeshes,  update_obj, cursor=None, extended=True):
+    def sort_ex(axis, align, padding, reverse, sync,  umeshes, cursor=None, extended=True):
         islands_bboxes_points = []
         general_bbox = BBox()
         for umesh in umeshes:
@@ -1027,8 +1017,10 @@ class UNIV_OT_Sort(Operator):
                         bbox = island.calc_bbox()
                         general_bbox.union(bbox)
                     islands_bboxes_points.append((island, bbox))
+            umesh.update_tag = bool(islands)
 
-                update_obj.umeshes.append(umesh)
+        if not islands_bboxes_points:
+            return
 
         islands_bboxes_points.sort(key=lambda x: x[1].max_length, reverse=reverse)
 
@@ -1039,22 +1031,25 @@ class UNIV_OT_Sort(Operator):
 
         margin = general_bbox.min if cursor is None else cursor
 
+        update_tag = False
         if horizontal_sort:
             for island, bbox in islands_bboxes_points:
                 width = bbox.width
                 if align and width > bbox.height:
                     width = bbox.height
-                    island.rotate(pi*0.5, bbox.center)
-                island.set_position(margin, _from=bbox.min)
+                    update_tag |= island.rotate(pi*0.5, bbox.center)
+                update_tag |= island.set_position(margin, _from=bbox.min)
                 margin.x += padding + width
         else:
             for island, bbox in islands_bboxes_points:
                 height = bbox.height
                 if align and bbox.width < height:
                     height = bbox.width
-                    island.rotate(pi*0.5, bbox.center)
-                island.set_position(margin, _from=bbox.minmn)
+                    update_tag |= island.rotate(pi*0.5, bbox.center)
+                update_tag |= island.set_position(margin, _from=bbox.minmn)
                 margin.y += padding + height
+        if not update_tag:
+            umeshes.cancel_with_report(info='Islands is sorted')
 
 
 class UNIV_OT_Distribute(Operator):
@@ -1069,8 +1064,8 @@ class UNIV_OT_Distribute(Operator):
         ('SPACE', 'Space', ''),
         ('SPACE_TO_CURSOR', 'Space to Cursor', ''),
     ))
-        # ('OVERLAPPED', 'Overlapped', ''),
-        # ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', '')
+        # ('OVERLAPPED', 'Overlapped', ''),  # noqa
+        # ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', '')  # noqa
 
     axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
@@ -1096,7 +1091,7 @@ class UNIV_OT_Distribute(Operator):
             # case False, True, False:
             #     self.mode = 'OVERLAPPED'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -1110,8 +1105,7 @@ class UNIV_OT_Distribute(Operator):
         cursor_loc = None
         if 'CURSOR' in mode:
             if not (cursor_loc := utils.get_cursor_location()):
-                if report:
-                    report({'INFO'}, "Cursor not found")
+                umeshes.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
 
         distribute_args = (axis, padding, sync,  umeshes, cursor_loc)
@@ -1119,11 +1113,12 @@ class UNIV_OT_Distribute(Operator):
         match mode:
             case 'DEFAULT' | 'TO_CURSOR':
                 UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=True)
-                if not umeshes.has_update():
+                if not umeshes.final():
                     UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=False)
+
             case 'SPACE' | 'SPACE_TO_CURSOR':
                 UNIV_OT_Distribute.distribute_space(*distribute_args, extended=True)
-                if not umeshes.has_update():
+                if not umeshes.final():
                     UNIV_OT_Distribute.distribute_space(*distribute_args, extended=False)
             #
             # case 'OVERLAPPED':
@@ -1133,10 +1128,7 @@ class UNIV_OT_Distribute(Operator):
             case _:
                 raise NotImplementedError(mode)
 
-        if not umeshes.update():
-            umeshes.report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
     def distribute_ex(axis, padding, sync,  umeshes, cursor, extended=True):
@@ -1152,8 +1144,7 @@ class UNIV_OT_Distribute(Operator):
 
         if len(islands_bboxes_points) <= 2:
             if len(islands_bboxes_points) != 0:
-                umeshes.update_tag = False
-                umeshes.report_info = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found")
             return
 
         if axis == 'AUTO':
@@ -1161,21 +1152,23 @@ class UNIV_OT_Distribute(Operator):
         else:
             horizontal_distribute = axis == 'X'
 
+        update_tag = False
         if horizontal_distribute:
             islands_bboxes_points.sort(key=lambda a: a[1].xmin)
-
             margin = general_bbox.min.x if cursor is None else cursor.x
             for island, bbox in islands_bboxes_points:
                 width = bbox.width
-                island.set_position(Vector((margin, bbox.ymin)), _from=bbox.min)
+                update_tag |= island.set_position(Vector((margin, bbox.ymin)), _from=bbox.min)
                 margin += padding + width
         else:
             islands_bboxes_points.sort(key=lambda a: a[1].ymin)
             margin = general_bbox.min.y if cursor is None else cursor.y
             for island, bbox in islands_bboxes_points:
                 height = bbox.height
-                island.set_position(Vector((bbox.xmin, margin)), _from=bbox.min)
+                update_tag |= island.set_position(Vector((bbox.xmin, margin)), _from=bbox.min)
                 margin += padding + height
+        if not update_tag:
+            umeshes.cancel_with_report(info='Islands is Distributed')
 
     @staticmethod
     def distribute_space(axis, padding, sync,  umeshes, cursor, extended=True):
@@ -1191,14 +1184,15 @@ class UNIV_OT_Distribute(Operator):
 
         if len(islands_bboxes_points) <= 2:
             if len(islands_bboxes_points) != 0:
-                umeshes.update_tag = False
-                umeshes.report_info = {'INFO'}, f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found"
+                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found")
             return
 
         if axis == 'AUTO':
             horizontal_distribute = general_bbox.width * 2 > general_bbox.height
         else:
             horizontal_distribute = axis == 'X'
+
+        update_tag = False
 
         if horizontal_distribute:
             islands_bboxes_points.sort(key=lambda a: a[1].xmin)
@@ -1207,32 +1201,34 @@ class UNIV_OT_Distribute(Operator):
             start_space = general_bbox.xmin + islands_bboxes_points[0][1].half_width
             end_space = general_bbox.xmax - islands_bboxes_points[-1][1].half_width
             if start_space == end_space:
-                umeshes.update_tag = False
-                umeshes.report = {'INFO'}, f"No distance to place UV"
+                umeshes.cancel_with_report(info=f"No distance to place UV")
                 return
-            if cursor:
-                start_space += start_space - cursor.x
-                end_space += end_space - cursor.x
+            # if cursor:
+            #     start_space += start_space - cursor.x
+            #     end_space += end_space - cursor.x
             space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
 
             for (island, bbox), space_point in zip(islands_bboxes_points, space_points):
-                island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
+                update_tag |= island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
         else:
             islands_bboxes_points.sort(key=lambda a: a[1].ymin)
             general_bbox.ymax += padding * (len(islands_bboxes_points) - 1)
             start_space = general_bbox.ymin + islands_bboxes_points[0][1].half_height
             end_space = general_bbox.ymax - islands_bboxes_points[-1][1].half_height
             if start_space == end_space:
-                umeshes.update_tag = False
-                umeshes.report = {'INFO'}, f"No distance to place UV"
+                umeshes.cancel_with_report(info=f"No distance to place UV")
                 return
             if cursor:
                 start_space += start_space - cursor.y
                 end_space += end_space - cursor.y
             space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
 
-            for (island, bbox), space_point in zip(*islands_bboxes_points, space_points):
-                island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
+            for (island, bbox), space_point in zip(islands_bboxes_points, space_points):
+                update_tag |= island.set_position(Vector((bbox.center_x, space_point)), _from=bbox.center)
+
+        if not update_tag:
+            umeshes.cancel_with_report(info='Islands is Distributed')
+
 
 class UNIV_OT_Home(Operator):
     bl_idname = 'uv.univ_home'
@@ -1264,7 +1260,7 @@ class UNIV_OT_Home(Operator):
             # case False, True, False:
             #     self.mode = 'OVERLAPPED'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement.\n\n"
                                       f"See all variations:\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -1278,7 +1274,7 @@ class UNIV_OT_Home(Operator):
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
-                if not umeshes.has_update():
+                if not umeshes.final():
                     UNIV_OT_Home.home_ex(umeshes, sync, extended=False)
 
             case 'TO_CURSOR':
@@ -1286,16 +1282,13 @@ class UNIV_OT_Home(Operator):
                     umeshes.report({'WARNING'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True, cursor=cursor_loc)
-                if not umeshes.has_update():
+                if not umeshes.final():
                     UNIV_OT_Home.home_ex(umeshes, sync, extended=False, cursor=cursor_loc)
 
             case _:
                 raise NotImplementedError(mode)
 
-        if not umeshes.update():
-            umeshes.report({'INFO'}, "No uv for manipulate")
-            return {'CANCELLED'}
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
     def home_ex(umeshes, sync, extended, cursor=Vector((0, 0))):
