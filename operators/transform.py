@@ -53,7 +53,7 @@ class UNIV_OT_Crop(Operator):
             case False, True, True:
                 self.mode = 'INDIVIDUAL_INPLACE'
             case _:
-                self.report({'INFO'}, f"Event: Ctrl={event.ctrl}, Shift={event.shift}, Alt={event.alt} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n{self.get_event_info()}")
                 return {'CANCELLED'}
         return self.execute(context)
@@ -64,13 +64,12 @@ class UNIV_OT_Crop(Operator):
 
     @staticmethod
     def crop(mode, axis, padding, proportional, sync, report=None):
-        update_obj = utils.UMeshes([])
-        umeshes = utils.UMeshes.sel_ob_with_uv()
-        crop_args = [axis, padding, umeshes, update_obj, proportional, sync]
+        umeshes = utils.UMeshes(report=report)
+        crop_args = [axis, padding, umeshes, proportional, sync]
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Crop.crop_default(*crop_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_default(*crop_args, extended=False)
             case 'TO_CURSOR':
                 if not (offset := utils.get_tile_from_cursor()):
@@ -78,7 +77,7 @@ class UNIV_OT_Crop(Operator):
                         report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Crop.crop_default(*crop_args, offset=offset, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_default(*crop_args, offset=offset, extended=False)
             case 'TO_CURSOR_INDIVIDUAL':
                 if not (offset := utils.get_tile_from_cursor()):
@@ -86,65 +85,59 @@ class UNIV_OT_Crop(Operator):
                         report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Crop.crop_individual(*crop_args, offset=offset, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_individual(*crop_args, offset=offset, extended=False)
             case 'INDIVIDUAL':
                 UNIV_OT_Crop.crop_individual(*crop_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_individual(*crop_args, extended=False)
             case 'INDIVIDUAL_INPLACE':
                 UNIV_OT_Crop.crop_individual(*crop_args, inplace=True, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_individual(*crop_args, inplace=True, extended=False)
             case 'INPLACE':
                 UNIV_OT_Crop.crop_inplace(*crop_args, extended=True)
-                if not update_obj:
+                if not umeshes.final():
                     UNIV_OT_Crop.crop_inplace(*crop_args, extended=False)
             case _:
                 raise NotImplementedError(mode)
-        if not update_obj:
-            if report:
-                report({'INFO'}, "No faces/verts for manipulate")
-            return {'CANCELLED'}
 
-        update_obj.update()
-
-        return {'FINISHED'}
+        return umeshes.update()
 
     @staticmethod
-    def crop_default(axis, padding, umeshes, update_obj, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
+    def crop_default(axis, padding, umeshes, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
-        if not update_obj:
+        if not islands_of_mesh:
             return
 
         UNIV_OT_Crop.crop_ex(axis, general_bbox, inplace, islands_of_mesh, offset, padding, proportional)
 
     @staticmethod
-    def crop_individual(axis, padding, umeshes, update_obj, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
+    def crop_individual(axis, padding, umeshes, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     UNIV_OT_Crop.crop_ex(axis, island.calc_bbox(), inplace, (island, ), offset, padding, proportional)
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
     @staticmethod
-    def crop_inplace(axis, padding, umeshes, update_obj, proportional, sync, inplace=True, extended=True):
+    def crop_inplace(axis, padding, umeshes, proportional, sync, inplace=True, extended=True):
         islands_of_tile: dict[int | list[tuple[FaceIsland | BBox]]] = {}
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
                     bbox = island.calc_bbox()
                     islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
-                update_obj.umeshes.append(umesh)
+            umesh.update_tag = bool(islands)
 
-        if not update_obj:
+        if not islands_of_tile:
             return
 
         for tile, islands_and_bboxes in islands_of_tile.items():
@@ -768,6 +761,7 @@ class UNIV_OT_Flip(Operator):
 
         if has_islands and len(flipped_islands_of_mesh) == 0:
             return umeshes.cancel_with_report(info='Flipped islands not found')
+        umeshes.report(info=f'Found {sum(len(f_isl) for f_isl in flipped_islands_of_mesh)} Flipped islands')
 
         scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
         pivot = general_bbox.center
@@ -780,6 +774,7 @@ class UNIV_OT_Flip(Operator):
         umeshes_for_update = []
         has_islands = False
         has_flipped_islands = False
+        islands_count = 0
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 flipped_islands = [isl for isl in islands if isl.is_flipped()]
@@ -788,6 +783,7 @@ class UNIV_OT_Flip(Operator):
                 if flipped_islands:
                     umeshes_for_update.append(umesh)
                 has_flipped_islands |= bool(flipped_islands)
+                islands_count += len(flipped_islands)
             umesh.update_tag = bool(islands)
             has_islands |= bool(islands)
 
@@ -797,6 +793,7 @@ class UNIV_OT_Flip(Operator):
 
         if has_islands and not has_flipped_islands:
             return umeshes.cancel_with_report(info='Flipped islands not found')
+        umeshes.report(info=f'Found {islands_count} Flipped islands')
 
     @staticmethod
     def get_flip_scale_from_axis(axis):
