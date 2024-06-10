@@ -36,7 +36,8 @@ class timer:
             self.name = func.__name__
             with self:
                 for i in range(self.repeat):
-                    func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+                return result
         return wrapper_timer
 
 def profile(func):

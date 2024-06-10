@@ -22,6 +22,7 @@ import bpy
 #     PointerProperty,
 # )
 
+from . import types
 from . import preferences
 from .types import bbox
 from .types import btypes
