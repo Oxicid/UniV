@@ -284,8 +284,8 @@ class BBox:
         self.xmax += center[0] + y1
         self.ymax += center[1] - x1
 
-    def scale(self, scale):
-        center = self.center
+    def scale(self, scale, pivot=None):
+        center = self.center if pivot is None else pivot
         self.xmin, self.ymin = (self.min - center) * scale + center
         self.xmax, self.ymax = (self.max - center) * scale + center
 
@@ -491,6 +491,14 @@ class BBox:
 
         if xmax >= xmin and ymax >= ymin:
             return BBox(xmin, xmax, ymin, ymax)
+
+    def is_isect(self, other: 'BBox') -> 'BBox | None':
+        xmin = self.xmin if (self.xmin > other.xmin) else other.xmin
+        xmax = self.xmax if (self.xmax < other.xmax) else other.xmax
+        ymin = self.ymin if (self.ymin > other.ymin) else other.ymin
+        ymax = self.ymax if (self.ymax < other.ymax) else other.ymax
+
+        return xmax >= xmin and ymax >= ymin
 
     def isect_rect_y(self, other: 'BBox') -> 'tuple[float, float] | None':
         ymin = self.ymin if (self.ymin > other.ymin) else other.ymin

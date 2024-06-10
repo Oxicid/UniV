@@ -4,9 +4,10 @@ import math
 import mathutils
 
 from mathutils import Vector, Matrix
+from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
 
-from bmesh.types import BMesh, BMFace, BMLayerItem
-from ..utils import umath
+from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
+from ..utils import umath, timer
 from . import btypes
 from. import BBox
 
@@ -238,8 +239,6 @@ class Islands(IslandsBase):
         self.islands: list[FaceIsland] = islands
         self.bm: BMesh = bm
         self.uv_layer: BMLayerItem = uv_layer
-        # self.obj: 'bpy.types.Object | None' = None
-        # self.mesh: 'bpy.types.Mesh | None' = None
 
     @classmethod
     def calc_selected(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
@@ -470,3 +469,93 @@ class FaceIsland:
 
     def __str__(self):
         return f'Faces count = {len(self.faces)}'
+
+class AdvIslands(Islands):
+    def __init__(self, islands: list['AdvIsland'], bm, uv_layer):
+        super().__init__([], bm, uv_layer)
+        self.islands: list[AdvIsland] = islands
+
+    @staticmethod
+    def triangulate_islands(islands, bm):
+        loop_triangles = bm.calc_loop_triangles()
+        for idx, island in enumerate(islands):
+            for face in island:
+                face.tag = True
+                face.index = idx
+
+        islands_of_tris: list[list[tuple[BMLoop]]] = [[] for _ in range(len(islands))]
+        for tris in loop_triangles:
+            face = tris[0].face
+            if face.tag:
+                islands_of_tris[face.index].append(tris)
+        return islands_of_tris
+
+    @classmethod
+    def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'AdvIslands':
+        islands: Islands = super().calc_extended_or_visible(bm, uv_layer, sync, extended=extended)
+        if not islands:
+            return cls([], bm, uv_layer)
+        triangulated_islands = AdvIslands.triangulate_islands(islands, bm)
+        adv_islands = []
+        for isl, tria_isl in zip(islands, triangulated_islands):
+            adv_islands.append(AdvIsland(isl.faces, tria_isl, bm, uv_layer))
+        return cls(adv_islands, bm, uv_layer)
+
+    def calc_flat_coords(self):
+        for island in self.islands:
+            island.calc_flat_coords()
+
+
+class AdvIsland(FaceIsland):
+    def __init__(self, faces: list[BMFace], tris: list[tuple[BMLoop]], bm: BMesh, uv_layer: BMLayerItem):
+        super().__init__(faces, bm, uv_layer)
+        self.tris: list[tuple[BMLoop]] = tris
+        self.flat_coords = []
+        self.convex_coords = []
+        self._bbox: BBox | None = None
+
+    def move(self, delta: Vector) -> bool:
+        if self._bbox is not None:
+            self._bbox.move(delta)
+        return super().move(delta)
+
+    def scale(self, scale: Vector, pivot: Vector) -> bool:
+        if self._bbox is not None:
+            self._bbox.scale(scale, pivot)
+        return super().scale(scale, pivot)
+    
+    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
+        self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ration for bbox
+        return super().rotate(angle, pivot, aspect)
+
+    def calc_flat_coords(self):
+        assert self.tris, 'Calculate tris'
+
+        uv_layer = self.uv_layer
+        flat_coords = self.flat_coords
+        for t in self.tris:
+            flat_coords.extend((t_loop[uv_layer].uv for t_loop in t))
+
+    @timer()
+    def is_overlap(self, other: 'AdvIsland'):
+        assert(self.flat_coords and other.flat_coords), 'Calculate flat coordinates'
+        if not self.bbox.is_isect(other.bbox):
+            return False
+        for i in range(0, len(self.flat_coords), 3):
+            a0, a1, a2 = self.flat_coords[i], self.flat_coords[i+1], self.flat_coords[i+2]
+            for j in range(0, len(other.flat_coords), 3):
+                if isect_tris_2d(a0, a1, a2, other.flat_coords[j], other.flat_coords[j+1], other.flat_coords[j+2]):
+                    return True
+        return False
+
+    def calc_bbox(self):
+        self._bbox = super().calc_bbox()
+
+    @property
+    def bbox(self) -> BBox:
+        if self._bbox is None:
+            self.calc_bbox()
+        return self._bbox
+
+    def __str__(self):
+        return f'Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
