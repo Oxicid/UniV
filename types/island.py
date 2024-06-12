@@ -2,14 +2,226 @@ import bpy
 import bmesh
 import math
 import mathutils
+import typing
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
 
 from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
-from ..utils import umath, timer
+from ..utils import umath, timer  # noqa
 from . import btypes
 from. import BBox
+
+
+class FaceIsland:
+    def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
+        self.faces: list[BMFace] = faces
+        self.bm: BMesh = bm
+        self.uv_layer: BMLayerItem = uv_layer
+
+    def move(self, delta: Vector) -> bool:
+        if umath.vec_isclose_to_zero(delta):
+            return False
+        for face in self.faces:
+            for loop in face.loops:
+                loop[self.uv_layer].uv += delta
+        return True
+
+    def set_position(self, to: Vector, _from: Vector = None):
+        if _from is None:
+            _from = self.calc_bbox().min
+        return self.move(to - _from)
+
+    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
+        """Rotate a list of faces by angle (in radians) around a pivot
+        :param angle: Angle in radians
+        :param pivot: Pivot
+        :param aspect: Aspect Ratio = Height / Width
+        """
+        if math.isclose(angle, 0, abs_tol=0.0001):
+            return False
+        rot_matrix = Matrix.Rotation(angle, 2)
+
+        rot_matrix[0][1] = rot_matrix[0][1] / aspect
+        rot_matrix[1][0] = aspect * rot_matrix[1][0]
+
+        diff = pivot-(pivot @ rot_matrix)
+        for face in self.faces:
+            for loop in face.loops:
+                uv = loop[self.uv_layer]
+                uv.uv = uv.uv @ rot_matrix + diff
+        return True
+
+    def rotate_simple(self, angle: float) -> bool:
+        """Rotate a list of faces by angle (in radians) around a world center"""
+        if math.isclose(angle, 0, abs_tol=0.0001):
+            return False
+        rot_matrix = Matrix.Rotation(-angle, 2)
+        for face in self.faces:
+            for loop in face.loops:
+                uv = loop[self.uv_layer]
+                uv.uv = uv.uv @ rot_matrix
+        return True
+
+    def scale(self, scale: Vector, pivot: Vector) -> bool:
+        """Scale a list of faces by pivot"""
+        if umath.vec_isclose_to_uniform(scale):
+            return False
+        diff = pivot - pivot * scale
+        for face in self.faces:
+            for loop in face.loops:
+                uv = loop[self.uv_layer]
+                uv.uv = (uv.uv * scale) + diff
+        return True
+
+    def scale_simple(self, scale: Vector) -> bool:
+        """Scale a list of faces by world center"""
+        if umath.vec_isclose_to_uniform(scale):
+            return False
+        for face in self.faces:
+            for loop in face.loops:
+                loop[self.uv_layer].uv *= scale
+        return True
+
+    def is_flipped(self) -> bool:
+        for f in self.faces:
+            area = 0.0
+            uvs = [l[self.uv_layer].uv for l in f.loops]
+            for i in range(len(uvs)):
+                area += uvs[i - 1].cross(uvs[i])
+            if area < 0:
+                return True
+        return False
+
+    def is_full_flipped(self, partial=False) -> bool:
+        counter = 0
+        for f in self.faces:
+            area = 0.0
+            uvs = [l[self.uv_layer].uv for l in f.loops]
+            for i in range(len(uvs)):
+                area += uvs[i - 1].cross(uvs[i])
+            if area < 0:
+                counter += 1
+
+        if partial:
+            if counter != 0 and counter != len(self):
+                return True
+            return False
+        return counter == len(self)
+
+    def calc_bbox(self) -> BBox:
+        return BBox.calc_bbox_uv(self.faces, self.uv_layer)
+
+    def calc_convex_points(self):
+        points = [l[self.uv_layer].uv for f in self.faces for l in f.loops]  # Warning: points referenced to uv
+        return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
+
+    def __select_ex(self, state, force, sync):
+        if sync is None:
+            sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        if sync or force:
+            for face in self.faces:
+                face.select = state
+                for e in face.edges:
+                    e.select = state
+                for v in face.verts:
+                    v.select = state
+        if not sync or force:
+            for face in self.faces:
+                for l in face.loops:
+                    luv = l[self.uv_layer]
+                    luv.select = state
+                    luv.select_edge = state
+
+    def select(self, force=False, sync=None):
+        self.__select_ex(True, force, sync)
+
+    def deselect(self, force=False, sync=None):
+        self.__select_ex(False, force, sync)
+
+    def __iter__(self):
+        return iter(self.faces)
+
+    def __getitem__(self, idx):
+        return self.faces[idx]
+
+    def __len__(self):
+        return len(self.faces)
+
+    def __str__(self):
+        return f'Faces count = {len(self.faces)}'
+
+class AdvIsland(FaceIsland):
+    def __init__(self, faces: list[BMFace], tris: list[tuple[BMLoop]], bm: BMesh, uv_layer: BMLayerItem):
+        super().__init__(faces, bm, uv_layer)
+        self.tris: list[tuple[BMLoop]] = tris
+        self.flat_coords = []
+        self.convex_coords = []
+        self._bbox: BBox | None = None
+        self.tag = True
+
+    def move(self, delta: Vector) -> bool:
+        if self._bbox is not None:
+            self._bbox.move(delta)
+        return super().move(delta)
+
+    def scale(self, scale: Vector, pivot: Vector) -> bool:
+        if self._bbox is not None:
+            self._bbox.scale(scale, pivot)
+        return super().scale(scale, pivot)
+
+    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
+        self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ration for bbox
+        return super().rotate(angle, pivot, aspect)
+
+    def set_position(self, to: Vector, _from: Vector = None):
+        if _from is None:
+            _from = self.bbox.min
+        return self.move(to - _from)
+
+    def calc_flat_coords(self):
+        assert self.tris, 'Calculate tris'
+
+        uv_layer = self.uv_layer
+        flat_coords = self.flat_coords
+        for t in self.tris:
+            flat_coords.extend((t_loop[uv_layer].uv for t_loop in t))
+
+    def is_overlap(self, other: 'AdvIsland'):
+        assert (self.flat_coords and other.flat_coords), 'Calculate flat coordinates'
+        if not self.bbox.is_isect(other.bbox):
+            return False
+        for i in range(0, len(self.flat_coords), 3):
+            a0, a1, a2 = self.flat_coords[i], self.flat_coords[i + 1], self.flat_coords[i + 2]
+            for j in range(0, len(other.flat_coords), 3):
+                if isect_tris_2d(a0, a1, a2, other.flat_coords[j], other.flat_coords[j + 1], other.flat_coords[j + 2]):
+                    return True
+        return False
+
+    def calc_bbox(self) -> BBox:
+        if self.convex_coords:
+            self._bbox = BBox.calc_bbox(self.convex_coords)
+        elif self.flat_coords:
+            self._bbox = BBox.calc_bbox(self.flat_coords)
+        else:
+            self._bbox = BBox.calc_bbox_uv(self.faces, self.uv_layer)
+        return self._bbox
+
+    @property
+    def bbox(self) -> BBox:
+        if self._bbox is None:
+            self.calc_bbox()
+        return self._bbox
+
+    def calc_convex_points(self):
+        if self.flat_coords:
+            self.convex_coords = [self.flat_coords[i] for i in mathutils.geometry.convex_hull_2d(self.flat_coords)]
+        else:
+            self.convex_coords = super().calc_convex_points()
+        return self.convex_coords
+
+    def __str__(self):
+        return f'Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
 
 
 class IslandsBase:
@@ -273,7 +485,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
+    def calc_visible(cls, bm: BMesh, uv_layer: BMLayerItem,  sync: bool):
         cls.tag_filter_visible(bm, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
@@ -299,6 +511,9 @@ class Islands(IslandsBase):
     def move(self, delta: Vector) -> bool:
         return bool(sum(island.move(delta) for island in self.islands))
 
+    def set_position(self, to, _from):
+        return bool(sum(island.set_position(to, _from) for island in self.islands))
+
     def scale_simple(self, scale: Vector):
         return bool(sum(island.scale_simple(scale) for island in self.islands))
 
@@ -308,16 +523,19 @@ class Islands(IslandsBase):
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         return bool(sum(island.rotate(angle, pivot, aspect) for island in self.islands))
 
+    def rotate_simple(self, angle: float):
+        return bool(sum(island.rotate_simple(angle) for island in self.islands))
+
     def calc_bbox(self) -> BBox:
         general_bbox = BBox()
         for island in self.islands:
             general_bbox.union(island.calc_bbox())
         return general_bbox
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator['FaceIsland | AdvIsland']:
         return iter(self.islands)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> 'FaceIsland | AdvIsland':
         return self.islands[idx]
 
     def __bool__(self):
@@ -329,151 +547,88 @@ class Islands(IslandsBase):
     def __str__(self):
         return f'Islands count = {len(self.islands)}'
 
+class UnionIslands(Islands):
+    def __init__(self, islands):
+        super().__init__([], None, None)
+        self.islands: list[AdvIsland | FaceIsland] = islands
+        self.flat_coords = []
+        self.convex_coords = []
+        self._bbox = None
 
-class FaceIsland:
-    def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
-        self.faces: list[BMFace] = faces
-        self.bm: BMesh = bm
-        self.uv_layer: BMLayerItem = uv_layer
+    def calc_bbox(self, force=True) -> BBox:
+        self._bbox = BBox()
+        if force:
+            for island in self.islands:
+                self._bbox.union(island.calc_bbox())
+        else:
+            for island in self.islands:
+                self._bbox.union(island.bbox)
+        return self._bbox
 
-    def move(self, delta: Vector) -> bool:
-        if umath.vec_isclose_to_zero(delta):
-            return False
-        for face in self.faces:
-            for loop in face.loops:
-                loop[self.uv_layer].uv += delta
-        return True
+    @property
+    def bbox(self) -> BBox:
+        if self._bbox is None:
+            self.calc_bbox()
+        return self._bbox
 
-    def set_position(self, to: Vector, _from: Vector = None):
-        if _from is None:
-            _from = self.calc_bbox().min
-        return self.move(to - _from)
+    def calc_convex_points(self):
+        if self[0].convex_coords:
+            points = []
+            for island in self:
+                points.extend(island.convex_coords)
+            self.convex_coords = [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
+            return self.convex_coords
+        elif self[0].flat_coords:
+            points = []
+            for island in self:
+                points.extend(island.flat_coords)
+            self.convex_coords = [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
+            return self.convex_coords
+        else:
+            uv_layer = self.uv_layer
+            points = [l[uv_layer].uv for island in self for f in island for l in f.loops]  # Warning: points referenced to uv
+            self.convex_coords = [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
+            return self.convex_coords
 
-    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
-        """Rotate a list of faces by angle (in radians) around a pivot
-        :param angle: Angle in radians
-        :param pivot: Pivot
-        :param aspect: Aspect Ratio = Height / Width
-        """
-        if math.isclose(angle, 0, abs_tol=0.0001):
-            return False
-        rot_matrix = Matrix.Rotation(angle, 2)
+    @staticmethod
+    def calc_overlapped_island_groups(adv_islands: list[AdvIsland]) -> list['UnionIslands']:
+        islands_group = []
+        union_islands = []
+        for island_first in adv_islands:
+            if not island_first.tag:
+                continue
+            island_first.tag = False
 
-        rot_matrix[0][1] = rot_matrix[0][1] / aspect
-        rot_matrix[1][0] = aspect * rot_matrix[1][0]
+            union_islands.append(island_first)
+            compare_index = 0
+            while True:
+                if compare_index > len(union_islands) - 1:
+                    islands_group.append(UnionIslands(union_islands))
+                    union_islands = []
+                    break
 
-        diff = pivot-(pivot @ rot_matrix)
-        for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = uv.uv @ rot_matrix + diff
-        return True
+                for isl in adv_islands:
+                    if not isl.tag:
+                        continue
+                    if union_islands[compare_index].is_overlap(isl):
+                        isl.tag = False
+                        union_islands.append(isl)
+                compare_index += 1
+        return islands_group
 
-    def rotate_simple(self, angle: float) -> bool:
-        """Rotate a list of faces by angle (in radians) around a world center"""
-        if math.isclose(angle, 0, abs_tol=0.0001):
-            return False
-        rot_matrix = Matrix.Rotation(-angle, 2)
-        for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = uv.uv @ rot_matrix
-        return True
 
-    def scale(self, scale: Vector, pivot: Vector) -> bool:
-        """Scale a list of faces by pivot"""
-        if umath.vec_isclose_to_uniform(scale):
-            return False
-        diff = pivot - pivot * scale
-        for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = (uv.uv * scale) + diff
-        return True
 
-    def scale_simple(self, scale: Vector) -> bool:
-        """Scale a list of faces by world center"""
-        if umath.vec_isclose_to_uniform(scale):
-            return False
-        for face in self.faces:
-            for loop in face.loops:
-                loop[self.uv_layer].uv *= scale
-        return True
+    def append(self, island):
+        self.islands.append(island)
 
-    def is_flipped(self) -> bool:
-        for f in self.faces:
-            area = 0.0
-            uvs = [l[self.uv_layer].uv for l in f.loops]
-            for i in range(len(uvs)):
-                area += uvs[i - 1].cross(uvs[i])
-            if area < 0:
-                return True
-        return False
+    def pop(self, island):
+        self.islands.pop(island)
 
-    def is_full_flipped(self, partial=False) -> bool:
-        counter = 0
-        for f in self.faces:
-            area = 0.0
-            uvs = [l[self.uv_layer].uv for l in f.loops]
-            for i in range(len(uvs)):
-                area += uvs[i - 1].cross(uvs[i])
-            if area < 0:
-                counter += 1
-
-        if partial:
-            if counter != 0 and counter != len(self):
-                return True
-            return False
-        return counter == len(self)
-
-    def calc_bbox(self) -> BBox:
-        return BBox.calc_bbox_uv(self.faces, self.uv_layer)
-
-    def calc_corner_points(self, convex=True):
-        points = [l[self.uv_layer].uv for f in self.faces for l in f.loops]  # Warning: points referenced to uv
-        if convex:
-            return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
-        return points
-
-    def __select_ex(self, state, force, sync):
-        if sync is None:
-            sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        if sync or force:
-            for face in self.faces:
-                face.select = state
-                for e in face.edges:
-                    e.select = state
-                for v in face.verts:
-                    v.select = state
-        if not sync or force:
-            for face in self.faces:
-                for l in face.loops:
-                    luv = l[self.uv_layer]
-                    luv.select = state
-                    luv.select_edge = state
-
-    def select(self, force=False, sync=None):
-        self.__select_ex(True, force, sync)
-
-    def deselect(self, force=False, sync=None):
-        self.__select_ex(False, force, sync)
-
-    def __iter__(self):
-        return iter(self.faces)
-
-    def __getitem__(self, idx):
-        return self.faces[idx]
-
-    def __len__(self):
-        return len(self.faces)
-
-    def __str__(self):
-        return f'Faces count = {len(self.faces)}'
 
 class AdvIslands(Islands):
-    def __init__(self, islands: list['AdvIsland'], bm, uv_layer):
+    def __init__(self, islands: list[AdvIsland], bm, uv_layer):
         super().__init__([], bm, uv_layer)
-        self.islands: list[AdvIsland] = islands
+        self.islands: list[AdvIsland | FaceIsland] = islands
 
     @staticmethod
     def triangulate_islands(islands, bm):
@@ -490,72 +645,16 @@ class AdvIslands(Islands):
                 islands_of_tris[face.index].append(tris)
         return islands_of_tris
 
-    @classmethod
-    def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'AdvIslands':
-        islands: Islands = super().calc_extended_or_visible(bm, uv_layer, sync, extended=extended)
-        if not islands:
-            return cls([], bm, uv_layer)
-        triangulated_islands = AdvIslands.triangulate_islands(islands, bm)
+    def calc_tris(self):
+        if not self.islands:
+            return False
+        triangulated_islands = AdvIslands.triangulate_islands(self.islands, self.bm)
         adv_islands = []
-        for isl, tria_isl in zip(islands, triangulated_islands):
-            adv_islands.append(AdvIsland(isl.faces, tria_isl, bm, uv_layer))
-        return cls(adv_islands, bm, uv_layer)
+        for isl, tria_isl in zip(self.islands, triangulated_islands):
+            adv_islands.append(AdvIsland(isl.faces, tria_isl, isl.bm, isl.uv_layer))
+        self.islands = adv_islands
+        return True
 
     def calc_flat_coords(self):
         for island in self.islands:
             island.calc_flat_coords()
-
-
-class AdvIsland(FaceIsland):
-    def __init__(self, faces: list[BMFace], tris: list[tuple[BMLoop]], bm: BMesh, uv_layer: BMLayerItem):
-        super().__init__(faces, bm, uv_layer)
-        self.tris: list[tuple[BMLoop]] = tris
-        self.flat_coords = []
-        self.convex_coords = []
-        self._bbox: BBox | None = None
-
-    def move(self, delta: Vector) -> bool:
-        if self._bbox is not None:
-            self._bbox.move(delta)
-        return super().move(delta)
-
-    def scale(self, scale: Vector, pivot: Vector) -> bool:
-        if self._bbox is not None:
-            self._bbox.scale(scale, pivot)
-        return super().scale(scale, pivot)
-    
-    def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
-        self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ration for bbox
-        return super().rotate(angle, pivot, aspect)
-
-    def calc_flat_coords(self):
-        assert self.tris, 'Calculate tris'
-
-        uv_layer = self.uv_layer
-        flat_coords = self.flat_coords
-        for t in self.tris:
-            flat_coords.extend((t_loop[uv_layer].uv for t_loop in t))
-
-    @timer()
-    def is_overlap(self, other: 'AdvIsland'):
-        assert(self.flat_coords and other.flat_coords), 'Calculate flat coordinates'
-        if not self.bbox.is_isect(other.bbox):
-            return False
-        for i in range(0, len(self.flat_coords), 3):
-            a0, a1, a2 = self.flat_coords[i], self.flat_coords[i+1], self.flat_coords[i+2]
-            for j in range(0, len(other.flat_coords), 3):
-                if isect_tris_2d(a0, a1, a2, other.flat_coords[j], other.flat_coords[j+1], other.flat_coords[j+2]):
-                    return True
-        return False
-
-    def calc_bbox(self):
-        self._bbox = super().calc_bbox()
-
-    @property
-    def bbox(self) -> BBox:
-        if self._bbox is None:
-            self.calc_bbox()
-        return self._bbox
-
-    def __str__(self):
-        return f'Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
