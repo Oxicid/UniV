@@ -152,9 +152,9 @@ class FaceIsland:
         return f'Faces count = {len(self.faces)}'
 
 class AdvIsland(FaceIsland):
-    def __init__(self, faces: list[BMFace], tris: list[tuple[BMLoop]], bm: BMesh, uv_layer: BMLayerItem):
+    def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
         super().__init__(faces, bm, uv_layer)
-        self.tris: list[tuple[BMLoop]] = tris
+        self.tris: list[tuple[BMLoop]] = []
         self.flat_coords = []
         self.convex_coords = []
         self._bbox: BBox | None = None
@@ -617,7 +617,6 @@ class UnionIslands(Islands):
         return islands_group
 
 
-
     def append(self, island):
         self.islands.append(island)
 
@@ -628,7 +627,13 @@ class UnionIslands(Islands):
 class AdvIslands(Islands):
     def __init__(self, islands: list[AdvIsland], bm, uv_layer):
         super().__init__([], bm, uv_layer)
-        self.islands: list[AdvIsland | FaceIsland] = islands
+        self.islands: list[AdvIsland] = islands
+
+    @classmethod
+    def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'AdvIslands':
+        islands = super().calc_extended_or_visible(bm, uv_layer, sync, extended=extended)
+        adv_islands = [AdvIsland(isl.faces, isl.bm, isl.uv_layer) for isl in islands]
+        return cls(adv_islands, bm, uv_layer)
 
     @staticmethod
     def triangulate_islands(islands, bm):
@@ -649,10 +654,8 @@ class AdvIslands(Islands):
         if not self.islands:
             return False
         triangulated_islands = AdvIslands.triangulate_islands(self.islands, self.bm)
-        adv_islands = []
         for isl, tria_isl in zip(self.islands, triangulated_islands):
-            adv_islands.append(AdvIsland(isl.faces, tria_isl, isl.bm, isl.uv_layer))
-        self.islands = adv_islands
+            isl.tris = tria_isl
         return True
 
     def calc_flat_coords(self):

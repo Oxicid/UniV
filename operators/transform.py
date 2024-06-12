@@ -955,17 +955,17 @@ class UNIV_OT_Sort(Operator):
         sort_args = (sync,  umeshes, cursor_loc)
 
         if not self.overlapped:
-            self.sort_ex(*sort_args, extended=True)
+            self.sort_individual_preprocessing(*sort_args, extended=True)
             if not umeshes.final():
-                self.sort_ex(*sort_args, extended=False)
+                self.sort_individual_preprocessing(*sort_args, extended=False)
         else:
-            self.sort_overlapped(*sort_args, extended=True)
+            self.sort_overlapped_preprocessing(*sort_args, extended=True)
             if not umeshes.final():
-                self.sort_overlapped(*sort_args, extended=False)
+                self.sort_overlapped_preprocessing(*sort_args, extended=False)
 
         return umeshes.update()
 
-    def sort_overlapped(self, sync,  umeshes, cursor=None, extended=True):
+    def sort_overlapped_preprocessing(self, sync, umeshes, cursor=None, extended=True):
         _islands: list[AdvIsland] = []
         for umesh in umeshes:
             if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
@@ -992,86 +992,62 @@ class UNIV_OT_Sort(Operator):
                 bb = union_island.bbox
                 general_bbox.union(bb)
 
-        union_islands_groups.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
+        self.sort_islands(cursor, general_bbox, umeshes, union_islands_groups)
 
-        if self.axis == 'AUTO':
-            horizontal_sort = general_bbox.width * 2 > general_bbox.height
-        else:
-            horizontal_sort = self.axis == 'X'
-
-        margin = general_bbox.min if cursor is None else cursor
-
-        update_tag = False
-        if horizontal_sort:
-            for union_island in union_islands_groups:
-                width = union_island.bbox.width
-                if self.align and width > union_island.bbox.height:
-                    width = union_island.bbox.height
-                    update_tag |= union_island.rotate(pi*0.5, union_island.bbox.center)
-                update_tag |= union_island.set_position(margin, _from=union_island.bbox.min)
-                margin.x += self.padding + width
-        else:
-            for union_island in union_islands_groups:
-                height = union_island.bbox.height
-                if self.align and union_island.bbox.width < height:
-                    height = union_island.bbox.width
-                    update_tag |= union_island.rotate(pi*0.5, union_island.bbox.center)
-                update_tag |= union_island.set_position(margin, _from=union_island.bbox.min)
-                margin.y += self.padding + height
-        if not update_tag:
-            umeshes.cancel_with_report(info='Islands is sorted')
-
-    def sort_ex(self, sync,  umeshes, cursor=None, extended=True):
-        islands_bboxes_points = []
+    def sort_individual_preprocessing(self, sync, umeshes, cursor=None, extended=True):
+        _islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                for island in islands:
-                    if self.align:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                if self.align:
+                    for island in adv_islands:
                         isl_coords = island.calc_convex_points()
-                        bbox = BBox.calc_bbox(isl_coords)
-                        general_bbox.union(bbox)
-
+                        general_bbox.union(island.bbox)
                         angle = utils.calc_min_align_angle(isl_coords)
                         if not math.isclose(angle, 0, abs_tol=0.0001):
                             island.rotate_simple(angle)
-                            bbox = island.calc_bbox()
-                    else:
-                        bbox = island.calc_bbox()
-                        general_bbox.union(bbox)
-                    islands_bboxes_points.append((island, bbox))
-            umesh.update_tag = bool(islands)
+                            island.calc_bbox()
+                else:
+                    for island in adv_islands:
+                        general_bbox.union(island.bbox)
+                _islands.extend(adv_islands)
 
-        if not islands_bboxes_points:
+            umesh.update_tag = bool(adv_islands)
+
+        if not _islands:
             return
-        islands_bboxes_points.sort(key=lambda x: x[1].max_length, reverse=self.reverse)
+        self.sort_islands(cursor, general_bbox, umeshes, _islands)
 
+    def sort_islands(self, cursor, general_bbox, umeshes, islands: list[AdvIsland | UnionIslands]):
+        islands.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
         if self.axis == 'AUTO':
             horizontal_sort = general_bbox.width * 2 > general_bbox.height
         else:
             horizontal_sort = self.axis == 'X'
 
-        margin = general_bbox.min if cursor is None else cursor
-
+        margin = general_bbox.min if (cursor is None) else cursor
         update_tag = False
         if horizontal_sort:
-            for island, bbox in islands_bboxes_points:
-                width = bbox.width
-                if self.align and width > bbox.height:
-                    width = bbox.height
-                    update_tag |= island.rotate(pi*0.5, bbox.center)
-                update_tag |= island.set_position(margin, _from=bbox.min)
+            for island in islands:
+                width = island.bbox.width
+                if self.align and island.bbox.height < width:
+                    width = island.bbox.height
+                    update_tag |= island.rotate(pi * 0.5, island.bbox.center)
+                    island.calc_bbox()
+                update_tag |= island.set_position(margin, _from=island.bbox.min)
                 margin.x += self.padding + width
         else:
-            for island, bbox in islands_bboxes_points:
-                height = bbox.height
-                if self.align and bbox.width < height:
-                    height = bbox.width
-                    update_tag |= island.rotate(pi*0.5, bbox.center)
-                update_tag |= island.set_position(margin, _from=bbox.min)
+            for island in islands:
+                height = island.bbox.height
+                if self.align and island.bbox.width < height:
+                    height = island.bbox.width
+                    update_tag |= island.rotate(pi * 0.5, island.bbox.center)
+                    island.calc_bbox()  # TODO: Optimize this
+                update_tag |= island.set_position(margin, _from=island.bbox.min)
                 margin.y += self.padding + height
         if not update_tag:
             umeshes.cancel_with_report(info='Islands is sorted')
+
 
 class UNIV_OT_Distribute(Operator):
     bl_idname = 'uv.univ_distribute'
