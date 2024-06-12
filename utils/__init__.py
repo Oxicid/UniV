@@ -71,7 +71,7 @@ class UMeshes:
     def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self._cancel is True:
             return {'CANCELLED'}
-        if any(umesh.update(force=force) for umesh in self.umeshes):
+        if sum(umesh.update(force=force) for umesh in self.umeshes):
             return {'FINISHED'}
         self.report(info_type, info)
         return {'CANCELLED'}
