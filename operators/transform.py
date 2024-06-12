@@ -6,7 +6,7 @@ from bpy.types import Operator
 from bpy.props import *
 
 from math import pi
-from ..types import BBox, Islands, FaceIsland
+from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands
 from .. import utils
 from .. import info
 from mathutils import Vector
@@ -919,19 +919,12 @@ class UNIV_OT_Sort(Operator):
     bl_description = 'Sort'
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('ALIGN', 'Align', ''),
-        ('TO_CURSOR', 'To Cursor', ''),
-        ('TO_CURSOR_ALIGN', 'To Cursor Align', ''),
-        ('OVERLAPPED', 'Overlapped', ''),
-        ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', ''),
-        ('OVERLAPPED_TO_CURSOR_ALIGN', 'Overlapped to Cursor Align', '')
-    ))
-
     axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     reverse: bpy.props.BoolProperty(name='Reverse', default=True)
+    to_cursor: bpy.props.BoolProperty(name='To Cursor', default=False)
+    align: bpy.props.BoolProperty(name='Align', default=False)
+    overlapped: bpy.props.BoolProperty(name='Overlapped', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -942,67 +935,100 @@ class UNIV_OT_Sort(Operator):
         return True
 
     def invoke(self, context, event):
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.mode = 'DEFAULT'
-            case False, False, True:
-                self.mode = 'ALIGN'
-            case True, False, False:
-                self.mode = 'TO_CURSOR'
-            case True, False, True:
-                self.mode = 'TO_CURSOR_ALIGN'
-            # case False, True, False:
-            #     self.mode = 'OVERLAPPED'
-            # case False, True, True:
-            #     self.mode = 'OVERLAPPED_TO_CURSOR'
-            # case True, True, True:
-            #     self.mode = 'OVERLAPPED_TO_CURSOR_ALIGN'
-            case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n")
-                return {'CANCELLED'}
+        self.to_cursor = event.ctrl
+        self.overlapped = event.shift
+        self.align = event.alt
         return self.execute(context)
 
     def execute(self, context):
-        return UNIV_OT_Sort.sort(self.mode, self.axis, self.padding, self.reverse,
-                                 sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.sort()
 
-    @staticmethod
-    def sort(mode, axis, padding, reverse, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
+    def sort(self):
         cursor_loc = None
-        align = 'ALIGN' in mode
-        if 'CURSOR' in mode:
+        if self.to_cursor:
             if not (cursor_loc := utils.get_cursor_location()):
-                umeshes.report({'INFO'}, "Cursor not found")
+                self.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
 
-        flip_args = (axis, align, padding, reverse, sync,  umeshes, cursor_loc)
+        sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        umeshes = utils.UMeshes(report=self.report)
+        sort_args = (sync,  umeshes, cursor_loc)
 
-        match mode:
-            case 'DEFAULT' | 'ALIGN' | 'TO_CURSOR' | 'TO_CURSOR_ALIGN':
-                UNIV_OT_Sort.sort_ex(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Sort.sort_ex(*flip_args, extended=False)
-            #
-            # case 'OVERLAPPED' | 'OVERLAPPED_ALIGN':
-            #     UNIV_OT_Sort.sort_overlapped(*flip_args, extended=True)
-            #     if not update_obj:
-            #         UNIV_OT_Sort.sort_overlapped(*flip_args, extended=False)
-            case _:
-                raise NotImplementedError(mode)
+        if not self.overlapped:
+            self.sort_ex(*sort_args, extended=True)
+            if not umeshes.final():
+                self.sort_ex(*sort_args, extended=False)
+        else:
+            self.sort_overlapped(*sort_args, extended=True)
+            if not umeshes.final():
+                self.sort_overlapped(*sort_args, extended=False)
 
         return umeshes.update()
 
-    @staticmethod
-    def sort_ex(axis, align, padding, reverse, sync,  umeshes, cursor=None, extended=True):
+    def sort_overlapped(self, sync,  umeshes, cursor=None, extended=True):
+        _islands: list[AdvIsland] = []
+        for umesh in umeshes:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_coords()
+                _islands.extend(adv_islands)
+            umesh.update_tag = bool(adv_islands)
+
+        if not _islands:
+            return
+
+        general_bbox = BBox()
+        union_islands_groups = UnionIslands.calc_overlapped_island_groups(_islands)
+        for union_island in union_islands_groups:
+            if self.align:
+                isl_coords = union_island.calc_convex_points()
+                general_bbox.union(union_island.bbox)
+                angle = utils.calc_min_align_angle(isl_coords)
+
+                if not math.isclose(angle, 0, abs_tol=0.0001):
+                    union_island.rotate_simple(angle)
+                    union_island.calc_bbox()
+            else:
+                bb = union_island.bbox
+                general_bbox.union(bb)
+
+        union_islands_groups.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
+
+        if self.axis == 'AUTO':
+            horizontal_sort = general_bbox.width * 2 > general_bbox.height
+        else:
+            horizontal_sort = self.axis == 'X'
+
+        margin = general_bbox.min if cursor is None else cursor
+
+        update_tag = False
+        if horizontal_sort:
+            for union_island in union_islands_groups:
+                width = union_island.bbox.width
+                if self.align and width > union_island.bbox.height:
+                    width = union_island.bbox.height
+                    update_tag |= union_island.rotate(pi*0.5, union_island.bbox.center)
+                update_tag |= union_island.set_position(margin, _from=union_island.bbox.min)
+                margin.x += self.padding + width
+        else:
+            for union_island in union_islands_groups:
+                height = union_island.bbox.height
+                if self.align and union_island.bbox.width < height:
+                    height = union_island.bbox.width
+                    update_tag |= union_island.rotate(pi*0.5, union_island.bbox.center)
+                update_tag |= union_island.set_position(margin, _from=union_island.bbox.min)
+                margin.y += self.padding + height
+        if not update_tag:
+            umeshes.cancel_with_report(info='Islands is sorted')
+
+    def sort_ex(self, sync,  umeshes, cursor=None, extended=True):
         islands_bboxes_points = []
         general_bbox = BBox()
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
                 for island in islands:
-                    if align:
-                        isl_coords = island.calc_corner_points(convex=True)
+                    if self.align:
+                        isl_coords = island.calc_convex_points()
                         bbox = BBox.calc_bbox(isl_coords)
                         general_bbox.union(bbox)
 
@@ -1018,13 +1044,12 @@ class UNIV_OT_Sort(Operator):
 
         if not islands_bboxes_points:
             return
+        islands_bboxes_points.sort(key=lambda x: x[1].max_length, reverse=self.reverse)
 
-        islands_bboxes_points.sort(key=lambda x: x[1].max_length, reverse=reverse)
-
-        if axis == 'AUTO':
+        if self.axis == 'AUTO':
             horizontal_sort = general_bbox.width * 2 > general_bbox.height
         else:
-            horizontal_sort = axis == 'X'
+            horizontal_sort = self.axis == 'X'
 
         margin = general_bbox.min if cursor is None else cursor
 
@@ -1032,22 +1057,21 @@ class UNIV_OT_Sort(Operator):
         if horizontal_sort:
             for island, bbox in islands_bboxes_points:
                 width = bbox.width
-                if align and width > bbox.height:
+                if self.align and width > bbox.height:
                     width = bbox.height
                     update_tag |= island.rotate(pi*0.5, bbox.center)
                 update_tag |= island.set_position(margin, _from=bbox.min)
-                margin.x += padding + width
+                margin.x += self.padding + width
         else:
             for island, bbox in islands_bboxes_points:
                 height = bbox.height
-                if align and bbox.width < height:
+                if self.align and bbox.width < height:
                     height = bbox.width
                     update_tag |= island.rotate(pi*0.5, bbox.center)
-                update_tag |= island.set_position(margin, _from=bbox.minmn)
-                margin.y += padding + height
+                update_tag |= island.set_position(margin, _from=bbox.min)
+                margin.y += self.padding + height
         if not update_tag:
             umeshes.cancel_with_report(info='Islands is sorted')
-
 
 class UNIV_OT_Distribute(Operator):
     bl_idname = 'uv.univ_distribute'
