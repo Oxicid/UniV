@@ -1,6 +1,5 @@
-import sys
 import bpy
-import bmesh
+# import bmesh
 import typing
 from ctypes import (
     POINTER,
@@ -20,7 +19,7 @@ from ctypes import (
 from . import bbox
 
 version = bpy.app.version
-
+bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
 
 def info_(self):
     print('', '=' * 80, '\n', self)
@@ -64,6 +63,10 @@ class StructBase(Structure):
             cls.__annotations__.clear()
 
         StructBase._subclasses.clear()
+
+    @classmethod
+    def get_fields(cls, tar: bpy_struct_subclass):
+        return cls.from_address(tar.as_pointer())
 
 
 class BArray(StructBase):
@@ -246,6 +249,8 @@ class rcti(StructBase, bbox.BBox):
     ymin: c_int
     ymax: c_int
 
+    def __str__(self):
+        return f"xmin={self.xmin}, xmax={self.xmax}, ymin={self.ymin}, ymax={self.ymax}, width={self.width}, height={self.height}"
 
 class View2D(StructBase):
     tot: rctf
@@ -288,6 +293,103 @@ class View2D(StructBase):
     @classmethod
     def get_rect(cls, view):
         return cls.from_address(view.as_pointer()).cur
+
+
+class PanelCategoryStack(StructBase):
+    next: lambda: POINTER(PanelCategoryStack)
+    prev: lambda: POINTER(PanelCategoryStack)
+    idname: c_char * 64
+
+
+class PanelCategoryDyn(StructBase):
+    next: lambda: POINTER(PanelCategoryStack)
+    prev: lambda: POINTER(PanelCategoryStack)
+    idname: c_char * 64
+    rect: rcti
+
+
+# source/blender/makesdna/DNA_screen_types.h | rev 362
+class ARegion(StructBase):
+    next: lambda: POINTER(ARegion)
+    prev: lambda: POINTER(ARegion)
+
+    view2D: View2D
+    winrct: rcti
+    drawrct: rcti
+    winx: c_short
+    winy: c_short
+
+    if version > (3, 5):
+        category_scroll: c_int
+        _pad0: c_char * 4
+
+    visible: c_short
+    regiontype: c_short
+    alignment: c_short
+    flag: c_short
+
+    sizex: c_short
+    sizey: c_short
+
+    do_draw: c_short
+    do_draw_overlay: c_short
+    overlap: c_short
+    flagfullscreen: c_short
+
+    type: c_void_p  # ARegionType
+
+    uiblocks: ListBase
+    panels: ListBase  # Panel
+    panels_category_active: ListBase(PanelCategoryStack)
+    ui_lists: ListBase
+    ui_previews: ListBase
+    handlers: ListBase
+    panels_category: ListBase(PanelCategoryDyn)
+
+    @staticmethod
+    def get_n_panel_from_area(_area: bpy.types.Area):
+        for reg in _area.regions:
+            if reg.type == 'UI':
+                return reg
+        raise AttributeError('Area not have N-Panel')
+
+    @staticmethod
+    def set_active_category(name: str, area: bpy.types.Area) -> bool:
+        name = name.encode('utf-8')
+        c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
+        # Checking for a category in the N-Panel
+        if not any(category for category in c_region.panels_category if category.idname == name):
+            available_categories = [category.idname.decode("utf-8") for category in c_region.panels_category]
+            if c_region.alignment == 1:
+                raise AttributeError('N-Panel aligned, cannot be set active category')
+            raise AttributeError(f'Category \'{name.decode("utf-8")}\' not found in {available_categories}')
+
+        # Check for the possibility to set an active category (for the presence of an allocated memory cell)
+        if not (category_history := list(category for category in c_region.panels_category_active)):
+            raise AttributeError(f'Unable to set a category because Blender did not allocate memory for active panels')
+
+        # Check that the active panel with the given name is already active
+        if category_history[0].idname == name:
+            return False
+        # If history length == 1, set it to
+        if len(category_history) == 1:
+            category_history[0].idname = name
+            return True
+
+        # Swap
+        category_from_history = None
+        for category in category_history:
+            if category.idname == name:
+                category_from_history = category
+                break
+
+        if not category_from_history:
+            category_history[0].idname = name
+            return True
+
+        category_from_history.idname = category_history[0].idname
+        category_history[0].idname = name
+        return True
 
 
 class CBMesh(StructBase):

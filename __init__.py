@@ -33,6 +33,7 @@ from .utils import text
 from .utils import ubm
 from .utils import umath
 from .operators import transform
+from .operators import other
 from . import ui
 
 
@@ -45,6 +46,7 @@ classes = (
     transform.UNIV_OT_Sort,
     transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
+    other.UNIV_OT_SplitUVToggle,
     ui.UNIV_PT_General
 )
 
@@ -53,14 +55,16 @@ def register():
     # Force reload by kaio: https://devtalk.blender.org/t/blender-2-91-addon-dev-workflow/15320/6
     from sys import modules
     from importlib import reload
-    for _ in range(2):
-        modules[__name__] = reload(modules[__name__])
-        for name, module in modules.copy().items():
-            if name.startswith(f"{__package__}."):
-                globals()[name] = reload(module)
+    modules[__name__] = reload(modules[__name__])
+    for name, module in modules.copy().items():
+        if name.startswith(f"{__package__}."):
+            globals()[name] = reload(module)
 
     for c in classes:
         bpy.utils.register_class(c)
+
+    bpy.types.VIEW3D_HT_header.prepend(other.univ_header_btn)
+    bpy.types.IMAGE_HT_header.prepend(other.univ_header_btn)
 
 
 def unregister():
@@ -69,6 +73,9 @@ def unregister():
             bpy.utils.unregister_class(c)
     except Exception as e:
         print(e)
+
+    bpy.types.VIEW3D_HT_header.remove(other.univ_header_btn)
+    bpy.types.IMAGE_HT_header.remove(other.univ_header_btn)
 
 
 if __name__ == "__main__":

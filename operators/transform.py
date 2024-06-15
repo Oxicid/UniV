@@ -1083,8 +1083,8 @@ class UNIV_OT_Distribute(Operator):
                 self.mode = 'TO_CURSOR'
             case False, False, True:
                 self.mode = 'SPACE'
-            case False, False, True:
-                self.mode = 'SPACE_TO_CURSOR'
+            # case False, False, True:
+            #     self.mode = 'SPACE_TO_CURSOR'
             # case False, True, False:
             #     self.mode = 'OVERLAPPED'
             case _:
