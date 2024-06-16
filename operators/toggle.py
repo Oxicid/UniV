@@ -2,7 +2,8 @@ import bpy
 import traceback
 
 from .. import info
-from ..types import ARegion
+from .. import utils
+from ..types import ARegion, PyBMesh
 
 from bpy.props import *
 from bpy.types import Operator
@@ -192,6 +193,115 @@ class UNIV_OT_SplitUVToggle(Operator):
             if False:  # TODD: Implement Debug
                 traceback.print_exc()
 
-def univ_header_btn(self, _context):
+class UNIV_OT_SyncUVToggle(Operator):
+    bl_idname = 'uv.sync_uv_toggle'
+    bl_label = 'Sync UV Toggle'
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH'
+
+    def execute(self, context):
+        tool_settings = context.tool_settings
+        convert_to_sync = not tool_settings.use_uv_select_sync
+        tool_settings.use_uv_select_sync = convert_to_sync
+
+        self.sync_uv_selection_mode(convert_to_sync)
+
+        umeshes = utils.UMeshes()
+        for umesh in umeshes:
+            if convert_to_sync:
+                self.to_sync(umesh)
+            else:
+                self.disable_sync(umesh)
+        return umeshes.update()
+
+    @staticmethod
+    def sync_uv_selection_mode(sync):
+        if sync:
+            if utils.get_select_mode_uv() == 'VERTEX':
+                utils.set_select_mode_mesh('VERTEX')
+            elif utils.get_select_mode_uv() == 'EDGE':
+                utils.set_select_mode_mesh('EDGE')
+            else:
+                utils.set_select_mode_mesh('FACE')
+
+        else:
+            if utils.get_select_mode_mesh() == 'VERTEX':
+                utils.set_select_mode_uv('VERTEX')
+            elif utils.get_select_mode_mesh() == 'EDGE':
+                utils.set_select_mode_uv('EDGE')
+            else:
+                if utils.get_select_mode_uv() == 'ISLAND':
+                    return
+                utils.set_select_mode_uv('FACE')
+
+    @staticmethod
+    def disable_sync(umesh):
+        uv_layer = umesh.uv_layer
+        if utils.get_select_mode_mesh() == 'FACE':
+            if PyBMesh.is_full_face_selected(umesh.bm):
+                for face in umesh.bm.faces:
+                    for loop in face.loops:
+                        loop_uv = loop[uv_layer]
+                        loop_uv.select = True
+                        loop_uv.select_edge = True
+                return
+            for face in umesh.bm.faces:
+                sel_state = face.select
+                for loop in face.loops:
+                    loop_uv = loop[uv_layer]
+                    loop_uv.select = sel_state
+                    loop_uv.select_edge = sel_state
+                face.select = True
+
+        elif utils.get_select_mode_mesh() == 'VERTEX':
+            for vert in umesh.bm.verts:
+                if hasattr(vert, 'link_loops'):
+                    sel_state = vert.select
+                    for loop in vert.link_loops:
+                        loop_uv = loop[uv_layer]
+                        loop_uv.select = sel_state
+                        loop_uv.select_edge = sel_state
+            if not PyBMesh.is_full_face_selected(umesh.bm):
+                for face in umesh.bm.faces:
+                    face.select = True
+
+        else:
+            for edge in umesh.bm.edges:
+                if hasattr(edge, 'link_loops'):
+                    sel_state = edge.select
+                    for loop in edge.link_loops:
+                        loop_uv = loop[uv_layer]
+                        loop_uv.select = sel_state
+                        loop_uv.select_edge = sel_state
+            if not PyBMesh.is_full_face_selected(umesh.bm):
+                for face in umesh.bm.faces:
+                    face.select = True
+
+    @staticmethod
+    def to_sync(umesh):
+        uv_layer = umesh.uv_layer
+        if utils.get_select_mode_uv() in ('FACE', 'ISLAND'):
+            for face in umesh.bm.faces:
+                face.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in face.loops)
+
+        elif utils.get_select_mode_uv() == 'VERTEX':
+            for vert in umesh.bm.verts:
+                if hasattr(vert, 'link_loops'):
+                    vert.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in vert.link_loops)
+        else:
+            for edge in umesh.bm.edges:
+                if hasattr(edge, 'link_loops'):
+                    edge.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in edge.link_loops)
+        umesh.bm.select_flush_mode()
+
+
+def univ_header_sync_btn(self, context):
+    if context.mode == 'EDIT_MESH':
+        layout = self.layout
+        layout.operator('uv.sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
+
+def univ_header_split_btn(self, _context):
     layout = self.layout
-    layout.operator('wm.split_uv_toggle', text='', icon='ARROW_LEFTRIGHT')
+    layout.operator('wm.split_uv_toggle', text='', icon='SCREEN_BACK')

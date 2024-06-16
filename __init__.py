@@ -2,40 +2,28 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (0, 0, 1),
+    "version": (0, 1, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
 }
 
 import bpy
+import traceback
 
-# from bpy.types import Menu, Operator, Panel, PropertyGroup
-# from bpy.props import (
-#     StringProperty,
-#     BoolProperty,
-#     IntProperty,
-#     IntVectorProperty,
-#     FloatProperty,
-#     FloatVectorProperty,
-#     EnumProperty,
-#     PointerProperty,
-# )
-
-from . import types
-from . import preferences
-from .types import bbox
-from .types import btypes
-from .types import island
-from .utils import bench
-from .utils import other
-from .utils import text
-from .utils import ubm
-from .utils import umath
+from . import types        # noqa: F401
+from . import preferences  # noqa: F401
+from .types import bbox    # noqa: F401
+from .types import btypes  # noqa: F401
+from .types import island  # noqa: F401
+from .utils import bench   # noqa: F401
+from .utils import other   # noqa: F401
+from .utils import text    # noqa: F401
+from .utils import ubm     # noqa: F401
+from .utils import umath   # noqa: F401
 from .operators import transform
-from .operators import other
+from .operators import toggle
 from . import ui
-
 
 classes = (
     transform.UNIV_OT_Align,
@@ -46,7 +34,8 @@ classes = (
     transform.UNIV_OT_Sort,
     transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
-    other.UNIV_OT_SplitUVToggle,
+    toggle.UNIV_OT_SplitUVToggle,
+    toggle.UNIV_OT_SyncUVToggle,
     ui.UNIV_PT_General
 )
 
@@ -63,19 +52,21 @@ def register():
     for c in classes:
         bpy.utils.register_class(c)
 
-    bpy.types.VIEW3D_HT_header.prepend(other.univ_header_btn)
-    bpy.types.IMAGE_HT_header.prepend(other.univ_header_btn)
+    bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
+    bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
+    bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
 
 def unregister():
     try:
         for c in reversed(classes):
             bpy.utils.unregister_class(c)
-    except Exception as e:
-        print(e)
+    except Exception:  # noqa
+        traceback.print_exc()
 
-    bpy.types.VIEW3D_HT_header.remove(other.univ_header_btn)
-    bpy.types.IMAGE_HT_header.remove(other.univ_header_btn)
+    bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
+    bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
+    bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
 
 
 if __name__ == "__main__":
