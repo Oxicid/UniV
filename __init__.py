@@ -2,7 +2,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (0, 1, 0),
+    "version": (0, 1, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -24,8 +24,12 @@ from .utils import umath   # noqa: F401
 from .operators import transform
 from .operators import toggle
 from . import ui
+from . import keymaps
+from . import preferences
 
 classes = (
+    preferences.UNIV_AddonPreferences,
+    keymaps.UNIV_RestoreKeymaps,
     transform.UNIV_OT_Align,
     transform.UNIV_OT_Fill,
     transform.UNIV_OT_Crop,
@@ -56,8 +60,12 @@ def register():
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
+    keymaps.add_keymaps()
+
 
 def unregister():
+    keymaps.remove_keymaps()
+
     try:
         for c in reversed(classes):
             bpy.utils.unregister_class(c)
