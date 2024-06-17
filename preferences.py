@@ -7,6 +7,12 @@ from bpy.props import *
 def prefs():
     return bpy.context.preferences.addons[__package__].preferences
 
+def force_debug():
+    return prefs().debug == 'FORCE'
+
+def debug():
+    return prefs().debug == 'ENABLED'
+
 def get_keymap_entry_item(km, kmi):
     for i, km_item in enumerate(km.keymap_items):
         if km.keymap_items.keys()[i] == kmi.idname:
@@ -17,19 +23,30 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
     tab: EnumProperty(
-        items=[
+        items=(
+            ('GENERAL', 'General', ''),
             ('KEYMAPS', 'Keymaps', ''),
-        ],
-        default='KEYMAPS')
+        ),
+        default='GENERAL')
 
-            # ('GENERAL', 'General', ''),  # noqa
             # ('UI', 'UI', ''),  # noqa
+
+    debug: EnumProperty(name='Debug',
+        items=(
+            ('DISABLED', 'Disabled', ''),
+            ('ENABLED', 'Enabled', ''),
+            ('FORCE', 'Force', ''),
+        ),
+        default='DISABLED')
 
     def draw(self, context):
         layout = self.layout
 
-        # row = layout.row()
-        # row.prop(self, "tab", expand=True)
+        row = layout.row()
+        row.prop(self, "tab", expand=True)
+
+        if self.tab == 'GENERAL':
+            layout.prop(self, "debug", emboss=True)
 
         if self.tab == 'KEYMAPS':
             layout.operator('wm.univ_restore_keymaps', text='Restore')
