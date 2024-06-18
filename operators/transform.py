@@ -1055,17 +1055,11 @@ class UNIV_OT_Distribute(Operator):
     bl_description = 'Distribute'
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('TO_CURSOR', 'To Cursor', ''),
-        ('SPACE', 'Space', ''),
-        ('SPACE_TO_CURSOR', 'Space to Cursor', ''),
-    ))
-        # ('OVERLAPPED', 'Overlapped', ''),  # noqa
-        # ('OVERLAPPED_TO_CURSOR', 'Overlapped to Cursor', '')  # noqa
-
     axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
+    to_cursor: bpy.props.BoolProperty(name='To Cursor', default=False)
+    overlapped: bpy.props.BoolProperty(name='Overlapped', default=False)
+    space: bpy.props.BoolProperty(name='Space', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -1076,156 +1070,164 @@ class UNIV_OT_Distribute(Operator):
         return True
 
     def invoke(self, context, event):
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.mode = 'DEFAULT'
-            case True, False, False:
-                self.mode = 'TO_CURSOR'
-            case False, False, True:
-                self.mode = 'SPACE'
-            # case False, False, True:
-            #     self.mode = 'SPACE_TO_CURSOR'
-            # case False, True, False:
-            #     self.mode = 'OVERLAPPED'
-            case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n")
-                return {'CANCELLED'}
+        self.to_cursor = event.ctrl
+        self.overlapped = event.shift
+        self.space = event.alt
         return self.execute(context)
 
     def execute(self, context):
-        return UNIV_OT_Distribute.distribute(self.mode, self.axis, self.padding, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.distribute(sync=context.scene.tool_settings.use_uv_select_sync)
 
-    @staticmethod
-    def distribute(mode, axis, padding, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
+    def distribute(self, sync):
+        umeshes = utils.UMeshes(report=self.report)
         cursor_loc = None
-        if 'CURSOR' in mode:
+        if self.to_cursor:
             if not (cursor_loc := utils.get_cursor_location()):
                 umeshes.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
 
-        distribute_args = (axis, padding, sync,  umeshes, cursor_loc)
+        distribute_args = (sync,  umeshes, cursor_loc)
 
-        match mode:
-            case 'DEFAULT' | 'TO_CURSOR':
-                UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Distribute.distribute_ex(*distribute_args, extended=False)
-
-            case 'SPACE' | 'SPACE_TO_CURSOR':
-                UNIV_OT_Distribute.distribute_space(*distribute_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Distribute.distribute_space(*distribute_args, extended=False)
-            #
-            # case 'OVERLAPPED':
-            #     UNIV_OT_Distribute.distribute_overlapped(*distribute_args, extended=True)
-            #     if not update_obj:
-            #         UNIV_OT_Distribute.distribute_overlapped(*distribute_args, extended=False)
-            case _:
-                raise NotImplementedError(mode)
-
+        if self.space:
+            self.distribute_space(*distribute_args, extended=True)
+            if not umeshes.final():
+                self.distribute_space(*distribute_args, extended=False)
+        else:
+            self.distribute_ex(*distribute_args, extended=True)
+            if not umeshes.final():
+                self.distribute_ex(*distribute_args, extended=False)
         return umeshes.update()
 
-    @staticmethod
-    def distribute_ex(axis, padding, sync,  umeshes, cursor, extended=True):
-        islands_bboxes_points = []
-        general_bbox = BBox()
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                for island in islands:
-                    bbox = island.calc_bbox()
-                    general_bbox.union(bbox)
-                    islands_bboxes_points.append((island, bbox))
-            umesh.update_tag = bool(islands)
+    def distribute_ex(self, sync,  umeshes, cursor, extended=True):
+        func = self.distribute_preprocessing_overlap if self.overlapped else self.distribute_preprocessing
+        _islands, general_bbox = func(sync, umeshes, extended)
 
-        if len(islands_bboxes_points) <= 2:
-            if len(islands_bboxes_points) != 0:
-                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found")
+        if len(_islands) <= 2:
+            if len(_islands) != 0:
+                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(_islands)} was found")
             return
 
-        if axis == 'AUTO':
+        if self.axis == 'AUTO':
             horizontal_distribute = general_bbox.width * 2 > general_bbox.height
         else:
-            horizontal_distribute = axis == 'X'
+            horizontal_distribute = self.axis == 'X'
 
         update_tag = False
+        cursor_offset = 0
         if horizontal_distribute:
-            islands_bboxes_points.sort(key=lambda a: a[1].xmin)
-            margin = general_bbox.min.x if cursor is None else cursor.x
-            for island, bbox in islands_bboxes_points:
-                width = bbox.width
-                update_tag |= island.set_position(Vector((margin, bbox.ymin)), _from=bbox.min)
-                margin += padding + width
+            _islands.sort(key=lambda a: a.bbox.xmin)
+            if cursor is None:
+                margin = general_bbox.min.x
+            else:
+                margin = cursor.x
+                cursor_offset += general_bbox.min.y - cursor.y
+
+            for island in _islands:
+                width = island.bbox.width
+                update_tag |= island.set_position(Vector((margin, island.bbox.ymin - cursor_offset)), _from=island.bbox.min)
+                margin += self.padding + width
         else:
-            islands_bboxes_points.sort(key=lambda a: a[1].ymin)
-            margin = general_bbox.min.y if cursor is None else cursor.y
-            for island, bbox in islands_bboxes_points:
-                height = bbox.height
-                update_tag |= island.set_position(Vector((bbox.xmin, margin)), _from=bbox.min)
-                margin += padding + height
+            _islands.sort(key=lambda a: a.bbox.ymin)
+            if cursor is None:
+                margin = general_bbox.min.y
+            else:
+                margin = cursor.y
+                cursor_offset += general_bbox.min.x - cursor.x
+
+            for island in _islands:
+                height = island.bbox.height
+                update_tag |= island.set_position(Vector((island.bbox.xmin - cursor_offset, margin)), _from=island.bbox.min)
+                margin += self.padding + height
         if not update_tag:
             umeshes.cancel_with_report(info='Islands is Distributed')
 
-    @staticmethod
-    def distribute_space(axis, padding, sync,  umeshes, cursor, extended=True):
-        islands_bboxes_points = []
-        general_bbox = BBox()
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                for island in islands:
-                    bbox = island.calc_bbox()
-                    general_bbox.union(bbox)
-                    islands_bboxes_points.append((island, bbox))
-            umesh.update_tag = bool(islands)
+    def distribute_space(self, sync, umeshes, cursor, extended=True):
+        func = self.distribute_preprocessing_overlap if self.overlapped else self.distribute_preprocessing
+        _islands, general_bbox = func(sync, umeshes, extended)
 
-        if len(islands_bboxes_points) <= 2:
-            if len(islands_bboxes_points) != 0:
-                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(islands_bboxes_points)} was found")
+        if len(_islands) <= 2:
+            if len(_islands) != 0:
+                umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(_islands)} was found")
             return
 
-        if axis == 'AUTO':
+        if self.axis == 'AUTO':
             horizontal_distribute = general_bbox.width * 2 > general_bbox.height
         else:
-            horizontal_distribute = axis == 'X'
+            horizontal_distribute = self.axis == 'X'
 
         update_tag = False
-
+        cursor_offset = 0
         if horizontal_distribute:
-            islands_bboxes_points.sort(key=lambda a: a[1].xmin)
+            _islands.sort(key=lambda a: a.bbox.xmin)
 
-            general_bbox.xmax += padding * (len(islands_bboxes_points) - 1)
-            start_space = general_bbox.xmin + islands_bboxes_points[0][1].half_width
-            end_space = general_bbox.xmax - islands_bboxes_points[-1][1].half_width
+            general_bbox.xmax += self.padding * (len(_islands) - 1)
+            start_space = general_bbox.xmin + _islands[0].bbox.half_width
+            end_space = general_bbox.xmax - _islands[-1].bbox.half_width
             if start_space == end_space:
                 umeshes.cancel_with_report(info=f"No distance to place UV")
                 return
-            # if cursor:
-            #     start_space += start_space - cursor.x
-            #     end_space += end_space - cursor.x
-            space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
 
-            for (island, bbox), space_point in zip(islands_bboxes_points, space_points):
-                update_tag |= island.set_position(Vector((space_point, bbox.center_y)), _from=bbox.center)
+            if cursor:
+                diff = end_space - start_space
+                start_space += cursor.x - start_space
+                end_space = start_space + diff
+                cursor_offset += general_bbox.ymin - cursor.y
+            space_points = np.linspace(start_space, end_space, len(_islands))
+
+            for island, space_point in zip(_islands, space_points):
+                update_tag |= island.set_position(Vector((space_point, island.bbox.center_y - cursor_offset)), _from=island.bbox.center)
         else:
-            islands_bboxes_points.sort(key=lambda a: a[1].ymin)
-            general_bbox.ymax += padding * (len(islands_bboxes_points) - 1)
-            start_space = general_bbox.ymin + islands_bboxes_points[0][1].half_height
-            end_space = general_bbox.ymax - islands_bboxes_points[-1][1].half_height
+            _islands.sort(key=lambda a: a.bbox.ymin)
+            general_bbox.ymax += self.padding * (len(_islands) - 1)
+            start_space = general_bbox.ymin + _islands[0].bbox.half_height
+            end_space = general_bbox.ymax - _islands[-1].bbox.half_height
             if start_space == end_space:
                 umeshes.cancel_with_report(info=f"No distance to place UV")
                 return
             if cursor:
                 start_space += start_space - cursor.y
                 end_space += end_space - cursor.y
-            space_points = np.linspace(start_space, end_space, len(islands_bboxes_points))
 
-            for (island, bbox), space_point in zip(islands_bboxes_points, space_points):
-                update_tag |= island.set_position(Vector((bbox.center_x, space_point)), _from=bbox.center)
+            if cursor:
+                diff = end_space - start_space
+                start_space += cursor.y - start_space
+                end_space = start_space + diff
+                cursor_offset += general_bbox.xmin - cursor.x
+
+            space_points = np.linspace(start_space, end_space, len(_islands))
+
+            for island, space_point in zip(_islands, space_points):
+                update_tag |= island.set_position(Vector((island.bbox.center_x - cursor_offset, space_point)), _from=island.bbox.center)
 
         if not update_tag:
             umeshes.cancel_with_report(info='Islands is Distributed')
 
+    @staticmethod
+    def distribute_preprocessing(sync, umeshes, extended):
+        _islands: list[AdvIsland] = []
+        general_bbox = BBox()
+        for umesh in umeshes:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                general_bbox.union(adv_islands.calc_bbox())
+                _islands.extend(adv_islands)
+            umesh.update_tag = bool(adv_islands)
+        return _islands, general_bbox
+
+    @staticmethod
+    def distribute_preprocessing_overlap(sync, umeshes, extended):
+        _islands: list[AdvIsland] = []
+        for umesh in umeshes:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_coords()
+                _islands.extend(adv_islands)
+            umesh.update_tag = bool(adv_islands)
+
+        general_bbox = BBox()
+        union_islands_groups = UnionIslands.calc_overlapped_island_groups(_islands)
+        for union_island in union_islands_groups:
+            general_bbox.union(union_island.bbox)
+        return union_islands_groups, general_bbox
 
 class UNIV_OT_Home(Operator):
     bl_idname = 'uv.univ_home'
