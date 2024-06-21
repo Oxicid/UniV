@@ -3,14 +3,23 @@ import bmesh
 import math
 import mathutils
 import typing
+import enum
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
 
 from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
+
+from .. import utils
 from ..utils import umath, timer  # noqa
 from . import btypes
 from. import BBox
+
+
+class eInfoSelectFaceIsland(enum.IntEnum):
+    UNSELECTED = 0
+    HALF_SELECTED = 1
+    FULL_SELECTED = 2
 
 
 class FaceIsland:
@@ -83,6 +92,10 @@ class FaceIsland:
                 loop[self.uv_layer].uv *= scale
         return True
 
+    def set_tag(self, tag=True):
+        for f in self:
+            f.tag = tag
+
     def is_flipped(self) -> bool:
         for f in self.faces:
             area = 0.0
@@ -116,33 +129,171 @@ class FaceIsland:
         points = [l[self.uv_layer].uv for f in self.faces for l in f.loops]  # Warning: points referenced to uv
         return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
 
-    def __select_ex(self, state, force, sync):
-        if sync is None:
-            sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        if sync or force:
+    def __select_force(self, state, sync):
+        if sync:
             for face in self.faces:
                 face.select = state
                 for e in face.edges:
                     e.select = state
                 for v in face.verts:
                     v.select = state
-        if not sync or force:
+        else:
             for face in self.faces:
                 for l in face.loops:
                     luv = l[self.uv_layer]
                     luv.select = state
                     luv.select_edge = state
 
-    def select(self, force=False, sync=None):
-        self.__select_ex(True, force, sync)
+    def __select_ex(self, state, sync, mode):
+        if sync:
+            if mode == 'FACE':
+                for face in self.faces:
+                    face.select = state
+            elif mode == 'VERTEX':
+                for face in self.faces:
+                    for v in face.verts:
+                        v.select = state
+            else:
+                for face in self.faces:
+                    for e in face.edges:
+                        e.select = state
+        else:
+            if mode == 'VERTEX':
+                for face in self.faces:
+                    for l in face.loops:
+                        l[self.uv_layer].select = state
+            else:
+                for face in self.faces:
+                    for l in face.loops:
+                        l[self.uv_layer].select_edge = state
 
-    def deselect(self, force=False, sync=None):
-        self.__select_ex(False, force, sync)
+    def select(self, mode, sync, force=False):
+        if force:
+            return self.__select_force(True, sync)
+        self.__select_ex(True, sync, mode)
+
+    def deselect(self, mode, sync, force=False):
+        if force:
+            return self.__select_force(False, sync)
+        self.__select_ex(False, sync, mode)
+
+    def __info_vertex_select(self) -> eInfoSelectFaceIsland:
+        uv_layer = self.uv_layer
+        loops = self[0].loops
+        if not sum(l[uv_layer].select for l in loops) == len(loops):
+            if any(l[uv_layer].select for face in self for l in face.loops):
+                return eInfoSelectFaceIsland.HALF_SELECTED
+            return eInfoSelectFaceIsland.UNSELECTED
+
+        iter_count = 0
+        selected_count = 0
+        for face in self:
+            for l in face.loops:
+                iter_count += 1
+                selected_count += l[uv_layer].select
+        if selected_count == 0:
+            return eInfoSelectFaceIsland.UNSELECTED
+        elif selected_count == iter_count:
+            return eInfoSelectFaceIsland.FULL_SELECTED
+        else:
+            return eInfoSelectFaceIsland.HALF_SELECTED
+
+    def __info_crn_select(self) -> eInfoSelectFaceIsland:
+        uv_layer = self.uv_layer
+        loops = self[0].loops
+        if not sum(l[uv_layer].select_edge for l in loops) == len(loops):
+            if any(l[uv_layer].select_edge for face in self for l in face.loops):
+                return eInfoSelectFaceIsland.HALF_SELECTED
+            return eInfoSelectFaceIsland.UNSELECTED
+
+        iter_count = 0
+        selected_count = 0
+        for face in self:
+            for l in face.loops:
+                iter_count += 1
+                selected_count += l[uv_layer].select_edge
+        if selected_count == 0:
+            return eInfoSelectFaceIsland.UNSELECTED
+        elif selected_count == iter_count:
+            return eInfoSelectFaceIsland.FULL_SELECTED
+        else:
+            return eInfoSelectFaceIsland.HALF_SELECTED
+
+    def __info_vertex_select_sync(self) -> eInfoSelectFaceIsland:
+        verts: bmesh.types.BMVertSeq = self[0].verts
+        if not sum(v.select for v in verts) == len(verts):
+            if any(v.select for face in self for v in face.verts):
+                return eInfoSelectFaceIsland.HALF_SELECTED
+            return eInfoSelectFaceIsland.UNSELECTED
+
+        iter_count = 0
+        selected_count = 0
+        for face in self:
+            for v in face.verts:
+                iter_count += 1
+                selected_count += v.select
+
+        if selected_count == iter_count:
+            return eInfoSelectFaceIsland.FULL_SELECTED
+        else:
+            return eInfoSelectFaceIsland.HALF_SELECTED
+
+    def __info_edge_select_sync(self) -> eInfoSelectFaceIsland:
+        edges: bmesh.types.BMEdgeSeq = self[0].edges
+        if not sum(e.select for e in edges) == len(edges):
+            if any(e.select for face in self for e in face.edges):
+                return eInfoSelectFaceIsland.HALF_SELECTED
+            return eInfoSelectFaceIsland.UNSELECTED
+
+        iter_count = 0
+        selected_count = 0
+        for face in self:
+            for e in face.edges:
+                iter_count += 1
+                selected_count += e.select
+
+        if selected_count == iter_count:
+            return eInfoSelectFaceIsland.FULL_SELECTED
+        else:
+            return eInfoSelectFaceIsland.HALF_SELECTED
+
+    def __info_face_select_sync(self) -> eInfoSelectFaceIsland:
+        if not self[0].select:
+            if any(f.select for f in self):
+                return eInfoSelectFaceIsland.HALF_SELECTED
+            return eInfoSelectFaceIsland.UNSELECTED
+
+        iter_count = 0
+        selected_count = 0
+        for f in self:
+            iter_count += 1
+            selected_count += f.select
+
+        if selected_count == iter_count:
+            return eInfoSelectFaceIsland.FULL_SELECTED
+        else:
+            return eInfoSelectFaceIsland.HALF_SELECTED
+
+    def info_select(self, sync, mode=None) -> eInfoSelectFaceIsland:
+        if mode is None:
+            mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
+        if not sync:
+            if mode == 'VERTEX':
+                return self.__info_vertex_select()
+            else:
+                return self.__info_crn_select()
+        else:
+            if mode == 'VERTEX':
+                return self.__info_vertex_select_sync()
+            elif mode == 'EDGE':
+                return self.__info_edge_select_sync()
+            else:
+                return self.__info_face_select_sync()
 
     def __iter__(self):
         return iter(self.faces)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> BMFace:
         return self.faces[idx]
 
     def __len__(self):
@@ -615,7 +766,6 @@ class UnionIslands(Islands):
                         union_islands.append(isl)
                 compare_index += 1
         return islands_group
-
 
     def append(self, island):
         self.islands.append(island)

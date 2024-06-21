@@ -73,3 +73,6 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.operator('uv.univ_home', text='Home')
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_select_linked', text='Linked')

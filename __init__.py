@@ -23,6 +23,7 @@ from .utils import ubm     # noqa: F401
 from .utils import umath   # noqa: F401
 from .operators import transform
 from .operators import toggle
+from .operators import select
 from . import ui
 from . import keymaps
 from . import preferences
@@ -40,6 +41,7 @@ classes = (
     transform.UNIV_OT_Home,
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,
+    select.UNIV_OT_SelectLinked,
     ui.UNIV_PT_General
 )
 
