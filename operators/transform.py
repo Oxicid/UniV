@@ -39,6 +39,8 @@ class UNIV_OT_Crop(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         match event.ctrl, event.shift, event.alt:
             case False, False, False:
                 self.mode = 'DEFAULT'
@@ -343,7 +345,7 @@ class UNIV_OT_Align(Operator):
                     for island in islands:
                         bbox = island.calc_bbox()
                         all_groups.append((island, bbox, umesh.uv_layer))
-                    umesh.update_tag = bool(islands)
+                umesh.update_tag = bool(islands)
             else:
                 if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
                     all_groups.append((corners, umesh.uv_layer))
@@ -535,7 +537,15 @@ class UNIV_OT_Align(Operator):
     @staticmethod
     def align_cursor(direction: str, general_bbox, cursor_loc):
 
-        if loc := getattr(general_bbox, direction.lower(), False):
+        if direction in ('UPPER', 'BOTTOM'):
+            loc = getattr(general_bbox, direction.lower())
+            loc.x = cursor_loc.x
+            utils.set_cursor_location(loc)
+        elif direction in ('RIGHT', 'LEFT'):
+            loc = getattr(general_bbox, direction.lower())
+            loc.y = cursor_loc.y
+            utils.set_cursor_location(loc)
+        elif loc := getattr(general_bbox, direction.lower(), False):
             utils.set_cursor_location(loc)
         elif direction == 'VERTICAL':
             utils.set_cursor_location(Vector((general_bbox.center.x, cursor_loc.y)))
@@ -644,6 +654,8 @@ class UNIV_OT_Flip(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         match event.ctrl, event.shift, event.alt:
             case False, False, False:
                 self.mode = 'DEFAULT'
@@ -828,6 +840,8 @@ class UNIV_OT_Rotate(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         match event.ctrl, event.shift, event.alt:
             case False, False, False:
                 self.mode = 'DEFAULT'
@@ -935,6 +949,8 @@ class UNIV_OT_Sort(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         self.to_cursor = event.ctrl
         self.overlapped = event.shift
         self.align = event.alt
@@ -1070,6 +1086,8 @@ class UNIV_OT_Distribute(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         self.to_cursor = event.ctrl
         self.overlapped = event.shift
         self.space = event.alt
@@ -1251,6 +1269,8 @@ class UNIV_OT_Home(Operator):
         return True
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
         match event.ctrl, event.shift, event.alt:
             case False, False, False:
                 self.mode = 'DEFAULT'

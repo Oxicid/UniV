@@ -62,7 +62,10 @@ def register():
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
-    keymaps.add_keymaps()
+    try:
+        keymaps.add_keymaps()
+    except AttributeError:  # noqa
+        traceback.print_exc()
 
 
 def unregister():
