@@ -31,6 +31,7 @@ from . import preferences
 classes = (
     preferences.UNIV_AddonPreferences,
     keymaps.UNIV_RestoreKeymaps,
+    # Transforms
     transform.UNIV_OT_Align,
     transform.UNIV_OT_Fill,
     transform.UNIV_OT_Crop,
@@ -39,9 +40,13 @@ classes = (
     transform.UNIV_OT_Sort,
     transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
+    # Toggles
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,
+    # Selects
     select.UNIV_OT_SelectLinked,
+    select.UNIV_OT_SelectView,
+    # UI
     ui.UNIV_PT_General
 )
 

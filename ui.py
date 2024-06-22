@@ -74,5 +74,11 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_home', text='Home')
 
+        # Select
+        col_align = col.column(align=True)
+        col_align.separator(factor=0.35)
+
         split = col_align.split(align=True)
-        split.operator('uv.univ_select_linked', text='Linked')
+        row = split.row(align=True)
+        row.operator('uv.univ_select_linked', text='Linked')
+        row.operator('uv.univ_select_view', text='View')
