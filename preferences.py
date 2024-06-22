@@ -13,12 +13,6 @@ def force_debug():
 def debug():
     return prefs().debug == 'ENABLED'
 
-def get_keymap_entry_item(km, kmi):
-    for i, km_item in enumerate(km.keymap_items):
-        if km.keymap_items.keys()[i] == kmi.idname:
-            return km_item
-    return None
-
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -27,7 +21,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             ('GENERAL', 'General', ''),
             ('KEYMAPS', 'Keymaps', ''),
         ),
-        default='GENERAL')
+        default='KEYMAPS')
 
             # ('UI', 'UI', ''),  # noqa
 
@@ -53,10 +47,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             box = layout.box()
             split = box.split()
             col = split.column()
-            kc = context.window_manager.keyconfigs.user
+
+            kc = context.window_manager.keyconfigs.addon
 
             for km, kmi in keymaps.keys:
-                km = kc.keymaps[km.name]
+                km = km.active()
                 col.context_pointer_set("keymap", km)
-                if _kmi := get_keymap_entry_item(km, kmi):
-                    rna_keymap_ui.draw_kmi([], kc, km, get_keymap_entry_item(km, kmi), col, 0)
+                rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
