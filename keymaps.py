@@ -190,8 +190,8 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
 
     def execute(self, context):
         global keys
-        for km, _ in keys:
-            km.restore_to_default()
+        for km, kmi in keys:
+            km.restore_item_to_default(kmi)
         remove_keymaps()
         add_keymaps()
         return {'FINISHED'}
