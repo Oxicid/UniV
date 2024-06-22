@@ -59,9 +59,7 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_rotate', text='Rot CCW').rot_dir = 'CCW'
-        row = split.row(align=True)
-        row.operator('uv.univ_rotate', text='Rot CW').rot_dir = 'CW'
+        split.operator('uv.univ_rotate', text='Rotate')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_flip', text='Flip')

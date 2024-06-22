@@ -14,15 +14,53 @@ def add_keymaps():
     keys.append((km, kmi))
 
     km = kc.keymaps.new(name='UV Editor')
-    kmi = km.keymap_items.new('uv.sync_uv_toggle', 'ACCENT_GRAVE', 'PRESS', repeat=True)
+    kmi = km.keymap_items.new('uv.sync_uv_toggle', 'ACCENT_GRAVE', 'PRESS')
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True, repeat=True)
+    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = False
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True, repeat=True)
+    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = True
+    keys.append((km, kmi))
+
+    # Rotate
+    ## Default. CW.
+    ## DOUBLE_CLICK + R doesn't work, I'll have to set it to 'FIVE'.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
+    kmi.properties.rot_dir = 'CW'
+    kmi.properties.mode = 'DEFAULT'
+    keys.append((km, kmi))
+
+    ## Default. CCW.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', alt=True)
+    kmi.properties.rot_dir = 'CCW'
+    kmi.properties.mode = 'DEFAULT'
+    keys.append((km, kmi))
+
+    ## Default. CW. By Cursor.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True)
+    kmi.properties.rot_dir = 'CW'
+    kmi.properties.mode = 'BY_CURSOR'
+    keys.append((km, kmi))
+
+    ## Default. CCW. By Cursor.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True, alt=True)
+    kmi.properties.rot_dir = 'CCW'
+    kmi.properties.mode = 'BY_CURSOR'
+    keys.append((km, kmi))
+
+    ## Default. CW. Individual.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True)
+    kmi.properties.rot_dir = 'CW'
+    kmi.properties.mode = 'INDIVIDUAL'
+    keys.append((km, kmi))
+
+    ## Default. CCW. Individual.
+    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True, alt=True)
+    kmi.properties.rot_dir = 'CCW'
+    kmi.properties.mode = 'INDIVIDUAL'
     keys.append((km, kmi))
 
     # Align operator

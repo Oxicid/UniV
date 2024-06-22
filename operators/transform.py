@@ -818,18 +818,14 @@ class UNIV_OT_Rotate(Operator):
     bl_description = 'Rotate CW and Rotate CCW'
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('BY_CURSOR', 'By cursor', ''),
-        ('INDIVIDUAL', 'Individual', ''),
-        ('DOUBLE', 'Double', ''),
-        ('DOUBLE_INDIVIDUAL', 'Double Individual', ''),
-        ('DOUBLE_BY_CURSOR', 'Double by Cursor', '')
-        # ('EXPAND', 'Double by Cursor', '')  # by tile
-    ))
-
-    rot_dir: bpy.props.EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
-    angle: bpy.props.FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
+    mode: EnumProperty(name='Mode',
+                       default='DEFAULT',
+                       items=(('DEFAULT', 'Default', ''),
+                              ('INDIVIDUAL', 'Individual', ''),
+                              ('BY_CURSOR', 'By Cursor', ''))
+                       )
+    rot_dir: EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
+    angle: FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
 
     @classmethod
     def poll(cls, context):
@@ -842,58 +838,44 @@ class UNIV_OT_Rotate(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.mode = 'DEFAULT'
-            case True, False, False:
-                self.mode = 'BY_CURSOR'
-            case False, True, False:
-                self.mode = 'INDIVIDUAL'
-            case False, False, True:
-                self.mode = 'DOUBLE'
-            case False, True, True:
-                self.mode = 'DOUBLE_INDIVIDUAL'
-            case True, True, True:
-                self.mode = 'DOUBLE_BY_CURSOR'
-            case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n")
-                return {'CANCELLED'}
+
+        self.rot_dir = 'CCW' if event.alt else 'CW'
+        if event.shift:
+            self.mode = 'INDIVIDUAL'
+        elif event.ctrl:
+            self.mode = 'BY_CURSOR'
+        else:
+            self.mode = 'DEFAULT'
         return self.execute(context)
 
     def execute(self, context):
-        return self.rotate(self.mode, self.angle, self.rot_dir, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.rotate(sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
 
-    @staticmethod
-    def rotate(mode, angle, rot_dir, sync, report=None):
+    def rotate(self, sync, report=None):
         umeshes = utils.UMeshes(report=report)
-        if 'DOUBLE' in mode:
-            angle *= 2.0
-        if rot_dir == 'CCW':
-            angle = -angle
+        angle = (-self.angle) if self.rot_dir == 'CCW' else self.angle
         flip_args = (angle, sync, umeshes)
 
-        match mode:
-            case 'DEFAULT' | 'DOUBLE':
-                UNIV_OT_Rotate.rotate_ex(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Rotate.rotate_ex(*flip_args, extended=False)
+        if self.mode == 'DEFAULT':
+            UNIV_OT_Rotate.rotate_ex(*flip_args, extended=True)
+            if not umeshes.final():
+                UNIV_OT_Rotate.rotate_ex(*flip_args, extended=False)
 
-            case 'BY_CURSOR' | 'DOUBLE_BY_CURSOR':
-                if not (cursor_loc := utils.get_cursor_location()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
+        elif self.mode == 'BY_CURSOR':
+            if not (cursor_loc := utils.get_cursor_location()):
+                if report:
+                    report({'INFO'}, "Cursor not found")
+                return {'CANCELLED'}
+            UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
+            if not umeshes.final():
+                UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
 
-            case 'INDIVIDUAL' | 'DOUBLE_INDIVIDUAL':
-                UNIV_OT_Rotate.rotate_individual(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Rotate.rotate_individual(*flip_args, extended=False)
-            case _:
-                raise NotImplementedError(mode)
+        elif self.mode == 'INDIVIDUAL':
+            UNIV_OT_Rotate.rotate_individual(*flip_args, extended=True)
+            if not umeshes.final():
+                UNIV_OT_Rotate.rotate_individual(*flip_args, extended=False)
+        else:
+            raise NotImplementedError()
 
         return umeshes.update()
 
