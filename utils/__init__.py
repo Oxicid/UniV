@@ -12,6 +12,7 @@ from .bench import timer, profile
 from . import umath
 from .umath import *
 from .other import *
+from .ubm import *
 from ..types import PyBMesh
 
 class UMesh:

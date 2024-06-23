@@ -144,7 +144,7 @@ class FaceIsland:
                     luv.select = state
                     luv.select_edge = state
 
-    def __select_ex(self, state, sync, mode):
+    def _select_ex(self, state, sync, mode):
         if sync:
             if mode == 'FACE':
                 for face in self.faces:
@@ -170,12 +170,12 @@ class FaceIsland:
     def select(self, mode, sync, force=False):
         if force:
             return self.__select_force(True, sync)
-        self.__select_ex(True, sync, mode)
+        self._select_ex(True, sync, mode)
 
     def deselect(self, mode, sync, force=False):
         if force:
             return self.__select_force(False, sync)
-        self.__select_ex(False, sync, mode)
+        self._select_ex(False, sync, mode)
 
     def __info_vertex_select(self) -> eInfoSelectFaceIsland:
         uv_layer = self.uv_layer
@@ -274,7 +274,9 @@ class FaceIsland:
         else:
             return eInfoSelectFaceIsland.HALF_SELECTED
 
-    def info_select(self, sync, mode=None) -> eInfoSelectFaceIsland:
+    def info_select(self, sync=None, mode=None) -> eInfoSelectFaceIsland:
+        if sync is None:
+            sync = bpy.context.scene.tool_settings.use_uv_select_sync
         if mode is None:
             mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
         if not sync:
@@ -310,6 +312,7 @@ class AdvIsland(FaceIsland):
         self.convex_coords = []
         self._bbox: BBox | None = None
         self.tag = True
+        self._select_state = None
 
     def move(self, delta: Vector) -> bool:
         if self._bbox is not None:
@@ -363,6 +366,13 @@ class AdvIsland(FaceIsland):
         if self._bbox is None:
             self.calc_bbox()
         return self._bbox
+
+    @property
+    def select_state(self):
+        if self._select_state is None:
+            self._select_state = self.info_select()
+        else:
+            return self._select_state
 
     def calc_convex_points(self):
         if self.flat_coords:

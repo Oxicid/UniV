@@ -517,14 +517,14 @@ class BBox:
     def draw_data_verts(self):
         return [self.left_bottom, self.left_upper, self.right_upper, self.right_bottom]
 
-    def draw_data_edges(self):
+    def draw_data_lines(self):
         lb = self.left_bottom
         lu = self.left_upper
         ru = self.right_upper
         rb = self.right_bottom
         return [lb, lu, lu, ru, ru, rb, rb, lb]
 
-    def draw_data_faces(self):
+    def draw_data_tris(self):
         lb = self.left_bottom
         lu = self.left_upper
         ru = self.right_upper
@@ -535,7 +535,7 @@ class BBox:
         return copy.copy(self)
 
     def __contains__(self, pt_or_bbox) -> bool:
-        if isinstance(BBox, pt_or_bbox):
+        if isinstance(pt_or_bbox, BBox):
             bbox = pt_or_bbox
             return (self.xmin <= bbox.xmin) and (self.xmax >= bbox.xmax) and \
                    (self.ymin <= bbox.ymin) and (self.ymax >= bbox.ymax)  # noqa
