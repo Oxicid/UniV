@@ -13,7 +13,7 @@ AREA: bpy.types.Area | None = None
 AREA_TICKS: bool = False
 
 class UNIV_OT_SplitUVToggle(Operator):
-    bl_idname = 'wm.split_uv_toggle'
+    bl_idname = 'wm.univ_split_uv_toggle'
     bl_label = 'Split UV Toggle'
 
     mode: EnumProperty(name='Mode',
@@ -267,7 +267,7 @@ class UNIV_OT_SplitUVToggle(Operator):
             return False
 
 class UNIV_OT_SyncUVToggle(Operator):
-    bl_idname = 'uv.sync_uv_toggle'
+    bl_idname = 'uv.univ_sync_uv_toggle'
     bl_label = 'Sync UV Toggle'
 
     @classmethod
@@ -373,8 +373,8 @@ class UNIV_OT_SyncUVToggle(Operator):
 def univ_header_sync_btn(self, context):
     if context.mode == 'EDIT_MESH':
         layout = self.layout
-        layout.operator('uv.sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
+        layout.operator('uv.univ_sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
 
 def univ_header_split_btn(self, _context):
     layout = self.layout
-    layout.operator('wm.split_uv_toggle', text='', icon='SCREEN_BACK')
+    layout.operator('wm.univ_split_uv_toggle', text='', icon='SCREEN_BACK')
