@@ -80,3 +80,7 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         row.operator('uv.univ_select_linked', text='Linked')
         row.operator('uv.univ_select_view', text='View')
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_single', text='Single')

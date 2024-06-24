@@ -10,7 +10,7 @@ from .. import utils
 from .. import info
 from .. import types
 from ..utils import UMeshes, face_centroid_uv
-from ..types import Islands, AdvIslands, AdvIsland  # , FaceIsland, UnionIslands
+from ..types import Islands, AdvIslands, AdvIsland,  MeshIslands  # , UnionIslands
 
 from mathutils import Vector
 from time import perf_counter as time
@@ -215,7 +215,6 @@ class UNIV_OT_SelectView(Operator):
         ('SELECT', 'Select', ''),
         ('ADDITIONAL', 'Additional', ''),
         ('DESELECT', 'Deselect', ''),
-        ('DESELECT_INVERTED', 'Deselect Inverted', ''),
     ))
     face_mode = BoolProperty(name='Face Mode', default=False)
 
@@ -252,10 +251,9 @@ class UNIV_OT_SelectView(Operator):
         elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
         view_rect = types.View2D.get_rect(context.area.regions[-1].view2d).copy()
-        view_rect.xmax -= bpy.context.preferences.system.ui_scale  # category panel compensation
+        # view_rect.xmax -= bpy.context.preferences.system.ui_scale  # category panel compensation
 
         padding = -(view_rect.min_length * 0.1)
-
         view_rect.pad(Vector((padding, padding)))
 
         view_island = AdvIsland([], None, None)  # noqa
@@ -296,11 +294,6 @@ class UNIV_OT_SelectView(Operator):
                         if not f.select:
                             if face_centroid_uv(f, uv_layer) in bb:
                                 f.select = True
-                                # for v in f.verts:
-                                #     v.select = True
-                                #
-                                # for e in f.edges:
-                                #     e.select = True
                 else:
                     for f in umesh.bm.faces:
                         if f.select:
@@ -337,16 +330,9 @@ class UNIV_OT_SelectView(Operator):
                 bb = view_island.bbox
                 uv_layer = umesh.uv_layer
                 if sync:
-                    # TODO: Implement border selection safe
                     for f in umesh.bm.faces:
                         if face_centroid_uv(f, uv_layer) in bb:
                             f.select = True
-                            # # TODO: Optimize that moment
-                            # for v in f.verts:
-                            #     v.select = True
-                            #
-                            # for e in f.edges:
-                            #     e.select = True
                         else:
                             f.select = False
                             for v in f.verts:
@@ -412,11 +398,6 @@ class UNIV_OT_SelectView(Operator):
                         if f.select:
                             if face_centroid_uv(f, uv_layer) in bb:
                                 f.select = False
-                                # for v in f.verts:
-                                #     v.select = False
-                                #
-                                # for e in f.edges:
-                                #     e.select = False
 
                 else:
                     for f in umesh.bm.faces:
@@ -445,3 +426,109 @@ class UNIV_OT_SelectView(Operator):
                 if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
                     umesh.bm.select_flush_mode()
                 umesh.update_tag = has_update
+
+class UNIV_OT_Single(Operator):
+    bl_idname = 'uv.univ_single'
+    bl_label = 'Single'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITIONAL', 'Additional', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+    invert: BoolProperty(name='Invert', default=False)
+
+    def __init__(self):
+        self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.umeshes: UMeshes | None = None
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        self.invert = event.alt
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITIONAL'
+        else:
+            self.mode = 'SELECT'
+
+        return self.execute(context)
+
+    def execute(self, context):
+
+        if not self.sync:
+            if self.mode == 'ADDITIONAL':
+                bpy.ops.uv.univ_sync_uv_toggle()  # noqa
+            bpy.context.scene.tool_settings.use_uv_select_sync = True
+            self.sync = True
+
+        if utils.get_select_mode_mesh != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.select()
+
+        return self.umeshes.update()
+
+    def select(self):
+        total_selected = 0
+        total_deselected = 0
+
+        for umesh in self.umeshes:
+            if self.mode == 'ADDITIONAL' and types.PyBMesh.is_full_face_selected(umesh.bm):
+                umesh.update_tag = False
+                continue
+            elif self.mode == 'DESELECT' and types.PyBMesh.is_full_face_deselected(umesh.bm):
+                umesh.update_tag = False
+                continue
+
+            selected = 0
+            deselected = 0
+            if islands := AdvIslands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
+                islands.indexing()
+
+                for mesh_island in MeshIslands.calc_visible(umesh):
+                    indexes = {f.index for f in mesh_island}
+                    state = len(indexes) == 1
+                    if self.invert:
+                        state ^= 1
+
+                    if self.mode == 'SELECT':
+                        if state:
+                            mesh_island.select(mode='FACE')
+                            selected += 1
+                        else:
+                            mesh_island.deselect(mode='FACE')
+                            deselected += 1
+                    elif self.mode == 'DESELECT':
+                        if state:
+                            mesh_island.deselect(mode='FACE')
+                            deselected += 1
+                    else:
+                        if state:
+                            mesh_island.select(mode='FACE')
+                            deselected += 1
+
+            umesh.update_tag = bool(selected + deselected)
+
+        if total_selected or total_deselected:
+            selected_deselected_info = ''
+            if total_selected:
+                selected_deselected_info = f'Total selected = {total_selected}. '
+            if total_deselected:
+                selected_deselected_info += f'Total deselected = {total_deselected}'
+
+            self.report({'INFO'}, selected_deselected_info)
+

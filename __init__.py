@@ -13,14 +13,15 @@ import traceback
 
 from . import types        # noqa: F401
 from . import preferences  # noqa: F401
-from .types import bbox    # noqa: F401
-from .types import btypes  # noqa: F401
-from .types import island  # noqa: F401
 from .utils import bench   # noqa: F401
 from .utils import other   # noqa: F401
 from .utils import text    # noqa: F401
 from .utils import ubm     # noqa: F401
 from .utils import umath   # noqa: F401
+from .types import bbox    # noqa: F401
+from .types import btypes  # noqa: F401
+from .types import island  # noqa: F401
+from .types import mesh_island  # noqa: F401
 from .operators import transform
 from .operators import toggle
 from .operators import select
@@ -46,6 +47,7 @@ classes = (
     # Selects
     select.UNIV_OT_SelectLinked,
     select.UNIV_OT_SelectView,
+    select.UNIV_OT_Single,
     # UI
     ui.UNIV_PT_General
 )

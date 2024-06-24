@@ -437,7 +437,7 @@ class IslandsBase:
             return any(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def island_filter_is_all_corner_selected(island: list[BMFace], uv_layer: 'bmesh.types.BMLayerItem', sync: bool) -> bool:
+    def island_filter_is_all_corner_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         assert (sync is False)
         return all(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
@@ -693,6 +693,12 @@ class Islands(IslandsBase):
             general_bbox.union(island.calc_bbox())
         return general_bbox
 
+    def indexing(self):
+        for idx, island in enumerate(self.islands):
+            for face in island:
+                face.tag = True
+                face.index = idx
+
     def __iter__(self) -> typing.Iterator['FaceIsland | AdvIsland']:
         return iter(self.islands)
 
@@ -795,15 +801,11 @@ class AdvIslands(Islands):
         adv_islands = [AdvIsland(isl.faces, isl.bm, isl.uv_layer) for isl in islands]
         return cls(adv_islands, bm, uv_layer)
 
-    @staticmethod
-    def triangulate_islands(islands, bm):
-        loop_triangles = bm.calc_loop_triangles()
-        for idx, island in enumerate(islands):
-            for face in island:
-                face.tag = True
-                face.index = idx
+    def triangulate_islands(self):
+        loop_triangles = self.bm.calc_loop_triangles()
+        self.indexing()
 
-        islands_of_tris: list[list[tuple[BMLoop]]] = [[] for _ in range(len(islands))]
+        islands_of_tris: list[list[tuple[BMLoop]]] = [[] for _ in range(len(self.islands))]
         for tris in loop_triangles:
             face = tris[0].face
             if face.tag:
@@ -813,7 +815,7 @@ class AdvIslands(Islands):
     def calc_tris(self):
         if not self.islands:
             return False
-        triangulated_islands = AdvIslands.triangulate_islands(self.islands, self.bm)
+        triangulated_islands = self.triangulate_islands()
         for isl, tria_isl in zip(self.islands, triangulated_islands):
             isl.tris = tria_isl
         return True
