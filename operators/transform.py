@@ -1,15 +1,19 @@
 import bpy
 import math
+import random
+import bl_math
+
 import numpy as np
 
 from bpy.types import Operator
 from bpy.props import *
 
 from math import pi
+from mathutils import Vector
+
 from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands
 from .. import utils
 from .. import info
-from mathutils import Vector
 
 
 class UNIV_OT_Crop(Operator):
@@ -18,7 +22,7 @@ class UNIV_OT_Crop(Operator):
     bl_description = info.operator.crop_info
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('TO_CURSOR', 'To cursor', ''),
         ('TO_CURSOR_INDIVIDUAL', 'To cursor individual', ''),
@@ -27,14 +31,14 @@ class UNIV_OT_Crop(Operator):
         ('INDIVIDUAL_INPLACE', 'Individual Inplace', ''),
     ))
 
-    axis: bpy.props.EnumProperty(name='Axis', default='XY', items=(('XY', 'XY', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    padding: bpy.props.FloatProperty(name='Padding', description='Padding=1/TextureSize (1/256=0.0039)', default=0, soft_min=0, soft_max=1/256*4, max=0.49)
+    axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'XY', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    padding: FloatProperty(name='Padding', description='Padding=1/TextureSize (1/256=0.0039)', default=0, soft_min=0, soft_max=1/256*4, max=0.49)
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -61,7 +65,7 @@ class UNIV_OT_Crop(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        sync = context.scene.tool_settings.use_uv_select_sync
         return self.crop(self.mode, self.axis, self.padding, proportional=True, sync=sync, report=self.report)
 
     @staticmethod
@@ -198,7 +202,7 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        sync = context.scene.tool_settings.use_uv_select_sync
         return self.crop(self.mode, self.axis, self.padding, proportional=False, sync=sync, report=self.report)
 
     @staticmethod
@@ -225,7 +229,7 @@ class UNIV_OT_Align(Operator):
     bl_description = info.operator.align_info
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name="Mode", default='MOVE', items=(
+    mode: EnumProperty(name="Mode", default='MOVE', items=(
         ('ALIGN', 'Align', ''),
         ('MOVE', 'Move', ''),
         ('ALIGN_CURSOR', 'Move cursor to selected', ''),
@@ -236,13 +240,13 @@ class UNIV_OT_Align(Operator):
         # ('MOVE_COLLISION', 'Collision move', '')
     ))
 
-    direction: bpy.props.EnumProperty(name="Direction", default='UPPER', items=align_align_direction_items)
+    direction: EnumProperty(name="Direction", default='UPPER', items=align_align_direction_items)
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -269,7 +273,7 @@ class UNIV_OT_Align(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return self.align(self.mode, self.direction, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.align(self.mode, self.direction, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
 
     @staticmethod
     def align(mode, direction, sync, report=None):
@@ -635,7 +639,7 @@ class UNIV_OT_Flip(Operator):
     bl_description = 'FlipX and FlipY'
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('BY_CURSOR', 'By cursor', ''),
         ('INDIVIDUAL', 'Individual', ''),
@@ -643,13 +647,13 @@ class UNIV_OT_Flip(Operator):
         ('FLIPPED_INDIVIDUAL', 'Flipped Individual', ''),
     ))
 
-    axis: bpy.props.EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
+    axis: EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -674,7 +678,7 @@ class UNIV_OT_Flip(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return self.flip(self.mode, self.axis, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.flip(self.mode, self.axis, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
 
     @staticmethod
     def flip(mode, axis, sync, report=None):
@@ -829,9 +833,9 @@ class UNIV_OT_Rotate(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -849,7 +853,7 @@ class UNIV_OT_Rotate(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return self.rotate(sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.rotate(sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
 
     def rotate(self, sync, report=None):
         umeshes = utils.UMeshes(report=report)
@@ -915,18 +919,18 @@ class UNIV_OT_Sort(Operator):
     bl_description = 'Sort'
     bl_options = {'REGISTER', 'UNDO'}
 
-    axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
-    reverse: bpy.props.BoolProperty(name='Reverse', default=True)
-    to_cursor: bpy.props.BoolProperty(name='To Cursor', default=False)
-    align: bpy.props.BoolProperty(name='Align', default=False)
-    overlapped: bpy.props.BoolProperty(name='Overlapped', default=False)
+    axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
+    reverse: BoolProperty(name='Reverse', default=True)
+    to_cursor: BoolProperty(name='To Cursor', default=False)
+    align: BoolProperty(name='Align', default=False)
+    overlapped: BoolProperty(name='Overlapped', default=False)
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -1053,17 +1057,17 @@ class UNIV_OT_Distribute(Operator):
     bl_description = 'Distribute'
     bl_options = {'REGISTER', 'UNDO'}
 
-    axis: bpy.props.EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    padding: bpy.props.FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
-    to_cursor: bpy.props.BoolProperty(name='To Cursor', default=False)
-    overlapped: bpy.props.BoolProperty(name='Overlapped', default=False)
-    space: bpy.props.BoolProperty(name='Space', default=False)
+    axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
+    to_cursor: BoolProperty(name='To Cursor', default=False)
+    overlapped: BoolProperty(name='Overlapped', default=False)
+    space: BoolProperty(name='Space', default=False)
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -1235,7 +1239,7 @@ class UNIV_OT_Home(Operator):
     bl_description = 'Home'
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT', items=(
+    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('TO_CURSOR', 'To Cursor', ''),
     ))
@@ -1244,9 +1248,9 @@ class UNIV_OT_Home(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
+        if not context.active_object:
             return False
-        if bpy.context.active_object.mode != 'EDIT':
+        if context.active_object.mode != 'EDIT':
             return False
         return True
 
@@ -1267,7 +1271,7 @@ class UNIV_OT_Home(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return UNIV_OT_Home.home(self.mode, sync=bpy.context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return UNIV_OT_Home.home(self.mode, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
 
     @staticmethod
     def home(mode, sync, report):
@@ -1301,3 +1305,275 @@ class UNIV_OT_Home(Operator):
                     delta = Vector(round(-i + 0.5) for i in center) + cursor
                     changed |= island.move(delta)
             umesh.update_tag = changed
+
+
+class UNIV_OT_Random(Operator):
+    bl_idname = "uv.univ_random"
+    bl_label = "Random"
+    bl_description = "Randomize selected UV islands or faces"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    overlapped: BoolProperty(name='Overlapped', default=False)
+    between: BoolProperty(name='Between', default=False)
+    bound_between: EnumProperty(name='Bound Between', default='OFF', items=(('OFF', 'Off', ''), ('CROP', 'Crop', ''), ('CLAMP', 'Clamp', '')))
+    round_mode: EnumProperty(name='Round Mode', default='OFF', items=(('OFF', 'Off', ''), ('INT', 'Int', ''), ('STEPS', 'Steps', '')))
+    steps: FloatVectorProperty(name='Steps', description="Incorrectly works with Within Image Bounds",
+                               default=(0, 0), min=0, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
+    strength: FloatVectorProperty(name='Strength', default=(1, 1), min=-10, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
+    rotation: FloatProperty(name='Rotation Range', default=0, min=0, soft_max=math.pi * 2, subtype='ANGLE',
+        update=lambda self, _: setattr(self, 'rotation_steps', self.rotation) if self.rotation < self.rotation_steps else None)
+    rotation_steps: FloatProperty(name='Rotation Steps', default=0, min=0, max=math.pi, subtype='ANGLE',
+        update=lambda self, _: setattr(self, 'rotation', self.rotation_steps) if self.rotation < self.rotation_steps else None)
+    scale_factor: FloatProperty(name="Scale Factor", default=0, min=0, soft_max=1, subtype='FACTOR')
+    min_scale: FloatProperty(name='Min Scale', default=0.5, min=0, max=10, soft_min=0.1, soft_max=2,
+                             update=lambda self, _: setattr(self, 'max_scale', self.min_scale) if self.max_scale < self.min_scale else None)
+    max_scale: FloatProperty(name='Max Scale', default=2, min=0, max=10, soft_min=0.1, soft_max=2,
+                             update=lambda self, _: setattr(self, 'min_scale', self.max_scale) if self.max_scale < self.min_scale else None)
+    bool_bounds: BoolProperty(name="Within Image Bounds", default=False, description="Keep the UV faces/islands within the 0-1 UV domain.", )
+    rand_seed: IntProperty(name='Seed', default=0)
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, 'rand_seed')
+
+        if not self.between:
+            layout.prop(self, 'round_mode', slider=True)
+            if self.round_mode == 'STEPS':
+                layout.prop(self, 'steps', slider=True)
+            layout.prop(self, 'strength', slider=True)
+
+        if self.bound_between != 'CROP':
+            layout.prop(self, 'scale_factor', slider=True)
+            if self.scale_factor != 0:
+                layout.prop(self, 'min_scale', slider=True)
+                layout.prop(self, 'max_scale', slider=True)
+
+        layout.prop(self, 'rotation', slider=True)
+        if self.rotation != 0:
+            layout.prop(self, 'rotation_steps', slider=True)
+
+        if not self.between:
+            layout.prop(self, 'bool_bounds')
+
+        layout = self.layout.row()
+        if self.between:
+            layout.prop(self, 'bound_between', expand=True)
+        layout = self.layout.row()
+        layout.prop(self, 'overlapped', toggle=1)
+        layout.prop(self, 'between', toggle=1)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.overlapped = event.shift
+        self.between = event.alt
+        self.bound_between = 'CROP' if event.ctrl else 'OFF'
+        return self.execute(context)
+
+    def __init__(self):
+        self.seed = 1000
+        self.non_valid_counter = 0
+        self.umeshes: utils.UMeshes | None = None
+        self.all_islands: list[UnionIslands | AdvIsland] | None = None
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+
+    def execute(self, context):
+        self.non_valid_counter = 0
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.random_preprocessing()
+
+        if not self.all_islands:
+            self.random_preprocessing(extended=False)
+
+        if self.between:
+            self.random_between()
+        else:
+            self.random()
+        if self.non_valid_counter:
+            self.report({'INFO'}, f"Found {self.non_valid_counter} zero-sized islands that will not be affected by some effects")
+        return self.umeshes.update(info="No object for randomize.")
+
+    def random_preprocessing(self, extended=True):
+        self.seed = sum(id(umesh.obj) for umesh in self.umeshes) // len(self.umeshes) + self.rand_seed
+
+        self.all_islands = []
+        _islands = []
+        for umesh in self.umeshes:
+            if islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+                if self.overlapped:
+                    islands.calc_tris()
+                    islands.calc_flat_coords()
+                    _islands.extend(islands)
+                else:
+                    self.all_islands.extend(islands)
+            umesh.update_tag = bool(islands)
+
+        if self.overlapped:
+            self.all_islands = UnionIslands.calc_overlapped_island_groups(_islands)
+
+    def random(self):
+        bb_general = BBox()
+        for e_seed, island in enumerate(self.all_islands, start=100):
+            seed = e_seed + self.seed
+            random.seed(seed)
+            rand_rotation = random.uniform(-self.rotation, self.rotation)
+            random.seed(seed + 1000)
+            rand_scale = random.uniform(self.min_scale, self.max_scale)
+
+            if self.bool_bounds or self.rotation or self.scale_factor != 0:
+
+                bb = island.bbox
+                if bb.min_length == 0:
+                    self.non_valid_counter += 1
+                    continue
+
+                vec_origin = bb.center
+
+                if self.rotation:
+                    angle = rand_rotation
+                    if self.rotation_steps:
+                        angle = self.round_threshold(angle, self.rotation_steps)
+                        # clamp angle in self.rotation
+                        if angle > self.rotation:
+                            angle -= self.rotation_steps
+                        elif angle < -self.rotation:
+                            angle += self.rotation_steps
+
+                    if island.rotate(angle, vec_origin):
+                        bb.rotate_expand(angle)
+
+                scale = bl_math.lerp(1.0, rand_scale, self.scale_factor)
+
+                new_scale = 100
+                # Reset the scale to 0.5 to fit in the tile.
+                if self.bool_bounds:
+                    max_length = bb.max_length
+                    max_length_lock = 1.0
+                    if max_length * scale > max_length_lock:
+                        new_scale = max_length_lock / max_length
+
+                if self.scale_factor != 0 or new_scale < 1:
+                    # If the scale from random is smaller, we choose it
+                    scale = min(scale, new_scale)
+                    scale = Vector((scale, scale))
+                    island.scale(scale, pivot=vec_origin)
+                    bb.scale(scale)
+
+                if self.bool_bounds:
+                    to_center_delta = Vector((0.5, 0.5)) - vec_origin
+                    island.move(to_center_delta)
+                    bb.move(to_center_delta)
+                    bb_general.union(bb)
+
+            if self.bool_bounds:
+                move = Vector((
+                    min(bb_general.xmin, abs(1 - bb_general.xmax)) * max(min(self.strength.x, 1), -1),
+                    min(bb_general.ymin, abs(1 - bb_general.ymax)) * max(min(self.strength.y, 1), -1)
+                ))
+            else:
+                move = Vector((self.strength.x, self.strength.y))
+
+            if not (move.x or move.y):
+                continue
+
+            random.seed(seed + 2000)
+            rand_move_x = 2 * (random.random() - 0.5)
+            random.seed(seed + 3000)
+            rand_move_y = 2 * (random.random() - 0.5)
+
+            randmove = Vector((rand_move_x, rand_move_y)) * move
+
+            if self.round_mode == 'INT':
+                randmove = Vector([round(i) for i in randmove])
+            elif self.round_mode == 'STEPS':
+                # TODO bool_bounds for steps
+                if self.steps.x > 1e-05:
+                    randmove.x = self.round_threshold(randmove.x, self.steps.x)
+                if self.steps.y > 1e-05:
+                    randmove.y = self.round_threshold(randmove.y, self.steps.y)
+
+            if not self.bool_bounds:
+                island.move(randmove)
+
+    def random_between(self):
+        shaffle_island_bboxes: list[BBox] = [isl.bbox.copy() for isl in self.all_islands]
+        random.seed(self.seed)
+        random.shuffle(shaffle_island_bboxes)
+
+        for e_seed, island in enumerate(self.all_islands, start=100):
+            seed = e_seed + self.seed
+            random.seed(seed)
+            rand_rotation = random.uniform(-self.rotation, self.rotation)
+            random.seed(seed + 1000)
+            rand_scale = random.uniform(self.min_scale, self.max_scale)
+
+            bb = island.bbox
+            if self.rotation or self.scale_factor != 0:
+                if bb.min_length == 0:
+                    self.non_valid_counter += 1
+                    continue
+
+                vec_origin = bb.center
+
+                if self.rotation:
+                    angle = rand_rotation
+                    if self.rotation_steps:
+                        angle = self.round_threshold(angle, self.rotation_steps)
+                        # clamp angle in self.rotation
+                        if angle > self.rotation:
+                            angle -= self.rotation_steps
+                        elif angle < -self.rotation:
+                            angle += self.rotation_steps
+
+                    island.rotate(angle, vec_origin)
+                    # if island.rotate(angle, vec_origin):
+                    #     bb.rotate_expand(angle)
+                if self.bound_between != 'CROP':
+                    scale = bl_math.lerp(1.0, rand_scale, self.scale_factor)
+                    vector_scale = Vector((scale, scale))
+                    island.scale(vector_scale, vec_origin)
+                    # bb.scale(vector_scale, vec_origin)
+
+            protege = shaffle_island_bboxes[e_seed-100]
+            island.set_position(protege.center, _from=island.bbox.center)
+
+            if self.bound_between == 'OFF':
+                continue
+
+            if self.overlapped:
+                bb = island.calc_bbox(force=True)
+            else:
+                bb = island.calc_bbox()
+
+            if protege.min_length < 2e-07 and bb.min_length < 2e-07:
+                self.non_valid_counter += 1
+                continue
+
+            if self.bound_between == 'CLAMP':
+                if bb.width <= protege.width:
+                    width_scale = 1
+                else:
+                    width_scale = protege.width / bb.width
+
+                if bb.height <= protege.height:
+                    height_scale = 1
+                else:
+                    height_scale = protege.height / bb.height
+            else:  # 'CROP'
+                width_scale = protege.width / bb.width
+                height_scale = protege.height / bb.height
+
+            crop_scale = min(width_scale, height_scale)
+            island.scale(Vector((crop_scale, crop_scale)), bb.center)
+
+    @staticmethod
+    def round_threshold(a, min_clip):
+        return round(float(a) / min_clip) * min_clip

@@ -59,10 +59,9 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_rotate', text='Rotate')
-
-        split = col_align.split(align=True)
-        split.operator('uv.univ_flip', text='Flip')
+        row = split.row(align=True)
+        row.operator('uv.univ_rotate', text='Rotate')
+        row.operator('uv.univ_flip', text='Flip')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_sort', text='Sort')
@@ -71,6 +70,9 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.operator('uv.univ_home', text='Home')
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_random', text='Random')
 
         # Select
         col_align = col.column(align=True)

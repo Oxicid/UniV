@@ -2,7 +2,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (0, 1, 2),
+    "version": (0, 1, 5),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -42,6 +42,7 @@ classes = (
     transform.UNIV_OT_Sort,
     transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
+    transform.UNIV_OT_Random,
     # Quadrify
     quadrify.UNIV_OT_Quad,
     # Toggles
