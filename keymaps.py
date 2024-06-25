@@ -222,6 +222,10 @@ def add_keymaps():
     kmi.properties.direction = 'LEFT'
     keys.append((km, kmi))
 
+    # Quad
+    kmi = km.keymap_items.new('uv.univ_quad', 'E', 'PRESS')
+    keys.append((km, kmi))
+
 
 def remove_keymaps():
     global keys

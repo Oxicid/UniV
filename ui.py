@@ -84,3 +84,11 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_single', text='Single')
+
+        # Quadrify
+        col_align = col.column(align=True)
+        col_align.separator(factor=0.35)
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_quad', text='Quad')

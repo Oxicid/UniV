@@ -22,6 +22,7 @@ from .types import bbox    # noqa: F401
 from .types import btypes  # noqa: F401
 from .types import island  # noqa: F401
 from .types import mesh_island  # noqa: F401
+from .operators import quadrify
 from .operators import transform
 from .operators import toggle
 from .operators import select
@@ -41,6 +42,8 @@ classes = (
     transform.UNIV_OT_Sort,
     transform.UNIV_OT_Distribute,
     transform.UNIV_OT_Home,
+    # Quadrify
+    quadrify.UNIV_OT_Quad,
     # Toggles
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,

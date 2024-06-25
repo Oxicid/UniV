@@ -1,5 +1,7 @@
 # import bpy
 # import math
+import typing
+
 import bmesh
 import mathutils
 
@@ -128,7 +130,7 @@ class UMeshes:
                 bmeshes.append(UMesh(bm, obj, False))
         self.umeshes = bmeshes
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)
 
     def __getitem__(self, item):

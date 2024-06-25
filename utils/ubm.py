@@ -2,7 +2,11 @@
 from bmesh.types import *
 from mathutils import Vector
 
-__all__ = ('face_centroid_uv', 'calc_non_manifolds')
+__all__ = ('face_centroid_uv', 'calc_non_manifolds', 'set_faces_tag')
+
+def set_faces_tag(faces, tag=True):
+    for f in faces:
+        f.tag = tag
 
 def face_centroid_uv(f: BMFace, uv_layer: BMLayerItem):
     value = Vector((0, 0))

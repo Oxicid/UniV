@@ -393,6 +393,19 @@ class IslandsBase:
 
     @staticmethod
     def tag_filter_selected(bm: BMesh, uv_layer: BMLayerItem, sync: bool):
+        if btypes.PyBMesh.is_full_face_selected(bm):
+            if sync:
+                for face in bm.faces:
+                    face.tag = True
+                return
+            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+                for face in bm.faces:
+                    face.tag = all(l[uv_layer].select for l in face.loops)
+            else:
+                for face in bm.faces:
+                    face.tag = all(l[uv_layer].select_edge for l in face.loops)
+            return
+
         if sync:
             for face in bm.faces:
                 face.tag = face.select
@@ -403,6 +416,36 @@ class IslandsBase:
         else:
             for face in bm.faces:
                 face.tag = all(l[uv_layer].select_edge for l in face.loops) and face.select
+
+    @staticmethod
+    def tag_filter_selected_quad(bm: BMesh, uv_layer: BMLayerItem, sync: bool):
+        if btypes.PyBMesh.is_full_face_selected(bm):
+            if sync:
+                for face in bm.faces:
+                    face.tag = len(face.loops) == 4
+                return
+            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+                for face in bm.faces:
+                    corners = face.loops
+                    face.tag = all(l[uv_layer].select for l in corners) and len(corners) == 4
+            else:
+                for face in bm.faces:
+                    corners = face.loops
+                    face.tag = all(l[uv_layer].select_edge for l in corners) and len(corners) == 4
+            return
+
+        if sync:
+            for face in bm.faces:
+                face.tag = face.select and len(face.loops) == 4
+            return
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            for face in bm.faces:
+                corners = face.loops
+                face.tag = all(l[uv_layer].select for l in corners) and face.select and len(corners) == 4
+        else:
+            for face in bm.faces:
+                corners = face.loops
+                face.tag = all(l[uv_layer].select_edge for l in corners) and face.select and len(corners) == 4
 
     @staticmethod
     def tag_filter_visible(bm: BMesh, sync: bool):
@@ -618,6 +661,14 @@ class Islands(IslandsBase):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls([], None, None)
         cls.tag_filter_selected(bm, uv_layer, sync)
+        islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
+        return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_selected_quad(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
+        if btypes.PyBMesh.fields(bm).totfacesel == 0:
+            return cls([], None, None)
+        cls.tag_filter_selected_quad(bm, uv_layer, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
 
