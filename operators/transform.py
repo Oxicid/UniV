@@ -1553,7 +1553,7 @@ class UNIV_OT_Random(Operator):
             else:
                 bb = island.calc_bbox()
 
-            if protege.min_length < 2e-07 and bb.min_length < 2e-07:
+            if protege.min_length < 2e-07 or bb.min_length < 2e-07:
                 self.non_valid_counter += 1
                 continue
 
