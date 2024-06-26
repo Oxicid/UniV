@@ -162,17 +162,33 @@ class FaceIsland:
                 for face in self.faces:
                     for l in face.loops:
                         l[self.uv_layer].select = state
-            else:
+            elif mode == 'EDGE':
                 for face in self.faces:
                     for l in face.loops:
                         l[self.uv_layer].select_edge = state
+            else:
+                for face in self.faces:
+                    for l in face.loops:
+                        luv = l[self.uv_layer]
+                        luv.select = state
+                        luv.select_edge = state
 
-    def select(self, mode, sync, force=False):
+    @property
+    def select(self):
+        raise NotImplementedError()
+
+    @select.setter
+    def select(self, state: bool):
+        sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
+        elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
+        self._select_ex(state, sync, elem_mode)
+
+    def select_set(self, mode, sync, force=False):
         if force:
             return self.__select_force(True, sync)
         self._select_ex(True, sync, mode)
 
-    def deselect(self, mode, sync, force=False):
+    def deselect_set(self, mode, sync, force=False):
         if force:
             return self.__select_force(False, sync)
         self._select_ex(False, sync, mode)
