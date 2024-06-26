@@ -52,6 +52,7 @@ classes = (
     select.UNIV_OT_SelectLinked,
     select.UNIV_OT_SelectView,
     select.UNIV_OT_Single,
+    select.UNIV_OT_Select_HVS_Island,
     # UI
     ui.UNIV_PT_General
 )

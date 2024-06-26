@@ -1,3 +1,5 @@
+import math
+
 import bpy
 import gpu
 # import math
@@ -314,7 +316,7 @@ class UNIV_OT_SelectView(Operator):
                         if select_info == types.eInfoSelectFaceIsland.FULL_SELECTED:
                             continue
                         if island.is_overlap(view_island):
-                            island.select(elem_mode, sync)
+                            island.select = True
                             has_update = True
 
                 if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
@@ -367,10 +369,10 @@ class UNIV_OT_SelectView(Operator):
 
                         for island in adv_islands:
                             if not island.tag:
-                                island.deselect(elem_mode, sync)
+                                island.select = False
                         for island in adv_islands:
                             if island.tag:
-                                island.select(elem_mode, sync)
+                                island.select = True
 
                         umesh.bm.select_flush_mode()
 
@@ -420,7 +422,7 @@ class UNIV_OT_SelectView(Operator):
                         if select_info == types.eInfoSelectFaceIsland.UNSELECTED:
                             continue
                         if island.is_overlap(view_island):
-                            island.deselect(elem_mode, sync)
+                            island.select = False
                             has_update = True
 
                 if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
@@ -507,7 +509,7 @@ class UNIV_OT_Single(Operator):
 
                     if self.mode == 'SELECT':
                         if state:
-                            mesh_island.select(mode='FACE')
+                            mesh_island.select = True
                             selected += 1
                         else:
                             mesh_island.deselect(mode='FACE')
@@ -518,7 +520,7 @@ class UNIV_OT_Single(Operator):
                             deselected += 1
                     else:
                         if state:
-                            mesh_island.select(mode='FACE')
+                            mesh_island.select = True
                             deselected += 1
 
             umesh.update_tag = bool(selected + deselected)
@@ -532,3 +534,138 @@ class UNIV_OT_Single(Operator):
 
             self.report({'INFO'}, selected_deselected_info)
 
+class UNIV_OT_Select_HVS_Island(Operator):
+    bl_idname = 'uv.univ_select_hvs_island'
+    bl_label = 'Select HVS Island'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITIONAL', 'Additional', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+    shape: EnumProperty(name='Shape', default='HORIZONTAL', items=(
+        ('HORIZONTAL', 'Horizontal', ''),
+        ('SQUARE', 'Square', ''),
+        ('VERTICAL', 'Vertical', ''),
+    ))
+
+    threshold: FloatProperty(name='Square Threshold', default=0.05, min=0, max=1)
+
+    def __init__(self):
+        self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.elem_mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+        self.umeshes: UMeshes | None = None
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITIONAL'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    def execute(self, context):
+        if self.sync and utils.get_select_mode_mesh != 'FACE':
+            if self.mode != 'ADDITIONAL':
+                utils.set_select_mode_mesh('FACE')
+                self.elem_mode = 'FACE'
+
+        self.umeshes = utils.UMeshes(report=self.report)
+
+        if self.mode == 'DESELECT':
+            self.deselect()
+        elif self.mode == 'ADDITIONAL':
+            self.addition()
+        else:
+            self.select()
+
+        return self.umeshes.update()
+
+    def select(self):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
+                for island in islands:
+                    percent, close = self.percent_and_is_square_close(island)
+
+                    if self.shape == 'SQUARE':
+                        island.select = close
+                    elif self.shape == 'HORIZONTAL':
+                        island.select = percent > 0 and not close
+                    else:
+                        island.select = percent < 0 and not close
+            umesh.update_tag = bool(islands)
+
+    def deselect(self):
+        for umesh in self.umeshes:
+            update_tag = False
+            if islands := Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
+                if self.sync and types.PyBMesh.is_full_face_deselected(umesh.bm):
+                    umesh.update_tag = False
+                    continue
+
+                for island in islands:
+                    percent, close = self.percent_and_is_square_close(island)
+
+                    if self.shape == 'SQUARE':
+                        deselect = close
+                    elif self.shape == 'HORIZONTAL':
+                        deselect = percent > 0 and not close
+                    else:
+                        deselect = percent < 0 and not close
+
+                    if deselect:
+                        island.select = False
+                        update_tag = True
+            umesh.update_tag = update_tag
+
+    def addition(self):
+        for umesh in self.umeshes:
+            update_tag = False
+            if islands := Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
+                if self.sync and types.PyBMesh.is_full_face_selected(umesh.bm):
+                    umesh.update_tag = False
+                    continue
+
+                for island in islands:
+                    percent, close = self.percent_and_is_square_close(island)
+
+                    if self.shape == 'SQUARE':
+                        select = close
+                    elif self.shape == 'HORIZONTAL':
+                        select = percent > 0 and not close
+                    else:
+                        select = percent < 0 and not close
+
+                    if select:
+                        island.select = True
+                        update_tag = True
+
+            umesh.update_tag = update_tag
+
+    def percent_and_is_square_close(self, island):
+        bbox = island.calc_bbox()
+        width = bbox.width
+        height = bbox.height
+
+        if width == 0 and height == 0:
+            width = height = 1
+        elif width == 0:
+            width = 1e-06
+        elif height == 0:
+            height = 1e-06
+
+        percent = (width - height) / height
+        return percent, math.isclose(percent, 0, abs_tol=self.threshold)

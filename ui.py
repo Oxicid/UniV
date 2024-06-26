@@ -84,8 +84,13 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_view', text='View')
 
         split = col_align.split(align=True)
+        split.operator('uv.univ_single', text='Single')
+
+        split = col.split(factor=0.65, align=True)
+        split.operator('uv.univ_select_hvs_island', text='Square Island').shape = 'SQUARE'
         row = split.row(align=True)
-        row.operator('uv.univ_single', text='Single')
+        row.operator('uv.univ_select_hvs_island', text='H').shape = 'HORIZONTAL'
+        row.operator('uv.univ_select_hvs_island', text='V').shape = 'VERTICAL'
 
         # Quadrify
         col_align = col.column(align=True)
