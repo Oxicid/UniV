@@ -1091,3 +1091,96 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
         crn_uv_a.select = False
         crn_uv_a.select_edge = False
         crn_uv_b.select = False
+
+class UNIV_OT_Select_Border(Operator):
+    bl_idname = 'uv.univ_select_border'
+    bl_label = 'Select Border'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+
+    def draw(self, context):
+        row = self.layout.row(align=True)
+        row.prop(self, 'mode', expand=True)
+
+    def __init__(self):
+        self.umeshes: UMeshes | None = None
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    def execute(self, context):
+        if context.scene.tool_settings.use_uv_select_sync:
+            bpy.ops.uv.univ_sync_uv_toggle()  # noqa
+        if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
+            utils.set_select_mode_uv('EDGE')
+
+        self.umeshes = utils.UMeshes(report=self.report)
+
+        self.select_border()
+
+        return self.umeshes.update()
+
+    def select_border(self):
+        for umesh in self.umeshes:
+            if types.PyBMesh.is_full_face_deselected(umesh.bm):
+                umesh.update_tag = False
+                continue
+
+            uv_layer = umesh.uv_layer
+            corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
+            if self.mode == 'SELECT':
+                to_select_corns = []
+                for crn in corners:
+                    if is_boundary(crn, uv_layer):
+                        to_select_corns.append(crn)
+                    else:
+                        crn_uv_a = crn[uv_layer]
+                        crn_uv_a.select = False
+                        crn_uv_a.select_edge = False
+                        crn.link_loop_next[uv_layer].select = False
+
+                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(to_select_corns, uv_layer)
+
+            elif self.mode == 'DESELECT':
+                _corners = list(corners)
+                for crn in _corners:
+                    if is_boundary(crn, uv_layer):
+                        UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(crn, uv_layer)
+                for crn in _corners:
+                    crn_uv = crn[uv_layer]
+                    if crn_uv.select_edge:
+                        UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge([crn], uv_layer)
+
+            else:  # 'ADDITION'
+                for crn in corners:
+                    crn_uv_a = crn[uv_layer]
+                    if crn_uv_a.select_edge:
+                        continue
+                    if is_boundary(crn, uv_layer):
+                        select_linked_crn_uv_vert(crn, uv_layer)
+                        select_linked_crn_uv_vert(crn.link_loop_next, uv_layer)
+                        crn_uv_a.select = True
+                        crn_uv_a.select_edge = True
+                        crn.link_loop_next[uv_layer].select = True

@@ -86,17 +86,20 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_single', text='Single')
 
-        split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_select_square_island', text='Square').shape = 'SQUARE'
-        row = split.row(align=True)
-        row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
-        row.operator('uv.univ_select_square_island', text='V').shape = 'VERTICAL'
+        split = col.split(align=True)
+        split.operator('uv.univ_select_border', text='Border')
 
         split = col.split(factor=0.65, align=True)
         split.operator('uv.univ_select_border_edge_by_angle', text='Border by Angle').edge_dir = 'BOTH'
         row = split.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', text='H').edge_dir = 'HORIZONTAL'
         row.operator('uv.univ_select_border_edge_by_angle', text='V').edge_dir = 'VERTICAL'
+
+        split = col.split(factor=0.65, align=True)
+        split.operator('uv.univ_select_square_island', text='Square').shape = 'SQUARE'
+        row = split.row(align=True)
+        row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
+        row.operator('uv.univ_select_square_island', text='V').shape = 'VERTICAL'
 
         # Quadrify
         col_align = col.column(align=True)
