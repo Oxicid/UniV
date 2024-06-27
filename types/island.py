@@ -158,20 +158,17 @@ class FaceIsland:
                     for e in face.edges:
                         e.select = state
         else:
+            uv_layer = self.uv_layer
             if mode == 'VERTEX':
                 for face in self.faces:
-                    for l in face.loops:
-                        l[self.uv_layer].select = state
-            elif mode == 'EDGE':
-                for face in self.faces:
-                    for l in face.loops:
-                        l[self.uv_layer].select_edge = state
+                    for crn in face.loops:
+                        crn[uv_layer].select = state
             else:
                 for face in self.faces:
-                    for l in face.loops:
-                        luv = l[self.uv_layer]
-                        luv.select = state
-                        luv.select_edge = state
+                    for crn in face.loops:
+                        crn_uv = crn[uv_layer]
+                        crn_uv.select = state
+                        crn_uv.select_edge = state
 
     @property
     def select(self):

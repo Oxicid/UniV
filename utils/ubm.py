@@ -2,7 +2,17 @@
 from bmesh.types import *
 from mathutils import Vector
 
-__all__ = ('face_centroid_uv', 'calc_non_manifolds', 'set_faces_tag')
+__all__ = (
+    'face_centroid_uv',
+    'calc_non_manifolds',
+    'set_faces_tag',
+    '_prev_disc',
+    'linked_crn_uv',
+    'select_linked_crn_uv_vert',
+    'deselect_linked_crn_uv_vert',
+    'is_boundary',
+    'is_boundary_sync',
+)
 
 def set_faces_tag(faces, tag=True):
     for f in faces:
@@ -63,3 +73,54 @@ def calc_non_manifolds(bm: BMesh) -> tuple[set[BMVert], set[BMEdge]]:
                     if not ll.edge.is_boundary:
                         non_manifold_edges.add(ll.edge)
     return non_manifold_verts, non_manifold_edges
+
+
+def _prev_disc(l: BMLoop) -> BMLoop:
+    return l.link_loop_prev.link_loop_radial_prev
+
+def linked_crn_uv(first: BMLoop, uv_layer: BMLayerItem):
+    linked = []
+    bm_iter = first
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == first:
+            break
+        if first[uv_layer].uv == bm_iter[uv_layer].uv:
+            linked.append(bm_iter)
+    return linked
+
+def select_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
+    bm_iter = first
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == first:
+            break
+        crn_uv_bm_iter = bm_iter[uv_layer]
+        if first[uv_layer].uv == crn_uv_bm_iter.uv:
+            crn_uv_bm_iter.select = True
+
+def deselect_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
+    bm_iter = first
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == first:
+            break
+        crn_uv_bm_iter = bm_iter[uv_layer]
+        if first[uv_layer].uv == crn_uv_bm_iter.uv:
+            crn_uv_bm_iter.select = False
+def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):
+    # assert(not l.face.select)
+
+    # We get a clockwise corner, but linked to the end of the current corner
+    if (next_linked_disc := crn.link_loop_radial_prev) == crn:
+        return True
+    if not next_linked_disc.face.select:
+        return True
+    return not (crn[uv_layer].uv == next_linked_disc.link_loop_next[uv_layer].uv and
+                crn.link_loop_next[uv_layer].uv == next_linked_disc[uv_layer].uv)
+
+def is_boundary_sync(crn: BMLoop, uv_layer: BMLayerItem):
+    # assert(not l.face.hide)
+    if (next_linked_disc := crn.link_loop_radial_prev) == crn:
+        return True
+    if next_linked_disc.face.hide:
+        return True
+    return not (crn[uv_layer].uv == next_linked_disc.link_loop_next[uv_layer].uv and
+                crn.link_loop_next[uv_layer].uv == next_linked_disc[uv_layer].uv)
