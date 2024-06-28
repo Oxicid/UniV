@@ -790,7 +790,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                         crn_uv_a.select = False
                         crn_uv_a.select_edge = False
                         crn_uv_b.select = False
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             elif self.mode == 'DESELECT':
                 to_select_corns = []
@@ -806,7 +806,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                     else:
                         if crn_uv_a.select_edge:
                             to_select_corns.append(crn)
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             else:  # 'ADDITIONAL'
                 for loop in corners:
@@ -850,7 +850,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                         crn_uv_a.select = False
                         crn_uv_a.select_edge = False
                         crn_uv_b.select = False
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             elif self.mode == 'DESELECT':
                 to_select_corns = []
@@ -868,7 +868,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                     else:
                         if crn_uv_a.select_edge:
                             to_select_corns.append(crn)
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             else:  # 'ADDITION'
                 for crn in corners:
@@ -921,7 +921,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                         crn_uv_a.select_edge = False
                         crn.link_loop_next[uv_layer].select = False
 
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
@@ -941,7 +941,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                 for crn in _corners:
                     crn_uv = crn[uv_layer]
                     if crn_uv.select_edge:
-                        self.select_crn_uv_edge([crn], uv_layer)
+                        self.select_crn_uv_edge_sequence([crn], uv_layer)
 
             else:  # 'ADDITION'
                 for crn in corners:
@@ -993,7 +993,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                         crn_uv_a.select_edge = False
                         crn.link_loop_next[uv_layer].select = False
 
-                self.select_crn_uv_edge(to_select_corns, uv_layer)
+                self.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
@@ -1021,7 +1021,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                 for crn in _corners:
                     crn_uv = crn[uv_layer]
                     if crn_uv.select_edge:
-                        self.select_crn_uv_edge([crn], uv_layer)
+                        self.select_crn_uv_edge_sequence([crn], uv_layer)
 
             else:  # 'ADDITION'
                 for crn in corners:
@@ -1042,7 +1042,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                             crn_uv_b.select = True
 
     @staticmethod
-    def select_crn_uv_edge(to_select_corns: list[BMLoop], uv_layer):
+    def select_crn_uv_edge_sequence(to_select_corns: list[BMLoop], uv_layer):
         for crn in to_select_corns:
             link_crn_next = crn.link_loop_next
             select_linked_crn_uv_vert(crn, uv_layer)
@@ -1053,6 +1053,18 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             crn_uv_a.select = True
             crn_uv_a.select_edge = True
             crn_uv_b.select = True
+
+    @staticmethod
+    def select_crn_uv_edge(crn: BMLoop, uv_layer):
+        link_crn_next = crn.link_loop_next
+        select_linked_crn_uv_vert(crn, uv_layer)
+        select_linked_crn_uv_vert(link_crn_next, uv_layer)
+
+        crn_uv_a = crn[uv_layer]
+        crn_uv_b = link_crn_next[uv_layer]
+        crn_uv_a.select = True
+        crn_uv_a.select_edge = True
+        crn_uv_b.select = True
 
     @staticmethod
     def deselect_crn_uv_edge(crn: BMLoop, uv_layer: BMLayerItem):
@@ -1102,12 +1114,19 @@ class UNIV_OT_Select_Border(Operator):
         ('ADDITION', 'Addition', ''),
         ('DESELECT', 'Deselect', ''),
     ))
+    border_mode: EnumProperty(name='Border Mode', default='ALL', items=(
+        ('ALL', 'All', ''),
+        ('BETWEEN', 'Between', ''),
+    ))
 
     def draw(self, context):
+        row = self.layout.row(align=True)
+        row.prop(self, 'border_mode', expand=True)
         row = self.layout.row(align=True)
         row.prop(self, 'mode', expand=True)
 
     def __init__(self):
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: UMeshes | None = None
 
     @classmethod
@@ -1122,6 +1141,8 @@ class UNIV_OT_Select_Border(Operator):
         if event.value == 'PRESS':
             return self.execute(context)
 
+        self.border_mode = 'BETWEEN' if event.alt else 'ALL'
+
         if event.ctrl:
             self.mode = 'DESELECT'
         elif event.shift:
@@ -1133,12 +1154,16 @@ class UNIV_OT_Select_Border(Operator):
     def execute(self, context):
         if context.scene.tool_settings.use_uv_select_sync:
             bpy.ops.uv.univ_sync_uv_toggle()  # noqa
+            self.sync = False
         if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
             utils.set_select_mode_uv('EDGE')
 
         self.umeshes = utils.UMeshes(report=self.report)
+        if self.border_mode == 'ALL':
+            self.select_border()
+        else:
+            self.select_border_between()
 
-        self.select_border()
 
         return self.umeshes.update()
 
@@ -1161,7 +1186,7 @@ class UNIV_OT_Select_Border(Operator):
                         crn_uv_a.select_edge = False
                         crn.link_loop_next[uv_layer].select = False
 
-                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(to_select_corns, uv_layer)
+                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge_sequence(to_select_corns, uv_layer)
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
@@ -1171,7 +1196,7 @@ class UNIV_OT_Select_Border(Operator):
                 for crn in _corners:
                     crn_uv = crn[uv_layer]
                     if crn_uv.select_edge:
-                        UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge([crn], uv_layer)
+                        UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge_sequence([crn], uv_layer)
 
             else:  # 'ADDITION'
                 for crn in corners:
@@ -1184,3 +1209,67 @@ class UNIV_OT_Select_Border(Operator):
                         crn_uv_a.select = True
                         crn_uv_a.select_edge = True
                         crn.link_loop_next[uv_layer].select = True
+
+    def select_border_between(self):
+        # bpy.ops.uv.select_all(action='DESELECT')
+        for umesh in self.umeshes:
+            uv_layer = umesh.uv_layer
+            if self.mode == 'SELECT':
+                islands = Islands.calc_extended(umesh.bm, umesh.uv_layer, self.sync)
+
+                for _f in umesh.bm.faces:
+                    for _crn in _f.loops:
+                        _crn_uv = _crn[uv_layer]
+                        _crn_uv.select = False
+                        _crn_uv.select_edge = False
+
+                islands.indexing()
+                for island in islands:
+                    for f in island:
+                        for crn in f.loops:
+                            shared_crn: BMLoop
+                            if crn == (shared_crn := crn.link_loop_radial_prev):
+                                continue
+                            if not shared_crn.face.tag:
+                                continue
+                            if shared_crn.face.index != f.index:
+                                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(crn, uv_layer)
+                                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(shared_crn, uv_layer)
+
+            elif self.mode == 'DESELECT':
+                islands = Islands.calc_extended(umesh.bm, umesh.uv_layer, self.sync)
+
+                islands.indexing()
+                for island in islands:
+                    for f in island:
+                        for crn in f.loops:
+                            shared_crn: BMLoop
+                            if crn == (shared_crn := crn.link_loop_radial_prev):
+                                continue
+                            if not shared_crn.face.tag:
+                                continue
+                            if shared_crn.face.index != f.index:
+                                UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(crn, uv_layer)
+                                UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(shared_crn, uv_layer)
+                                # Removing the notches
+                                if is_boundary(crn.link_loop_next, uv_layer):
+                                    crn_uv_c = crn.link_loop_next[uv_layer]
+                                    crn_uv_c.select = False
+                                    crn_uv_c.select_edge = False
+            else:  # 'ADDITION'
+                islands = Islands.calc_extended(umesh.bm, umesh.uv_layer, self.sync)
+
+                islands.indexing()
+                for island in islands:
+                    for f in island:
+                        for crn in f.loops:
+                            shared_crn: BMLoop
+                            if crn == (shared_crn := crn.link_loop_radial_prev):
+                                continue
+                            if not shared_crn.face.tag:
+                                continue
+                            if shared_crn.face.index != f.index:
+                                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(crn, uv_layer)
+                                UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(shared_crn, uv_layer)
+                umesh.update_tag = bool(islands)
+
