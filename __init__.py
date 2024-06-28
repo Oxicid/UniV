@@ -22,6 +22,7 @@ from .types import bbox    # noqa: F401
 from .types import btypes  # noqa: F401
 from .types import island  # noqa: F401
 from .types import mesh_island  # noqa: F401
+from .operators import straight
 from .operators import quadrify
 from .operators import transform
 from .operators import toggle
@@ -45,6 +46,7 @@ classes = (
     transform.UNIV_OT_Random,
     # Quadrify
     quadrify.UNIV_OT_Quad,
+    straight.UNIV_OT_Straight,
     # Toggles
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,

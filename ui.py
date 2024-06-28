@@ -108,3 +108,4 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_quad', text='Quad')
+        row.operator('uv.univ_straight', text='Straight')

@@ -88,6 +88,29 @@ class UMeshes:
         for umesh in self.umeshes:
             umesh.ensure(face, edge, vert, force)
 
+    def loop(self):
+        active = bpy.context.active_object
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+        area = [a for a in bpy.context.screen.areas if a.type == 'VIEW_3D'][0]
+        with bpy.context.temp_override(area=area):
+            bpy.ops.object.select_all(action='DESELECT')
+
+        for umesh in self.umeshes:
+            bpy.context.view_layer.objects.active = umesh.obj
+            umesh.obj.select_set(True)
+            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
+            bm = bmesh.from_edit_mesh(umesh.obj.data)
+            yield UMesh(bm, umesh.obj)
+
+            umesh.obj.select_set(False)
+            bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+
+        for umesh in self.umeshes:
+            umesh.obj.select_set(True)
+        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+        bpy.context.view_layer.objects.active = active
+
     @classmethod
     def sel_ob_with_uv(cls):
         bmeshes = []
