@@ -76,7 +76,8 @@ class UMeshes:
             return {'CANCELLED'}
         if sum(umesh.update(force=force) for umesh in self.umeshes):
             return {'FINISHED'}
-        self.report(info_type, info)
+        if info:
+            self.report(info_type, info)
         return {'CANCELLED'}
 
     def final(self):

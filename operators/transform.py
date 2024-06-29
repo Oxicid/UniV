@@ -11,9 +11,10 @@ from bpy.props import *
 from math import pi
 from mathutils import Vector
 
-from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands
+from .. import types
 from .. import utils
 from .. import info
+from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands
 
 
 class UNIV_OT_Crop(Operator):
@@ -1577,3 +1578,291 @@ class UNIV_OT_Random(Operator):
     @staticmethod
     def round_threshold(a, min_clip):
         return round(float(a) / min_clip) * min_clip
+
+class UNIV_OT_Orient(Operator):
+    bl_idname = 'uv.univ_orient'
+    bl_label = 'Orient'
+    bl_description = "Orient selected UV islands or edges"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    edge_dir: EnumProperty(name='Direction', default='HORIZONTAL', items=(
+        ('BOTH', 'Both', ''),
+        ('HORIZONTAL', 'Horizontal', ''),
+        ('VERTICAL', 'Vertical', ''),
+    ))
+
+    world_mode: bpy.props.BoolProperty(name='World', default=False, description="Align selected UV islands or faces to world / gravity directions")
+    axis: bpy.props.EnumProperty(name="Axis", default='W', items=(
+                                    ('AUTO', 'Auto', 'Detect World axis to align to.'),
+                                    ('U', 'X', 'Align to the X axis of the World.'),
+                                    ('V', 'Y', 'Align to the Y axis of the World.'),
+                                    ('W', 'Z', 'Align to the Z axis of the World.')
+    )
+                                 )
+
+    def draw(self, context):
+        if self.world_mode:
+            layout = self.layout.row()
+            layout.prop(self, 'axis', expand=True)
+        layout = self.layout
+        layout.prop(self, 'world_mode')
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        # self.overlapped = event.shift
+        self.world_mode = event.alt
+        return self.execute(context)
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.type != 'MESH':
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+
+        return True
+
+    def __init__(self):
+        self.skip_count: int = 0
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.elem_mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+        self.umeshes: utils.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = utils.UMeshes(report=self.report)
+        # World Orient
+        if self.world_mode:
+            self.world_orient(extended=True)
+            if self.skip_count == len(self.umeshes):
+                self.world_orient(extended=False)
+                if self.skip_count == len(self.umeshes):
+                    return self.umeshes.update(info="No uv for manipulate")
+            return self.umeshes.update(info="All islands oriented")
+
+        # Island Orient
+        if self.elem_mode in ('FACE', 'ISLAND'):
+            self.orient_island(extended=True)
+            if self.skip_count == len(self.umeshes):
+                self.orient_island(extended=False)
+                if self.skip_count == len(self.umeshes):
+                    return self.umeshes.update(info="No uv for manipulate")
+            return self.umeshes.update(info="All islands oriented")
+
+        # Edge Orient
+        if self.sync:
+            self.orient_edge_sync()
+        else:
+            self.orient_edge()
+
+        if self.skip_count == len(self.umeshes):
+            return self.umeshes.update(info="No selected edges")
+        return self.umeshes.update(info="All islands aligned")
+
+    def orient_edge(self):
+        self.skip_count = 0
+        for umesh in self.umeshes:
+            uv_layer = umesh.uv_layer
+            umesh.update_tag = False
+
+            if types.PyBMesh.is_full_face_deselected(umesh.bm) or \
+                    not any(l[uv_layer].select_edge for f in umesh.bm.faces for l in f.loops):
+                self.skip_count += 1
+                continue
+
+            for island in Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
+                luvs = (l for f in island for l in f.loops if l[uv_layer].select_edge)
+
+                for l in luvs:
+                    diff: Vector = (v1 := l[uv_layer].uv) - (v2 := l.link_loop_next[uv_layer].uv)
+                    if not any(diff):
+                        continue
+                    if self.edge_dir == 'BOTH':
+                        current_angle = math.atan2(*diff)
+                        angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
+                    elif self.edge_dir == 'HORIZONTAL':
+                        vec = diff.normalized()
+                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
+                    else:
+                        vec = diff.normalized()
+                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+
+                    pivot: Vector = (v1 + v2) / 2
+                    umesh.update_tag |= island.rotate(angle_to_rotate, pivot)
+                    break
+
+    def orient_edge_sync(self):
+        self.skip_count = 0
+        for umesh in self.umeshes:
+            uv_layer = umesh.uv_layer
+            umesh.update_tag = False
+
+            if types.PyBMesh.is_full_edge_deselected(umesh.bm):
+                self.skip_count += 1
+                continue
+
+            _islands = Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync)
+            _islands.indexing()
+            for idx, island in enumerate(_islands):
+                luvs = (l for f in island for e in f.edges if e.select for l in e.link_loops if l.face.index == idx and l.face.tag)
+
+                for l in luvs:
+                    diff: Vector = (v1 := l[uv_layer].uv) - (v2 := l.link_loop_next[uv_layer].uv)
+                    if not any(diff):
+                        continue
+                    if self.edge_dir == 'BOTH':
+                        current_angle = math.atan2(*diff)
+                        angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
+                    elif self.edge_dir == 'HORIZONTAL':
+                        vec = diff.normalized()
+                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
+                    else:
+                        vec = diff.normalized()
+                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+
+                    pivot: Vector = (v1 + v2) / 2
+                    umesh.update_tag |= island.rotate(angle_to_rotate, pivot)
+                    break
+
+    def orient_island(self, extended):
+        self.skip_count = 0
+        for umesh in self.umeshes:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+                for island in adv_islands:
+                    points = island.calc_convex_points()
+
+                    angle = -utils.calc_min_align_angle(points)
+                    umesh.update_tag |= island.rotate(angle, island.bbox.center)
+                    island._bbox = None
+
+                    if self.edge_dir == 'HORIZONTAL':
+                        if island.bbox.width < island.bbox.height:
+                            end_angle = pi/2 if angle < 0 else -pi/2
+                            umesh.update_tag |= island.rotate(end_angle, island.bbox.center)
+
+                    elif self.edge_dir == 'VERTICAL':
+                        if island.bbox.width > island.bbox.height:
+                            end_angle = pi / 2 if angle < 0 else -pi / 2
+                            umesh.update_tag |= island.rotate(end_angle, island.bbox.center)
+            else:
+                self.skip_count += 1
+
+    def world_orient(self, extended):
+        self.skip_count = 0
+        for umesh in self.umeshes:
+            umesh.update_tag = False
+            full_selected = types.PyBMesh.is_full_face_selected(umesh.bm)
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+
+                for island in islands:
+                    if extended:
+                        if self.sync:
+                            if full_selected:
+                                pre_calc_faces = island
+                            else:
+                                pre_calc_faces = [f for f in island if f.select]
+                        else:
+                            pre_calc_faces = [f for f in island if all(l[umesh.uv_layer].select for l in f.loops)]
+                            if not pre_calc_faces:
+                                pre_calc_faces = island
+                    else:
+                        pre_calc_faces = island
+
+                    if len(pre_calc_faces) == 1:
+                        selected_face = next(iter(pre_calc_faces))
+                        calc_loops = selected_face.loops
+                        avg_normal = selected_face.normal
+                    else:
+                        calc_loops = []
+                        calc_edges = set()
+                        island_edges = {edge for face in pre_calc_faces for edge in face.edges}
+                        island_loops = {loop for face in pre_calc_faces for loop in face.loops}
+                        for edge in island_edges:
+                            if len({loop[umesh.uv_layers].uv.copy().freeze() for vert in edge.verts for loop in vert.link_loops if loop in island_loops}) == 2:
+                                calc_edges.add(edge)
+                                for loop in edge.link_loops:
+                                    if loop in island_loops:
+                                        calc_loops.append(loop)
+                                        break
+                        if not calc_loops:
+                            self.report({'ERROR_INVALID_INPUT'}, "Invalid selection in an island: zero non-splitted edges.")
+                            continue
+
+                        # Get average viewport normal of UV island
+                        avg_normal = Vector((0, 0, 0))
+                        calc_faces = [face for face in pre_calc_faces if {edge for edge in face.edges}.issubset(calc_edges)]
+                        if not calc_faces:
+                            self.report({'ERROR_INVALID_INPUT'}, "Invalid selection in an island: no faces formed by unique edges.")
+                            continue
+                        for face in calc_faces:
+                            avg_normal += face.normal
+                        avg_normal /= len(calc_faces)
+
+                    # Which Side
+                    x = 0
+                    y = 1
+                    z = 2
+                    max_size = max(map(abs, avg_normal))
+
+                    if (self.axis == 'AUTO' and abs(avg_normal.z) == max_size) or self.axis == 'W':
+                        angle = self.calc_world_orient_angle(island, calc_loops, x, y, False, avg_normal.z < 0)
+                    elif (self.axis == 'AUTO' and abs(avg_normal.y) == max_size) or self.axis == 'V':
+                        angle = self.calc_world_orient_angle(island, calc_loops, x, z, avg_normal.y > 0, False)
+                    else:  # (self.axis == 'AUTO' and abs(avg_normal.x) == max_size) or self.axis == 'U':
+                        angle = self.calc_world_orient_angle(island, calc_loops, y, z, avg_normal.x < 0, False)
+
+                    if angle:
+                        umesh.update_tag |= island.rotate(angle, pivot=island.calc_bbox().center)
+            else:
+                self.skip_count += 1
+
+    @staticmethod
+    def calc_world_orient_angle(island, loops, x=0, y=1, flip_x=False, flip_y=False):
+        n_edges = 0
+        avg_angle = 0
+        uv_layers = island.uv_layer
+        for loop in loops:
+            co0 = loop.vert.co
+            co1 = loop.link_loop_next.vert.co
+            delta = co1 - co0
+            max_side = max(map(abs, delta))
+
+            # Check edges dominant in active axis
+            if abs(delta[x]) == max_side or abs(delta[y]) == max_side:
+                n_edges += 1
+                uv0 = loop[uv_layers].uv
+                uv1 = loop.link_loop_next[uv_layers].uv
+
+                delta_verts = Vector((0, 0))
+                if not flip_x:
+                    delta_verts.x = co1[x] - co0[x]
+                else:
+                    delta_verts.x = co0[x] - co1[x]
+                if not flip_y:
+                    delta_verts.y = co1[y] - co0[y]
+                else:
+                    delta_verts.y = co0[y] - co1[y]
+
+                delta_uvs = uv1 - uv0
+
+                a0 = math.atan2(*delta_verts)
+                a1 = math.atan2(*delta_uvs)
+
+                a_delta = math.atan2(math.sin(a0 - a1), math.cos(a0 - a1))
+
+                # Consolidation (math.atan2 gives the lower angle between -Pi and Pi,
+                # this triggers errors when using the average avg_angle /= n_edges for rotation angles close to Pi)
+                if n_edges > 1:
+                    if abs((avg_angle / (n_edges - 1)) - a_delta) > 3.12:
+                        if a_delta > 0:
+                            avg_angle += (a_delta - pi * 2)
+                        else:
+                            avg_angle += (a_delta + pi * 2)
+                    else:
+                        avg_angle += a_delta
+                else:
+                    avg_angle += a_delta
+
+        return avg_angle / n_edges

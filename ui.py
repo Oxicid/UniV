@@ -24,6 +24,12 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_fill', text='X').axis = 'X'
         row.operator('uv.univ_fill', text='Y').axis = 'Y'
 
+        split = col.split(factor=0.65, align=True)
+        split.operator('uv.univ_orient', text='Orient').edge_dir = 'BOTH'
+        row = split.row(align=True)
+        row.operator('uv.univ_orient', text='→').edge_dir = 'HORIZONTAL'
+        row.operator('uv.univ_orient', text='↑').edge_dir = 'VERTICAL'
+
         # row = col.row(align=True)
         # row.operator('uv.univ_align_edge', text="Align Edge")
         #

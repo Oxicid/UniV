@@ -2,7 +2,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (0, 1, 5),
+    "version": (0, 1, 8),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -35,6 +35,7 @@ classes = (
     preferences.UNIV_AddonPreferences,
     keymaps.UNIV_RestoreKeymaps,
     # Transforms
+    transform.UNIV_OT_Orient,
     transform.UNIV_OT_Align,
     transform.UNIV_OT_Fill,
     transform.UNIV_OT_Crop,
