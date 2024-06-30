@@ -70,6 +70,7 @@ class UMeshes:
     def cancel_with_report(self, info_type: set[str]={'INFO'}, info: str ="No uv for manipulate"): # noqa
         self._cancel = True
         self.report(info_type, info)
+        return {'CANCELLED'}
 
     def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self._cancel is True:
@@ -93,7 +94,7 @@ class UMeshes:
         active = bpy.context.active_object
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
         area = [a for a in bpy.context.screen.areas if a.type == 'VIEW_3D'][0]
-        with bpy.context.temp_override(area=area):
+        with bpy.context.temp_override(area=area):  # noqa
             bpy.ops.object.select_all(action='DESELECT')
 
         for umesh in self.umeshes:
@@ -148,10 +149,10 @@ class UMeshes:
                 if obj.type == 'MESH' and obj.data.uv_layers:
                     data_and_objects[obj.data].append(obj)
 
-            for data, obj in data_and_objects.items():
+            for data, objs in data_and_objects.items():
                 bm = bmesh.new()
                 bm.from_mesh(data)
-                bmeshes.append(UMesh(bm, obj, False))
+                bmeshes.append(UMesh(bm, objs[0], False))
         self.umeshes = bmeshes
 
     def __iter__(self) -> typing.Iterator[UMesh]:
@@ -165,6 +166,17 @@ class UMeshes:
 
     def __bool__(self):
         return bool(self.umeshes)
+
+
+class NoInit:
+    def __getattribute__(self, item):
+        raise AttributeError(f'Object not initialized')
+
+    def __bool__(self):
+        raise AttributeError(f'Object not initialized')
+
+    def __len__(self):
+        raise AttributeError(f'Object not initialized')
 
 
 def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:

@@ -7,6 +7,7 @@ import enum
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
+from mathutils.geometry import area_tri
 
 from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
 
@@ -305,6 +306,21 @@ class FaceIsland:
             else:
                 return self.__info_face_select_sync()
 
+    def calc_materials(self, umesh: utils.UMesh) -> tuple[str]:
+        indexes = set()
+        for f in self.faces:
+            indexes.add(f.material_index)
+        indexes = list(indexes)
+        indexes.sort()
+
+        material: list[str] = []
+        for idx in indexes:
+            if idx < len(umesh.obj.material_slots):
+                material.append(umesh.obj.material_slots[idx].name)
+            else:
+                material.append('')
+        return tuple(material)
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -317,6 +333,14 @@ class FaceIsland:
     def __str__(self):
         return f'Faces count = {len(self.faces)}'
 
+class AdvIslandInfo:
+    def __init__(self):
+        self.area_uv: float = -1.0
+        self.area_3d: float = -1.0
+        self.td: float | None = -1.0
+        self.scale: Vector | None = None
+        self.materials: tuple[str] = tuple()
+
 class AdvIsland(FaceIsland):
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
         super().__init__(faces, bm, uv_layer)
@@ -326,6 +350,7 @@ class AdvIsland(FaceIsland):
         self._bbox: BBox | None = None
         self.tag = True
         self._select_state = None
+        self.info: AdvIslandInfo | None = None
 
     def move(self, delta: Vector) -> bool:
         if self._bbox is not None:
@@ -393,6 +418,23 @@ class AdvIsland(FaceIsland):
         else:
             self.convex_coords = super().calc_convex_points()
         return self.convex_coords
+
+    def calc_area(self):
+        area = 0.0
+        for i in range(0, len(self.flat_coords), 3):
+            area += area_tri(self.flat_coords[i], self.flat_coords[i + 1], self.flat_coords[i + 2])
+
+        if self.info is None:
+            self.info = AdvIslandInfo()
+        self.info.area_uv = area
+
+    def calc_materials(self, umesh: utils.UMesh):
+        materials = super().calc_materials(umesh)
+        if self.info is None:
+            self.info = AdvIslandInfo()
+
+        self.info.materials = materials
+        return materials
 
     def __str__(self):
         return f'Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
@@ -887,3 +929,11 @@ class AdvIslands(Islands):
     def calc_flat_coords(self):
         for island in self.islands:
             island.calc_flat_coords()
+
+    def calc_area(self):
+        for isl in self:
+            isl.calc_area()
+
+    def calc_materials(self, umesh: utils.UMesh):
+        for isl in self:
+            isl.calc_materials(umesh)
