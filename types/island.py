@@ -545,7 +545,7 @@ class IslandsBase:
         return any(any(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def calc_iter_ex(bm, uv_layer):
+    def calc_iter_ex(bm, uv):
         island: list[BMFace] = []
 
         for face in bm.faces:
@@ -559,22 +559,13 @@ class IslandsBase:
             while parts_of_island:  # Blank list == all faces of the island taken
                 for f in parts_of_island:
                     for l in f.loops:  # Running through all the neighboring faces
-                        link_face = l.link_loop_radial_next.face
-                        if not link_face.tag:  # Skip appended
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
                             continue
-
-                        for ll in link_face.loops:
-                            if not ll.face.tag:
-                                continue
-                            # If the coordinates of the vertices of adjacent faces on the uv match,
-                            # then this is part of the island, and we append face to the list
-                            if ll[uv_layer].uv != l[uv_layer].uv:
-                                continue
-                            # Skip non-manifold
-                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
-                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
-                                temp.append(ll.face)
-                                ll.face.tag = False
+                        if l[uv].uv == shared_crn.link_loop_next[uv].uv and l.link_loop_next[uv].uv == shared_crn[uv].uv:
+                            temp.append(ff)
+                            ff.tag = False
 
                 island.extend(parts_of_island)
                 parts_of_island = temp
