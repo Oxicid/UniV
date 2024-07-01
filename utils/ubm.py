@@ -1,18 +1,7 @@
-# import bmesh
+import bmesh
+from ..types import PyBMesh
 from bmesh.types import *
 from mathutils import Vector
-
-__all__ = (
-    'face_centroid_uv',
-    'calc_non_manifolds',
-    'set_faces_tag',
-    '_prev_disc',
-    'linked_crn_uv',
-    'select_linked_crn_uv_vert',
-    'deselect_linked_crn_uv_vert',
-    'is_boundary',
-    'is_boundary_sync',
-)
 
 def set_faces_tag(faces, tag=True):
     for f in faces:
@@ -124,3 +113,91 @@ def is_boundary_sync(crn: BMLoop, uv_layer: BMLayerItem):
         return True
     return not (crn[uv_layer].uv == next_linked_disc.link_loop_next[uv_layer].uv and
                 crn.link_loop_next[uv_layer].uv == next_linked_disc[uv_layer].uv)
+
+def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
+    if PyBMesh.is_full_face_deselected(bm):
+        return []
+
+    if sync:
+        if PyBMesh.is_full_face_selected(bm):
+            return bm.faces
+        return [f for f in bm.faces if f.select]
+
+    if PyBMesh.is_full_face_selected(bm):
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops)]
+        else:
+            return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops)]
+    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
+    else:
+        return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select]
+
+def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMFace] | tuple':
+    if PyBMesh.is_full_face_deselected(bm):
+        return ()
+
+    if sync:
+        if PyBMesh.is_full_face_selected(bm):
+            return bm.faces
+        return (f for f in bm.faces if f.select)
+
+    if PyBMesh.is_full_face_selected(bm):
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops))
+        else:
+            return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops))
+    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        return (f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select)
+    else:
+        return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select)
+
+def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:  # noqa
+    if PyBMesh.is_full_face_selected(bm):
+        return bm.faces
+    if sync:
+        return [f for f in bm.faces if not f.hide]
+    return [f for f in bm.faces if f.select]
+
+def calc_uv_faces(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMFace]:
+    if selected:
+        return calc_selected_uv_faces(bm, uv_layer, sync)
+    return calc_visible_uv_faces(bm, uv_layer, sync)
+
+def calc_selected_uv_corners(bm, uv_layer, sync) -> list[bmesh.types.BMLoop]:
+    if PyBMesh.is_full_vert_deselected(bm):
+        return []
+
+    if sync:
+        if PyBMesh.is_full_vert_selected(bm):
+            return [l for f in bm.faces for l in f.loops]
+        return [l for f in bm.faces for l in f.loops if l.vert.select]
+
+    if PyBMesh.is_full_face_selected(bm):
+        return [l for f in bm.faces for l in f.loops if l[uv_layer].select]
+    return [l for f in bm.faces if f.select for l in f.loops if l[uv_layer].select]
+
+def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMLoop] | tuple':
+    if PyBMesh.is_full_vert_deselected(bm):
+        return ()
+
+    if sync:
+        if PyBMesh.is_full_vert_selected(bm):
+            return (l for f in bm.faces for l in f.loops)
+        return (l for f in bm.faces for l in f.loops if l.vert.select)
+
+    if PyBMesh.is_full_face_selected(bm):
+        return (luv for f in bm.faces for luv in f.loops if luv[uv_layer].select)
+    return (luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select)
+
+def calc_visible_uv_corners(bm, sync) -> list[bmesh.types.BMLoop]:
+    if sync:
+        return [luv for f in bm.faces if not f.hide for luv in f.loops]
+    if PyBMesh.fields(bm).totfacesel == 0:
+        return []
+    return [luv for f in bm.faces if (f.select and not f.hide) for luv in f.loops]
+
+def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMLoop]:
+    if selected:
+        return calc_selected_uv_corners(bm, uv_layer, sync)
+    return calc_visible_uv_corners(bm, sync)
