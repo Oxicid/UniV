@@ -13,6 +13,7 @@ from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
 
 from .. import utils
 from ..utils import umath, timer  # noqa
+from .btypes import PyBMesh
 from . import btypes
 from. import BBox
 
@@ -321,6 +322,33 @@ class FaceIsland:
                 material.append('')
         return tuple(material)
 
+    def mark_seam(self, additional=False):
+        uv = self.uv_layer
+        if utils.sync():
+            for f in self.faces:
+                for crn in f.loops:
+                    shared_crn = crn.link_loop_radial_prev
+                    if crn == shared_crn and shared_crn.face.select:
+                        crn.edge.seam = True
+                        continue
+                    seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
+                    if additional:
+                        crn.edge.seam |= seam
+                    else:
+                        crn.edge.seam = seam
+        else:
+            for f in self.faces:
+                for crn in f.loops:
+                    shared_crn = crn.link_loop_radial_prev
+                    if crn == shared_crn and all(_crn[uv].select_edge for _crn in shared_crn.face.loops):
+                        crn.edge.seam = True
+                        continue
+                    seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
+                    if additional:
+                        crn.edge.seam |= seam
+                    else:
+                        crn.edge.seam = seam
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -508,8 +536,12 @@ class IslandsBase:
             for face in bm.faces:
                 face.tag = not face.hide
         else:
-            for face in bm.faces:
-                face.tag = not face.hide and face.select
+            if PyBMesh.is_full_face_selected(bm):
+                for face in bm.faces:
+                    face.tag = True
+            else:
+                for face in bm.faces:
+                    face.tag = face.select
 
     @staticmethod
     def island_filter_is_partial_face_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
@@ -575,7 +607,7 @@ class IslandsBase:
             island = []
 
     @staticmethod
-    def calc_with_markseam_iter_ex(bm, uv_layer):
+    def calc_with_markseam_iter_ex(bm, uv):
         island: list[BMFace] = []
 
         for face in bm.faces:
@@ -589,21 +621,15 @@ class IslandsBase:
             while parts_of_island:
                 for f in parts_of_island:
                     for l in f.loops:
-                        link_face = l.link_loop_radial_next.face
-                        if not link_face.tag:
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
                             continue
                         if l.edge.seam:  # Skip if seam
                             continue
-
-                        for ll in link_face.loops:
-                            if not ll.face.tag:
-                                continue
-                            if ll[uv_layer].uv != l[uv_layer].uv:
-                                continue
-                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
-                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
-                                temp.append(ll.face)
-                                ll.face.tag = False
+                        if l[uv].uv == shared_crn.link_loop_next[uv].uv and l.link_loop_next[uv].uv == shared_crn[uv].uv:
+                            temp.append(ff)
+                            ff.tag = False
 
                 island.extend(parts_of_island)
                 parts_of_island = temp
@@ -613,7 +639,7 @@ class IslandsBase:
             island = []
 
     @staticmethod
-    def calc_with_markseam_material_iter_ex(bm, uv_layer):
+    def calc_with_markseam_material_iter_ex(bm, uv):
         island: list[BMFace] = []
 
         for face in bm.faces:
@@ -627,23 +653,17 @@ class IslandsBase:
             while parts_of_island:
                 for f in parts_of_island:
                     for l in f.loops:
-                        link_face = l.link_loop_radial_next.face
-                        if not link_face.tag:
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
                             continue
                         if l.edge.seam:  # Skip if seam
                             continue
-                        if link_face.material_index != f.material_index:  # Skip if other material
+                        if ff.material_index != f.material_index:  # Skip if other material
                             continue
-
-                        for ll in link_face.loops:
-                            if not ll.face.tag:
-                                continue
-                            if ll[uv_layer].uv != l[uv_layer].uv:
-                                continue
-                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
-                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
-                                temp.append(ll.face)
-                                ll.face.tag = False
+                        if l[uv].uv == shared_crn.link_loop_next[uv].uv and l.link_loop_next[uv].uv == shared_crn[uv].uv:
+                            temp.append(ff)
+                            ff.tag = False
 
                 island.extend(parts_of_island)
                 parts_of_island = temp
@@ -653,7 +673,7 @@ class IslandsBase:
             island = []
 
     @staticmethod
-    def calc_with_markseam_material_edgeangle_iter_ex(bm, uv_layer, angle, sharp=True):
+    def calc_all_ex(bm, uv, angle):
         island: list[BMFace] = []
 
         for face in bm.faces:
@@ -667,27 +687,21 @@ class IslandsBase:
             while parts_of_island:
                 for f in parts_of_island:
                     for l in f.loops:
-                        link_face = l.link_loop_radial_next.face
-                        if not link_face.tag:
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
                             continue
-                        if sharp and not l.edge.smooth:  # Skip by sharp
+                        if not l.edge.smooth:  # Skip by sharp
                             continue
                         if l.edge.calc_face_angle() >= angle:  # Skip by angle
                             continue
                         if l.edge.seam:  # Skip if seam
                             continue
-                        if link_face.material_index != f.material_index:  # Skip if other material
+                        if ff.material_index != f.material_index:  # Skip if other material
                             continue
-
-                        for ll in link_face.loops:
-                            if not ll.face.tag:
-                                continue
-                            if ll[uv_layer].uv != l[uv_layer].uv:
-                                continue
-                            if (l.link_loop_next[uv_layer].uv == ll.link_loop_prev[uv_layer].uv) or \
-                                    (ll.link_loop_next[uv_layer].uv == l.link_loop_prev[uv_layer].uv):
-                                temp.append(ll.face)
-                                ll.face.tag = False
+                        if l[uv].uv == shared_crn.link_loop_next[uv].uv and l.link_loop_next[uv].uv == shared_crn[uv].uv:
+                            temp.append(ff)
+                            ff.tag = False
 
                 island.extend(parts_of_island)
                 parts_of_island = temp
@@ -739,7 +753,10 @@ class Islands(IslandsBase):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
-        islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
+        if PyBMesh.is_full_face_selected(bm) and sync:
+            islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
+        else:
+            islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
 
     @classmethod
@@ -749,10 +766,30 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
+    def calc_extended_all(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, angle: float):
+        if btypes.PyBMesh.fields(bm).totfacesel == 0:
+            return cls([], None, None)
+        cls.tag_filter_visible(bm, sync)
+        islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_all_ex(bm, uv_layer, angle) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
+        return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_visible_all(cls, bm: BMesh, uv_layer: BMLayerItem,  sync: bool, angle: float):
+        cls.tag_filter_visible(bm, sync)
+        islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_all_ex(bm, uv_layer, angle)]
+        return cls(islands, bm, uv_layer)
+
+    @classmethod
     def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'Islands':
         if extended:
             return cls.calc_extended(bm, uv_layer, sync)
         return cls.calc_visible(bm, uv_layer, sync)
+
+    @classmethod
+    def calc_extended_or_visible_all(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, angle: float, *, extended) -> 'Islands':
+        if extended:
+            return cls.calc_extended_all(bm, uv_layer, sync, angle)
+        return cls.calc_visible_all(bm, uv_layer, sync, angle)
 
     @classmethod
     def calc(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, selected) -> 'Islands':
@@ -895,6 +932,12 @@ class AdvIslands(Islands):
     @classmethod
     def calc_extended_or_visible(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'AdvIslands':
         islands = super().calc_extended_or_visible(bm, uv_layer, sync, extended=extended)
+        adv_islands = [AdvIsland(isl.faces, isl.bm, isl.uv_layer) for isl in islands]
+        return cls(adv_islands, bm, uv_layer)
+
+    @classmethod
+    def calc_extended_or_visible_all(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, angle: float, *, extended) -> 'AdvIslands':
+        islands = super().calc_extended_or_visible_all(bm, uv_layer, sync, angle, extended=extended)
         adv_islands = [AdvIsland(isl.faces, isl.bm, isl.uv_layer) for isl in islands]
         return cls(adv_islands, bm, uv_layer)
 
