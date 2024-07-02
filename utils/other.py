@@ -17,6 +17,8 @@ def get_select_mode_mesh() -> str:
         return 'FACE'
 
 def set_select_mode_mesh(mode: str):
+    if get_select_mode_mesh() == mode:
+        return
     if mode == 'VERTEX':
         bpy.context.tool_settings.mesh_select_mode[:] = True, False, False
     elif mode == 'EDGE':
@@ -31,4 +33,6 @@ def get_select_mode_uv() -> str:
     return bpy.context.scene.tool_settings.uv_select_mode
 
 def set_select_mode_uv(mode: str):
+    if get_select_mode_uv() == mode:
+        return
     bpy.context.scene.tool_settings.uv_select_mode = mode

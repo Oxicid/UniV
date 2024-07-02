@@ -7,6 +7,7 @@ import gpu_extras
 # import numpy as np
 
 from mathutils import Vector
+from mathutils.geometry import area_tri
 from bpy.props import *
 from bpy.types import Operator
 from bmesh.types import BMLoop, BMLayerItem
@@ -1415,3 +1416,94 @@ class UNIV_OT_Select_Inner(Operator):
             umesh.update_tag = update_tag
             if update_tag:
                 umesh.bm.select_flush_mode()
+
+class UNIV_OT_Select_Zero(bpy.types.Operator):
+    bl_idname = "uv.univ_select_zero"
+    bl_label = "Select Degenerate"
+    bl_description = "Select degenerate UVs (zero area UV triangles)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+
+    precision: bpy.props.FloatProperty(name='Precision', default=0.0001, min=0, soft_max=0.001, step=0.0001, precision=7)  # noqa
+
+    def draw(self, context):
+        self.layout.prop(self, 'precision', slider=True)
+        self.layout.row(align=True).prop(self, 'mode')
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.umeshes: UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = UMeshes()
+        if self.sync:
+            if self.mode == 'SELECT':
+                bpy.ops.mesh.select_all(action='DESELECT')
+            utils.set_select_mode_mesh('FACE')
+        else:
+            if self.mode == 'SELECT':
+                bpy.ops.uv.select_all(action='DESELECT')
+
+        select_state = False if self.mode == 'DESELECT' else True
+        precision = self.precision * 0.001
+        total_counter = 0
+        for umesh in self.umeshes:
+            if not self.sync and umesh.is_full_face_deselected:
+                umesh.update_tag = False
+                continue
+
+            local_counter = 0
+            uv = umesh.uv_layer
+            loop_triangles = umesh.bm.calc_loop_triangles()
+            for tris in loop_triangles:
+                if self.sync:
+                    if tris[0].face.hide:
+                        continue
+                else:
+                    if not tris[0].face.select:
+                        continue
+                area = area_tri(tris[0][uv].uv, tris[1][uv].uv, tris[2][uv].uv)
+                if area < precision:
+                    if self.sync:
+                        tris[0].face.select = select_state
+                    else:
+                        for crn in tris[0].face.loops:
+                            crn[uv].select = select_state
+                            crn[uv].select_edge = select_state
+                    local_counter += 1
+            umesh.update_tag = bool(local_counter)
+            total_counter += local_counter
+
+        self.umeshes.update()
+
+        if not total_counter:
+            self.report({'INFO'}, f'Degenerate triangles not found')
+            return {'FINISHED'}
+
+        self.report({'WARNING'}, f'Detected {total_counter} degenerate triangles')
+        return {'FINISHED'}

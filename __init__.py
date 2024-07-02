@@ -58,6 +58,7 @@ classes = (
     select.UNIV_OT_Select_Square_Island,
     select.UNIV_OT_Select_Border,
     select.UNIV_OT_Select_Inner,
+    select.UNIV_OT_Select_Zero,
     select.UNIV_OT_Select_Border_Edge_by_Angle,
     # UI
     ui.UNIV_PT_General
