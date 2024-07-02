@@ -464,6 +464,11 @@ class AdvIsland(FaceIsland):
         self.info.materials = materials
         return materials
 
+    def calc_sub_islands_all(self, angle: float):
+        self.set_tag()
+        islands = [AdvIsland(i, self.bm, self.uv_layer) for i in IslandsBase.calc_all_ex(self, self.uv_layer, angle)]
+        return AdvIslands(islands, self.bm, self.uv_layer)
+
     def __str__(self):
         return f'Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
 

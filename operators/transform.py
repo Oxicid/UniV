@@ -1163,11 +1163,12 @@ class UNIV_OT_Distribute(Operator):
     angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
-        layout = self.layout
         if not self.break_:
+            layout = self.layout.row()
+            layout.prop(self, 'space', expand=True)
+            layout = self.layout
             layout.prop(self, 'overlapped')
-        layout.prop(self, 'to_cursor')
-        if not self.break_:
+            layout.prop(self, 'to_cursor')
             layout.prop(self, 'break_')
         else:
             layout = self.layout.row()
@@ -1176,8 +1177,6 @@ class UNIV_OT_Distribute(Operator):
 
         layout = self.layout
         layout.prop(self, 'padding', slider=True)
-        layout = self.layout.row()
-        layout.prop(self, 'space', expand=True)
         layout = self.layout.row()
         layout.prop(self, 'axis', expand=True)
 
@@ -1194,20 +1193,18 @@ class UNIV_OT_Distribute(Operator):
             return self.execute(context)
         self.to_cursor = event.ctrl
         self.overlapped = event.shift
-        self.space = 'SPACE' if event.alt else 'ALIGN'
+        self.break_ = event.alt
         return self.execute(context)
 
     def __init__(self):
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: utils.UMeshes | None = None
         self.cursor_loc: Vector | None = None
+        self.update_tag = False
 
     def execute(self, context):
-        if self.break_ and self.overlapped:
-            self.overlapped = False
-
         self.umeshes = utils.UMeshes(report=self.report)
-        if self.to_cursor:
+        if self.to_cursor and not self.break_:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
@@ -1215,7 +1212,14 @@ class UNIV_OT_Distribute(Operator):
         else:
             self.cursor_loc = None
 
-        if self.space == 'SPACE':
+        if self.break_:
+            max_angle = max(umesh.smooth_angle for umesh in self.umeshes)
+            self.angle = min(self.angle, max_angle)  # clamp for angle
+
+            self.distribute_break_preprocessing(extended=True)
+            if not self.umeshes.final():
+                self.distribute_break_preprocessing(extended=False)
+        elif self.space == 'SPACE':
             self.distribute_space(extended=True)
             if not self.umeshes.final():
                 self.distribute_space(extended=False)
@@ -1226,19 +1230,29 @@ class UNIV_OT_Distribute(Operator):
         self.umeshes.update()
         return {'FINISHED'}
 
-    def distribute(self, extended=True):
-        if self.overlapped:
-            func = self.distribute_preprocessing_overlap
-        else:
-            func = self.distribute_preprocessing
-        _islands, general_bbox = func(extended)
+    def distribute_break_preprocessing(self, extended):
+        cancel = False
+        for umesh in self.umeshes:
+            self.update_tag = False
+            angle = min(self.angle, umesh.smooth_angle)
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+                for isl in adv_islands:
+                    if len(isl) == 1:
+                        continue
+                    sub_islands = isl.calc_sub_islands_all(angle)
+                    if len(sub_islands) > 1:
+                        self.distribute_ex(list(sub_islands), isl.bbox)
+            umesh.update_tag = self.update_tag
+            cancel |= bool(adv_islands)
+        if cancel and not any(umesh.update_tag for umesh in self.umeshes):
+            self.umeshes.cancel_with_report(info=f"Islands for break not found")
 
-        if len(_islands) <= 2:
-            if len(_islands) != 0:
-                self.umeshes.cancel_with_report(info=f"The number of islands must be greater than two, {len(_islands)} was found")
+    def distribute_ex(self, _islands, general_bbox):
+        if len(_islands) < 2:
+            if len(_islands) == 1:
+                self.umeshes.cancel_with_report(info=f"The number of islands must be greater than one")
             return
 
-        update_tag = False
         cursor_offset = 0
         if self.is_horizontal(general_bbox):
             _islands.sort(key=lambda a: a.bbox.xmin)
@@ -1250,7 +1264,7 @@ class UNIV_OT_Distribute(Operator):
 
             for island in _islands:
                 width = island.bbox.width
-                update_tag |= island.set_position(Vector((margin, island.bbox.ymin - cursor_offset)), _from=island.bbox.min)
+                self.update_tag |= island.set_position(Vector((margin, island.bbox.ymin - cursor_offset)), _from=island.bbox.min)
                 margin += self.padding + width
         else:
             _islands.sort(key=lambda a: a.bbox.ymin)
@@ -1262,9 +1276,18 @@ class UNIV_OT_Distribute(Operator):
 
             for island in _islands:
                 height = island.bbox.height
-                update_tag |= island.set_position(Vector((island.bbox.xmin - cursor_offset, margin)), _from=island.bbox.min)
+                self.update_tag |= island.set_position(Vector((island.bbox.xmin - cursor_offset, margin)), _from=island.bbox.min)
                 margin += self.padding + height
-        if not update_tag:
+
+    def distribute(self, extended=True):
+        self.update_tag = False
+        if self.overlapped:
+            func = self.distribute_preprocessing_overlap
+        else:
+            func = self.distribute_preprocessing
+        self.distribute_ex(*func(extended))
+
+        if not self.update_tag and any(umesh.update_tag for umesh in self.umeshes):
             self.umeshes.cancel_with_report(info='Islands is Distributed')
 
     def distribute_space(self, extended=True):
@@ -1329,20 +1352,11 @@ class UNIV_OT_Distribute(Operator):
     def distribute_preprocessing(self, extended):
         _islands: list[AdvIsland] = []
         general_bbox = BBox()
-        if self.break_:
-            for umesh in self.umeshes:
-                angle = min(self.angle, umesh.smooth_angle)
-                print(angle)
-                if adv_islands := AdvIslands.calc_extended_or_visible_all(umesh.bm, umesh.uv_layer, self.sync, angle, extended=extended):
-                    general_bbox.union(adv_islands.calc_bbox())
-                    _islands.extend(adv_islands)
-                umesh.update_tag = bool(adv_islands)
-        else:
-            for umesh in self.umeshes:
-                if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
-                    general_bbox.union(adv_islands.calc_bbox())
-                    _islands.extend(adv_islands)
-                umesh.update_tag = bool(adv_islands)
+        for umesh in self.umeshes:
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+                general_bbox.union(adv_islands.calc_bbox())
+                _islands.extend(adv_islands)
+            umesh.update_tag = bool(adv_islands)
         return _islands, general_bbox
 
     def distribute_preprocessing_overlap(self, extended):
@@ -1362,7 +1376,10 @@ class UNIV_OT_Distribute(Operator):
 
     def is_horizontal(self, bbox):
         if self.axis == 'AUTO':
-            return bbox.width * 2 > bbox.height
+            if self.break_:
+                return bbox.width > bbox.height
+            else:
+                return bbox.width * 2 > bbox.height
         else:
             return self.axis == 'X'
 
