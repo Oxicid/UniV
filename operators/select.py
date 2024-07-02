@@ -1433,7 +1433,7 @@ class UNIV_OT_Select_Zero(bpy.types.Operator):
 
     def draw(self, context):
         self.layout.prop(self, 'precision', slider=True)
-        self.layout.row(align=True).prop(self, 'mode')
+        self.layout.row(align=True).prop(self, 'mode', expand=True)
 
     @classmethod
     def poll(cls, context):
@@ -1460,6 +1460,16 @@ class UNIV_OT_Select_Zero(bpy.types.Operator):
         self.umeshes: UMeshes | None = None
 
     def execute(self, context):
+        total_counter = self.zero()
+
+        if not total_counter:
+            self.report({'INFO'}, 'Degenerate triangles not found')
+            return {'FINISHED'}
+
+        self.report({'WARNING'}, f'Detected {total_counter} degenerate triangles')
+        return {'FINISHED'}
+
+    def zero(self):
         self.umeshes = UMeshes()
         if self.sync:
             if self.mode == 'SELECT':
@@ -1468,7 +1478,6 @@ class UNIV_OT_Select_Zero(bpy.types.Operator):
         else:
             if self.mode == 'SELECT':
                 bpy.ops.uv.select_all(action='DESELECT')
-
         select_state = False if self.mode == 'DESELECT' else True
         precision = self.precision * 0.001
         total_counter = 0
@@ -1498,12 +1507,99 @@ class UNIV_OT_Select_Zero(bpy.types.Operator):
                     local_counter += 1
             umesh.update_tag = bool(local_counter)
             total_counter += local_counter
-
         self.umeshes.update()
+        return total_counter
+
+class UNIV_OT_Select_Flipped(bpy.types.Operator):
+    bl_idname = "uv.univ_select_flipped"
+    bl_label = "Select Flipped"
+    bl_description = "Select flipped UV faces"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+
+    def draw(self, context):
+        self.layout.row(align=True).prop(self, 'mode', expand=True)
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.umeshes: UMeshes | None = None
+
+    def execute(self, context):
+        total_counter = self.zero()
 
         if not total_counter:
-            self.report({'INFO'}, f'Degenerate triangles not found')
+            self.report({'INFO'}, 'Flipped faces not found')
             return {'FINISHED'}
 
-        self.report({'WARNING'}, f'Detected {total_counter} degenerate triangles')
+        self.report({'WARNING'}, f'Detected {total_counter} flipped faces')
         return {'FINISHED'}
+
+    def zero(self):
+        self.umeshes = UMeshes()
+        if self.sync:
+            if self.mode == 'SELECT':
+                bpy.ops.mesh.select_all(action='DESELECT')
+            utils.set_select_mode_mesh('FACE')
+        else:
+            if self.mode == 'SELECT':
+                bpy.ops.uv.select_all(action='DESELECT')
+        select_state = False if self.mode == 'DESELECT' else True
+
+        total_counter = 0
+        for umesh in self.umeshes:
+            if not self.sync and umesh.is_full_face_deselected:
+                umesh.update_tag = False
+                continue
+
+            local_counter = 0
+            uv = umesh.uv_layer
+            loop_triangles = umesh.bm.calc_loop_triangles()
+            for tris in loop_triangles:
+                if self.sync:
+                    if tris[0].face.hide:
+                        continue
+                else:
+                    if not tris[0].face.select:
+                        continue
+                a = tris[0][uv].uv
+                b = tris[1][uv].uv
+                c = tris[2][uv].uv
+
+                area = a.cross(b) + b.cross(c) + c.cross(a)
+                if area < 0:
+                    if self.sync:
+                        tris[0].face.select = select_state
+                    else:
+                        for crn in tris[0].face.loops:
+                            crn[uv].select = select_state
+                            crn[uv].select_edge = select_state
+                    local_counter += 1
+            umesh.update_tag = bool(local_counter)
+            total_counter += local_counter
+        self.umeshes.update()
+        return total_counter

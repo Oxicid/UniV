@@ -30,12 +30,6 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_orient', text='→').edge_dir = 'HORIZONTAL'
         row.operator('uv.univ_orient', text='↑').edge_dir = 'VERTICAL'
 
-        # row = col.row(align=True)
-        # row.operator('uv.univ_align_edge', text="Align Edge")
-        #
-        # row = col.row(align=True)
-        # row.operator('uv.univ_align_world', text="Align World")
-
         col_align = col.column(align=True)
         col_align.separator(factor=0.35)
         row = col_align.row(align=True)
@@ -91,7 +85,6 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.operator('uv.univ_single', text='Single')
-        split.operator('uv.univ_select_zero', text='Zero')
 
         row = col.split().row(align=True)
         row.operator('uv.univ_select_border', text='Border')
@@ -117,3 +110,11 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         row.operator('uv.univ_quad', text='Quad')
         row.operator('uv.univ_straight', text='Straight')
+
+        # Inspect
+        col_align = col.column(align=True)
+        col_align.separator(factor=0.35)
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_select_zero', text='Zero')
+        split.operator('uv.univ_select_flipped', text='Flipped')
