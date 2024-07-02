@@ -86,6 +86,17 @@ def select_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
         if first[uv_layer].uv == crn_uv_bm_iter.uv:
             crn_uv_bm_iter.select = True
 
+def select_crn_uv_edge(crn: BMLoop, uv_layer):
+    link_crn_next = crn.link_loop_next
+    select_linked_crn_uv_vert(crn, uv_layer)
+    select_linked_crn_uv_vert(link_crn_next, uv_layer)
+
+    crn_uv_a = crn[uv_layer]
+    crn_uv_b = link_crn_next[uv_layer]
+    crn_uv_a.select = True
+    crn_uv_a.select_edge = True
+    crn_uv_b.select = True
+
 def deselect_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
     bm_iter = first
     while True:
@@ -94,6 +105,108 @@ def deselect_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
         crn_uv_bm_iter = bm_iter[uv_layer]
         if first[uv_layer].uv == crn_uv_bm_iter.uv:
             crn_uv_bm_iter.select = False
+
+def deselect_crn_uv(first: BMLoop, uv: BMLayerItem):
+    first[uv].select_edge = False
+
+    bm_iter = first
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == first:
+            break
+        if not bm_iter.face.select:
+            continue
+        crn_uv_bm_iter = bm_iter[uv]
+        if first[uv].uv == crn_uv_bm_iter.uv:
+            if crn_uv_bm_iter.select:
+                break
+        else:
+            first[uv].select = False
+
+    second = first.link_loop_next
+    bm_iter = second
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == second:
+            break
+        if not bm_iter.face.select:
+            continue
+        crn_uv_bm_iter = bm_iter[uv]
+        if second[uv].uv == crn_uv_bm_iter.uv:
+            if crn_uv_bm_iter.select:
+                break
+        else:
+            second[uv].select = False
+
+def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
+    first[uv].select_edge = False
+
+    bm_iter = first
+    first[uv].select = False
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == first:
+            break
+        if not bm_iter.face.select:
+            continue
+        crn_uv_bm_iter = bm_iter[uv]
+        if first[uv].uv == crn_uv_bm_iter.uv:
+            crn_uv_bm_iter.select = False
+
+    second = first.link_loop_next
+    second[uv].select = False
+    bm_iter = second
+    while True:
+        if (bm_iter := _prev_disc(bm_iter)) == second:
+            break
+        if not bm_iter.face.select:
+            continue
+        crn_uv_bm_iter = bm_iter[uv]
+        if second[uv].uv == crn_uv_bm_iter.uv:
+            crn_uv_bm_iter.select = False
+
+
+# def deselect_crn_uv_extend(first: BMLoop, uv: BMLayerItem):
+#     if not first[uv].select_edge:
+#         return
+#     first[uv].select_edge = False
+#
+#     shared_crn = first.link_loop_radial_prev
+#     if shared_crn != first:
+#         if first[uv].uv == shared_crn.link_loop_next[uv].uv and first.link_loop_next[uv].uv == shared_crn[uv].uv:
+#             shared_crn[uv].select_edge = False
+#             deselect_linked_crn_uv_vert(shared_crn, uv)
+#             deselect_linked_crn_uv_vert(first, uv)
+#         elif first[uv].uv == shared_crn.link_loop_next[uv].uv:
+#             deselect_linked_crn_uv_vert(first, uv)
+#         elif first.link_loop_next[uv].uv == shared_crn[uv].uv:
+#             deselect_linked_crn_uv_vert(shared_crn, uv)
+#
+#
+#     bm_iter = first
+#     while True:
+#         if (bm_iter := _prev_disc(bm_iter)) == first:
+#             break
+#         if not bm_iter.face.select:
+#             continue
+#         crn_uv_bm_iter = bm_iter[uv]
+#         if first[uv].uv == crn_uv_bm_iter.uv:
+#             if crn_uv_bm_iter.select:
+#                 break
+#         else:
+#             first[uv].select = False
+#
+#     second = first.link_loop_next
+#     bm_iter = first
+#     while True:
+#         if (bm_iter := _prev_disc(bm_iter)) == second:
+#             break
+#         if not bm_iter.face.select:
+#             continue
+#         crn_uv_bm_iter = bm_iter[uv]
+#         if second[uv].uv == crn_uv_bm_iter.uv:
+#             if crn_uv_bm_iter.select:
+#                 break
+#         else:
+#             second[uv].select = False
+
 def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):
     # assert(not l.face.select)
 
