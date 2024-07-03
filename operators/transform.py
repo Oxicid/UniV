@@ -2016,3 +2016,138 @@ class UNIV_OT_Orient(Operator):
                     avg_angle += a_delta
 
         return avg_angle / n_edges
+
+
+import bmesh
+
+class UNIV_OT_Weld(Operator):
+    bl_idname = "uv.univ_weld"
+    bl_label = "Weld"
+    bl_description = "Weld"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    distance: FloatProperty(name='Distance', default=0.0005, min=0, soft_max=0.05, step=0.0001)  # noqa
+    mode: EnumProperty(name='Mode', default='SELF', items=(
+        ('DEFAULT', 'Default', ''),
+        ('SELF', 'Self', ''),
+    ))
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def draw(self, context):
+        self.layout.prop(self, 'distance', slider=True)
+        self.layout.row(align=True).prop(self, 'mode', expand=True)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.umeshes: utils.UMeshes | None = None
+        self.global_counter = 0
+
+    def execute(self, context):
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.global_counter = 0
+
+        self.weld_self(extended=True)
+        if not self.umeshes.final():
+            self.weld_self(extended=False)
+
+        self.umeshes.update(info='Not found verts for weld')
+        return {'FINISHED'}
+
+    def weld_self(self, extended):
+        for umesh in self.umeshes:
+            uv = umesh.uv_layer
+            local_counter = 0
+            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=extended):
+                # Tagging
+                for f in umesh.bm.faces:
+                    for crn in f.loops:
+                        crn.tag = False
+                for isl in islands:
+                    if extended:
+                        if self.sync:
+                            for f in isl:
+                                for crn in f.loops:
+                                    crn.tag = crn.vert.select
+                        else:
+                            for f in isl:
+                                for crn in f.loops:
+                                    crn.tag = crn[uv].select
+                    else:
+                        for f in isl:
+                            for crn in f.loops:
+                                crn.tag = True
+
+                    corners = (crn for f in isl for crn in f.loops if crn.tag)
+                    for crn in corners:
+                        crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
+                        coords = {_crn[uv].uv.copy().freeze() for _crn in crn_in_vert}
+
+                        if len(coords) == 1:
+                            for crn_t in crn_in_vert:
+                                crn_t.tag = False
+                            continue
+
+                        for group in self.calc_distance_groups(crn_in_vert, uv):
+                            value = Vector((0, 0))
+                            for c in group:
+                                value += c[uv].uv
+                            size = len(group)
+                            avg = value / size
+                            for c in group:
+                                c[uv].uv = avg
+                            local_counter += size
+
+            if local_counter:
+                for _isl in islands:
+                    _isl.mark_seam()
+
+            umesh.update_tag = bool(local_counter)
+            self.global_counter += local_counter
+
+        if self.umeshes.final() and self.global_counter == 0:
+            self.umeshes.cancel_with_report(info='Not found verts for weld')
+
+        if self.global_counter:
+            self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
+
+    def calc_distance_groups(self, crn_in_vert: list[bmesh.types.BMLoop], uv) -> list[list[bmesh.types.BMLoop]]:
+        corners_groups = []
+        union_corners = []
+        for corner_first in crn_in_vert:
+            if not corner_first.tag:
+                continue
+            corner_first.tag = False
+
+            union_corners.append(corner_first)
+            compare_index = 0
+            while True:
+                if compare_index > len(union_corners) - 1:
+                    coords = {_crn[uv].uv.copy().freeze() for _crn in union_corners}
+                    if len(coords) == 1:
+                        union_corners = []
+                        break
+                    corners_groups.append(union_corners)
+                    union_corners = []
+                    break
+
+                for isl in crn_in_vert:
+                    if not isl.tag:
+                        continue
+
+                    if (union_corners[compare_index][uv].uv - isl[uv].uv).length <= self.distance:
+                        isl.tag = False
+                        union_corners.append(isl)
+                compare_index += 1
+        return corners_groups

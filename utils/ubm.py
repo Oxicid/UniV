@@ -64,23 +64,35 @@ def calc_non_manifolds(bm: BMesh) -> tuple[set[BMVert], set[BMEdge]]:
     return non_manifold_verts, non_manifold_edges
 
 
-def _prev_disc(l: BMLoop) -> BMLoop:
+def prev_disc(l: BMLoop) -> BMLoop:
     return l.link_loop_prev.link_loop_radial_prev
 
 def linked_crn_uv(first: BMLoop, uv_layer: BMLayerItem):
     linked = []
     bm_iter = first
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == first:
+        if (bm_iter := prev_disc(bm_iter)) == first:
             break
         if first[uv_layer].uv == bm_iter[uv_layer].uv:
+            linked.append(bm_iter)
+    return linked
+
+def calc_crn_in_vert_by_tag(first: BMLoop):
+    if not first.tag:
+        return []
+    linked = [first]
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if bm_iter.tag:
             linked.append(bm_iter)
     return linked
 
 def select_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
     bm_iter = first
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == first:
+        if (bm_iter := prev_disc(bm_iter)) == first:
             break
         crn_uv_bm_iter = bm_iter[uv_layer]
         if first[uv_layer].uv == crn_uv_bm_iter.uv:
@@ -100,7 +112,7 @@ def select_crn_uv_edge(crn: BMLoop, uv_layer):
 def deselect_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
     bm_iter = first
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == first:
+        if (bm_iter := prev_disc(bm_iter)) == first:
             break
         crn_uv_bm_iter = bm_iter[uv_layer]
         if first[uv_layer].uv == crn_uv_bm_iter.uv:
@@ -111,7 +123,7 @@ def deselect_crn_uv(first: BMLoop, uv: BMLayerItem):
 
     bm_iter = first
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == first:
+        if (bm_iter := prev_disc(bm_iter)) == first:
             break
         if not bm_iter.face.select:
             continue
@@ -125,7 +137,7 @@ def deselect_crn_uv(first: BMLoop, uv: BMLayerItem):
     second = first.link_loop_next
     bm_iter = second
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == second:
+        if (bm_iter := prev_disc(bm_iter)) == second:
             break
         if not bm_iter.face.select:
             continue
@@ -142,7 +154,7 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
     bm_iter = first
     first[uv].select = False
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == first:
+        if (bm_iter := prev_disc(bm_iter)) == first:
             break
         if not bm_iter.face.select:
             continue
@@ -154,7 +166,7 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
     second[uv].select = False
     bm_iter = second
     while True:
-        if (bm_iter := _prev_disc(bm_iter)) == second:
+        if (bm_iter := prev_disc(bm_iter)) == second:
             break
         if not bm_iter.face.select:
             continue

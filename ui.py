@@ -118,3 +118,6 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_select_zero', text='Zero')
         split.operator('uv.univ_select_flipped', text='Flipped')
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_weld', text='Weld')
