@@ -1,7 +1,8 @@
-from ..utils import prev_disc
-from bmesh.types import BMLoop, BMLayerItem
 import typing
 from collections import defaultdict
+from bmesh.types import BMLoop, BMLayerItem
+from ..utils import prev_disc
+from .. import utils
 
 class LoopGroup:
     def __init__(self, uv: BMLayerItem):
@@ -85,7 +86,20 @@ class LoopGroup:
         lg.corners = shared_group
         return lg
 
-    def boundary_tag(self, crn):
+    def boundary_tag_by_face_index(self, crn: BMLoop):
+        shared_crn = crn.link_loop_radial_prev
+        if shared_crn == crn:
+            crn.tag = False
+            return
+
+        # if shared_crn.face.index in (-1, crn.face.index):
+        if shared_crn.face.index == -1:
+            crn.tag = False
+            return
+
+        crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+
+    def boundary_tag(self, crn: BMLoop):
         shared_crn = crn.link_loop_radial_prev
         if shared_crn == crn:
             crn.tag = False
@@ -94,6 +108,19 @@ class LoopGroup:
             crn.tag = False
             return
         if not shared_crn.face.select:  # Change
+            crn.tag = False
+            return
+        crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+
+    def boundary_tag_sync(self, crn: BMLoop):
+        shared_crn = crn.link_loop_radial_prev
+        if shared_crn == crn:
+            crn.tag = False
+            return
+        if not crn.edge.select:
+            crn.tag = False
+            return
+        if shared_crn.face.hide:  # Change
             crn.tag = False
             return
         crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
@@ -110,12 +137,19 @@ class LoopGroup:
         return islands_for_stitch
 
     def tagging(self, island):
+        func: typing.Callable = self.boundary_tag_sync if utils.sync() else self.boundary_tag
         for f in island:
             for crn in f.loops:
-                self.boundary_tag(crn)
+                func(crn)
 
-    def calc_first(self, island):
-        self.tagging(island)
+    def calc_first(self, island, selected=True):
+        if selected:
+            self.tagging(island)
+        else:
+            for f__ in island:
+                for crn__ in f__.loops:
+                    self.boundary_tag_by_face_index(crn__)
+
         indexes = self.calc_island_index_for_stitch(island)
         for k, corner_edges in indexes.items():
             for _crn in corner_edges:

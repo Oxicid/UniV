@@ -2158,7 +2158,7 @@ class UNIV_OT_Stitch(Operator):
     bl_description = 'Stitch'
     bl_options = {'REGISTER', 'UNDO'}
 
-    # between: BoolProperty(name='Between', default=False)
+    between: BoolProperty(name='Between', default=False)
     flip: BoolProperty(name='Flip', default=False)
 
     @classmethod
@@ -2167,54 +2167,96 @@ class UNIV_OT_Stitch(Operator):
             return False
         if context.active_object.mode != 'EDIT':
             return False
-        if utils.sync():
-            return False
         return True
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
+            if context.area.ui_type == 'UV':
+                self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
+        self.between = event.alt
         return self.execute(context)
 
     def __init__(self):
-        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.sync = utils.sync()
         self.umeshes: utils.UMeshes | None = None
         self.global_counter = 0
+        self.mouse_position: Vector | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes(report=self.report)
         self.global_counter = 0
-
-        self.stitch_()
+        if self.between:
+            self.stitch_between()
+        else:
+            self.stitch()
 
         return self.umeshes.update(info='Not found edges for stitch')
 
-    def stitch_(self):
+    def stitch(self):
         for umesh in self.umeshes:
             uv = umesh.uv_layer
-            adv_islands = AdvIslands.calc_visible(umesh.bm, uv, sync=False)
+            adv_islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=False)
             if len(adv_islands) < 2:
                 umesh.update_tag = False
                 continue
 
             adv_islands.indexing(force=True)
-            for isl in adv_islands:
-                for f in isl:
-                    for crn in f.loops:
-                        crn.tag = False
 
-            target_islands = [isl for isl in adv_islands if any(crn for f in isl for crn in f.loops if crn[uv].select_edge)]
+            for f in umesh.bm.faces:
+                for crn in f.loops:
+                    crn.tag = False
+
+            if self.sync:
+                target_islands = [isl for isl in adv_islands if any(crn.edge.select for f in isl for crn in f.loops)]
+            else:
+                target_islands = [isl for isl in adv_islands if any(crn[uv].select_edge for f in isl for crn in f.loops)]
+
+            if self.sync and self.mouse_position:
+                def sort_by_nearest_to_mouse(__island: AdvIsland) -> float:
+                    from mathutils.geometry import intersect_point_line
+                    nonlocal uv
+                    nonlocal mouse_position
+
+                    min_dist = math.inf
+                    for _ff in __island:
+                        for __crn_sort in _ff.loops:
+                            if __crn_sort.edge.select:
+                                intersect = intersect_point_line(mouse_position, __crn_sort[uv].uv, __crn_sort.link_loop_next[uv].uv)
+                                # dist = (intersect[0] - mouse_position).length
+                                dist = (mouse_position - intersect[0]).length
+                                if min_dist > dist:
+                                    min_dist = dist
+                    return min_dist
+
+                mouse_position = self.mouse_position
+                target_islands.sort(key=sort_by_nearest_to_mouse)
+
+            else:
+                for _isl in target_islands:
+                    _isl.calc_selected_edge_length()
+
+                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)
+
+                for _isl in reversed(target_islands):
+                    if _isl.info.edge_length < 1e-06:
+                        target_islands.remove(_isl)
+
+            if not target_islands:
+                umesh.update_tag = False
+                continue
+
             update_tag = False
             while True:
                 stitched = False
-                for target_island in target_islands:
+                for target_isl in target_islands:
                     tar = LoopGroup(uv)
 
                     while True:
                         local_stitched = False
-                        for _ in tar.calc_first(target_island):
+                        for _ in tar.calc_first(target_isl):
                             source = tar.calc_shared_group()
-                            res = self.stitch(tar, source, adv_islands)
+                            res = self.stitch_ex(tar, source, adv_islands)
                             local_stitched |= res
                         stitched |= local_stitched
                         if not local_stitched:
@@ -2222,6 +2264,79 @@ class UNIV_OT_Stitch(Operator):
                 update_tag |= stitched
                 if not stitched:
                     break
+            if update_tag:
+                for adv in adv_islands:
+                    adv.mark_seam()
+            umesh.update_tag = update_tag
+
+    def stitch_between(self):
+        for umesh in self.umeshes:
+            uv = umesh.uv_layer
+            _islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=True)
+            if len(_islands) < 2:
+                umesh.update_tag = False
+                continue
+
+            _islands.indexing(force=True)
+
+            for f in umesh.bm.faces:
+                for crn in f.loops:
+                    crn.tag = False
+
+            target_islands = _islands.islands[:]
+            if self.sync and self.mouse_position:
+                def sort_by_nearest_to_mouse(__island: AdvIsland) -> float:
+                    from mathutils.geometry import intersect_point_line
+                    nonlocal uv
+                    nonlocal mouse_position
+
+                    min_dist = math.inf
+                    for _ff in __island:
+                        for __crn_sort in _ff.loops:
+                            intersect = intersect_point_line(mouse_position, __crn_sort[uv].uv, __crn_sort.link_loop_next[uv].uv)
+                            dist = (mouse_position - intersect[0]).length
+                            if min_dist > dist:
+                                min_dist = dist
+                    return min_dist
+
+                mouse_position = self.mouse_position
+                target_islands.sort(key=sort_by_nearest_to_mouse)
+
+            else:
+                for _isl in target_islands:
+                    _isl.calc_selected_edge_length(selected=False)
+
+                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)
+
+                for _isl in reversed(target_islands):
+                    if _isl.info.edge_length < 1e-06:
+                        target_islands.remove(_isl)
+
+            if not target_islands:
+                umesh.update_tag = False
+                continue
+
+            update_tag = False
+            while True:
+                stitched = False
+                for target_isl in target_islands:
+                    tar = LoopGroup(uv)
+
+                    while True:
+                        local_stitched = False
+                        for _ in tar.calc_first(target_isl, selected=False):
+                            source = tar.calc_shared_group()
+                            res = self.stitch_ex(tar, source, _islands, selected=False)
+                            local_stitched |= res
+                        stitched |= local_stitched
+                        if not local_stitched:
+                            break
+                update_tag |= stitched
+                if not stitched:
+                    break
+            if update_tag:
+                for adv in target_islands:
+                    adv.mark_seam()
             umesh.update_tag = update_tag
 
     @staticmethod
@@ -2265,19 +2380,24 @@ class UNIV_OT_Stitch(Operator):
 
     @staticmethod
     def copy_pos(crn, uv):
-        next_crn_co = crn.link_loop_next[uv].uv
-        shared = utils.shared_crn(crn)
-
-        source_corners = utils.linked_crn_uv_by_face_index(shared, uv)
+        co_a = crn[uv].uv
+        shared_a = utils.shared_crn(crn).link_loop_next
+        source_corners = utils.linked_crn_uv_by_face_index(shared_a, uv)
         for _crn in source_corners:
-            _crn[uv].uv = next_crn_co
+            _crn[uv].uv = co_a
 
-    def stitch(self, tar, source, adv_islands):
+        co_b = crn.link_loop_next[uv].uv
+        shared_b = utils.shared_crn(crn)
+        source_corners = utils.linked_crn_uv_by_face_index(shared_b, uv)
+        for _crn in source_corners:
+            _crn[uv].uv = co_b
+
+    def stitch_ex(self, tar, source, adv_islands, selected=True):
         uv = tar.uv
         # Equal indices occur after merging on non-stitch edges
         if tar[0].face.index == source[0].face.index:
             for target_crn in tar:
-                UNIV_OT_Stitch.copy_pos(target_crn, uv)
+                self.copy_pos(target_crn, uv)
             return True
 
         if (corners := self.calc_begin_end_points(tar, source)) is False:
@@ -2307,5 +2427,5 @@ class UNIV_OT_Stitch(Operator):
         # Move
         source_isl.move(pt_a1 - pt_b1)
 
-        adv_islands.weld_selected(target_isl, source_isl)
+        adv_islands.weld_selected(target_isl, source_isl, selected=selected)
         return True

@@ -230,6 +230,10 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_straight', 'E', 'PRESS', shift=True)
     keys.append((km, kmi))
 
+    # Stitch
+    kmi = km.keymap_items.new('uv.univ_stitch', 'W', 'PRESS', shift=True)
+    keys.append((km, kmi))
+
 
 def remove_keymaps():
     global keys

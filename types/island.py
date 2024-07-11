@@ -374,6 +374,7 @@ class AdvIslandInfo:
         self.area_uv: float = -1.0
         self.area_3d: float = -1.0
         self.td: float | None = -1.0
+        self.edge_length: float | None = -1.0
         self.scale: Vector | None = None
         self.materials: tuple[str] = tuple()
 
@@ -463,6 +464,28 @@ class AdvIsland(FaceIsland):
         if self.info is None:
             self.info = AdvIslandInfo()
         self.info.area_uv = area
+
+    def calc_selected_edge_length(self, selected=True):
+        uv = self.uv_layer
+        total_length = 0.0
+        corners = (_crn for _f in self for _crn in _f.loops)
+        if selected:
+            if not utils.sync():
+                for crn in corners:
+                    uv_crn = crn[uv]
+                    if uv_crn.select_edge:
+                        total_length += (uv_crn.uv - crn.link_loop_next[uv].uv).length
+            else:
+                for crn in corners:
+                    if crn.edge.select:
+                        total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
+        else:
+            for crn in corners:
+                total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
+
+        if self.info is None:
+            self.info = AdvIslandInfo()
+        self.info.edge_length = total_length
 
     def calc_materials(self, umesh: utils.UMesh):
         materials = super().calc_materials(umesh)
@@ -931,21 +954,37 @@ class Islands(IslandsBase):
                     face.index = idx
 
     @staticmethod
-    def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland) -> bool:
+    def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland, selected=True) -> bool:
         """isl_a = target island"""
         assert(isl_a.bm == isl_b.bm)
-        assert(not utils.sync())
+        sync = utils.sync()
         uv = isl_a.uv_layer
         idx = isl_b[0].loops[0].face.index
         welded = False
-        for f in isl_a:
-            for crn in f.loops:
-                shared_crn = crn.link_loop_radial_prev
-                if shared_crn.face.index != idx:
-                    continue
-                if crn[uv].select_edge or shared_crn[uv].select_edge:
+
+        if selected:
+            for f in isl_a:
+                for crn in f.loops:
+                    shared_crn = crn.link_loop_radial_prev
+                    if shared_crn.face.index != idx:
+                        continue
+                    if sync:
+                        if crn.edge.select:
+                            utils.copy_pos_to_target(crn, uv, idx)
+                            welded = True
+                    else:
+                        if crn[uv].select_edge or shared_crn[uv].select_edge:
+                            utils.copy_pos_to_target(crn, uv, idx)
+                            welded = True
+        else:
+            for f in isl_a:
+                for crn in f.loops:
+                    shared_crn = crn.link_loop_radial_prev
+                    if shared_crn.face.index != idx:
+                        continue
                     utils.copy_pos_to_target(crn, uv, idx)
                     welded = True
+
         if welded:
             new_idx = isl_a[0].loops[0].face.index
             for f in isl_b:
