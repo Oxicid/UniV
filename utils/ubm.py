@@ -89,6 +89,17 @@ def calc_crn_in_vert_by_tag(first: BMLoop):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_uv_by_face_index(first: BMLoop, uv_layer: BMLayerItem):
+    face_index = first.face.index
+    linked = [first]
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if bm_iter.face.index == face_index and first[uv_layer].uv == bm_iter[uv_layer].uv:
+            linked.append(bm_iter)
+    return linked
+
 def select_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
     bm_iter = first
     while True:
@@ -218,6 +229,38 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
 #                 break
 #         else:
 #             second[uv].select = False
+
+def shared_crn(crn):
+    shared = crn.link_loop_radial_prev
+    if shared != crn:
+        return shared
+
+def linked_crn_uv_by_face_index_b(first: BMLoop, uv: BMLayerItem, idx: int):
+    first_co = first[uv].uv
+    linked = [first]
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
+            linked.append(bm_iter)
+    return linked
+
+def copy_pos_to_target(crn, uv, idx):
+    next_crn_co = crn.link_loop_next[uv].uv
+    shared = shared_crn(crn)
+
+    source_corners = linked_crn_uv_by_face_index_b(shared, uv, idx)
+    for _crn in source_corners:
+        _crn[uv].uv = next_crn_co
+
+    crn_co = crn[uv].uv
+    shared_next = shared_crn(crn).link_loop_next
+
+    source_corners = linked_crn_uv_by_face_index_b(shared_next, uv, idx)
+    for _crn in source_corners:
+        _crn[uv].uv = crn_co
+
 
 def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):
     # assert(not l.face.select)

@@ -2,7 +2,7 @@ import math
 import copy
 import typing
 from mathutils import Vector, Matrix
-
+from bmesh.types import BMLoop, BMLayerItem
 
 class BBox:
     @classmethod
@@ -45,6 +45,28 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
+    def calc_bbox_with_margins(cls, corners: typing.Sequence[BMLoop], uv: BMLayerItem) -> 'BBox, typing.Sequence[BMLoop]':
+        first_co: Vector = corners[0][uv].uv
+        xmin = xmax = ymin = ymax = first_co
+        xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
+        for crn in corners:
+            co: Vector = crn[uv].uv
+            if co.x < xmin.x:
+                xmin = co
+                xmin_crn = crn
+            if co.x > xmax.x:
+                xmax = co
+                xmax_crn = crn
+            if co.y < ymin.y:
+                ymin = co
+                ymin_crn = crn
+            if co.y > ymax.y:
+                ymax = co
+                ymax_crn = crn
+
+        return cls(xmin.x, xmax.x, ymin.y, ymax.y), (xmin_crn, xmax_crn, ymin_crn, ymax_crn)
+
+    @classmethod
     def calc_bbox_uv_corners(cls, group, uv_layers):
         xmin = math.inf
         xmax = -math.inf
@@ -69,7 +91,7 @@ class BBox:
         bbox.sanitize()
         return bbox
 
-    def __init__(self, xmin=math.inf, xmax=-math.inf, ymin=math.inf, ymax=-math.inf):
+    def __init__(self, xmin: float = math.inf, xmax: float = -math.inf, ymin: float = math.inf, ymax: float = -math.inf):
         self.xmin = xmin
         self.xmax = xmax
         self.ymin = ymin

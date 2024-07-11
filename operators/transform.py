@@ -16,7 +16,7 @@ from .. import types
 from .. import utils
 from .. import info
 from ..utils import UMeshes
-from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands
+from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands, LoopGroup
 
 
 class UNIV_OT_Crop(Operator):
@@ -2151,3 +2151,161 @@ class UNIV_OT_Weld(Operator):
                         union_corners.append(isl)
                 compare_index += 1
         return corners_groups
+
+class UNIV_OT_Stitch(Operator):
+    bl_idname = "uv.univ_stitch"
+    bl_label = 'Stitch'
+    bl_description = 'Stitch'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # between: BoolProperty(name='Between', default=False)
+    flip: BoolProperty(name='Flip', default=False)
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+        if utils.sync():
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        self.umeshes: utils.UMeshes | None = None
+        self.global_counter = 0
+
+    def execute(self, context):
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.global_counter = 0
+
+        self.stitch_()
+
+        return self.umeshes.update(info='Not found edges for stitch')
+
+    def stitch_(self):
+        for umesh in self.umeshes:
+            uv = umesh.uv_layer
+            adv_islands = AdvIslands.calc_visible(umesh.bm, uv, sync=False)
+            if len(adv_islands) < 2:
+                umesh.update_tag = False
+                continue
+
+            adv_islands.indexing(force=True)
+            for isl in adv_islands:
+                for f in isl:
+                    for crn in f.loops:
+                        crn.tag = False
+
+            target_islands = [isl for isl in adv_islands if any(crn for f in isl for crn in f.loops if crn[uv].select_edge)]
+            update_tag = False
+            while True:
+                stitched = False
+                for target_island in target_islands:
+                    tar = LoopGroup(uv)
+
+                    while True:
+                        local_stitched = False
+                        for _ in tar.calc_first(target_island):
+                            source = tar.calc_shared_group()
+                            res = self.stitch(tar, source, adv_islands)
+                            local_stitched |= res
+                        stitched |= local_stitched
+                        if not local_stitched:
+                            break
+                update_tag |= stitched
+                if not stitched:
+                    break
+            umesh.update_tag = update_tag
+
+    @staticmethod
+    def has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
+        return (crn_a1[uv].uv - crn_a2[uv].uv).length < 1e-06 or \
+            (crn_b1[uv].uv - crn_b2[uv].uv).length < 1e-06
+
+    def calc_begin_end_points(self, tar, source):
+        if not tar or not source:
+            return False
+        uv = tar.uv
+
+        crn_a1 = tar[0]
+        crn_a2 = tar[-1].link_loop_next
+        crn_b1 = source[-1].link_loop_next
+        crn_b2 = source[0]
+
+        if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_margins(tar, tar.uv)
+            xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
+            if bbox.max_length < 1e-06:
+                return False
+
+            if bbox.width > bbox.height:
+                crn_a1 = xmin_crn
+                crn_a2 = xmax_crn
+
+                crn_b1 = utils.shared_crn(xmin_crn).link_loop_next
+                crn_b2 = utils.shared_crn(xmax_crn).link_loop_next
+            else:
+                crn_a1 = ymin_crn
+                crn_a2 = ymax_crn
+
+                crn_b1 = utils.shared_crn(ymin_crn).link_loop_next
+                crn_b2 = utils.shared_crn(ymax_crn).link_loop_next
+
+            if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
+                return False
+
+        return crn_a1, crn_a2, crn_b1, crn_b2
+
+    @staticmethod
+    def copy_pos(crn, uv):
+        next_crn_co = crn.link_loop_next[uv].uv
+        shared = utils.shared_crn(crn)
+
+        source_corners = utils.linked_crn_uv_by_face_index(shared, uv)
+        for _crn in source_corners:
+            _crn[uv].uv = next_crn_co
+
+    def stitch(self, tar, source, adv_islands):
+        uv = tar.uv
+        # Equal indices occur after merging on non-stitch edges
+        if tar[0].face.index == source[0].face.index:
+            for target_crn in tar:
+                UNIV_OT_Stitch.copy_pos(target_crn, uv)
+            return True
+
+        if (corners := self.calc_begin_end_points(tar, source)) is False:
+            tar.tag = False
+            return False
+
+        target_isl = adv_islands[corners[0].face.index]
+        source_isl = adv_islands[corners[2].face.index]
+
+        # if not (target_isl.is_full_flipped != source_isl.is_full_flipped):  # TODO: Implement auto flip (reverse LoopGroup?)
+        #     source_isl.scale_simple(Vector((1, -1)))
+        if self.flip:
+            source_isl.scale_simple(Vector((1, -1)))
+        pt_a1, pt_a2, pt_b1, pt_b2 = [c[uv].uv for c in corners]
+
+        normal_a = pt_a1 - pt_a2
+        normal_b = pt_b1 - pt_b2
+
+        # Scale
+        scale = normal_a.length / normal_b.length
+        source_isl.scale_simple(Vector((scale, scale)))
+
+        # Rotate
+        rotate_angle = normal_a.angle_signed(normal_b)
+        source_isl.rotate_simple(rotate_angle)
+
+        # Move
+        source_isl.move(pt_a1 - pt_b1)
+
+        adv_islands.weld_selected(target_isl, source_isl)
+        return True

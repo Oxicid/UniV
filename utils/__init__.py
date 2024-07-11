@@ -1,10 +1,9 @@
 # import bpy
-# import math
-import typing
-import math
+import typing  # noqa
+import math  # noqa
 
 # import bmesh
-# import mathutils
+import mathutils  # noqa
 
 import numpy as np
 

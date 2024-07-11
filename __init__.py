@@ -46,6 +46,7 @@ classes = (
     transform.UNIV_OT_Home,
     transform.UNIV_OT_Random,
     transform.UNIV_OT_Weld,
+    transform.UNIV_OT_Stitch,
     # Quadrify
     quadrify.UNIV_OT_Quad,
     straight.UNIV_OT_Straight,

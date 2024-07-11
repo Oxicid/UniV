@@ -349,6 +349,11 @@ class FaceIsland:
                     else:
                         crn.edge.seam = seam
 
+    def clear(self):
+        self.faces = []
+        self.bm = None
+        self.uv_layer = None
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -357,6 +362,9 @@ class FaceIsland:
 
     def __len__(self):
         return len(self.faces)
+
+    def __bool__(self):
+        return bool(self.faces)
 
     def __str__(self):
         return f'Faces count = {len(self.faces)}'
@@ -907,11 +915,44 @@ class Islands(IslandsBase):
             general_bbox.union(island.calc_bbox())
         return general_bbox
 
-    def indexing(self):
-        for idx, island in enumerate(self.islands):
-            for face in island:
-                face.tag = True
-                face.index = idx
+    def indexing(self, force=False):
+        if force:
+            if sum(len(isl) for isl in self.islands) != len(self.bm.faces):
+                for f in self.bm.faces:
+                    f.index = -1
+            for idx, island in enumerate(self.islands):
+                for face in island:
+                    face.index = idx
+            return
+
+            for idx, island in enumerate(self.islands):
+                for face in island:
+                    face.tag = True
+                    face.index = idx
+
+    @staticmethod
+    def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland) -> bool:
+        """isl_a = target island"""
+        assert(isl_a.bm == isl_b.bm)
+        assert(not utils.sync())
+        uv = isl_a.uv_layer
+        idx = isl_b[0].loops[0].face.index
+        welded = False
+        for f in isl_a:
+            for crn in f.loops:
+                shared_crn = crn.link_loop_radial_prev
+                if shared_crn.face.index != idx:
+                    continue
+                if crn[uv].select_edge or shared_crn[uv].select_edge:
+                    utils.copy_pos_to_target(crn, uv, idx)
+                    welded = True
+        if welded:
+            new_idx = isl_a[0].loops[0].face.index
+            for f in isl_b:
+                f.index = new_idx
+            isl_a.faces.extend(isl_b.faces)
+            isl_b.clear()
+        return welded
 
     def __iter__(self) -> typing.Iterator['FaceIsland | AdvIsland']:
         return iter(self.islands)

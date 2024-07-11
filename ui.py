@@ -120,4 +120,6 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_select_flipped', text='Flipped')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_weld', text='Weld')
+        row = split.row(align=True)
+        row.operator('uv.univ_weld', text='Weld')
+        row.operator('uv.univ_stitch', text='Stitch')
