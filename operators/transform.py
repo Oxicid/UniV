@@ -1742,7 +1742,7 @@ class UNIV_OT_Orient(Operator):
     ))
 
     world_mode: bpy.props.BoolProperty(name='World', default=False, description="Align selected UV islands or faces to world / gravity directions")
-    axis: bpy.props.EnumProperty(name="Axis", default='W', items=(
+    axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
                                     ('AUTO', 'Auto', 'Detect World axis to align to.'),
                                     ('U', 'X', 'Align to the X axis of the World.'),
                                     ('V', 'Y', 'Align to the Y axis of the World.'),
@@ -2027,7 +2027,8 @@ class UNIV_OT_Weld(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     distance: FloatProperty(name='Distance', default=0.0005, min=0, soft_max=0.05, step=0.0001)  # noqa
-    mode: EnumProperty(name='Mode', default='SELF', items=(
+    flip: BoolProperty(name='Flip', default=False, options={'HIDDEN'})
+    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('SELF', 'Self', ''),
     ))
@@ -2041,29 +2042,199 @@ class UNIV_OT_Weld(Operator):
         return True
 
     def draw(self, context):
-        self.layout.prop(self, 'distance', slider=True)
+        if self.mode == 'SELF':
+            self.layout.prop(self, 'distance', slider=True)
         self.layout.row(align=True).prop(self, 'mode', expand=True)
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
+            if context.area.ui_type == 'UV':
+                self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
+        self.mode = 'SELF' if event.alt else 'DEFAULT'
+
         return self.execute(context)
 
     def __init__(self):
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: utils.UMeshes | None = None
         self.global_counter = 0
+        self.seam_clear_counter = 0
+        self.edge_weld_counter = 0
+        self.mouse_position: Vector | None = None
+        self.stitched_islands = 0
 
     def execute(self, context):
         self.umeshes = utils.UMeshes(report=self.report)
         self.global_counter = 0
+        self.seam_clear_counter = 0
+        self.edge_weld_counter = 0
+        self.stitched_islands = 0
 
-        self.weld_self(extended=True)
-        if not self.umeshes.final():
-            self.weld_self(extended=False)
+        if self.mode == 'SELF':
+            self.weld_self(extended=True)
+            if not self.umeshes.final():
+                self.weld_self(extended=False)
+        else:
+            if self.sync:
+                self.weld_sync()
+            else:
+                self.weld()
+
+            if self.stitched_islands:
+                self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
+            else:
+                if self.edge_weld_counter and self.seam_clear_counter:
+                    self.report({'INFO'}, f"Welded {self.edge_weld_counter} edges. Cleared mark seams edges = {self.seam_clear_counter} ")
+                elif self.edge_weld_counter:
+                    self.report({'INFO'}, f"Welded {self.edge_weld_counter} edges.")
+                elif self.seam_clear_counter:
+                    self.report({'INFO'}, f"Cleared seams edges = {self.seam_clear_counter} ")
 
         self.umeshes.update(info='Not found verts for weld')
         return {'FINISHED'}
+
+    def weld(self):
+        islands_of_mesh = []
+        for umesh in reversed(self.umeshes):
+            uv = umesh.uv_layer
+            if umesh.is_full_face_deselected or \
+                    not any(l[uv].select_edge for f in umesh.bm.faces if f.select for l in f.loops):
+                self.umeshes.umeshes.remove(umesh)
+                continue
+
+            local_seam_clear_counter = 0
+            local_edge_weld_counter = 0
+
+            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=False):  # TODO: Add any edge select method
+                islands.indexing(force=True)
+                for isl in reversed(islands):
+                    corners = [_crn for f in isl for _crn in f.loops if _crn[uv].select_edge]  # TODO: Add tag system
+                    if not corners:
+                        islands.islands.remove(isl)
+                        continue
+
+                    isl_idx = isl[0].index
+                    for crn in corners:
+                        shared = crn.link_loop_radial_prev
+                        if shared == crn or shared.face.index != isl_idx:
+                            continue
+                        if not shared[uv].select_edge:
+                            continue
+                        weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
+                        weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
+
+                        edge: bmesh.types.BMEdge = crn.edge
+                        if weld_a and weld_b:
+                            if edge.seam:
+                                edge.seam = False
+                                local_seam_clear_counter += 1
+                        else:
+                            utils.weld_crn_edge(crn, uv)
+                            if edge.seam:
+                                edge.seam = False
+                                local_seam_clear_counter += 1
+                            local_edge_weld_counter += 1
+
+            self.seam_clear_counter += local_seam_clear_counter
+            self.edge_weld_counter += local_edge_weld_counter
+            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+
+            if islands:
+                islands_of_mesh.append((umesh, islands))
+
+        if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
+            return
+
+        for umesh, islands in islands_of_mesh:
+            islands.indexing(force=True)
+            uv = islands.uv_layer
+
+            local_seam_clear_counter = 0
+            local_edge_weld_counter = 0
+
+            for isl in reversed(islands):
+                corners = (_crn for f in isl for _crn in f.loops if _crn[uv].select_edge)  # TODO: Add tag system
+
+                isl_idx = isl[0].index
+                for crn in corners:
+                    shared = crn.link_loop_radial_prev
+                    if shared == crn or shared.face.index != isl_idx:
+                        continue
+                    if shared[uv].select_edge:
+                        continue
+
+                    weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
+                    weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
+
+                    edge: bmesh.types.BMEdge = crn.edge
+                    if weld_a and weld_b:
+                        if edge.seam:
+                            edge.seam = False
+                            local_seam_clear_counter += 1
+                    else:
+                        utils.copy_pos_to_target_with_select(crn, uv, isl_idx)
+                        if edge.seam:
+                            edge.seam = False
+                            local_seam_clear_counter += 1
+                        local_edge_weld_counter += 1
+
+            self.seam_clear_counter += local_seam_clear_counter
+            self.edge_weld_counter += local_edge_weld_counter
+            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+
+        if self.seam_clear_counter + self.edge_weld_counter:
+            return
+
+        UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
+
+    def weld_sync(self):
+        for umesh in reversed(self.umeshes):
+            uv = umesh.uv_layer
+            if umesh.is_full_edge_deselected:
+                self.umeshes.umeshes.remove(umesh)
+                continue
+
+            local_seam_clear_counter = 0
+            local_edge_weld_counter = 0
+
+            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=False):  # TODO: Add any edge select method
+                islands.indexing(force=True)
+                for isl in reversed(islands):
+                    corners = [_crn for f in isl for _crn in f.loops if _crn.edge.select]  # TODO: Add tag system
+                    if not corners:
+                        islands.islands.remove(isl)
+                        continue
+
+                    isl_idx = isl[0].index
+                    for crn in corners:
+                        shared = crn.link_loop_radial_prev
+                        if shared == crn or shared.face.index != isl_idx:
+                            continue
+
+                        weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
+                        weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
+
+                        edge: bmesh.types.BMEdge = crn.edge
+                        if weld_a and weld_b:
+                            if edge.seam:
+                                edge.seam = False
+                                local_seam_clear_counter += 1
+                        else:
+                            utils.weld_crn_edge(crn, uv)
+                            if edge.seam:
+                                edge.seam = False
+                                local_seam_clear_counter += 1
+                            local_edge_weld_counter += 1
+
+            self.seam_clear_counter += local_seam_clear_counter
+            self.edge_weld_counter += local_edge_weld_counter
+            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+
+        if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
+            return
+
+        UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
 
     def weld_self(self, extended):
         for umesh in self.umeshes:
@@ -2182,19 +2353,27 @@ class UNIV_OT_Stitch(Operator):
         self.umeshes: utils.UMeshes | None = None
         self.global_counter = 0
         self.mouse_position: Vector | None = None
+        self.stitched_islands = 0
 
     def execute(self, context):
         self.umeshes = utils.UMeshes(report=self.report)
         self.global_counter = 0
+        self.stitched_islands = 0
         if self.between:
             self.stitch_between()
         else:
             self.stitch()
+            if self.stitched_islands:
+                self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
 
         return self.umeshes.update(info='Not found edges for stitch')
 
     def stitch(self):
         for umesh in self.umeshes:
+            if self.sync and umesh.is_full_edge_deselected or (not self.sync and umesh.is_full_face_deselected):
+                umesh.update_tag = False
+                continue
+
             uv = umesh.uv_layer
             adv_islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=False)
             if len(adv_islands) < 2:
@@ -2214,19 +2393,16 @@ class UNIV_OT_Stitch(Operator):
 
             if self.sync and self.mouse_position:
                 def sort_by_nearest_to_mouse(__island: AdvIsland) -> float:
-                    from mathutils.geometry import intersect_point_line
                     nonlocal uv
                     nonlocal mouse_position
 
                     min_dist = math.inf
                     for _ff in __island:
-                        for __crn_sort in _ff.loops:
-                            if __crn_sort.edge.select:
-                                intersect = intersect_point_line(mouse_position, __crn_sort[uv].uv, __crn_sort.link_loop_next[uv].uv)
-                                # dist = (intersect[0] - mouse_position).length
-                                dist = (mouse_position - intersect[0]).length
-                                if min_dist > dist:
-                                    min_dist = dist
+                        for crn_ in _ff.loops:
+                            if crn_.edge.select:
+                                min_dist = min((min_dist,
+                                                (mouse_position - crn_[uv].uv).length_squared,
+                                                (mouse_position - crn_.link_loop_next[uv].uv).length_squared))
                     return min_dist
 
                 mouse_position = self.mouse_position
@@ -2256,7 +2432,7 @@ class UNIV_OT_Stitch(Operator):
                         local_stitched = False
                         for _ in tar.calc_first(target_isl):
                             source = tar.calc_shared_group()
-                            res = self.stitch_ex(tar, source, adv_islands)
+                            res = UNIV_OT_Stitch.stitch_ex(self, tar, source, adv_islands)
                             local_stitched |= res
                         stitched |= local_stitched
                         if not local_stitched:
@@ -2267,10 +2443,14 @@ class UNIV_OT_Stitch(Operator):
             if update_tag:
                 for adv in adv_islands:
                     adv.mark_seam()
+            self.stitched_islands += len(adv_islands) - sum(bool(isl) for isl in adv_islands)
             umesh.update_tag = update_tag
 
     def stitch_between(self):
         for umesh in self.umeshes:
+            if umesh.is_full_face_deselected:
+                umesh.update_tag = False
+                continue
             uv = umesh.uv_layer
             _islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=True)
             if len(_islands) < 2:
@@ -2344,7 +2524,8 @@ class UNIV_OT_Stitch(Operator):
         return (crn_a1[uv].uv - crn_a2[uv].uv).length < 1e-06 or \
             (crn_b1[uv].uv - crn_b2[uv].uv).length < 1e-06
 
-    def calc_begin_end_points(self, tar, source):
+    @staticmethod
+    def calc_begin_end_points(tar, source):
         if not tar or not source:
             return False
         uv = tar.uv
@@ -2354,7 +2535,7 @@ class UNIV_OT_Stitch(Operator):
         crn_b1 = source[-1].link_loop_next
         crn_b2 = source[0]
 
-        if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
+        if UNIV_OT_Stitch.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
             bbox, bbox_margin_corners = BBox.calc_bbox_with_margins(tar, tar.uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
             if bbox.max_length < 1e-06:
@@ -2373,7 +2554,7 @@ class UNIV_OT_Stitch(Operator):
                 crn_b1 = utils.shared_crn(ymin_crn).link_loop_next
                 crn_b2 = utils.shared_crn(ymax_crn).link_loop_next
 
-            if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
+            if UNIV_OT_Stitch.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
                 return False
 
         return crn_a1, crn_a2, crn_b1, crn_b2
@@ -2397,10 +2578,10 @@ class UNIV_OT_Stitch(Operator):
         # Equal indices occur after merging on non-stitch edges
         if tar[0].face.index == source[0].face.index:
             for target_crn in tar:
-                self.copy_pos(target_crn, uv)
+                UNIV_OT_Stitch.copy_pos(target_crn, uv)
             return True
 
-        if (corners := self.calc_begin_end_points(tar, source)) is False:
+        if (corners := UNIV_OT_Stitch.calc_begin_end_points(tar, source)) is False:
             tar.tag = False
             return False
 

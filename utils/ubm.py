@@ -230,7 +230,7 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
 #         else:
 #             second[uv].select = False
 
-def shared_crn(crn):
+def shared_crn(crn: BMLoop) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn:
         return shared
@@ -260,6 +260,59 @@ def copy_pos_to_target(crn, uv, idx):
     source_corners = linked_crn_uv_by_face_index_b(shared_next, uv, idx)
     for _crn in source_corners:
         _crn[uv].uv = crn_co
+
+def copy_pos_to_target_with_select(crn, uv, idx):
+    """Weld and Selects a common edge"""
+    next_crn_co = crn.link_loop_next[uv].uv
+    shared = shared_crn(crn)
+    shared[uv].select_edge = True
+
+    source_corners = linked_crn_uv_by_face_index_b(shared, uv, idx)
+    for _crn in source_corners:
+        _crn_uv = _crn[uv]
+        _crn_uv.uv = next_crn_co
+        _crn_uv.select = True
+
+    crn_co = crn[uv].uv
+    shared_next = shared_crn(crn).link_loop_next
+
+    source_corners = linked_crn_uv_by_face_index_b(shared_next, uv, idx)
+    for _crn in source_corners:
+        _crn_uv = _crn[uv]
+        _crn_uv.uv = crn_co
+        _crn_uv.select = True
+
+def weld_crn_edge(crn: BMLoop, uv: BMLayerItem):
+    crn_next = crn.link_loop_next
+    shared = shared_crn(crn)
+    shared_next = shared.link_loop_next
+
+    index_a = crn.face.index
+    index_b = shared.face.index
+
+    corners_a = linked_crn_uv_by_face_index_b(crn, uv, index_a)
+    corners_b = linked_crn_uv_by_face_index_b(crn_next, uv, index_a)
+
+    corners_a += linked_crn_uv_by_face_index_b(shared_next, uv, index_b)
+    corners_b += linked_crn_uv_by_face_index_b(shared, uv, index_b)
+
+    coords_sum_a = Vector((0.0, 0.0))
+    coords_sum_b = Vector((0.0, 0.0))
+
+    for crn_a in corners_a:
+        coords_sum_a += crn_a[uv].uv
+
+    for crn_b in corners_b:
+        coords_sum_b += crn_b[uv].uv
+
+    avg_co_a = coords_sum_a / len(corners_a)
+    avg_co_b = coords_sum_b / len(corners_b)
+
+    for crn_a in corners_a:
+        crn_a[uv].uv = avg_co_a
+
+    for crn_b in corners_b:
+        crn_b[uv].uv = avg_co_b
 
 
 def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):

@@ -948,10 +948,10 @@ class Islands(IslandsBase):
                     face.index = idx
             return
 
-            for idx, island in enumerate(self.islands):
-                for face in island:
-                    face.tag = True
-                    face.index = idx
+        for idx, island in enumerate(self.islands):
+            for face in island:
+                face.tag = True
+                face.index = idx
 
     @staticmethod
     def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland, selected=True) -> bool:
