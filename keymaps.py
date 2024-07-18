@@ -238,6 +238,9 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_stitch', 'W', 'PRESS', shift=True)
     keys.append((km, kmi))
 
+    # Quick Snap
+    kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS')
+    keys.append((km, kmi))
 
 def remove_keymaps():
     global keys

@@ -33,3 +33,6 @@ def remap(i_min: float, i_max: float, o_min: float, o_max: float, v: float) -> f
         6.2 == remap(1, 5, 3, 7, 4.2)
     """
     return lerp(o_min, o_max, inv_lerp(i_min, i_max, v))
+
+def round_threshold(a, min_clip):
+    return round(float(a) / min_clip) * min_clip

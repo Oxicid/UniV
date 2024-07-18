@@ -870,6 +870,12 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
+    def calc_non_selected(cls, bm: BMesh, uv_layer: BMLayerItem,  sync: bool):
+        cls.tag_filter_visible(bm, sync)
+        islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if not cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
+        return cls(islands, bm, uv_layer)
+
+    @classmethod
     def calc_extended_all(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, angle: float):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls([], None, None)

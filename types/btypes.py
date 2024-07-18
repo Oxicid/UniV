@@ -17,6 +17,7 @@ from ctypes import (
 )
 
 from . import bbox
+from mathutils import Vector
 
 version = bpy.app.version
 bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
@@ -242,7 +243,6 @@ class rctf(StructBase, bbox.BBox):
     ymin: c_float
     ymax: c_float
 
-
 class rcti(StructBase, bbox.BBox):
     xmin: c_int
     xmax: c_int
@@ -294,6 +294,15 @@ class View2D(StructBase):
     def get_rect(cls, view):
         return cls.from_address(view.as_pointer()).cur
 
+    @classmethod
+    def get_scale(cls, view):
+        v2d = cls.from_address(view.as_pointer())
+        return Vector((v2d.mask.width / v2d.cur.width, v2d.mask.height / v2d.cur.height))
+
+    @classmethod
+    def get_zoom(cls, view):
+        v2d = cls.from_address(view.as_pointer())
+        return (v2d.mask.xmax - v2d.mask.xmin) / (v2d.cur.xmax - v2d.cur.xmin)  # noqa
 
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)

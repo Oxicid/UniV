@@ -27,6 +27,7 @@ from .operators import quadrify
 from .operators import transform
 from .operators import toggle
 from .operators import select
+from .operators import quick_snap
 from . import ui
 from . import keymaps
 from . import preferences
@@ -63,6 +64,8 @@ classes = (
     select.UNIV_OT_Select_Zero,
     select.UNIV_OT_Select_Flipped,
     select.UNIV_OT_Select_Border_Edge_by_Angle,
+    # QuickSnap
+    quick_snap.UNIV_OT_QuickSnap,
     # UI
     ui.UNIV_PT_General
 )

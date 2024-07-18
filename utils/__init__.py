@@ -112,6 +112,10 @@ class UMeshes:
             self.report(info_type, info)
         return {'CANCELLED'}
 
+    def silent_update(self):
+        for umesh in self:
+            umesh.update()
+
     def final(self):
         if self._cancel is True:
             return True
