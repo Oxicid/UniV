@@ -49,9 +49,12 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.dragged: bool = False
         self.island_mode_custom: bool = True  # Need for optimize calculation KDTrees
         self.move_object: UnionIslands | UnionLoopGroup | FaceIsland | None = None
+
         self._cancel: bool = False
         self.start_pos: Vector | None = None
         self.end_pos: Vector | None = None
+        self.first_pic_co: Vector | None = None
+        self.axis: str = ''
 
     def invoke(self, context, event):
         self.area = context.area
@@ -97,9 +100,22 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         if event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
             return self.exit()
 
+        if axis_sliding_event := event.type in ('X', 'Y') and event.value == 'PRESS':
+            if event.type == 'X':
+                if self.axis == 'X':
+                    self.axis = ''
+                else:
+                    self.axis = 'X'
+            else:
+                if self.axis == 'Y':
+                    self.axis = ''
+                else:
+                    self.axis = 'Y'
+
         if self.dragged:
             if self.mouse_position == self.prev_elem_position.to_3d():
-                return {'RUNNING_MODAL'}
+                if not axis_sliding_event:
+                    return {'RUNNING_MODAL'}
 
             points = self.kdmeshes.find_range(self.mouse_position, self.radius)
             self.points = self.kdmeshes.range_to_coords(points)
@@ -107,16 +123,19 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
             if not event.ctrl and (kd_data := self.find_nearest_target_pt()):
                 self.nearest_point[0] = kd_data.pt
-
                 pos = kd_data.pt.to_2d()
-                self.move_object.set_position(pos, self.prev_elem_position)
-                self.prev_elem_position = pos
             else:
                 self.nearest_point[0] = self.mouse_position
-
                 pos = self.mouse_position.to_2d()
-                self.move_object.set_position(pos, self.prev_elem_position)
-                self.prev_elem_position = pos
+
+            # Sliding by axis
+            if self.axis == 'X':
+                pos.y = self.first_pic_co.y
+            if self.axis == 'Y':
+                pos.x = self.first_pic_co.x
+
+            self.move_object.set_position(pos, self.prev_elem_position)
+            self.prev_elem_position = pos
             self.umeshes.silent_update()
             self.area.tag_redraw()
             return {'RUNNING_MODAL'}
@@ -164,6 +183,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             self.move_object.set_position(self.mouse_position.to_2d(), kd_data.pt.to_2d())
             self.prev_elem_position = self.mouse_position.to_2d()
 
+            self.first_pic_co = kd_data.pt.to_2d()
             self.calc_update_meshes()
             self.umeshes.silent_update()
             self.area.tag_redraw()
@@ -552,6 +572,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.area.tag_redraw()
 
     def univ_quick_snap_draw_callback(self):
+        if bpy.context.area.ui_type != 'UV':
+            return
         gpu.state.blend_set('ALPHA')
         gpu.state.point_size_set(4)
         self.shader.bind()
@@ -594,7 +616,12 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         if not (self.handler is None):
             bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, 'WINDOW')
-            self.area.tag_redraw()
+
+            for window in bpy.context.window_manager.windows:
+                for area in window.screen.areas:
+                    if area.ui_type == 'UV':
+                        area.tag_redraw()
+
         return {'FINISHED'}
 
     def calc_update_meshes(self):
