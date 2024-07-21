@@ -72,11 +72,161 @@ class UMesh:
         return PyBMesh.is_full_vert_deselected(self.bm)
 
     @property
+    def total_edge_sel(self):
+        return PyBMesh.fields(self.bm).totedgesel
+
+    @property
+    def total_face_sel(self):
+        return PyBMesh.fields(self.bm).totfacesel
+
+    @property
+    def has_any_selected_crn_non_sync(self):
+        if PyBMesh.is_full_face_deselected(self.bm):
+            return False
+
+        uv = self.uv_layer
+        if PyBMesh.is_full_face_selected(self.bm):
+            for f in self.bm.faces:
+                for _crn in f.loops:
+                    crn_uv = _crn[uv]
+                    if crn_uv.select or crn_uv.select_edge:
+                        return True
+            return False
+
+        for f in self.bm.faces:
+            if f.select:
+                for _crn in f.loops:
+                    crn_uv = _crn[uv]
+                    if crn_uv.select or crn_uv.select_edge:
+                        return True
+        return False
+
+    @property
+    def has_any_selected_crn_edge_non_sync(self):
+        if PyBMesh.is_full_face_deselected(self.bm):
+            return False
+
+        uv = self.uv_layer
+        if PyBMesh.is_full_face_selected(self.bm):
+            for f in self.bm.faces:
+                for crn in f.loops:
+                    if crn[uv].select_edge:
+                        return True
+            return False
+
+        for f in self.bm.faces:
+            if f.select:
+                for crn in f.loops:
+                    if crn[uv].select_edge:
+                        return True
+        return False
+
+    @property
+    def has_any_selected_crn_vert_non_sync(self):
+        if PyBMesh.is_full_face_deselected(self.bm):
+            return False
+
+        uv = self.uv_layer
+        if PyBMesh.is_full_face_selected(self.bm):
+            for f in self.bm.faces:
+                for crn in f.loops:
+                    if crn[uv].select:
+                        return True
+            return False
+
+        for f in self.bm.faces:
+            if f.select:
+                for crn in f.loops:
+                    if crn[uv].select:
+                        return True
+        return False
+
+    @property
     def smooth_angle(self):
         if hasattr(self.obj.data, 'use_auto_smooth'):
             if self.obj.data.use_auto_smooth:
                 return self.obj.data.auto_smooth_angle  # noqa
         return math.radians(180.0)
+
+    def tag_hidden_corners(self):
+        corners = (_crn for f in self.bm.faces for _crn in f.loops)
+        if sync():
+            if self.is_full_face_selected:
+                for crn in corners:
+                    crn.tag = False
+            else:
+                for f in self.bm.faces:
+                    h_tag = f.hide
+                    for crn in f.loops:
+                        crn.tag = h_tag
+        else:
+            if self.is_full_face_deselected:
+                for crn in corners:
+                    crn.tag = True
+            else:
+                for f in self.bm.faces:
+                    s_tag = f.select
+                    for crn in f.loops:
+                        crn.tag = s_tag
+
+    def tag_visible_corners(self):
+        corners = (_crn for f in self.bm.faces for _crn in f.loops)
+        if sync():
+            if self.is_full_face_selected:
+                for crn in corners:
+                    crn.tag = True
+            else:
+                for f in self.bm.faces:
+                    h_tag = not f.hide
+                    for crn in f.loops:
+                        crn.tag = h_tag
+        else:
+            if self.is_full_face_deselected:
+                for crn in corners:
+                    crn.tag = False
+            else:
+                for f in self.bm.faces:
+                    s_tag = f.select
+                    for crn in f.loops:
+                        crn.tag = s_tag
+
+    def tag_selected_corners(self, both=False):
+        corners = (_crn for f in self.bm.faces for _crn in f.loops)
+        if sync():
+            if self.is_full_face_selected:
+                for crn in corners:
+                    crn.tag = True
+            else:
+                for f in self.bm.faces:
+                    if f.hide:
+                        for crn in f.loops:
+                            crn.tag = False
+                    else:
+                        for crn in f.loops:
+                            crn.tag = crn.edge.select
+        else:
+            if self.is_full_face_deselected:
+                for crn in corners:
+                    crn.tag = False
+            else:
+                uv = self.uv_layer
+                if both:
+                    for f in self.bm.faces:
+                        if f.select:
+                            for crn in f.loops:
+                                crn_uv = crn[uv]
+                                crn.tag = crn_uv.select_edge or crn_uv.select
+                        else:
+                            for crn in f.loops:
+                                crn.tag = False
+                else:
+                    for f in self.bm.faces:
+                        if f.select:
+                            for crn in f.loops:
+                                crn.tag = crn[uv].select_edge
+                        else:
+                            for crn in f.loops:
+                                crn.tag = False
 
     def __del__(self):
         if not self.is_edit_bm:

@@ -77,6 +77,61 @@ def linked_crn_uv(first: BMLoop, uv_layer: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_uv_by_tag_b(first: BMLoop, uv_layer: BMLayerItem):
+    linked = []
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if not bm_iter.tag:
+            continue
+        if first[uv_layer].uv == bm_iter[uv_layer].uv:
+            linked.append(bm_iter)
+    return linked
+
+
+def linked_crn_vert_uv_for_transform(first, uv):
+    # Need tagging. tag == False - not append
+    # assert utils.sync()
+    linked = []
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if not bm_iter.tag:
+            continue
+        if first[uv].uv == bm_iter[uv].uv:
+            bm_iter.tag = False
+            linked.append(bm_iter)
+
+    next_crn = first.link_loop_next
+    if next_crn.tag:
+        next_crn.tag = False
+        linked.append(next_crn)
+
+        bm_iter = first.link_loop_next
+        while True:
+            if (bm_iter := prev_disc(bm_iter)) == next_crn:
+                break
+            if not bm_iter.tag:
+                continue
+            if first[uv].uv == bm_iter[uv].uv:
+                bm_iter.tag = False
+                linked.append(bm_iter)
+    return linked
+
+def linked_crn_uv_by_tag(first, uv):
+    linked = [first]
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if not (bm_iter.tag or bm_iter.link_loop_prev.tag):
+            continue
+        if first[uv].uv == bm_iter[uv].uv:
+            linked.append(bm_iter)
+    return linked
+
 def calc_crn_in_vert_by_tag(first: BMLoop):
     if not first.tag:
         return []
@@ -379,6 +434,15 @@ def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:  # no
     if sync:
         return [f for f in bm.faces if not f.hide]
     return [f for f in bm.faces if f.select]
+
+def calc_unselected_uv_faces(bm, uv, sync) -> list[bmesh.types.BMFace]:
+    if sync:
+        if PyBMesh.is_full_face_selected(bm):
+            return []
+        return [f for f in bm.faces if not (f.select or f.hide)]
+    if PyBMesh.is_full_face_deselected(bm):
+        return []
+    return [f for f in bm.faces if f.select and any(not crn[uv].select_edge for crn in f.loops)]
 
 def calc_uv_faces(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMFace]:
     if selected:
