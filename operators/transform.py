@@ -2426,7 +2426,7 @@ class UNIV_OT_Stitch(Operator):
             while True:
                 stitched = False
                 for target_isl in target_islands:
-                    tar = LoopGroup(uv)
+                    tar = LoopGroup(umesh)
 
                     while True:
                         local_stitched = False
@@ -2500,7 +2500,7 @@ class UNIV_OT_Stitch(Operator):
             while True:
                 stitched = False
                 for target_isl in target_islands:
-                    tar = LoopGroup(uv)
+                    tar = LoopGroup(umesh)
 
                     while True:
                         local_stitched = False

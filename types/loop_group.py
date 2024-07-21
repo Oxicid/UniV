@@ -1,14 +1,17 @@
 import typing
+from mathutils import Vector
 from collections import defaultdict
 from bmesh.types import BMLoop, BMLayerItem
-from ..utils import prev_disc
+from ..utils import prev_disc, linked_crn_uv_by_tag, vec_isclose_to_zero
 from .. import utils
 
 class LoopGroup:
-    def __init__(self, uv: BMLayerItem):
-        self.uv: BMLayerItem = uv
+    def __init__(self, umesh: utils.UMesh):
+        self.uv: BMLayerItem = umesh.uv_layer
+        self.umesh: utils.UMesh = umesh
         self.corners: list[BMLoop] = []
         self.tag = True
+        self.dirt = False
 
     def is_cyclic_vert(self):
         if len(self.corners) > 1:
@@ -82,7 +85,7 @@ class LoopGroup:
         shared_group = []
         for crn in reversed(self.corners):
             shared_group.append(crn.link_loop_radial_prev)
-        lg = LoopGroup(self.uv)
+        lg = LoopGroup(self.umesh)
         lg.corners = shared_group
         return lg
 
@@ -168,6 +171,77 @@ class LoopGroup:
                             _crn.tag = False
                     break
 
+    def set_tag(self, state=True):
+        for g in self.corners:
+            g.tag = state
+
+    def has_non_sync_crn(self):
+        assert utils.sync()
+        for crn in self.corners:
+            shared_crn = crn.link_loop_radial_prev
+            if shared_crn == crn:
+                return True  # TODO: Change behavior, count and compare with corners size?
+            if not shared_crn.tag:
+                return True  # TODO: Change behavior, count and compare with corners size?
+            if crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv:
+                return True
+        return False
+
+    def move(self, delta: Vector) -> bool:
+        if vec_isclose_to_zero(delta):
+            return False
+        uv = self.uv
+        for loop in self.corners:
+            loop[uv].uv += delta
+        return True
+
+    def set_position(self, to: Vector, _from: Vector):
+        return self.move(to - _from)
+
+    @classmethod
+    def calc_dirt_loop_groups(cls, umesh):
+        corners = (__crn for f in umesh.bm.faces for __crn in f.loops)
+        uv = umesh.uv_layer
+        # Tagging
+        if utils.sync():
+            assert utils.get_select_mode_mesh() != 'FACE'
+            for _crn in corners:
+                _crn.tag = _crn.edge.select and not _crn.face.hide
+        else:
+            for _crn in corners:
+                _crn.tag = _crn[uv].select_edge and _crn.face.select
+
+        sel_loops = (l for f in umesh.bm.faces for l in f.loops if l.tag)
+
+        groups: list[cls] = []
+        for crn_ in sel_loops:
+            group = []
+            temp_group = [crn_]
+            while True:
+                temp = []
+                for sel in temp_group:
+                    it = linked_crn_uv_by_tag(sel, uv)
+                    it.extend(linked_crn_uv_by_tag(sel.link_loop_next, uv))
+                    for l in it:
+                        if l.tag:
+                            l.tag = False
+                            temp.append(l)
+
+                        prev = l.link_loop_prev
+                        if prev.tag:
+                            prev.tag = False
+                            temp.append(prev)
+                if not temp:
+                    break
+
+                temp_group = temp
+                group.extend(temp)
+            lg = cls(umesh)
+            lg.corners = group
+            lg.dirt = True
+            groups.append(lg)
+        return LoopGroups(groups, umesh)
+
     def __iter__(self):
         return iter(self.corners)
 
@@ -182,3 +256,39 @@ class LoopGroup:
 
     def __str__(self):
         return f'Corner Edge count = {len(self.corners)}'
+
+class LoopGroups:
+    def __init__(self, loop_groups, umesh):
+        self.loop_groups: list[LoopGroup] = loop_groups
+        self.umesh: utils.UMesh | None = umesh
+
+    def indexing(self, _=None):
+        for f in self.umesh.bm.faces:
+            for crn in f.loops:
+                crn.index = -1
+
+        for idx, lg in enumerate(self.loop_groups):
+            for crn in lg:
+                crn.index = idx
+
+    def set_position(self, to: Vector, _from: Vector):
+        return bool(sum(lg.set_position(to, _from) for lg in self.loop_groups))
+
+    def __iter__(self) -> typing.Iterator[LoopGroup]:
+        return iter(self.loop_groups)
+
+    def __getitem__(self, idx) -> LoopGroup:
+        return self.loop_groups[idx]
+
+    def __bool__(self):
+        return bool(self.loop_groups)
+
+    def __len__(self):
+        return len(self.loop_groups)
+
+    def __str__(self):
+        return f'Loop Groups count = {len(self.loop_groups)}'
+
+class UnionLoopGroup(LoopGroups):
+    def __init__(self, loop_groups: list[LoopGroup]):
+        super().__init__(loop_groups, None)
