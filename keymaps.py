@@ -240,6 +240,11 @@ def add_keymaps():
 
     # Quick Snap
     kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS')
+    kmi.properties.quick_start = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS', alt=True)
+    kmi.properties.quick_start = False
     keys.append((km, kmi))
 
 def remove_keymaps():

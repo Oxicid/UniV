@@ -426,6 +426,8 @@ class PyBMesh(StructBase):
     @classmethod
     def is_full_face_selected(cls, bm):
         bm = cls.fields(bm)
+        if not bm.totface:
+            return False
         return bm.totfacesel == bm.totface
 
     @classmethod
