@@ -1,6 +1,6 @@
 import bpy
 import gpu
-import blf  # noqa
+import blf
 import typing
 import gpu_extras
 from math import inf
@@ -39,6 +39,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.mouse_position: Vector = Vector((0.0, 0.0, 0.0))
         self.prev_elem_position: Vector = Vector((0.0, 0.0, 0.0))
         self.handler: typing.Any = None
+        self.handler_ui: typing.Any = None
         self.shader: gpu.types.GPUShader | None = None
         self.batch: gpu.types.GPUBatch | None = None
         self.points: list[Vector] = []
@@ -111,6 +112,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     self.axis = ''
                 else:
                     self.axis = 'Y'
+
+        if event.type == 'G' and event.value == 'PRESS':
+            bpy.context.scene.tool_settings.use_snap_uv_grid_absolute ^= 1
 
         if self.dragged:
             if self.mouse_position == self.prev_elem_position.to_3d():
@@ -568,6 +572,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         return kd_data
 
     def register_draw(self):
+        self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_ui_draw_callback, (), 'WINDOW', 'POST_PIXEL')
         self.handler = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_draw_callback, (), 'WINDOW', 'POST_VIEW')
         self.area.tag_redraw()
 
@@ -584,22 +589,45 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)
 
-        font_id = 0
-        blf.size(font_id, 350)
-        blf.position(font_id, 0, 0, 0)
-        scale = 0.0001
-        blf.color(font_id, 0.8, 0., .0, 1)
-        if self.island_mode:
-            text = 'Island Mode'
-        else:
-            text = 'Element Mode'
-
-        with gpu.matrix.push_pop():
-            gpu.matrix.translate(self.mouse_position)
-            gpu.matrix.scale((scale, scale))
-            blf.draw(font_id, text)
-
         self.area.tag_redraw()
+        gpu.state.blend_set('NONE')
+
+    def univ_quick_snap_ui_draw_callback(self):
+        area = bpy.context.area
+        if area.ui_type != 'UV':
+            return
+
+        max_dim = 180
+        if area.width < max_dim * 2:
+            return
+
+        first_col = area.width - max_dim
+        second_col = first_col + 40
+
+        gpu.state.blend_set('ALPHA')
+
+        font_id = 0
+        blf.size(font_id, 16)
+        blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
+
+        text_y_size = blf.dimensions(0, 'T')[1]
+        text_y_size *= 1.75
+
+        blf.position(font_id, first_col, 20, 0)
+        blf.draw(font_id, 'Tab')
+        blf.position(font_id, second_col, 20, 0)
+        blf.draw(font_id, 'Island Mode' if self.island_mode else 'Element Mode')
+
+        blf.position(font_id, first_col, 20 + text_y_size, 0)
+        blf.draw(font_id, 'G')
+        blf.position(font_id, second_col, 20 + text_y_size, 0)
+        blf.draw(font_id, f"Grid: {'Enabled' if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute else 'Disabled'}")
+
+        blf.position(font_id, first_col, 20 + text_y_size*2, 0)
+        blf.draw(font_id, 'X, Y')
+        blf.position(font_id, second_col, 20 + text_y_size*2, 0)
+        blf.draw(font_id, f"Axis: {self.axis if self.axis else 'Both'}")
+
         gpu.state.blend_set('NONE')
 
     def refresh_draw_points(self):
@@ -616,6 +644,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         if not (self.handler is None):
             bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, 'WINDOW')
+            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler_ui, 'WINDOW')
 
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
