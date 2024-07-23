@@ -14,7 +14,7 @@ from ..utils import UMeshes
 from mathutils import Vector
 
 
-class eSnapPointMode(enum.IntEnum):
+class eSnapPointMode(enum.IntFlag):
     NONE = 1 << 0
     VERTEX = 1 << 1
     EDGE = 1 << 2
@@ -61,7 +61,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.visible: bool | None = None
         self.radius: float = 0.0
         self.axis: str = ''
-        self.snap_points_mode: eSnapPointMode = eSnapPointMode.NONE
+        self.snap_points_mode: eSnapPointMode = eSnapPointMode.VERTEX
 
         self._cancel: bool = False
 
@@ -76,6 +76,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.shader = gpu.shader.from_builtin('UNIFORM_COLOR')
         self.refresh_draw_points()
         self.register_draw()
+
+        self.snap_mode_init()
 
         self.umeshes = UMeshes()
         self.preprocessing()
@@ -99,6 +101,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         # print()
         # print(f'{event.type = }')
         # print(f'{event.value = }')
+
         if event.type in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'MIDDLEMOUSE'}:
             return {'PASS_THROUGH'}
 
@@ -127,13 +130,16 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             bpy.context.scene.tool_settings.use_snap_uv_grid_absolute ^= 1
             self.area.tag_redraw()
 
+        if event.value == 'PRESS' and event.type in {'ONE', 'TWO', 'THREE', 'FOUR'}:
+            self.snap_mode_update(event)
+            self.area.tag_redraw()
+
         if self.dragged:
             if self.mouse_position == self.prev_elem_position.to_3d():
                 if not axis_sliding_event:
                     return {'RUNNING_MODAL'}
 
-            points = self.kdmeshes.find_range(self.mouse_position, self.radius)
-            self.points = self.kdmeshes.range_to_coords(points)
+            self.points = self.find_range()
             self.refresh_draw_points()
 
             if not event.ctrl and (kd_data := self.find_nearest_target_pt()):
@@ -160,13 +166,12 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             self.preprocessing()
             self.area.tag_redraw()
 
-        if event.type == 'MOUSEMOVE':  # ', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}:
+        if event.type == 'MOUSEMOVE' and not self.quick_start:  # ', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}:
 
-            points = self.kdmeshes.find_range(self.mouse_position, self.radius)
-            self.points = self.kdmeshes.range_to_coords(points)
+            self.points = self.find_range()
             self.refresh_draw_points()
 
-            if kd_data := self.kdmeshes.find_from_all_trees_with_elem(self.mouse_position, self.radius):
+            if kd_data := self.find():
                 self.nearest_point[0] = kd_data.pt
             else:
                 self.nearest_point[0] = Vector((inf, inf, inf))
@@ -175,7 +180,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         elif event.type == 'LEFTMOUSE' or self.quick_start:
 
-            kd_data = self.kdmeshes.find_from_all_trees_with_elem(self.mouse_position, self.radius)
+            kd_data = self.find()
             if not kd_data:
                 self.quick_start = False
                 self.report({'INFO'}, 'Not found nearest elem')
@@ -207,48 +212,52 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             return {'RUNNING_MODAL'}
         return {'RUNNING_MODAL'}
 
-    def find_range(self, co, r):
+    def find_range(self):
         coords = []
-        if self.snap_points_mode & eSnapPointMode.VERTEX:
-            res = self.kdmeshes.find_range_vert(co, r)
+        if eSnapPointMode.VERTEX in self.snap_points_mode:
+            res = self.kdmeshes.find_range_vert(self.mouse_position, self.radius)
             coords = self.kdmeshes.range_to_coords(res)
-        if self.snap_points_mode & eSnapPointMode.EDGE:
-            res = self.kdmeshes.find_range_crn_center(co, r)
+        if eSnapPointMode.EDGE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_crn_center(self.mouse_position, self.radius)
             if coords:
                 coords.extend(self.kdmeshes.range_to_coords(res))
             else:
                 coords = self.kdmeshes.range_to_coords(res)
-        if self.snap_points_mode & eSnapPointMode.FACE:
-            res = self.kdmeshes.find_range_face_center(co, r)
+        if eSnapPointMode.FACE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_face_center(self.mouse_position, self.radius)
             if coords:
                 coords.extend(self.kdmeshes.range_to_coords(res))
             else:
                 coords = self.kdmeshes.range_to_coords(res)
+        return coords
 
-        self.points = coords
-        self.refresh_draw_points()
-
-    def find(self, co, r):
-        pt: tuple[Vector, int, float] = tuple((Vector((inf, inf, inf)), int(inf), inf))
+    def find(self):
+        pt: tuple[Vector, int, float] = tuple((Vector((inf, inf, inf)), 0, inf))
         elem: BMFace | BMLoop | None = None
-        kdmesh: KDMesh | None = None
+        r_kdmesh: KDMesh | None = None
+
+        r = self.radius
+        co = self.mouse_position
 
         for kdmesh in self.kdmeshes:
             if self.snap_points_mode & eSnapPointMode.VERTEX and (min_res_ := kdmesh.kdtree_crn_points.find(co))[0]:
                 if min_res_[2] <= r and min_res_[2] < pt[2]:
                     pt = min_res_
-                    elem = kdmesh.corners_center[min_res_[1]]
+                    elem = kdmesh.corners_vert[min_res_[1]]
+                    r_kdmesh = kdmesh
 
             if self.snap_points_mode & eSnapPointMode.EDGE and (min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
                 if min_res_[2] <= r and min_res_[2] < pt[2]:
                     pt = min_res_
                     elem = kdmesh.corners_center[min_res_[1]]
+                    r_kdmesh = kdmesh
             if self.snap_points_mode & eSnapPointMode.FACE and (min_res_ := kdmesh.kdtree_face_points.find(co))[0]:
                 if min_res_[2] <= r and min_res_[2] < pt[2]:
                     pt = min_res_
                     elem = kdmesh.faces[min_res_[1]]
+                    r_kdmesh = kdmesh
 
-        return KDData(pt, elem, kdmesh)
+        return KDData(pt, elem, r_kdmesh)
 
     def preprocessing(self):
         if self.island_mode:
@@ -290,7 +299,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     self.calc_crn_edge_selected_kdmeshes()
 
     def snap_mode_init(self):
-        self.snap_points_mode |= eSnapPointMode.VERTEX
+        self.snap_points_mode = eSnapPointMode.VERTEX
         if prefs().snap_points_default == 'FOLLOW_MODE':
             if self.sync:
                 if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
@@ -308,17 +317,17 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     def snap_mode_update(self, event):
         match event.type:
-            case '1':
+            case 'ONE':
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.VERTEX
                 else:
                     self.snap_points_mode = eSnapPointMode.VERTEX
-            case '2':
+            case 'TWO':
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.EDGE
                 else:
                     self.snap_points_mode = eSnapPointMode.EDGE
-            case '3':
+            case 'THREE':
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.FACE
                 else:
@@ -644,7 +653,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.mouse_position = mouse_position.to_3d()
 
     def find_nearest_target_pt(self):
-        kd_data = self.kdmeshes.find_from_all_trees_with_elem(self.mouse_position, self.radius)
+        kd_data = self.find()
 
         m_pos = self.mouse_position.to_2d()
         zoom = View2D.get_zoom(self.view)
@@ -685,12 +694,12 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         if area.ui_type != 'UV':
             return
 
-        max_dim = 180
+        max_dim = 240
         if area.width < max_dim * 2:
             return
 
         first_col = area.width - max_dim
-        second_col = first_col + 40
+        second_col = first_col + 90
 
         gpu.state.blend_set('ALPHA')
 
@@ -707,14 +716,20 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         blf.draw(font_id, 'Island Mode' if self.island_mode else 'Element Mode')
 
         blf.position(font_id, first_col, 20 + text_y_size, 0)
-        blf.draw(font_id, 'G')
+        blf.draw(font_id, 'X, Y')
         blf.position(font_id, second_col, 20 + text_y_size, 0)
-        blf.draw(font_id, f"Grid: {'Enabled' if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute else 'Disabled'}")
+        blf.draw(font_id, f"Axis: {self.axis if self.axis else 'Both'}")
 
         blf.position(font_id, first_col, 20 + text_y_size*2, 0)
-        blf.draw(font_id, 'X, Y')
+        blf.draw(font_id, 'G')
         blf.position(font_id, second_col, 20 + text_y_size*2, 0)
-        blf.draw(font_id, f"Axis: {self.axis if self.axis else 'Both'}")
+        blf.draw(font_id, f"Grid: {'Enabled' if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute else 'Disabled'}")
+
+        text = str(self.snap_points_mode).split('.')[1] if self.snap_points_mode else 'NONE'
+        blf.position(font_id, first_col, 20 + text_y_size*3, 0)
+        blf.draw(font_id, '(Shift) 1-4')
+        blf.position(font_id, second_col, 20 + text_y_size*3, 0)
+        blf.draw(font_id, text)
 
         gpu.state.blend_set('NONE')
 

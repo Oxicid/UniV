@@ -103,6 +103,7 @@ class KDMesh:
         self.islands = []
         self.loop_groups = None
         self.clear_containers()
+        uv = self.umesh.uv_layer
 
         corners_vert_append = self.corners_vert.append
         corners_center_append = self.corners_center.append
@@ -120,9 +121,14 @@ class KDMesh:
             if full_tagged:
                 faces_append(f)
 
-        self.calc_face_trees()
-
-        uv = self.umesh.uv_layer
+        self.kdtree_face_points = KDTree(len(self.faces))
+        kd_f_pt_insert = self.kdtree_face_points.insert
+        for idx, f in enumerate(self.faces):
+            sum_crn = Vector((0.0, 0.0))
+            for crn in f.loops:
+                sum_crn += crn[uv].uv
+            kd_f_pt_insert((sum_crn / len(f.loops)).to_3d(), idx)
+        self.kdtree_face_points.balance()
 
         self.kdtree_crn_points = KDTree(len(self.corners_vert))
         kd_crn_pt_insert = self.kdtree_crn_points.insert
@@ -219,38 +225,6 @@ class KDMesh:
     def find_range_face_center(self, co, r):
         return self.kdtree_face_points.find_range(co, r)
 
-    def find_all(self, co, r):
-        min_res = [Vector((inf, inf, inf)), inf, inf]
-        if (min_res_ := self.kdtree_face_points.find(co))[0]:
-            min_res = min_res_
-        if (min_res_ := self.kdtree_crn_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-        if (min_res_ := self.kdtree_crn_center_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-        if min_res[2] <= r:
-            return min_res
-        return [Vector((inf, inf, inf)), inf, inf]
-
-    def find_from_all_trees_with_elem(self, co, r) -> tuple[list[Vector, int, float], BMFace | BMLoop | None]:
-        founded_elem: BMFace | BMLoop | None = None
-        min_res = [Vector((inf, inf, inf)), inf, inf]
-        if (min_res_ := self.kdtree_face_points.find(co))[0]:
-            min_res = min_res_
-            founded_elem = self.faces[min_res_[1]]
-        if (min_res_ := self.kdtree_crn_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-                founded_elem = self.corners_vert[min_res_[1]]
-        if (min_res_ := self.kdtree_crn_center_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-                founded_elem = self.corners_center[min_res_[1]]
-        if min_res[2] <= r:
-            return min_res, founded_elem
-        return [Vector((inf, inf, inf)), inf, inf], None
-
     def clear_containers(self):
         self.corners_center = []
         self.corners_vert = []
@@ -275,19 +249,6 @@ class KDMeshes:
                 rmeshes.append(kdmesh)
         cls(rmeshes)
 
-    def find_from_all_trees_with_elem(self, co, r) -> KDData:
-        r_pt: list[Vector, int, float] = list((Vector((inf, inf, inf)), inf, inf))
-        r_elem: BMFace | BMLoop | None = None
-        r_kdmesh: KDMesh | None = None
-        for kdmesh in self.kdmeshes:
-            pt, elem = kdmesh.find_from_all_trees_with_elem(co, r)
-            if pt[2] < r_pt[2]:
-                r_pt = pt
-                r_elem = elem
-                r_kdmesh = kdmesh
-
-        return KDData(r_pt, r_elem, r_kdmesh)
-
     def find_range(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
         founded = []
         for kdmesh in self.kdmeshes:
@@ -309,7 +270,7 @@ class KDMeshes:
     def find_range_face_center(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
         founded = []
         for kdmesh in self.kdmeshes:
-            founded.append(kdmesh.find_range_crn_center(co, r))
+            founded.append(kdmesh.find_range_face_center(co, r))
         return chain.from_iterable(founded)
 
     @staticmethod
@@ -330,31 +291,3 @@ class KDMeshes:
 
     def __str__(self):
         return f'KD Meshes count = {len(self.kdmeshes)}'
-
-
-# radial search pattern to find proximity geometry
-# used in conjunction with bvh.ray_cast
-def radial_patterns():
-    from math import sin, cos, pi
-    points = (6,)
-    bases = [(r, n) for r, n in enumerate(points, 6)]
-
-    _patterns = []
-    for r, n in bases:
-        t = ((round(cos(2 * pi / n * x) * r),
-              round(sin(2 * pi / n * x) * r)) for x in range(n))
-        _patterns.append(tuple(t))
-    return tuple(_patterns)
-
-
-# patterns are fixed per pixels, so store
-# on module level for fast retrieval
-patterns = radial_patterns()
-
-
-# def search(rc, rv3d, rw, rh, mx, my):
-#     for p in patterns:
-#         for x, y in p:
-#             ret = ray_cast(rc, rv3d, rw, rh, mx + x * 2, my + y * 2)
-#             if ret:
-#                 return ret
