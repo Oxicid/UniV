@@ -177,14 +177,33 @@ class LoopGroup:
 
     def has_non_sync_crn(self):
         assert utils.sync()
+        count_non_shared = 0
         for crn in self.corners:
             shared_crn = crn.link_loop_radial_prev
             if shared_crn == crn:
-                return True  # TODO: Change behavior, count and compare with corners size?
+                count_non_shared += 1
+                continue
             if not shared_crn.tag:
-                return True  # TODO: Change behavior, count and compare with corners size?
+                count_non_shared += 1
+                continue
             if crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv:
                 return True
+        return count_non_shared == len(self.corners)
+
+    def has_sync_crn(self):
+        """ Need tagging and indexing"""
+        assert utils.sync()
+        for crn in self.corners:
+            shared_crn = crn.link_loop_radial_prev
+            if shared_crn == crn:
+                continue
+            elif not shared_crn.tag:
+                continue
+            elif crn.index == shared_crn.index:
+                continue
+            # elif crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv or crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv:
+            #     continue
+            return True
         return False
 
     def move(self, delta: Vector) -> bool:
@@ -200,16 +219,13 @@ class LoopGroup:
 
     @classmethod
     def calc_dirt_loop_groups(cls, umesh):
-        corners = (__crn for f in umesh.bm.faces for __crn in f.loops)
         uv = umesh.uv_layer
         # Tagging
         if utils.sync():
             assert utils.get_select_mode_mesh() != 'FACE'
-            for _crn in corners:
-                _crn.tag = _crn.edge.select and not _crn.face.hide
+            umesh.tag_selected_corners()
         else:
-            for _crn in corners:
-                _crn.tag = _crn[uv].select_edge and _crn.face.select
+            umesh.tag_selected_corners()
 
         sel_loops = (l for f in umesh.bm.faces for l in f.loops if l.tag)
 
@@ -241,6 +257,17 @@ class LoopGroup:
             lg.dirt = True
             groups.append(lg)
         return LoopGroups(groups, umesh)
+
+    def extend_from_linked(self):
+        # Need tag_visible_corners before use
+        assert utils.sync()
+        self.set_tag(False)
+
+        move_corners = []
+        uv = self.uv
+        for crn in self:
+            move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
+        self.corners.extend(move_corners)
 
     def __iter__(self):
         return iter(self.corners)

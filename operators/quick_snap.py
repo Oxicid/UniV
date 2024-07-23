@@ -278,7 +278,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                         self.visible = True
                         self.calc_elem_kdmeshes_visible()
                 else:
-                    if bool(sum(umesh.total_edge_sel for umesh in self.umeshes)):
+                    if any(umesh.total_edge_sel for umesh in self.umeshes):
                         self.visible = False
                         self.calc_elem_kdmeshes_sync()
                     else:
@@ -381,68 +381,57 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     _crn = kd_data.elem.loops[0] if isinstance(kd_data.elem, BMFace) else kd_data.elem
                     lgs = _kdmesh.loop_groups
                     lgs.indexing()
-                    picked_lg = lgs[_crn.index]
 
-                    lgs.loop_groups.remove(picked_lg)
-                    self.kdmeshes.kdmeshes.remove(kd_data.kdmesh)
+                    # Pick can be on link_loop_next, which is only added to kdmesh, not calc_dirt_loop_groups
+                    picked_lg = lgs[_crn.link_loop_prev.index if _crn.index == -1 else _crn.index]
 
-                    all_groups_of_mesh: list[list[LoopGroup]] = [[picked_lg]]
-
-                    kd_data.kdmesh.umesh.tag_selected_corners()
-                    for lg in kd_data.kdmesh.loop_groups:
-                        if lg.has_non_sync_crn():
-                            all_groups_of_mesh[0].append(lg)
-
-                    for kdmesh in self.kdmeshes:
-                        all_groups: list[LoopGroup] = []
-                        kdmesh.umesh.tag_selected_corners()
-                        for lg in kdmesh.loop_groups:
-                            if lg.has_non_sync_crn():
-                                all_groups.append(lg)
-                        if all_groups:
-                            all_groups_of_mesh.append(all_groups)
-
+                    kdmeshes = []
                     move_corners_of_mesh: list[LoopGroup] = []
 
-                    kdmeshes: list[KDMesh] = []
+                    kd_data.kdmesh.umesh.tag_selected_corners()
+                    if picked_lg.has_sync_crn():  # Transform only picked group if it has sync corner in loop_group
+                        move_corners_of_mesh.append(picked_lg)
+                        for umesh in self.umeshes:
+                            umesh.tag_visible_corners()
 
-                    for lgs in all_groups_of_mesh:
-                        move_corners = []
-                        umesh = lgs[0].umesh
-                        umesh.tag_visible_corners()
-                        for lg in lgs:
-                            uv = lg.uv
-                            for crn in lg:
-                                crn.tag = False
-                            for crn in lg:
-                                move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
-                            move_corners.extend(lg)
+                        picked_lg.extend_from_linked()  # tags false automatic
 
-                        umesh.update_tag = False
-                        new_lg = LoopGroup(umesh)
+                        for umesh in self.umeshes:
+                            kdmesh = KDMesh(umesh=umesh)
+                            kdmesh.calc_all_trees_from_static_corners_by_tag()
+                            if kdmesh:
+                                kdmeshes.append(kdmesh)
+                    else:
+                        for kdmesh in self.kdmeshes:
+                            kdmesh.umesh.update_tag = False
 
-                        new_lg.corners = move_corners
+                            if kd_data.kdmesh != kdmesh:
+                                kdmesh.umesh.tag_selected_corners()
+                                kdmesh.loop_groups.indexing()
+                            non_sync_lgs = []
+                            for lg in kdmesh.loop_groups:
+                                if not lg.has_sync_crn():
+                                    non_sync_lgs.append(lg)
 
-                        umesh.tag_visible_corners()
-                        new_lg.set_tag(False)
+                            kdmesh.umesh.tag_visible_corners()
+                            for non_sync_lg in non_sync_lgs:
+                                non_sync_lg.extend_from_linked()  # tags false automatic
+                                move_corners_of_mesh.append(non_sync_lg)
 
-                        move_corners_of_mesh.append(new_lg)
+                            kdmesh = KDMesh(umesh=kdmesh.umesh)
+                            kdmesh.calc_all_trees_from_static_corners_by_tag()
+                            if kdmesh:
+                                kdmeshes.append(kdmesh)
 
-                        kdmesh = KDMesh(umesh=umesh)
-                        kdmesh.calc_all_trees_from_static_corners_by_tag()
-                        if kdmesh.corners_center:
-                            kdmeshes.append(kdmesh)
-
-                    for umesh in self.umeshes:
-                        if not umesh.update_tag:
-                            umesh.update_tag = True
-                            continue
-                        umesh.tag_visible_corners()
-
-                        kdmesh = KDMesh(umesh=umesh)
-                        kdmesh.calc_all_trees_from_static_corners_by_tag()
-                        if kdmesh.corners_center:
-                            kdmeshes.append(kdmesh)
+                        for umesh in self.umeshes:
+                            if not umesh.update_tag:
+                                umesh.update_tag = True
+                                continue
+                            kdmesh = KDMesh(umesh=umesh)
+                            umesh.tag_visible_corners()
+                            kdmesh.calc_all_trees_from_static_corners_by_tag()
+                            if kdmesh:
+                                kdmeshes.append(kdmesh)
 
                     self.kdmeshes = KDMeshes(kdmeshes)
                     self.move_object = UnionLoopGroup(move_corners_of_mesh)

@@ -28,9 +28,6 @@ class KDData:
     def distance(self):
         return self.found[2]
 
-    def calc_visible_island(self):
-        pass
-
     def extract_drag_island(self):
         if len(self.kdmesh.islands) == 1:
             return self.kdmesh.islands.islands.pop()

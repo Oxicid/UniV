@@ -36,7 +36,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     snap_points_default: EnumProperty(name='Default Snap Points',
         items=(
             ('ALL', 'All', ''),
-            ('FOLLOW_MODE', 'Follow Mode', 'Follow the selection mode')
+            ('FOLLOW_MODE', 'Follow Mode', 'Follow the selection mode, VERTEX mode remains always')
         ),
         default='FOLLOW_MODE',
         description='Default Snap Points for QuickSnap')
