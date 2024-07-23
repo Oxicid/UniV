@@ -33,6 +33,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='DISABLED')
 
+    snap_points_default: EnumProperty(name='Default Snap Points',
+        items=(
+            ('ALL', 'All', ''),
+            ('FOLLOW_MODE', 'Follow Mode', 'Follow the selection mode')
+        ),
+        default='FOLLOW_MODE',
+        description='Default Snap Points for QuickSnap')
+
     def draw(self, context):
         layout = self.layout
 
@@ -40,7 +48,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         row.prop(self, "tab", expand=True)
 
         if self.tab == 'GENERAL':
-            layout.prop(self, "debug", emboss=True)
+            layout.prop(self, "debug")
+            layout.separator()
+            layout.label(text='QuickSnap:')
+            layout.prop(self, "quick_snap_points_default")
 
         if self.tab == 'KEYMAPS':
             row = layout.row()

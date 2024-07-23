@@ -109,13 +109,13 @@ def linked_crn_vert_uv_for_transform(first, uv):
         next_crn.tag = False
         linked.append(next_crn)
 
-        bm_iter = first.link_loop_next
+        bm_iter = next_crn
         while True:
             if (bm_iter := prev_disc(bm_iter)) == next_crn:
                 break
             if not bm_iter.tag:
                 continue
-            if first[uv].uv == bm_iter[uv].uv:
+            if next_crn[uv].uv == bm_iter[uv].uv:
                 bm_iter.tag = False
                 linked.append(bm_iter)
     return linked

@@ -80,6 +80,10 @@ class UMesh:
         return PyBMesh.fields(self.bm).totfacesel
 
     @property
+    def total_corners(self):
+        return PyBMesh.fields(self.bm).totloop
+
+    @property
     def has_any_selected_crn_non_sync(self):
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
@@ -227,6 +231,28 @@ class UMesh:
                         else:
                             for crn in f.loops:
                                 crn.tag = False
+
+    def tag_selected_edge_linked_crn_sync(self):
+        if PyBMesh.is_full_edge_selected(self.bm):
+            self.set_tag()
+            return
+        if PyBMesh.is_full_edge_deselected(self.bm):
+            self.set_tag(False)
+            return
+
+        self.set_tag(False)
+
+        for e in self.bm.edges:
+            if e.select:
+                for v in e.verts:
+                    for crn in v.link_loops:
+                        crn.tag = not crn.face.hide
+
+    def set_tag(self, state=True):
+        for f in self.bm.faces:
+            if f.select:
+                for crn in f.loops:
+                    crn.tag = state
 
     def __del__(self):
         if not self.is_edit_bm:

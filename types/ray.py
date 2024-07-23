@@ -42,7 +42,7 @@ class KDData:
             ret_isl = self.kdmesh.islands.islands.pop(self.elem.face.index)
 
         self.kdmesh.faces = []
-        self.kdmesh.corners = []
+        self.kdmesh.corners_center = []
         self.kdmesh.calc_all_trees()
         return ret_isl
 
@@ -54,8 +54,8 @@ class KDMesh:
         self.umesh: UMesh = umesh
         self.islands: Islands | AdvIslands | None = islands
         self.loop_groups: LoopGroups | None = loop_groups
-        self.corners: list[BMLoop] = []  # center
-        self.corners_2: list[BMLoop] = []  # crn and crn.link_loop_next
+        self.corners_vert: list[BMLoop] = []
+        self.corners_center: list[BMLoop] = []
         self.faces: list[BMFace] = []
         self.kdtree_crn_points: KDTree | None = None
         self.kdtree_crn_center_points: KDTree | None = None
@@ -64,10 +64,14 @@ class KDMesh:
         self.min_res = [Vector((inf, inf, inf)), inf, inf]
 
     def calc_all_trees(self):
+        self.clear_containers()
         for isl in self.islands:
             self.faces.extend(isl)
 
-        corners_size = sum(len(f.loops) for f in self.faces)
+        if len(self.umesh.bm.faces) == len(self.faces):
+            corners_size = self.umesh.total_corners
+        else:
+            corners_size = sum(len(f.loops) for f in self.faces)
         self.kdtree_crn_points = KDTree(corners_size)
         self.kdtree_crn_center_points = KDTree(corners_size)
         self.kdtree_face_points = KDTree(len(self.faces))
@@ -78,7 +82,7 @@ class KDMesh:
 
         uv = self.islands.uv_layer
         idx_ = 0
-        cnr_append = self.corners.append
+        cnr_append = self.corners_vert.append
         for idx, f in enumerate(self.faces):
             sum_crn = Vector((0.0, 0.0))
             for crn in f.loops:
@@ -89,6 +93,7 @@ class KDMesh:
                 kd_crn_center_pt_insert(((co+crn.link_loop_next[uv].uv)/2).to_3d(), idx_)
                 idx_ += 1
             kd_f_pt_insert((sum_crn / len(f.loops)).to_3d(), idx)
+        self.corners_center = self.corners_vert
 
         self.kdtree_face_points.balance()
         self.kdtree_crn_points.balance()
@@ -97,19 +102,19 @@ class KDMesh:
     def calc_all_trees_from_static_corners_by_tag(self):
         self.islands = []
         self.loop_groups = None
-        self.clear_elem()
+        self.clear_containers()
 
-        corners_append = self.corners.append
-        corners_2_append = self.corners_2.append
+        corners_vert_append = self.corners_vert.append
+        corners_center_append = self.corners_center.append
         faces_append = self.faces.append
 
         for f in self.umesh.bm.faces:
             full_tagged = True
             for crn in f.loops:
                 if crn.tag:
-                    corners_2_append(crn)
+                    corners_vert_append(crn)
                     if crn.link_loop_next.tag:
-                        corners_append(crn)
+                        corners_center_append(crn)
                 else:
                     full_tagged = False
             if full_tagged:
@@ -119,21 +124,22 @@ class KDMesh:
 
         uv = self.umesh.uv_layer
 
-        self.kdtree_crn_points = KDTree(len(self.corners_2))
+        self.kdtree_crn_points = KDTree(len(self.corners_vert))
         kd_crn_pt_insert = self.kdtree_crn_points.insert
-        for idx, crn in enumerate(self.corners_2):
+        for idx, crn in enumerate(self.corners_vert):
             kd_crn_pt_insert(crn[uv].uv.to_3d(), idx)
         self.kdtree_crn_points.balance()
 
-        self.kdtree_crn_center_points = KDTree(len(self.corners))
+        self.kdtree_crn_center_points = KDTree(len(self.corners_center))
         kd_crn_center_pt_insert = self.kdtree_crn_center_points.insert
-        for idx, crn in enumerate(self.corners):
+        for idx, crn in enumerate(self.corners_center):
             kd_crn_center_pt_insert(((crn[uv].uv + crn.link_loop_next[uv].uv) / 2).to_3d(), idx)
         self.kdtree_crn_center_points.balance()
 
     def calc_all_trees_loop_group(self):
+        self.clear_containers()
         for lg in self.loop_groups:
-            self.corners.extend(lg)
+            self.corners_center.extend(lg)
 
         faces_append = self.faces.append
         for f in self.umesh.bm.faces:
@@ -142,19 +148,20 @@ class KDMesh:
 
         uv = self.loop_groups.umesh.uv_layer
 
-        self.kdtree_crn_points = KDTree(len(self.corners)*2)
-        self.kdtree_crn_center_points = KDTree(len(self.corners))
+        self.kdtree_crn_points = KDTree(len(self.corners_center) * 2)
+        self.kdtree_crn_center_points = KDTree(len(self.corners_center))
         self.kdtree_face_points = KDTree(len(self.faces))
 
         kd_crn_center_pt_insert = self.kdtree_crn_center_points.insert
         kd_crn_pt_insert = self.kdtree_crn_points.insert
+        kd_f_pt_insert = self.kdtree_face_points.insert
 
-        corners_2_extend = self.corners_2.extend
+        corners_vert_extend = self.corners_vert.extend
 
         idx_ = 0
-        for idx, crn in enumerate(self.corners):
+        for idx, crn in enumerate(self.corners_center):
             crn_next = crn.link_loop_next
-            corners_2_extend((crn, crn_next))
+            corners_vert_extend((crn, crn_next))
 
             co_a = crn[uv].uv.to_3d()
             co_b = crn_next[uv].uv.to_3d()
@@ -165,7 +172,6 @@ class KDMesh:
             kd_crn_center_pt_insert((co_a+co_b)/2, idx)
             idx_ += 2
 
-        kd_f_pt_insert = self.kdtree_face_points.insert
         for idx, f in enumerate(self.faces):
             sum_crn = Vector((0.0, 0.0))
             for crn in f.loops:
@@ -193,11 +199,25 @@ class KDMesh:
         self.kdtree_face_points.balance()
 
     def find_range(self, co, r):
-        res = []
-        res.extend(self.kdtree_face_points.find_range(co, r))
-        res.extend(self.kdtree_crn_points.find_range(co, r))
-        res.extend(self.kdtree_crn_center_points.find_range(co, r))
+        res = self.kdtree_face_points.find_range(co, r)
+        if res:
+            res.extend(self.kdtree_crn_points.find_range(co, r))
+        else:
+            res = self.kdtree_crn_points.find_range(co, r)
+        if res:
+            res.extend(self.kdtree_crn_center_points.find_range(co, r))
+        else:
+            res = self.kdtree_crn_center_points.find_range(co, r)
         return res
+
+    def find_range_vert(self, co, r):
+        return self.kdtree_crn_points.find_range(co, r)
+
+    def find_range_crn_center(self, co, r):
+        return self.kdtree_crn_center_points.find_range(co, r)
+
+    def find_range_face_center(self, co, r):
+        return self.kdtree_face_points.find_range(co, r)
 
     def find_all(self, co, r):
         min_res = [Vector((inf, inf, inf)), inf, inf]
@@ -222,55 +242,22 @@ class KDMesh:
         if (min_res_ := self.kdtree_crn_points.find(co))[0]:
             if min_res_[2] < min_res[2]:
                 min_res = min_res_
-                founded_elem = self.corners[min_res_[1]]
+                founded_elem = self.corners_vert[min_res_[1]]
         if (min_res_ := self.kdtree_crn_center_points.find(co))[0]:
             if min_res_[2] < min_res[2]:
                 min_res = min_res_
-                founded_elem = self.corners[min_res_[1]]
+                founded_elem = self.corners_center[min_res_[1]]
         if min_res[2] <= r:
             return min_res, founded_elem
         return [Vector((inf, inf, inf)), inf, inf], None
 
-    def find_from_all_trees_with_elem_loop_group(self, co, r) -> tuple[list[Vector, int, float], BMFace | BMLoop | None]:
-        founded_elem: BMFace | BMLoop | None = None
-        min_res = [Vector((inf, inf, inf)), inf, inf]
-        if (min_res_ := self.kdtree_face_points.find(co))[0]:
-            min_res = min_res_
-            founded_elem = self.faces[min_res_[1]]
-        if (min_res_ := self.kdtree_crn_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-                founded_elem = self.corners_2[min_res_[1]]
-        if (min_res_ := self.kdtree_crn_center_points.find(co))[0]:
-            if min_res_[2] < min_res[2]:
-                min_res = min_res_
-                founded_elem = self.corners[min_res_[1]]
-        if min_res[2] <= r:
-            return min_res, founded_elem
-        return [Vector((inf, inf, inf)), inf, inf], None
-
-    def find_face(self, co, r):
-        if res := self.kdtree_face_points.find(co):
-            if res[2] <= r:
-                return res
-        return [Vector((inf, inf, inf)), inf, inf]
-
-    def find_crn(self, co, r):
-        if res := self.kdtree_crn_points.find(co):
-            if res[2] <= r:
-                return res
-        return [Vector((inf, inf, inf)), inf, inf]
-
-    def find_crn_center(self, co, r):
-        if res := self.kdtree_crn_center_points.find(co):
-            if res[2] <= r:
-                return res
-        return [Vector((inf, inf, inf)), inf, inf]
-
-    def clear_elem(self):
-        self.corners = []
-        self.corners_2 = []
+    def clear_containers(self):
+        self.corners_center = []
+        self.corners_vert = []
         self.faces = []
+
+    def __bool__(self):
+        return bool(self.corners_vert or self.corners_center or self.faces)
 
 
 class KDMeshes:
@@ -288,16 +275,13 @@ class KDMeshes:
                 rmeshes.append(kdmesh)
         cls(rmeshes)
 
-    def find_from_all_trees_with_elem(self, co, r, island_mode) -> KDData:
+    def find_from_all_trees_with_elem(self, co, r) -> KDData:
         r_pt: list[Vector, int, float] = list((Vector((inf, inf, inf)), inf, inf))
         r_elem: BMFace | BMLoop | None = None
         r_kdmesh: KDMesh | None = None
         for kdmesh in self.kdmeshes:
-            if island_mode:
-                pt, elem = kdmesh.find_from_all_trees_with_elem(co, r)
-            else:
-                pt, elem = kdmesh.find_from_all_trees_with_elem_loop_group(co, r)
-            if r_pt[2] > pt[2]:
+            pt, elem = kdmesh.find_from_all_trees_with_elem(co, r)
+            if pt[2] < r_pt[2]:
                 r_pt = pt
                 r_elem = elem
                 r_kdmesh = kdmesh
@@ -308,6 +292,24 @@ class KDMeshes:
         founded = []
         for kdmesh in self.kdmeshes:
             founded.append(kdmesh.find_range(co, r))
+        return chain.from_iterable(founded)
+
+    def find_range_vert(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+        founded = []
+        for kdmesh in self.kdmeshes:
+            founded.append(kdmesh.find_range_vert(co, r))
+        return chain.from_iterable(founded)
+
+    def find_range_crn_center(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+        founded = []
+        for kdmesh in self.kdmeshes:
+            founded.append(kdmesh.find_range_crn_center(co, r))
+        return chain.from_iterable(founded)
+
+    def find_range_face_center(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+        founded = []
+        for kdmesh in self.kdmeshes:
+            founded.append(kdmesh.find_range_crn_center(co, r))
         return chain.from_iterable(founded)
 
     @staticmethod

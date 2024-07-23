@@ -274,6 +274,9 @@ class LoopGroups:
     def set_position(self, to: Vector, _from: Vector):
         return bool(sum(lg.set_position(to, _from) for lg in self.loop_groups))
 
+    def move(self, delta: Vector):
+        return bool(sum(lg.move(delta) for lg in self.loop_groups))
+
     def __iter__(self) -> typing.Iterator[LoopGroup]:
         return iter(self.loop_groups)
 
