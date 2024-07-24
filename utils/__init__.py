@@ -24,6 +24,7 @@ class UMesh:
         self.uv_layer: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
         self.is_edit_bm: bool = is_edit_bm
         self.update_tag: bool = True
+        self.sync: bool = sync()
 
     def update(self, force=False):
         if not self.update_tag:
@@ -46,6 +47,14 @@ class UMesh:
             self.bm.edges.ensure_lookup_table()
         if vert:
             self.bm.verts.ensure_lookup_table()
+
+    def check_uniform_scale(self, report=None):
+        _, _, scale = self.obj.matrix_world.decompose()
+        if not vec_isclose_to_uniform(scale, 0.01):
+            if report:
+                report({'WARNING'}, f'Object {self.obj.name} has non-uniform scale: {scale}')
+            return False
+        return True
 
     @property
     def is_full_face_selected(self):
@@ -150,11 +159,20 @@ class UMesh:
         if hasattr(self.obj.data, 'use_auto_smooth'):
             if self.obj.data.use_auto_smooth:
                 return self.obj.data.auto_smooth_angle  # noqa
+        else:
+            for mod in self.obj.modifiers:
+                if 'Smooth by Angle' not in mod.name:
+                    continue
+                if not (mod.show_in_editmode and mod.show_viewport):
+                    continue
+                if 'Input_1' in mod:
+                    if isinstance(value := mod['Input_1'], float):
+                        return value
         return math.radians(180.0)
 
     def tag_hidden_corners(self):
         corners = (_crn for f in self.bm.faces for _crn in f.loops)
-        if sync():
+        if self.sync:
             if self.is_full_face_selected:
                 for crn in corners:
                     crn.tag = False
@@ -175,7 +193,7 @@ class UMesh:
 
     def tag_visible_corners(self):
         corners = (_crn for f in self.bm.faces for _crn in f.loops)
-        if sync():
+        if self.sync:
             if self.is_full_face_selected:
                 for crn in corners:
                     crn.tag = True
@@ -196,7 +214,7 @@ class UMesh:
 
     def tag_selected_corners(self, both=False):
         corners = (_crn for f in self.bm.faces for _crn in f.loops)
-        if sync():
+        if self.sync:
             if self.is_full_face_selected:
                 for crn in corners:
                     crn.tag = True
@@ -323,6 +341,10 @@ class UMeshes:
             umesh.obj.select_set(True)
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
         bpy.context.view_layer.objects.active = active
+
+    def set_sync(self, state=True):
+        for umesh in self:
+            umesh.sync = state
 
     @classmethod
     def sel_ob_with_uv(cls):

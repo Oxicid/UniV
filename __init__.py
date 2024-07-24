@@ -27,6 +27,7 @@ from .operators import quadrify
 from .operators import transform
 from .operators import toggle
 from .operators import select
+from .operators import seam
 from .operators import quick_snap
 from . import ui
 from . import keymaps
@@ -67,7 +68,9 @@ classes = (
     # QuickSnap
     quick_snap.UNIV_OT_QuickSnap,
     # UI
-    ui.UNIV_PT_General
+    ui.UNIV_PT_General,
+    # Seam
+    seam.UNIV_OT_Angle,
 )
 
 is_enabled = False

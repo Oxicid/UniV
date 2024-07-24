@@ -123,3 +123,10 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         row.operator('uv.univ_weld', text='Weld')
         row.operator('uv.univ_stitch', text='Stitch')
+
+        # Seam
+        col_align = col.column(align=True)
+        col_align.separator(factor=0.35)
+
+        split = col_align.split(align=True)
+        split.operator('mesh.univ_angle', text='Angle')
