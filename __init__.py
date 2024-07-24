@@ -69,7 +69,9 @@ classes = (
     quick_snap.UNIV_OT_QuickSnap,
     # UI
     ui.UNIV_PT_General,
+    ui.UNIV_PT_General_VIEW_3D,
     # Seam
+    seam.UNIV_OT_Cut,
     seam.UNIV_OT_Angle,
 )
 

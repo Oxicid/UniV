@@ -250,6 +250,31 @@ class UMesh:
                             for crn in f.loops:
                                 crn.tag = False
 
+    def tag_selected_faces(self, both=False):
+        if self.sync:
+            if self.is_full_face_selected:
+                self.set_face_tag()
+            else:
+                for f in self.bm.faces:
+                    f.tag = not f.hide
+        else:
+            if self.is_full_face_deselected:
+                self.set_face_tag(False)
+            else:
+                uv = self.uv_layer
+                if both:
+                    for f in self.bm.faces:
+                        if f.select:
+                            f.tag = all(crn[uv].select_edge or crn[uv].select for crn in f.loops)
+                        else:
+                            f.tag = False
+                else:
+                    for f in self.bm.faces:
+                        if f.select:
+                            f.tag = all(crn[uv].select_edge for crn in f.loops)
+                        else:
+                            f.tag = False
+
     def tag_selected_edge_linked_crn_sync(self):
         if PyBMesh.is_full_edge_selected(self.bm):
             self.set_tag()
@@ -271,6 +296,10 @@ class UMesh:
             if f.select:
                 for crn in f.loops:
                     crn.tag = state
+
+    def set_face_tag(self, state):
+        for f in self.bm.faces:
+            f.tag = state
 
     def __del__(self):
         if not self.is_edit_bm:

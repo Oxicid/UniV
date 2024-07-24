@@ -383,12 +383,16 @@ def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):
 
 def is_boundary_sync(crn: BMLoop, uv_layer: BMLayerItem):
     # assert(not l.face.hide)
-    if (next_linked_disc := crn.link_loop_radial_prev) == crn:
+    if (_shared_crn := crn.link_loop_radial_prev) == crn:
         return True
-    if next_linked_disc.face.hide:
+    if _shared_crn.face.hide:
         return True
-    return not (crn[uv_layer].uv == next_linked_disc.link_loop_next[uv_layer].uv and
-                crn.link_loop_next[uv_layer].uv == next_linked_disc[uv_layer].uv)
+    return not (crn[uv_layer].uv == _shared_crn.link_loop_next[uv_layer].uv and
+                crn.link_loop_next[uv_layer].uv == _shared_crn[uv_layer].uv)
+
+def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv_layer: BMLayerItem):
+    return crn.link_loop_next[uv_layer].uv == _shared_crn[uv_layer].uv and \
+           crn[uv_layer].uv == _shared_crn.link_loop_next[uv_layer].uv
 
 def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
     if PyBMesh.is_full_face_deselected(bm):

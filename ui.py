@@ -129,4 +129,22 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
+        split.operator('mesh.univ_cut', text='Cut')
+        split.operator('mesh.univ_angle', text='Angle')
+
+class UNIV_PT_General_VIEW_3D(Panel):
+    bl_label = "UniV"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "UniV"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'INVOKE_DEFAULT'
+        box = layout.box()
+        col = box.column(align=True)
+
+        col_align = col.column(align=True)
+        split = col_align.split(align=True)
+        split.operator('mesh.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
