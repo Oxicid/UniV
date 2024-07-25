@@ -64,6 +64,9 @@ def main(self, umesh):
         islands.append(i)
         selected_corns_islands.append(island_of_corns)
 
+    for isl_ in islands:
+        isl_.mark_seam()
+
     if not islands:
         umesh.update_tag = False
         return
@@ -101,9 +104,6 @@ def straighten(self, uv_layers, island, segment_loops):
         face.select_set(True)
         for loop in face.loops:
             loop[uv_layers].select = True
-
-    # Make edges of the island bounds seams temporarily for a more predictable result
-    bpy.ops.uv.seams_from_islands(mark_seams=True, mark_sharp=False)
 
     bbox = segment_loops[-1][uv_layers].uv - segment_loops[0][uv_layers].uv
     straighten_in_x = True
