@@ -413,7 +413,7 @@ class UNIV_OT_Align(Operator):
         island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
-                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         general_bbox.union(bbox)
