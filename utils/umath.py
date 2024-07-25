@@ -1,3 +1,20 @@
+"""
+Created by Oxicid
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
 import math
 from bl_math import lerp
 from mathutils import Vector
@@ -13,9 +30,9 @@ def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
     return math.isclose(delta.x, 0, abs_tol=abs_tol) and math.isclose(delta.y, 0, abs_tol=abs_tol)
 
 
-# https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
+# Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
 def inv_lerp(a: float, b: float, v: float) -> float:
-    """Inverse Linar Interpolation, get the fraction between a and b on which v resides.
+    """Inverse Linear Interpolation, get the fraction between a and b on which v resides.
     Examples
     --------
         0.5 == inv_lerp(0, 100, 50)

@@ -1,3 +1,23 @@
+"""
+Created by Oxicid
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+# Everything that happens below is thanks to the K-410
+# The code was taken and modified from the 'btypes' module: https://github.com/K-410/btypes/tree/fafc510bd9de3aa3201edf5ad9bced26a5298bc0
+
 import bpy
 # import bmesh
 import typing
