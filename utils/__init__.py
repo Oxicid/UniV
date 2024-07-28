@@ -18,7 +18,7 @@ Created by Oxicid
 import typing  # noqa
 import math  # noqa
 
-# import bmesh
+import bmesh
 import mathutils  # noqa
 
 import numpy as np

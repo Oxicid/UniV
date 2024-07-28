@@ -29,7 +29,8 @@ from math import pi
 from mathutils import Vector
 from collections import defaultdict
 
-from .. import types
+from bmesh.types import BMLoop
+
 from .. import utils
 from .. import info
 from ..utils import UMeshes
@@ -1834,7 +1835,7 @@ class UNIV_OT_Orient(Operator):
             uv_layer = umesh.uv_layer
             umesh.update_tag = False
 
-            if types.PyBMesh.is_full_face_deselected(umesh.bm) or \
+            if umesh.is_full_face_deselected or \
                     not any(l[uv_layer].select_edge for f in umesh.bm.faces for l in f.loops):
                 self.skip_count += 1
                 continue
@@ -1866,7 +1867,7 @@ class UNIV_OT_Orient(Operator):
             uv_layer = umesh.uv_layer
             umesh.update_tag = False
 
-            if types.PyBMesh.is_full_edge_deselected(umesh.bm):
+            if umesh.is_full_edge_deselected:
                 self.skip_count += 1
                 continue
 
@@ -1916,11 +1917,12 @@ class UNIV_OT_Orient(Operator):
             else:
                 self.skip_count += 1
 
+    # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
     def world_orient(self, extended):
         self.skip_count = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
-            full_selected = types.PyBMesh.is_full_face_selected(umesh.bm)
+            full_selected = umesh.is_full_face_selected
             if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
 
                 for island in islands:
@@ -2034,8 +2036,6 @@ class UNIV_OT_Orient(Operator):
 
         return avg_angle / n_edges
 
-
-import bmesh
 
 class UNIV_OT_Weld(Operator):
     bl_idname = "uv.univ_weld"
@@ -2184,7 +2184,7 @@ class UNIV_OT_Weld(Operator):
                     weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
                     weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
 
-                    edge: bmesh.types.BMEdge = crn.edge
+                    edge = crn.edge
                     if weld_a and weld_b:
                         if edge.seam:
                             edge.seam = False
@@ -2232,7 +2232,7 @@ class UNIV_OT_Weld(Operator):
                         weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
                         weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
 
-                        edge: bmesh.types.BMEdge = crn.edge
+                        edge = crn.edge
                         if weld_a and weld_b:
                             if edge.seam:
                                 edge.seam = False
@@ -2310,7 +2310,7 @@ class UNIV_OT_Weld(Operator):
         if self.global_counter:
             self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
 
-    def calc_distance_groups(self, crn_in_vert: list[bmesh.types.BMLoop], uv) -> list[list[bmesh.types.BMLoop]]:
+    def calc_distance_groups(self, crn_in_vert: list[BMLoop], uv) -> list[list[BMLoop]]:
         corners_groups = []
         union_corners = []
         for corner_first in crn_in_vert:

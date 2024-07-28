@@ -16,7 +16,7 @@ Created by Oxicid
 """
 
 from ..types import PyBMesh
-from bmesh.types import *
+from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
 from mathutils import Vector
 
 def set_faces_tag(faces, tag=True):
@@ -410,7 +410,7 @@ def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv_layer: BMLayerItem):
     return crn.link_loop_next[uv_layer].uv == _shared_crn[uv_layer].uv and \
            crn[uv_layer].uv == _shared_crn.link_loop_next[uv_layer].uv
 
-def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
+def calc_selected_uv_faces(bm, uv_layer, sync) -> list[BMFace]:
     if PyBMesh.is_full_face_deselected(bm):
         return []
 
@@ -429,7 +429,7 @@ def calc_selected_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:
     else:
         return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select]
 
-def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMFace] | tuple':
+def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[BMFace] | tuple':
     if PyBMesh.is_full_face_deselected(bm):
         return ()
 
@@ -448,14 +448,14 @@ def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.t
     else:
         return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select)
 
-def calc_visible_uv_faces(bm, uv_layer, sync) -> list[bmesh.types.BMFace]:  # noqa
+def calc_visible_uv_faces(bm, uv_layer, sync) -> list[BMFace]:  # noqa
     if PyBMesh.is_full_face_selected(bm):
         return bm.faces
     if sync:
         return [f for f in bm.faces if not f.hide]
     return [f for f in bm.faces if f.select]
 
-def calc_unselected_uv_faces(bm, uv, sync) -> list[bmesh.types.BMFace]:
+def calc_unselected_uv_faces(bm, uv, sync) -> list[BMFace]:
     if sync:
         if PyBMesh.is_full_face_selected(bm):
             return []
@@ -464,12 +464,12 @@ def calc_unselected_uv_faces(bm, uv, sync) -> list[bmesh.types.BMFace]:
         return []
     return [f for f in bm.faces if f.select and any(not crn[uv].select_edge for crn in f.loops)]
 
-def calc_uv_faces(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMFace]:
+def calc_uv_faces(bm, uv_layer, sync, *, selected) -> list[BMFace]:
     if selected:
         return calc_selected_uv_faces(bm, uv_layer, sync)
     return calc_visible_uv_faces(bm, uv_layer, sync)
 
-def calc_selected_uv_corners(bm, uv_layer, sync) -> list[bmesh.types.BMLoop]:
+def calc_selected_uv_corners(bm, uv_layer, sync) -> list[BMLoop]:
     if PyBMesh.is_full_vert_deselected(bm):
         return []
 
@@ -482,7 +482,7 @@ def calc_selected_uv_corners(bm, uv_layer, sync) -> list[bmesh.types.BMLoop]:
         return [l for f in bm.faces for l in f.loops if l[uv_layer].select]
     return [l for f in bm.faces if f.select for l in f.loops if l[uv_layer].select]
 
-def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh.types.BMLoop] | tuple':
+def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[BMLoop] | tuple':
     if PyBMesh.is_full_vert_deselected(bm):
         return ()
 
@@ -495,14 +495,14 @@ def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[bmesh
         return (luv for f in bm.faces for luv in f.loops if luv[uv_layer].select)
     return (luv for f in bm.faces if f.select for luv in f.loops if luv[uv_layer].select)
 
-def calc_visible_uv_corners(bm, sync) -> list[bmesh.types.BMLoop]:
+def calc_visible_uv_corners(bm, sync) -> list[BMLoop]:
     if sync:
         return [luv for f in bm.faces if not f.hide for luv in f.loops]
     if PyBMesh.fields(bm).totfacesel == 0:
         return []
     return [luv for f in bm.faces if (f.select and not f.hide) for luv in f.loops]
 
-def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[bmesh.types.BMLoop]:
+def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[BMLoop]:
     if selected:
         return calc_selected_uv_corners(bm, uv_layer, sync)
     return calc_visible_uv_corners(bm, sync)
