@@ -2553,7 +2553,7 @@ class UNIV_OT_Stitch(Operator):
         crn_b2 = source[0]
 
         if UNIV_OT_Stitch.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_margins(tar, tar.uv)
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(tar, tar.uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
             if bbox.max_length < 1e-06:
                 return False

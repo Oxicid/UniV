@@ -17,6 +17,21 @@ Created by Oxicid
 
 import bpy
 
+def get_aspect_y(context):
+    area = context.area
+    if not area:
+        return 1.0
+    space_data = context.area.spaces.active
+    if not space_data:
+        return 1.0
+    if not space_data.image:
+        return 1.0
+    image_width = space_data.image.size[0]
+    image_height = space_data.image.size[1]
+    if image_height:
+        return image_width / image_height
+    return 1.0
+
 def is_island_mode():
     scene = bpy.context.scene
     if scene.tool_settings.use_uv_select_sync:

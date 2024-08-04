@@ -41,6 +41,7 @@ from .types import island  # noqa: F401
 from .types import mesh_island  # noqa: F401
 from .operators import straight
 from .operators import quadrify
+from .operators import relax
 from .operators import transform
 from .operators import toggle
 from .operators import select
@@ -69,6 +70,7 @@ classes = (
     # Quadrify
     quadrify.UNIV_OT_Quad,
     straight.UNIV_OT_Straight,
+    relax.UNIV_OT_Relax,
     # Toggles
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,

@@ -97,6 +97,10 @@ class UMesh:
         return PyBMesh.is_full_vert_deselected(self.bm)
 
     @property
+    def total_vert_sel(self):
+        return PyBMesh.fields(self.bm).totvertsel
+
+    @property
     def total_edge_sel(self):
         return PyBMesh.fields(self.bm).totedgesel
 

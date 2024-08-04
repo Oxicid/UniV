@@ -40,6 +40,40 @@ class eInfoSelectFaceIsland(enum.IntEnum):
     HALF_SELECTED = 1
     FULL_SELECTED = 2
 
+class SaveTransform:
+    def __init__(self, island: 'FaceIsland | AdvIsland'):
+        self.island = island
+        self.bbox, self.corners = BBox.calc_bbox_with_corners([crn for f in island for crn in f.loops], island.uv_layer)
+        self.corners_co: list[Vector] = [crn[island.uv_layer].uv.copy() for crn in self.corners]
+
+    def inplace(self):
+        if self.bbox.max_length < 2e-08:
+            self.island.set_position(self.corners_co[0], self.island.calc_bbox().center)
+        else:
+            if self.bbox.width > self.bbox.height:
+                a1 = self.corners_co[0]
+                a2 = self.corners_co[1]
+                b1 = self.corners[0][self.island.uv_layer].uv
+                b2 = self.corners[1][self.island.uv_layer].uv
+            else:
+                a1 = self.corners_co[2]
+                a2 = self.corners_co[3]
+                b1 = self.corners[2][self.island.uv_layer].uv
+                b2 = self.corners[3][self.island.uv_layer].uv
+
+            old_vec = a1 - a2
+            new_vec = b1 - b2
+
+            angle = old_vec.angle_signed(new_vec)
+            self.island.rotate_simple(angle)
+
+            scale = old_vec.length / new_vec.length
+            self.island.scale_simple(Vector((scale, scale)))
+
+            old_center = (a1 + a2) / 2
+            new_center = (b1 + b2) / 2
+            self.island.set_position(old_center, new_center)
+
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
@@ -59,6 +93,9 @@ class FaceIsland:
         if _from is None:
             _from = self.calc_bbox().min
         return self.move(to - _from)
+
+    def save_transform(self):
+        return SaveTransform(self)
 
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         """Rotate a list of faces by angle (in radians) around a pivot
@@ -847,6 +884,31 @@ class Islands(IslandsBase):
             islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         else:
             islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
+        return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_extended_any_elem(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
+        if not sync:
+            if btypes.PyBMesh.is_full_face_deselected(bm):
+                return cls([], None, None)
+        else:
+            elem_mode = utils.get_select_mode_mesh()
+            if elem_mode == 'FACE':
+                if btypes.PyBMesh.is_full_face_deselected(bm):
+                    return cls([], None, None)
+            elif elem_mode == 'VERTEX':
+                if btypes.PyBMesh.is_full_vert_deselected(bm):
+                    return cls([], None, None)
+            else:
+                if btypes.PyBMesh.is_full_edge_deselected(bm):
+                    return cls([], None, None)
+
+        cls.tag_filter_visible(bm, sync)
+        if sync and PyBMesh.is_full_face_selected(bm):
+            islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
+        else:
+            islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)
+                       if cls.island_filter_is_any_elem_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
 
     @classmethod

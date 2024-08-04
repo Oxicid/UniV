@@ -15,6 +15,8 @@ Created by Oxicid
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import typing
+# from . import UMesh
 from ..types import PyBMesh
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
 from mathutils import Vector
@@ -448,11 +450,27 @@ def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[BMFace]
     else:
         return (f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select)
 
+def calc_selected_verts(umesh: 'UMesh') -> list[BMVert] | typing.Any:  # noqa
+    if umesh.is_full_vert_deselected:
+        return []
+    if umesh.is_full_vert_selected:
+        return umesh.bm.verts
+    return [v for v in umesh.bm.verts if v.select]
+
+def calc_selected_edges(umesh: 'UMesh') -> list[BMEdge] | typing.Any:  # noqa
+    if umesh.is_full_edge_deselected:
+        return []
+    if umesh.is_full_edge_selected:
+        return umesh.bm.edges
+    return [e for e in umesh.bm.edges if e.select]
+
 def calc_visible_uv_faces(bm, uv_layer, sync) -> list[BMFace]:  # noqa
     if PyBMesh.is_full_face_selected(bm):
         return bm.faces
     if sync:
         return [f for f in bm.faces if not f.hide]
+    if PyBMesh.is_full_face_deselected:
+        return []
     return [f for f in bm.faces if f.select]
 
 def calc_unselected_uv_faces(bm, uv, sync) -> list[BMFace]:

@@ -62,7 +62,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_with_margins(cls, corners: typing.Sequence[BMLoop], uv: BMLayerItem) -> 'BBox, typing.Sequence[BMLoop]':
+    def calc_bbox_with_corners(cls, corners: typing.Sequence[BMLoop], uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
         first_co: Vector = corners[0][uv].uv
         xmin = xmax = ymin = ymax = first_co
         xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
