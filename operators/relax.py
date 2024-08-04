@@ -37,11 +37,6 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
     iterations: bpy.props.IntProperty(name='Iterations', default=50, min=5, max=600, soft_min=50, soft_max=200)
     border_blend: bpy.props.FloatProperty(name='Border Blend', default=0.1, min=0, soft_min=0, soft_max=1)
-    unwrap_method: bpy.props.EnumProperty(name='Unwrap Method', default='ANGLE_BASED',
-                                          items=(
-                                              ('ANGLE_BASED', 'Angle Based', ''),
-                                              ('CONFORMAL', 'Conformal', '')
-                                          ))
 
     @classmethod
     def poll(cls, context):
@@ -54,7 +49,6 @@ class UNIV_OT_Relax(bpy.types.Operator):
     def draw(self, context):
         self.layout.prop(self, 'iterations', slider=True)
         self.layout.prop(self, 'border_blend', slider=True)
-        self.layout.row().prop(self, 'unwrap_method', expand=True)
 
     def invoke(self, context, event):
         return self.execute(context)
@@ -154,7 +148,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
         if any(rd.coords_before for rd in relax_data):
-            bpy.ops.uv.unwrap(method=self.unwrap_method)
+            bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
             for rd in relax_data:
                 uv = rd.umesh.uv_layer
@@ -248,7 +242,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
         if any(rd.coords_before for rd in relax_data):
-            bpy.ops.uv.unwrap(method=self.unwrap_method)
+            bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
             for rd in relax_data:
                 uv = rd.umesh.uv_layer

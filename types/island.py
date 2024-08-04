@@ -43,37 +43,64 @@ class eInfoSelectFaceIsland(enum.IntEnum):
 class SaveTransform:
     def __init__(self, island: 'FaceIsland | AdvIsland'):
         self.island = island
-        self.bbox, self.corners = BBox.calc_bbox_with_corners([crn for f in island for crn in f.loops], island.uv_layer)
-        self.corners_co: list[Vector] = [crn[island.uv_layer].uv.copy() for crn in self.corners]
+        uv = island.uv_layer
+        if utils.sync():
+            if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
+                corners = [crn for f in island if not f.select for crn in f.loops]
+            elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+                corners = [crn for f in island for crn in f.loops if not crn.edge.select]
+            else:  # VERTS
+                corners = [crn for f in island for crn in f.loops if not crn.vert.select]
+        else:
+            corners = [crn for f in island for crn in f.loops if not crn[uv].select]
+
+        if not corners:
+            corners = [crn for f in island for crn in f.loops]
+        else:
+            first = corners[0]
+            if all(first == _crn for _crn in corners):
+                corners = [crn for f in island for crn in f.loops]
+
+        self.bbox, self.corners = BBox.calc_bbox_with_corners(corners, island.uv_layer)
+        self.corners_co: list[Vector] = [crn[uv].uv.copy() for crn in self.corners]
 
     def inplace(self):
         if self.bbox.max_length < 2e-08:
             self.island.set_position(self.corners_co[0], self.island.calc_bbox().center)
         else:
+            width_a1 = self.corners_co[0]
+            width_a2 = self.corners_co[1]
+            width_b1 = self.corners[0][self.island.uv_layer].uv
+            width_b2 = self.corners[1][self.island.uv_layer].uv
+
+            height_a1 = self.corners_co[2]
+            height_a2 = self.corners_co[3]
+            height_b1 = self.corners[2][self.island.uv_layer].uv
+            height_b2 = self.corners[3][self.island.uv_layer].uv
+
+            width_old_vec = width_a1 - width_a2
+            width_new_vec = width_b1 - width_b2
+
+            height_old_vec = height_a1 - height_a2
+            height_new_vec = height_b1 - height_b2
+
+            # self.island.rotate_simple(min(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
+            # self.island.rotate_simple(max(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
+            self.island.rotate_simple(min(width_new_vec.angle_signed(width_old_vec), height_new_vec.angle_signed(height_old_vec)))
+
             if self.bbox.width > self.bbox.height:
-                a1 = self.corners_co[0]
-                a2 = self.corners_co[1]
-                b1 = self.corners[0][self.island.uv_layer].uv
-                b2 = self.corners[1][self.island.uv_layer].uv
+                scale = width_old_vec.length / width_new_vec.length
+                self.island.scale_simple(Vector((scale, scale)))
+
+                old_center = (width_a1 + width_a2) / 2
+                new_center = (width_b1 + width_b2) / 2
             else:
-                a1 = self.corners_co[2]
-                a2 = self.corners_co[3]
-                b1 = self.corners[2][self.island.uv_layer].uv
-                b2 = self.corners[3][self.island.uv_layer].uv
+                scale = height_old_vec.length / height_new_vec.length
+                self.island.scale_simple(Vector((scale, scale)))
 
-            old_vec = a1 - a2
-            new_vec = b1 - b2
-
-            angle = old_vec.angle_signed(new_vec)
-            self.island.rotate_simple(angle)
-
-            scale = old_vec.length / new_vec.length
-            self.island.scale_simple(Vector((scale, scale)))
-
-            old_center = (a1 + a2) / 2
-            new_center = (b1 + b2) / 2
+                old_center = (height_a1 + height_a2) / 2
+                new_center = (height_b1 + height_b2) / 2
             self.island.set_position(old_center, new_center)
-
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
