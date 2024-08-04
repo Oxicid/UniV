@@ -241,7 +241,7 @@ class UNIV_OT_SelectView(Operator):
         ('ADDITIONAL', 'Additional', ''),
         ('DESELECT', 'Deselect', ''),
     ))
-    face_mode = BoolProperty(name='Face Mode', default=False)
+    face_mode: BoolProperty(name='Face Mode', default=False)
 
     @classmethod
     def poll(cls, context):
