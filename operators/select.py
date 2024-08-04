@@ -30,7 +30,7 @@ from time import perf_counter as time
 from .. import utils
 from .. import info
 from .. import types
-from ..types import Islands, AdvIslands, AdvIsland,  MeshIslands  # , UnionIslands
+from ..types import Islands, AdvIslands, AdvIsland,  MeshIslands, BBox
 
 
 from ..utils import (
@@ -275,7 +275,7 @@ class UNIV_OT_SelectView(Operator):
         umeshes = utils.UMeshes(report=self.report)
         elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
-        view_rect = types.View2D.get_rect(context.area.regions[-1].view2d).copy()
+        view_rect = types.View2D.get_rect(context.area.regions[-1].view2d).copy()  # TODO: Replace
         # view_rect.xmax -= bpy.context.preferences.system.ui_scale  # category panel compensation
 
         padding = -(view_rect.min_length * 0.1)
@@ -451,6 +451,44 @@ class UNIV_OT_SelectView(Operator):
                 if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
                     umesh.bm.select_flush_mode()
                 umesh.update_tag = has_update
+
+class UNIV_OT_Select_By_Cursor(UNIV_OT_SelectView):
+    bl_idname = "uv.univ_select_by_cursor"
+    bl_label = "Select by Cursor"
+    bl_description = "Select by Cursor"
+
+    def execute(self, context):
+        if context.area.ui_type != 'UV':
+            self.report({'INFO'}, f"UV area not found")
+            return {'CANCELLED'}
+
+        sync = bpy.context.scene.tool_settings.use_uv_select_sync
+        umeshes = utils.UMeshes(report=self.report)
+        elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
+
+        tile_co = utils.get_tile_from_cursor()
+        view_rect = BBox.init_from_minmax(tile_co, tile_co+Vector((1, 1)))
+        view_rect.pad(Vector((-2e-08, -2e-08)))
+
+        view_island = AdvIsland([], None, None)  # noqa
+        view_island._bbox = view_rect
+        view_island.flat_coords = view_rect.draw_data_tris()
+
+        if sync and self.face_mode:
+            utils.set_select_mode_mesh('FACE')
+
+        args = (umeshes, elem_mode, self.face_mode, view_island, sync)
+
+        if self.mode == 'ADDITIONAL':
+            self._additional(*args)
+        elif self.mode == 'DESELECT':
+            self._deselect(*args)
+        else:
+            self._select(*args)
+
+        add_draw_rect(view_rect.draw_data_lines())
+
+        return umeshes.update()
 
 class UNIV_OT_Single(Operator):
     bl_idname = 'uv.univ_single'
