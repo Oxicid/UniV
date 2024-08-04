@@ -152,7 +152,7 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
-        split.operator('mesh.univ_cut', text='Cut')
+        split.operator('uv.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
 
 class UNIV_PT_General_VIEW_3D(Panel):

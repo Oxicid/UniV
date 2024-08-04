@@ -20,15 +20,21 @@ import math
 import bl_math
 
 from .. import utils
+from ..types import Islands
 
-
-class UNIV_OT_Cut(bpy.types.Operator):
-    bl_idname = "mesh.univ_cut"
+class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
+    bl_idname = "uv.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
     bl_options = {'REGISTER', 'UNDO'}
 
     addition: bpy.props.BoolProperty(name='Addition', default=True)
+    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED',
+                                   items=(
+                                          ('NONE', 'None', ''),
+                                          ('ANGLE_BASED', 'Angle Based', ''),
+                                          ('CONFORMAL', 'Conformal', '')
+                                      ))
 
     @classmethod
     def poll(cls, context):
@@ -37,6 +43,10 @@ class UNIV_OT_Cut(bpy.types.Operator):
         if context.active_object.mode != 'EDIT':
             return False
         return True
+
+    def draw(self, context):
+        self.layout.prop(self, 'addition')
+        self.layout.column(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -51,45 +61,19 @@ class UNIV_OT_Cut(bpy.types.Operator):
     def execute(self, context) -> set[str]:
         self.umeshes = utils.UMeshes(report=self.report)
 
-        if context.area.ui_type == 'UV':
-            if self.sync:
-                self.cut_view_2d_sync()
-            else:
-                self.cut_view_2d_no_sync()
+        if self.sync:
+            self.cut_view_2d_sync()
         else:
-            self.cut_view_3d()
+            self.cut_view_2d_no_sync()
+        if self.unwrap != 'NONE':
+            self.unwrap_after_unwrap()
         self.umeshes.update()
         return {'FINISHED'}
 
-    def cut_view_3d(self):
-        for umesh in self.umeshes:
-            if umesh.is_full_edge_deselected:
-                umesh.update_tag = False
-                continue
-            elif umesh.is_full_edge_selected:
-                for e in umesh.bm.edges:
-                    if not e.is_manifold:
-                        e.seam = True
-                    elif not self.addition:
-                        e.seam = False
-
-            for e in umesh.bm.edges:
-                if not e.select:
-                    continue
-                if not e.is_manifold:
-                    e.seam = True
-                    continue
-
-                sum_select_face = sum(f.select for f in e.link_faces)
-                if sum_select_face <= 1:
-                    e.seam = True
-                elif not self.addition:
-                    e.seam = False
-
     def cut_view_2d_sync(self):
-        for umesh in self.umeshes:
+        for umesh in reversed(self.umeshes):
             if umesh.is_full_edge_deselected:
-                umesh.update_tag = False
+                self.umeshes.umeshes.remove(umesh)
                 continue
 
             uv = umesh.uv_layer
@@ -122,7 +106,7 @@ class UNIV_OT_Cut(bpy.types.Operator):
     def cut_view_2d_no_sync(self):
         for umesh in self.umeshes:
             if umesh.is_full_face_deselected:
-                umesh.update_tag = False
+                self.umeshes.umeshes.remove(umesh)
                 continue
             umesh.tag_selected_faces()
 
@@ -141,6 +125,80 @@ class UNIV_OT_Cut(bpy.types.Operator):
                         crn.edge.seam = True
                     elif not self.addition:
                         crn.edge.seam = False
+
+    def unwrap_after_unwrap(self):
+        assert self.unwrap != 'NONE'
+
+        save_transform_islands = []
+        for umesh in self.umeshes:
+            islands = Islands.calc_selected_with_mark_seam(umesh)
+            for isl in islands:
+                if any(v.select for f in isl for v in f.verts):
+                    save_transform_islands.append(isl.save_transform())
+
+        if save_transform_islands:
+            bpy.ops.uv.unwrap(method=self.unwrap)
+            for isl in save_transform_islands:
+                isl.shift()
+                isl.inplace()
+
+
+class UNIV_OT_Cut_VIEW3D(bpy.types.Operator):
+    bl_idname = "mesh.univ_cut"
+    bl_label = "Cut"
+    bl_description = "Cut selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    addition: bpy.props.BoolProperty(name='Addition', default=True)
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.addition = event.shift
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = utils.sync()
+        self.umeshes: utils.UMeshes | None = None
+
+    def execute(self, context) -> set[str]:
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.cut_view_3d()
+        self.umeshes.update()
+        return {'FINISHED'}
+
+    def cut_view_3d(self):
+        for umesh in self.umeshes:
+            if umesh.is_full_edge_deselected:
+                umesh.update_tag = False
+                continue
+            elif umesh.is_full_edge_selected:
+                for e in umesh.bm.edges:
+                    if not e.is_manifold:
+                        e.seam = True
+                    elif not self.addition:
+                        e.seam = False
+
+            for e in umesh.bm.edges:
+                if not e.select:
+                    continue
+                if not e.is_manifold:
+                    e.seam = True
+                    continue
+
+                sum_select_face = sum(f.select for f in e.link_faces)
+                if sum_select_face <= 1:
+                    e.seam = True
+                elif not self.addition:
+                    e.seam = False
 
 class UNIV_OT_Angle(bpy.types.Operator):
     bl_idname = "mesh.univ_angle"

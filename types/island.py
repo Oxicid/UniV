@@ -29,7 +29,7 @@ from mathutils.geometry import area_tri
 from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
 
 from .. import utils
-from ..utils import umath, timer  # noqa
+from ..utils import umath, UMesh
 from .btypes import PyBMesh
 from . import btypes
 from. import BBox
@@ -64,6 +64,14 @@ class SaveTransform:
         self.bbox, self.corners = BBox.calc_bbox_with_corners(corners, island.uv_layer)
         self.corners_co: list[Vector] = [crn[uv].uv.copy() for crn in self.corners]
 
+    def shift(self):
+        sign_x = hash(self.bbox.width) % 2 == 0
+        sign_y = hash(self.bbox.width) % 2 == 0
+        x = self.bbox.width * 0.005
+        y = self.bbox.height * 0.005
+        for co in self.corners_co:
+            co += Vector((x if sign_x else -x, y if sign_y else -y))
+
     def inplace(self):
         if self.bbox.max_length < 2e-08:
             self.island.set_position(self.corners_co[0], self.island.calc_bbox().center)
@@ -84,9 +92,7 @@ class SaveTransform:
             height_old_vec = height_a1 - height_a2
             height_new_vec = height_b1 - height_b2
 
-            # self.island.rotate_simple(min(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
-            # self.island.rotate_simple(max(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
-            self.island.rotate_simple(min(width_new_vec.angle_signed(width_old_vec), height_new_vec.angle_signed(height_old_vec)))
+            self.island.rotate_simple(max(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
 
             if self.bbox.width > self.bbox.height:
                 scale = width_old_vec.length / width_new_vec.length
@@ -877,6 +883,14 @@ class Islands(IslandsBase):
         cls.tag_filter_selected(bm, uv_layer, sync)
         islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_selected_with_mark_seam(cls, umesh: UMesh):
+        if umesh.is_full_face_deselected:
+            return cls([], None, None)
+        cls.tag_filter_selected(umesh.bm, umesh.uv_layer, umesh.sync)
+        islands = [FaceIsland(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
     def calc_selected_quad(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):

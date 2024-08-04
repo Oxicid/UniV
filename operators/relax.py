@@ -77,11 +77,11 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
         for umesh in reversed(self.umeshes):
             if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
-                if not (selected_elem := utils.calc_selected_edges(umesh)):  # Need restore
+                if not (selected_elem := utils.calc_selected_edges(umesh)):
                     self.umeshes.umeshes.remove(umesh)
                     continue
             elif bpy.context.tool_settings.mesh_select_mode[0]:  # VERTEX
-                if not (selected_elem := utils.calc_selected_verts(umesh)):  # Need restore
+                if not (selected_elem := utils.calc_selected_verts(umesh)):
                     self.umeshes.umeshes.remove(umesh)
                     continue
             else:
@@ -133,9 +133,9 @@ class UNIV_OT_Relax(bpy.types.Operator):
             for crn in border_corners:
                 crn[uv].pin_uv = False
 
-            coords_before = [crn[uv].uv.copy() for crn in border_corners]  # Need restore
+            coords_before = [crn[uv].uv.copy() for crn in border_corners]
 
-            save_transform_islands = []   # Need restore
+            save_transform_islands = []
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
                     save_transform_islands.append(isl.save_transform())

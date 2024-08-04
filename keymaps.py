@@ -264,6 +264,15 @@ def add_keymaps():
     kmi.properties.quick_start = False
     keys.append((km, kmi))
 
+    # Cut
+    kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS')
+    kmi.properties.addition = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS', shift=True)
+    kmi.properties.addition = True
+    keys.append((km, kmi))
+
 def remove_keymaps():
     global keys
     import traceback

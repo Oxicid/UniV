@@ -91,7 +91,8 @@ classes = (
     ui.UNIV_PT_General,
     ui.UNIV_PT_General_VIEW_3D,
     # Seam
-    seam.UNIV_OT_Cut,
+    seam.UNIV_OT_Cut_VIEW2D,
+    seam.UNIV_OT_Cut_VIEW3D,
     seam.UNIV_OT_Angle,
 )
 
