@@ -19,7 +19,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (0, 6, 3),
+    "version": (0, 8, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -42,6 +42,7 @@ from .types import mesh_island  # noqa: F401
 from .operators import straight
 from .operators import quadrify
 from .operators import relax
+from .operators import unwrap
 from .operators import transform
 from .operators import toggle
 from .operators import select
@@ -71,6 +72,7 @@ classes = (
     quadrify.UNIV_OT_Quad,
     straight.UNIV_OT_Straight,
     relax.UNIV_OT_Relax,
+    unwrap.UNIV_OT_Unwrap,
     # Toggles
     toggle.UNIV_OT_SplitUVToggle,
     toggle.UNIV_OT_SyncUVToggle,

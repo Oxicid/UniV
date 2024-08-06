@@ -41,28 +41,32 @@ class eInfoSelectFaceIsland(enum.IntEnum):
     FULL_SELECTED = 2
 
 class SaveTransform:
-    def __init__(self, island: 'FaceIsland | AdvIsland'):
+    def __init__(self, island: 'FaceIsland | AdvIsland', fast=False):
         self.island = island
         uv = island.uv_layer
-        if utils.sync():
-            if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
-                corners = [crn for f in island if not f.select for crn in f.loops]
-            elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
-                corners = [crn for f in island for crn in f.loops if not crn.edge.select]
-            else:  # VERTS
-                corners = [crn for f in island for crn in f.loops if not crn.vert.select]
-        else:
-            corners = [crn for f in island for crn in f.loops if not crn[uv].select]
+        if not fast:
+            if utils.sync():
+                if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
+                    corners = [crn for f in island if not f.select for crn in f.loops]
+                elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+                    corners = [crn for f in island for crn in f.loops if not crn.edge.select]
+                else:  # VERTS
+                    corners = [crn for f in island for crn in f.loops if not crn.vert.select]
+            else:
+                corners = [crn for f in island for crn in f.loops if not crn[uv].select]
 
-        if not corners:
-            corners = [crn for f in island for crn in f.loops]
-        else:
-            first = corners[0]
-            if all(first == _crn for _crn in corners):
+            if not corners:
                 corners = [crn for f in island for crn in f.loops]
+            else:
+                first = corners[0]
+                if all(first == _crn for _crn in corners):
+                    corners = [crn for f in island for crn in f.loops]
+        else:
+            corners = [crn for f in island for crn in f.loops]
 
         self.bbox, self.corners = BBox.calc_bbox_with_corners(corners, island.uv_layer)
         self.corners_co: list[Vector] = [crn[uv].uv.copy() for crn in self.corners]
+        self.old_crn_pos = []
 
     def shift(self):
         sign_x = hash(self.bbox.width) % 2 == 0
@@ -107,6 +111,23 @@ class SaveTransform:
                 old_center = (height_a1 + height_a2) / 2
                 new_center = (height_b1 + height_b2) / 2
             self.island.set_position(old_center, new_center)
+
+    def save_coords(self, axis):
+        uv = self.island.uv_layer
+        if axis == 'Y':
+            self.old_crn_pos = [crn[uv].uv.x for f in self.island for crn in f.loops]
+        else:
+            self.old_crn_pos = [crn[uv].uv.y for f in self.island for crn in f.loops]
+
+    def apply_saved_coords(self, axis):
+        uv = self.island.uv_layer
+        corners = [crn[uv].uv for f in self.island for crn in f.loops]
+        if axis == 'Y':
+            for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                crn_uv.x = old_co
+        else:
+            for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                crn_uv.y = old_co
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
@@ -921,11 +942,23 @@ class Islands(IslandsBase):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
-        if PyBMesh.is_full_face_selected(bm) and sync:
+        if sync and PyBMesh.is_full_face_selected(bm):
             islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         else:
             islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer) if cls.island_filter_is_any_face_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_extended_with_mark_seam(cls, umesh: UMesh):
+        if umesh.is_full_face_deselected:
+            return cls([], None, None)
+        cls.tag_filter_visible(umesh.bm, umesh.sync)
+        if umesh.sync and umesh.is_full_face_deselected:
+            islands = [FaceIsland(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)]
+        else:
+            islands = [FaceIsland(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)
+                       if cls.island_filter_is_any_face_selected(i, umesh.uv_layer, umesh.sync)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
     def calc_extended_any_elem(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
@@ -951,6 +984,31 @@ class Islands(IslandsBase):
             islands = [FaceIsland(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)
                        if cls.island_filter_is_any_elem_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
+
+    @classmethod
+    def calc_extended_any_elem_with_mark_seam(cls, umesh: UMesh):
+        if umesh.sync:
+            elem_mode = utils.get_select_mode_mesh()
+            if elem_mode == 'FACE':
+                if umesh.is_full_face_deselected:
+                    return cls([], None, None)
+            elif elem_mode == 'VERTEX':
+                if umesh.is_full_vert_deselected:
+                    return cls([], None, None)
+            else:
+                if umesh.is_full_edge_deselected:
+                    return cls([], None, None)
+        else:
+            if umesh.is_full_face_deselected:
+                return cls([], None, None)
+
+        cls.tag_filter_visible(umesh.bm, umesh.sync)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [FaceIsland(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)]
+        else:
+            islands = [FaceIsland(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)
+                       if cls.island_filter_is_any_elem_selected(i, umesh.uv_layer, umesh.sync)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
     def calc_extended_any_elem_non_manifold(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
@@ -1118,6 +1176,9 @@ class Islands(IslandsBase):
             isl_a.faces.extend(isl_b.faces)
             isl_b.clear()
         return welded
+
+    def faces_iter(self):
+        return (f for isl in self for f in isl)
 
     def __iter__(self) -> typing.Iterator['FaceIsland | AdvIsland']:
         return iter(self.islands)
