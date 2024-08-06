@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import bmesh
@@ -66,7 +52,7 @@ class SaveTransform:
 
         self.bbox, self.corners = BBox.calc_bbox_with_corners(corners, island.uv_layer)
         self.corners_co: list[Vector] = [crn[uv].uv.copy() for crn in self.corners]
-        self.old_crn_pos = []
+        self.old_crn_pos: list[Vector | float] = []
 
     def shift(self):
         sign_x = hash(self.bbox.width) % 2 == 0
@@ -112,22 +98,44 @@ class SaveTransform:
                 new_center = (height_b1 + height_b2) / 2
             self.island.set_position(old_center, new_center)
 
-    def save_coords(self, axis):
+    def save_coords(self, axis, mix):
+        if mix == 1:
+            return
         uv = self.island.uv_layer
-        if axis == 'Y':
+        if axis == 'X':
             self.old_crn_pos = [crn[uv].uv.x for f in self.island for crn in f.loops]
-        else:
+        elif axis == 'Y':
             self.old_crn_pos = [crn[uv].uv.y for f in self.island for crn in f.loops]
+        else:
+            self.old_crn_pos = [crn[uv].uv.copy() for f in self.island for crn in f.loops]
 
-    def apply_saved_coords(self, axis):
+    def apply_saved_coords(self, axis, mix):
+        if mix == 1:
+            return
         uv = self.island.uv_layer
         corners = [crn[uv].uv for f in self.island for crn in f.loops]
-        if axis == 'Y':
-            for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                crn_uv.x = old_co
+        if mix == 0:
+            if axis == 'X':
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.x = old_co
+            elif axis == 'Y':
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.y = old_co
+            else:
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.xy = old_co
         else:
-            for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                crn_uv.y = old_co
+            from bl_math import lerp
+            if axis == 'X':
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.x = lerp(old_co, crn_uv.x, mix)
+            elif axis == 'Y':
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.y = lerp(old_co, crn_uv.y, mix)
+            else:
+                from ..utils import vec_lerp
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv[:] = vec_lerp(old_co, crn_uv, mix)
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):

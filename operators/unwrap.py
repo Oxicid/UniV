@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 
@@ -35,6 +21,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=(('ANGLE_BASED', 'Angle Based', ''), ('CONFORMAL', 'Conformal', '')))
     axis: bpy.props.EnumProperty(name='Axis', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
 
     @classmethod
     def poll(cls, context):
@@ -45,8 +32,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return True
 
     def draw(self, context):
-        self.layout.column(align=True).prop(self, 'unwrap', expand=True)
+        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
         self.layout.row(align=True).prop(self, 'axis', expand=True)
+        self.layout.prop(self, 'blend_factor', slider=True)
 
     def invoke(self, context, event):
         return self.execute(context)
@@ -123,8 +111,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
                     save_t = isl.save_transform()
-                    if self.axis != 'BOTH':
-                        save_t.save_coords(self.axis)
+                    save_t.save_coords(self.axis, self.blend_factor)
                     save_transform_islands.append(save_t)
 
             pin_and_inplace.append((unpin_uvs, save_transform_islands))
@@ -137,7 +124,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 pin.pin_uv = False
             for isl in ud.islands:
                 isl.inplace()
-                isl.apply_saved_coords(self.axis)
+                isl.apply_saved_coords(self.axis, self.blend_factor)
             for v in ud.temp_selected:
                 v.select = False
 
@@ -165,8 +152,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands_extended:
                 isl.mark_seam(additional=True)
                 save_t = isl.save_transform()
-                if self.axis != 'BOTH':
-                    save_t.save_coords(self.axis)
+                save_t.save_coords(self.axis, self.blend_factor)
                 save_transform_islands.append(save_t)
 
             pinned = []
@@ -225,7 +211,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 f.select = False
             for isl in islands:
                 isl.inplace()
-                isl.apply_saved_coords(self.axis)
+                isl.apply_saved_coords(self.axis, self.blend_factor)
 
     def unwrap_non_sync(self):
         save_transform_islands = []
@@ -242,12 +228,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             for isl in islands:
                 save_t = isl.save_transform()
-                if self.axis != 'BOTH':
-                    save_t.save_coords(self.axis)
+                save_t.save_coords(self.axis, self.blend_factor)
                 save_transform_islands.append(save_t)
 
         bpy.ops.uv.unwrap(method=self.unwrap)
 
         for isl in save_transform_islands:
             isl.inplace()
-            isl.apply_saved_coords(self.axis)
+            isl.apply_saved_coords(self.axis, self.blend_factor)
