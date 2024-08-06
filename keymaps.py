@@ -31,21 +31,24 @@ def add_keymaps():
 
     km = kc.keymaps.new(name='Window')
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
-    kmi.active = True
     kmi.properties.mode = 'SPLIT'
+    kmi.active = False
     keys.append((km, kmi))
     #
     km = kc.keymaps.new(name='UV Editor')
 
     kmi = km.keymap_items.new('uv.univ_sync_uv_toggle', 'ACCENT_GRAVE', 'PRESS')
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = False
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = True
+    kmi.active = False
     keys.append((km, kmi))
 
     # Rotate
@@ -53,41 +56,48 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_rotate', 'R', 'DOUBLE_CLICK')  # Work if not selection.
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'DEFAULT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'DEFAULT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Default. CCW.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'DEFAULT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Default. CW. By Cursor.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True)
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'BY_CURSOR'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Default. CCW. By Cursor.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'BY_CURSOR'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Default. CW. Individual.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True)
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'INDIVIDUAL'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Default. CCW. Individual.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True, alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'INDIVIDUAL'
+    kmi.active = False
     keys.append((km, kmi))
 
     # Align operator
@@ -95,182 +105,217 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS')
     kmi.properties.mode = 'ALIGN'
     kmi.properties.direction = 'UPPER'
-    kmi.active = True
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS')
     kmi.properties.mode = 'ALIGN'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS')
     kmi.properties.mode = 'ALIGN'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS')
     kmi.properties.mode = 'ALIGN'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Move
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', shift=True)
     kmi.properties.mode = 'MOVE'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', shift=True)
     kmi.properties.mode = 'MOVE'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', shift=True)
     kmi.properties.mode = 'MOVE'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', shift=True)
     kmi.properties.mode = 'MOVE'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Align Cursor
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', alt=True)
     kmi.properties.mode = 'ALIGN_CURSOR'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', alt=True)
     kmi.properties.mode = 'ALIGN_CURSOR'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', alt=True)
     kmi.properties.mode = 'ALIGN_CURSOR'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', alt=True)
     kmi.properties.mode = 'ALIGN_CURSOR'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Align to Cursor
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', ctrl=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', ctrl=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', ctrl=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', ctrl=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Align to Cursor Union
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', ctrl=True, shift=True, alt=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR_UNION'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', ctrl=True, shift=True, alt=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR_UNION'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', ctrl=True, shift=True, alt=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR_UNION'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', ctrl=True, shift=True, alt=True)
     kmi.properties.mode = 'ALIGN_TO_CURSOR_UNION'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Move Cursor
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', shift=True, alt=True)
     kmi.properties.mode = 'MOVE_CURSOR'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', shift=True, alt=True)
     kmi.properties.mode = 'MOVE_CURSOR'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', shift=True, alt=True)
     kmi.properties.mode = 'MOVE_CURSOR'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', shift=True, alt=True)
     kmi.properties.mode = 'MOVE_CURSOR'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     ## Cursor to Tile
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', ctrl=True, alt=True)
     kmi.properties.mode = 'CURSOR_TO_TILE'
     kmi.properties.direction = 'UPPER'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', ctrl=True, alt=True)
     kmi.properties.mode = 'CURSOR_TO_TILE'
     kmi.properties.direction = 'BOTTOM'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', ctrl=True, alt=True)
     kmi.properties.mode = 'CURSOR_TO_TILE'
     kmi.properties.direction = 'RIGHT'
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', ctrl=True, alt=True)
     kmi.properties.mode = 'CURSOR_TO_TILE'
     kmi.properties.direction = 'LEFT'
+    kmi.active = False
     keys.append((km, kmi))
 
     # Quad
     kmi = km.keymap_items.new('uv.univ_quad', 'E', 'PRESS')
+    kmi.active = False
     keys.append((km, kmi))
 
     # Straight
     kmi = km.keymap_items.new('uv.univ_straight', 'E', 'PRESS', shift=True)
+    kmi.active = False
     keys.append((km, kmi))
 
     # Weld
     kmi = km.keymap_items.new('uv.univ_weld', 'W', 'PRESS')
+    kmi.active = False
     keys.append((km, kmi))
 
     # Stitch
     kmi = km.keymap_items.new('uv.univ_stitch', 'W', 'PRESS', shift=True)
+    kmi.active = False
     keys.append((km, kmi))
 
     # Quick Snap
     kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS')
     kmi.properties.quick_start = True
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS', alt=True)
     kmi.properties.quick_start = False
+    kmi.active = False
     keys.append((km, kmi))
 
     # Cut
     kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS')
     kmi.properties.addition = False
+    kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS', shift=True)
     kmi.properties.addition = True
+    kmi.active = False
     keys.append((km, kmi))
 
 def remove_keymaps():

@@ -58,6 +58,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         default='FOLLOW_MODE',
         description='Default Snap Points for QuickSnap')
 
+    show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
+
     def draw(self, context):
         layout = self.layout
 
@@ -68,7 +70,9 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, "debug")
             layout.separator()
             layout.label(text='QuickSnap:')
-            layout.prop(self, "quick_snap_points_default")
+            layout.prop(self, 'snap_points_default')
+            layout.separator()
+            layout.prop(self, 'show_split_toggle_uv_button')
 
         if self.tab == 'KEYMAPS':
             row = layout.row()

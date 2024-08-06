@@ -20,7 +20,7 @@ import traceback
 
 from .. import info
 from .. import utils
-from ..preferences import force_debug
+from ..preferences import force_debug, prefs
 from ..types import ARegion, PyBMesh
 
 from bpy.props import *
@@ -388,10 +388,12 @@ class UNIV_OT_SyncUVToggle(Operator):
 
 
 def univ_header_sync_btn(self, context):
-    if context.mode == 'EDIT_MESH':
-        layout = self.layout
-        layout.operator('uv.univ_sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
+    if prefs().show_split_toggle_uv_button:
+        if context.mode == 'EDIT_MESH':
+            layout = self.layout
+            layout.operator('uv.univ_sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
 
 def univ_header_split_btn(self, _context):
-    layout = self.layout
-    layout.operator('wm.univ_split_uv_toggle', text='', icon='SCREEN_BACK')
+    if prefs().show_split_toggle_uv_button:
+        layout = self.layout
+        layout.operator('wm.univ_split_uv_toggle', text='', icon='SCREEN_BACK')
