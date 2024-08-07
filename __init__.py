@@ -55,7 +55,7 @@ classes = (
     transform.UNIV_OT_Weld,
     transform.UNIV_OT_Stitch,
     # Quadrify
-    quadrify.UNIV_OT_Quad,
+    quadrify.UNIV_OT_Quadrify,
     straight.UNIV_OT_Straight,
     relax.UNIV_OT_Relax,
     unwrap.UNIV_OT_Unwrap,

@@ -1,35 +1,22 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+# The code was taken and modified from the UvSquares addon: https://github.com/Radivarig/UvSquares/blob/master/uv_squares.py
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-
-# # The code was taken and modified from the UvSquares addon: https://github.com/Radivarig/UvSquares/blob/master/uv_squares.py
 import bpy
 
 from math import hypot
 from mathutils import Vector
 from collections import defaultdict
 from bmesh.types import BMLoopUV
+from mathutils.geometry import area_tri
 
 from .. import utils
 from ..types import Islands, FaceIsland
 
-
-class UNIV_OT_Quad(bpy.types.Operator):
-    bl_idname = "uv.univ_quad"
-    bl_label = "Quad"
+class UNIV_OT_Quadrify(bpy.types.Operator):
+    bl_idname = "uv.univ_quadrify"
+    bl_label = "Quadrify"
     bl_description = "Align selected UV to rectangular distribution"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -57,8 +44,18 @@ class UNIV_OT_Quad(bpy.types.Operator):
 
 def quad(umesh, island):
     co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(island)
+    uv = island.uv_layer
 
-    target_face = island[0]
+    def max_quad_uv_face_area(f):
+        f_loops = f.loops
+        l1 = f_loops[0][uv].uv
+        l2 = f_loops[1][uv].uv
+        l3 = f_loops[2][uv].uv
+        l4 = f_loops[3][uv].uv
+
+        return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
+
+    target_face = max(island, key=max_quad_uv_face_area)
     shape_face(island.uv_layer, target_face, co_and_linked_uv_corners)
     follow_active_uv(umesh, target_face, island)
 
@@ -300,7 +297,7 @@ def follow_active_uv(umesh, f_act, faces):
 
     for f in faces:
         # we know it's a quad
-        l_quad = f.loops[:]
+        l_quad = f.loops
         l_pair_a = (l_quad[0], l_quad[2])
         l_pair_b = (l_quad[1], l_quad[3])
 
@@ -328,7 +325,7 @@ def follow_active_uv(umesh, f_act, faces):
 def image_ratio():
     ratio = 256, 256
     area = bpy.context.area
-    if area.type == 'IMAGE_EDITOR':
+    if area and area.type == 'IMAGE_EDITOR':
         img = area.spaces[0].image
         if img and img.size[0] != 0:
             ratio = img.size
