@@ -261,8 +261,13 @@ class UNIV_OT_SelectView(Operator):
         umeshes = utils.UMeshes(report=self.report)
         elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
-        view_rect = types.View2D.get_rect(context.area.regions[-1].view2d).copy()  # TODO: Replace
-        # view_rect.xmax -= bpy.context.preferences.system.ui_scale  # category panel compensation
+        reg = context.area.regions[-1]
+        assert reg.type == 'WINDOW'
+
+        view_rect = BBox.init_from_minmax(
+            Vector(reg.view2d.region_to_view(reg.x, reg.y)),
+            Vector(reg.view2d.region_to_view(reg.x + reg.width, reg.y + reg.height))
+        )
 
         padding = -(view_rect.min_length * 0.1)
         view_rect.pad(Vector((padding, padding)))
