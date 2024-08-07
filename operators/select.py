@@ -1,30 +1,16 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import gpu
 import math
-import gpu_extras
 
 from mathutils import Vector
 from mathutils.geometry import area_tri
 from bpy.props import *
 from bpy.types import Operator
 from bmesh.types import BMLoop, BMLayerItem
+from gpu_extras.batch import batch_for_shader
 from time import perf_counter as time
 
 from .. import utils
@@ -83,7 +69,7 @@ def add_draw_rect(data):
     start = time()
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
 
-    batch = gpu_extras.batch.batch_for_shader(shader, 'LINES', {"pos": data})
+    batch = batch_for_shader(shader, 'LINES', {"pos": data})
 
     if not (uv_handle is None):
         bpy.types.SpaceImageEditor.draw_handler_remove(uv_handle, 'WINDOW')

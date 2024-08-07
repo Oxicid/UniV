@@ -1,33 +1,20 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import gpu
 import blf
 import enum
 import typing
-import gpu_extras
+from gpu_extras.batch import batch_for_shader
+
 from math import inf
 from bmesh.types import BMFace, BMLoop
 
 from ..preferences import debug, prefs
 from ..types import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup
 from .. import utils
-from ..utils import UMeshes
+from ..utils import UMeshes, blf_size
 from mathutils import Vector
 
 
@@ -90,7 +77,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             self.report({'INFO'}, 'Area must be UV')
             return {'CANCELLED'}
         self.view = context.region.view2d
-        self.shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+        self.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
         self.refresh_draw_points()
         self.register_draw()
 
@@ -682,18 +669,29 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
     def univ_quick_snap_draw_callback(self):
         if bpy.context.area.ui_type != 'UV':
             return
-        gpu.state.blend_set('ALPHA')
-        gpu.state.point_size_set(4)
+
+        if bpy.app.version < (3, 5, 0):
+            import bgl
+            bgl.glLineWidth(4)
+            bgl.glEnable(bgl.GL_BLEND)
+        else:
+            gpu.state.point_size_set(4)
+            gpu.state.blend_set('ALPHA')
+
         self.shader.bind()
         self.shader.uniform_float("color", (1, 1, 0, 0.5))
         self.batch.draw(self.shader)
 
-        batch_nearest = gpu_extras.batch.batch_for_shader(self.shader, 'POINTS', {"pos": self.nearest_point})
+        batch_nearest = batch_for_shader(self.shader, 'POINTS', {"pos": self.nearest_point})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)
 
         self.area.tag_redraw()
-        gpu.state.blend_set('NONE')
+
+        if bpy.app.version < (3, 5, 0):
+            bgl.glDisable(bgl.GL_BLEND)  # noqa
+        else:
+            gpu.state.blend_set('NONE')
 
     def univ_quick_snap_ui_draw_callback(self):
         area = bpy.context.area
@@ -710,37 +708,45 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         gpu.state.blend_set('ALPHA')
 
         font_id = 0
-        blf.size(font_id, 16)
+        blf_size(font_id, 16)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
 
         text_y_size = blf.dimensions(0, 'T')[1]
         text_y_size *= 1.75
 
         blf.position(font_id, first_col, 20, 0)
+        blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, 'Tab')
         blf.position(font_id, second_col, 20, 0)
+        blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, 'Island Mode' if self.island_mode else 'Element Mode')
 
         blf.position(font_id, first_col, 20 + text_y_size, 0)
+        blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, 'X, Y')
         blf.position(font_id, second_col, 20 + text_y_size, 0)
+        blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, f"Axis: {self.axis if self.axis else 'Both'}")
 
         blf.position(font_id, first_col, 20 + text_y_size*2, 0)
+        blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, 'G')
         blf.position(font_id, second_col, 20 + text_y_size*2, 0)
+        blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, f"Grid: {'Enabled' if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute else 'Disabled'}")
 
         text = str(self.snap_points_mode).split('.')[1] if self.snap_points_mode else 'NONE'
         blf.position(font_id, first_col, 20 + text_y_size*3, 0)
+        blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, '(Shift) 1-4')
         blf.position(font_id, second_col, 20 + text_y_size*3, 0)
+        blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, text)
 
         gpu.state.blend_set('NONE')
 
     def refresh_draw_points(self):
-        self.batch = gpu_extras.batch.batch_for_shader(self.shader, 'POINTS', {"pos": self.points})
+        self.batch = batch_for_shader(self.shader, 'POINTS', {"pos": self.points})
 
     def exit(self):
         if self._cancel:
