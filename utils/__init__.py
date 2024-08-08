@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import typing  # noqa
 import math  # noqa
@@ -78,7 +64,7 @@ class UMesh:
 
     @property
     def is_full_face_deselected(self):
-        return PyBMesh.is_full_face_deselected(self.bm)
+        return PyBMesh.fields(self.bm).totfacesel == 0
 
     @property
     def is_full_edge_selected(self):
@@ -321,6 +307,14 @@ class UMesh:
         for f in self.bm.faces:
             f.tag = state
 
+    def calc_selected_faces(self) -> list[BMFace] or bmesh.types.BMFaceSeq:
+        if self.is_full_face_deselected:
+            return []
+
+        if self.is_full_face_selected:
+            return self.bm.faces
+        return [f for f in self.bm.faces if f.select]
+
     def __del__(self):
         if not self.is_edit_bm:
             self.bm.free()
@@ -436,6 +430,32 @@ class UMeshes:
                 bm.from_mesh(data)
                 bmeshes.append(UMesh(bm, objs[0], False))
         self.umeshes = bmeshes
+
+    @classmethod
+    def calc(cls):
+        bmeshes = []
+        if bpy.context.mode == 'EDIT_MESH':
+            for obj in bpy.context.objects_in_mode_unique_data:
+                if obj.type == 'MESH':
+                    bm = bmesh.from_edit_mesh(obj.data)
+                    bmeshes.append(UMesh(bm, obj))
+        else:
+            data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+
+            for obj in bpy.context.selected_objects:
+                if obj.type == 'MESH':
+                    data_and_objects[obj.data].append(obj)
+
+            for data, objs in data_and_objects.items():
+                bm = bmesh.new()
+                bm.from_mesh(data)
+                bmeshes.append(UMesh(bm, objs[0], False))
+        return cls(bmeshes)
+
+    def filter_selected_faces(self):
+        for umesh in reversed(self.umeshes):
+            if umesh.is_full_face_deselected:
+                self.umeshes.remove(umesh)
 
     def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)

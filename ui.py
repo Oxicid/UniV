@@ -158,3 +158,5 @@ class UNIV_PT_General_VIEW_3D(Panel):
         split = col_align.split(align=True)
         split.operator('mesh.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
+
+        self.layout.operator('mesh.univ_n_project', text='NProject')

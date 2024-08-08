@@ -34,6 +34,7 @@ from .operators import toggle
 from .operators import select
 from .operators import seam
 from .operators import quick_snap
+from .operators import project
 from . import ui
 from . import keymaps
 from . import preferences
@@ -82,6 +83,8 @@ classes = (
     seam.UNIV_OT_Cut_VIEW2D,
     seam.UNIV_OT_Cut_VIEW3D,
     seam.UNIV_OT_Angle,
+    # Project
+    project.UNIV_NProject,
 )
 
 is_enabled = False
