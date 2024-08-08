@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import math
@@ -1949,7 +1935,7 @@ class UNIV_OT_Orient(Operator):
                         island_edges = {edge for face in pre_calc_faces for edge in face.edges}
                         island_loops = {loop for face in pre_calc_faces for loop in face.loops}
                         for edge in island_edges:
-                            if len({loop[umesh.uv_layers].uv.copy().freeze() for vert in edge.verts for loop in vert.link_loops if loop in island_loops}) == 2:
+                            if len({loop[umesh.uv_layer].uv.copy().freeze() for vert in edge.verts for loop in vert.link_loops if loop in island_loops}) == 2:
                                 calc_edges.add(edge)
                                 for loop in edge.link_loops:
                                     if loop in island_loops:
@@ -1991,7 +1977,7 @@ class UNIV_OT_Orient(Operator):
     def calc_world_orient_angle(island, loops, x=0, y=1, flip_x=False, flip_y=False):
         n_edges = 0
         avg_angle = 0
-        uv_layers = island.uv_layer
+        uv = island.uv_layer
         for loop in loops:
             co0 = loop.vert.co
             co1 = loop.link_loop_next.vert.co
@@ -2001,8 +1987,8 @@ class UNIV_OT_Orient(Operator):
             # Check edges dominant in active axis
             if abs(delta[x]) == max_side or abs(delta[y]) == max_side:
                 n_edges += 1
-                uv0 = loop[uv_layers].uv
-                uv1 = loop.link_loop_next[uv_layers].uv
+                uv0 = loop[uv].uv
+                uv1 = loop.link_loop_next[uv].uv
 
                 delta_verts = Vector((0, 0))
                 if not flip_x:
