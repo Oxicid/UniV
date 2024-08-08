@@ -208,7 +208,7 @@ class UNIV_OT_SelectLinked(Operator):
             if islands := Islands.calc_visible(umesh.bm, umesh.uv_layer, sync):
                 for island in islands:
                     if update_state := (island.info_select(sync) == types.eInfoSelectFaceIsland.HALF_SELECTED):
-                        island.deselect(mode=mode, sync=sync)
+                        island.deselect_set(mode=mode, sync=sync)
                     is_update |= update_state
             umesh.update_tag = is_update
 
