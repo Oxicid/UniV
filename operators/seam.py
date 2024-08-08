@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import math
@@ -209,10 +195,11 @@ class UNIV_OT_Angle(bpy.types.Operator):
     selected: bpy.props.BoolProperty(name='Selected', default=False)
     addition: bpy.props.BoolProperty(name='Addition', default=True)
     borders: bpy.props.BoolProperty(name='Borders', default=False)
-    obj_smooth: bpy.props.BoolProperty(name='Obj Smooth', default=True)
     mtl: bpy.props.BoolProperty(name='Mtl', default=True)
+    by_weight: bpy.props.BoolProperty(name='By Weight', default=True)
     by_sharps: bpy.props.BoolProperty(name='By Sharps', default=True)
-    mark_sharps: bpy.props.BoolProperty(name='Mark Sharps', default=True)
+    seams_to_sharps: bpy.props.BoolProperty(name='Seams to Sharps', default=True)
+    obj_smooth: bpy.props.BoolProperty(name='Auto Smooth', default=True)
     angle: bpy.props.FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     @classmethod
@@ -227,10 +214,13 @@ class UNIV_OT_Angle(bpy.types.Operator):
         layout = self.layout
         layout.prop(self, 'selected')
         layout.prop(self, 'addition')
+        layout.separator()
         layout.prop(self, 'borders')
+        layout.separator()
         layout.prop(self, 'mtl')
+        layout.prop(self, 'by_weight')
         layout.prop(self, 'by_sharps')
-        layout.prop(self, 'mark_sharps')
+        layout.prop(self, 'seams_to_sharps')
         layout.prop(self, 'obj_smooth')
         layout.prop(self, 'angle', slider=True)
 
@@ -263,6 +253,9 @@ class UNIV_OT_Angle(bpy.types.Operator):
             else:
                 angle = self.angle
 
+            bevel_weight_key = umesh.bm.edges.layers.bevel_weight.active
+            check_weights = self.by_weight and bevel_weight_key
+
             if umesh.is_full_face_selected:
                 faces = (_f for _f in umesh.bm.faces)
             elif self.selected:
@@ -272,23 +265,26 @@ class UNIV_OT_Angle(bpy.types.Operator):
 
             for f in faces:
                 for crn in f.loops:
-                    if not crn.edge.is_manifold:  # boundary
-                        if self.borders or len(crn.edge.link_faces) > 2:
-                            crn.edge.seam = True
+                    crn_edge = crn.edge
+                    if not crn_edge.is_manifold:  # boundary
+                        if self.borders or len(crn_edge.link_faces) > 2:
+                            crn_edge.seam = True
                         elif not self.addition:
-                            crn.edge.seam = False
-                    elif crn.edge.calc_face_angle() >= angle:  # Skip by angle
-                        crn.edge.seam = True
-                        if self.mark_sharps:
-                            crn.edge.smooth = False
+                            crn_edge.seam = False
+                    elif crn_edge.calc_face_angle() >= angle:  # Skip by angle
+                        crn_edge.seam = True
+                        if self.seams_to_sharps:
+                            crn_edge.smooth = False
                     elif self.borders and crn.link_loop_radial_prev.face.hide:
-                        crn.edge.seam = True
-                    elif self.by_sharps and not crn.edge.smooth:
-                        crn.edge.seam = True
+                        crn_edge.seam = True
+                    elif self.by_sharps and not crn_edge.smooth:
+                        crn_edge.seam = True
                     elif self.mtl and crn.face.material_index != crn.link_loop_radial_prev.face.material_index:
-                        crn.edge.seam = True
+                        crn_edge.seam = True
+                    elif check_weights and crn_edge[bevel_weight_key]:
+                        crn_edge.seam = True
                     elif not self.addition:
-                        crn.edge.seam = False
+                        crn_edge.seam = False
 
         self.umeshes.update()
         return {'FINISHED'}
