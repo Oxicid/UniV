@@ -12,8 +12,7 @@ class UNIV_PT_General(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
-        box = layout.box()
-        col = box.column(align=True)
+        col = layout.column(align=True)
 
         split = col.split(factor=0.65, align=True)
         split.operator('uv.univ_crop', text='Crop').axis = 'XY'
@@ -151,8 +150,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
-        box = layout.box()
-        col = box.column(align=True)
+        col = layout.column(align=True)
 
         col_align = col.column(align=True)
         split = col_align.split(align=True)
