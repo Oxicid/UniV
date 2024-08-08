@@ -432,7 +432,7 @@ class UMeshes:
         self.umeshes = bmeshes
 
     @classmethod
-    def calc(cls):
+    def calc(cls, report=None):
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
@@ -450,7 +450,7 @@ class UMeshes:
                 bm = bmesh.new()
                 bm.from_mesh(data)
                 bmeshes.append(UMesh(bm, objs[0], False))
-        return cls(bmeshes)
+        return cls(bmeshes, report=report)
 
     def filter_selected_faces(self):
         for umesh in reversed(self.umeshes):

@@ -4,6 +4,7 @@
 import bpy
 import math
 
+from math import pi
 from .transform import UNIV_OT_Crop
 from .. import utils
 from ..types import AdvIslands, AdvIsland, BBox
@@ -32,7 +33,7 @@ class UNIV_NProject(bpy.types.Operator):
         self.islands_of_mesh: list[AdvIslands] = []  # TODO: Replace to FaceIsland after refactor
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes.calc()
+        self.umeshes = utils.UMeshes.calc(self.report)
         self.umeshes.filter_selected_faces()
         self.islands_of_mesh = []
         self.xyz_to_uv()
@@ -126,3 +127,66 @@ class UNIV_NProject(bpy.types.Operator):
         eul.y = theta_y
 
         return eul.to_matrix().to_4x4()
+
+class UNIV_BoxProject(bpy.types.Operator):
+    bl_idname = "mesh.univ_box_project"
+    bl_label = "Project by Normal"
+    bl_description = "Box Projection by faces normal"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    scale: bpy.props.FloatProperty(name='Scale', default=1, soft_min=0.5, soft_max=2)
+    scale_individual: bpy.props.FloatVectorProperty(name='Scale Individual', default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2)
+    rotation: bpy.props.FloatVectorProperty(name='Rotate', subtype='EULER', soft_min=-pi, soft_max=pi)
+    move: bpy.props.FloatVectorProperty(name='Move', subtype='XYZ')
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+        return True
+
+    def draw(self, context):
+        self.layout.prop(self, 'scale', slider=True)
+        self.layout.column(align=True).prop(self, 'scale_individual', expand=True, slider=True)
+        self.layout.column(align=True).prop(self, 'rotation', expand=True, slider=True)
+        self.layout.row(align=True).prop(self, 'move', expand=True)
+
+    def __init__(self):
+        self.umeshes: utils.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = utils.UMeshes.calc(self.report)
+        self.umeshes.filter_selected_faces()
+        self.box()
+        return self.umeshes.update(info='Not selected face')
+
+    def box(self):
+        for umesh in self.umeshes:
+            uv = umesh.uv_layer
+            move = Vector(self.move) * -1
+            scale = Vector(self.scale_individual)*self.scale
+
+            mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
+            mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
+            mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
+
+            mtx_x = umesh.obj.matrix_world @ mtx_from_prop_x
+            mtx_y = umesh.obj.matrix_world @ mtx_from_prop_y
+            mtx_z = umesh.obj.matrix_world @ mtx_from_prop_z
+
+            _, r, _ = umesh.obj.matrix_world.decompose()
+            selected_faces_iter = (f for f in umesh.bm.faces if f.select)
+            for f, _ in zip(selected_faces_iter, range(umesh.total_face_sel)):
+                n = f.normal.copy()
+                n.rotate(r)
+                if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_x @ crn.vert.co).yz
+                elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):  # Y
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_y @ crn.vert.co).xz
+                else:  # Z
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()

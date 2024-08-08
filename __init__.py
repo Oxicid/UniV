@@ -85,6 +85,7 @@ classes = (
     seam.UNIV_OT_Angle,
     # Project
     project.UNIV_NProject,
+    project.UNIV_BoxProject,
 )
 
 is_enabled = False
