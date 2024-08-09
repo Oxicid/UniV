@@ -389,6 +389,10 @@ class UMeshes:
         for umesh in self:
             umesh.sync = state
 
+    def free(self):
+        for umesh in self:
+            umesh.free()
+
     @classmethod
     def sel_ob_with_uv(cls):
         bmeshes = []

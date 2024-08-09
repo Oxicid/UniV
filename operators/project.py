@@ -130,7 +130,7 @@ class UNIV_NProject(bpy.types.Operator):
 
 class UNIV_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
-    bl_label = "Project by Normal"
+    bl_label = "Project by Box"
     bl_description = "Box Projection by faces normal"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -143,31 +143,37 @@ class UNIV_BoxProject(bpy.types.Operator):
     def poll(cls, context):
         if not context.active_object:
             return False
-        if context.active_object.mode != 'EDIT':
-            return False
         return True
 
     def draw(self, context):
         self.layout.prop(self, 'scale', slider=True)
-        self.layout.column(align=True).prop(self, 'scale_individual', expand=True, slider=True)
-        self.layout.column(align=True).prop(self, 'rotation', expand=True, slider=True)
-        self.layout.row(align=True).prop(self, 'move', expand=True)
+        col = self.layout.column(align=True)
+        col.prop(self, 'scale_individual', expand=True, slider=True)
+        col.prop(self, 'rotation', expand=True, slider=True)
+        col.prop(self, 'move', expand=True)
 
     def __init__(self):
+        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes.calc(self.report)
-        self.umeshes.filter_selected_faces()
+        if not self.is_obj_mode:
+            self.umeshes.filter_selected_faces()
         self.box()
-        return self.umeshes.update(info='Not selected face')
+        if self.is_obj_mode:
+            self.umeshes.update()
+            self.umeshes.free()
+            bpy.context.area.tag_redraw()
+            return {'FINISHED'}
+        else:
+            return self.umeshes.update(info='Not selected face')
 
     def box(self):
+        move = Vector(self.move) * -1
+        scale = Vector(self.scale_individual)*self.scale
         for umesh in self.umeshes:
             uv = umesh.uv_layer
-            move = Vector(self.move) * -1
-            scale = Vector(self.scale_individual)*self.scale
-
             mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
             mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
             mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
@@ -177,8 +183,8 @@ class UNIV_BoxProject(bpy.types.Operator):
             mtx_z = umesh.obj.matrix_world @ mtx_from_prop_z
 
             _, r, _ = umesh.obj.matrix_world.decompose()
-            selected_faces_iter = (f for f in umesh.bm.faces if f.select)
-            for f, _ in zip(selected_faces_iter, range(umesh.total_face_sel)):
+            faces = umesh.bm.faces if self.is_obj_mode else (f for f in umesh.bm.faces if f.select)
+            for f in faces:
                 n = f.normal.copy()
                 n.rotate(r)
                 if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
