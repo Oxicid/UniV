@@ -14,6 +14,7 @@ class UNIV_PT_General(Panel):
         layout.operator_context = 'INVOKE_DEFAULT'
         col = layout.column(align=True)
 
+        col.label(text='Transform')
         split = col.split(factor=0.65, align=True)
         split.operator('uv.univ_crop', text='Crop').axis = 'XY'
         row = split.row(align=True)
@@ -76,9 +77,28 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_random', text='Random')
 
-        # Select
+        # Misc
         col_align = col.column(align=True)
-        col_align.separator(factor=0.35)
+
+        col_align.label(text='Misc')
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_quadrify', text='Quadrify')
+        row.operator('uv.univ_straight', text='Straight')
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_relax', text='Relax')
+        row.operator('uv.univ_unwrap', text='Unwrap')
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_weld', text='Weld')
+        row.operator('uv.univ_stitch', text='Stitch')
+
+        # Select
+        col_align.label(text='Select')
+        col_align = col.column(align=True)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
@@ -106,35 +126,17 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
         row.operator('uv.univ_select_square_island', text='V').shape = 'VERTICAL'
 
-        # Quadrify
-        col_align = col.column(align=True)
-        col_align.separator(factor=0.35)
-
-        split = col_align.split(align=True)
-        row = split.row(align=True)
-        row.operator('uv.univ_quadrify', text='Quadrify')
-        row.operator('uv.univ_straight', text='Straight')
-
-        split = col_align.split(align=True)
-        row = split.row(align=True)
-        row.operator('uv.univ_relax', text='Relax')
-        row.operator('uv.univ_unwrap', text='Unwrap')
-
         # Inspect
         col_align = col.column(align=True)
-        col_align.separator(factor=0.35)
+        col_align.label(text='Inspect')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_select_zero', text='Zero')
         split.operator('uv.univ_select_flipped', text='Flipped')
 
-        split = col_align.split(align=True)
-        row = split.row(align=True)
-        row.operator('uv.univ_weld', text='Weld')
-        row.operator('uv.univ_stitch', text='Stitch')
-
         # Seam
         col_align = col.column(align=True)
+        col_align.label(text='Seam')
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
@@ -152,9 +154,12 @@ class UNIV_PT_General_VIEW_3D(Panel):
         col = layout.column(align=True)
 
         col_align = col.column(align=True)
+        col_align.label(text='Seam')
         split = col_align.split(align=True)
         split.operator('mesh.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
 
-        self.layout.operator('mesh.univ_planner', text='Planner')
-        self.layout.operator('mesh.univ_box_project', text='Box Project')
+        self.layout.label(text='Project')
+        row = self.layout.row(align=True)
+        row.operator('mesh.univ_planner', text='Planner')
+        row.operator('mesh.univ_box_project', text='Box')
