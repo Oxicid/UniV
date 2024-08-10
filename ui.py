@@ -156,5 +156,5 @@ class UNIV_PT_General_VIEW_3D(Panel):
         split.operator('mesh.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
 
-        self.layout.operator('mesh.univ_n_project', text='NProject')
+        self.layout.operator('mesh.univ_planner', text='Planner')
         self.layout.operator('mesh.univ_box_project', text='Box Project')

@@ -2,23 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
-import math
 
 from math import pi
 from .transform import UNIV_OT_Crop
 from .. import utils
-from ..types import AdvIslands, AdvIsland, BBox
-from bmesh.types import BMFace
+from ..types import BBox, MeshIsland, MeshIslands
 from mathutils import Vector, Euler, Matrix
 
-class UNIV_NProject(bpy.types.Operator):
-    bl_idname = "mesh.univ_n_project"
+class UNIV_Planner(bpy.types.Operator):
+    bl_idname = "mesh.univ_planner"
     bl_label = "Project by Normal"
     bl_description = "Projection by faces normal"
     bl_options = {'REGISTER', 'UNDO'}
 
     crop: bpy.props.BoolProperty(name='Crop', default=True)
     orient: bpy.props.BoolProperty(name='Orient', default=True)
+    individual: bpy.props.BoolProperty(name='Individual', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -28,82 +27,122 @@ class UNIV_NProject(bpy.types.Operator):
             return False
         return True
 
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.individual = event.alt
+        return self.execute(context)
+
     def __init__(self):
         self.umeshes: utils.UMeshes | None = None
-        self.islands_of_mesh: list[AdvIslands] = []  # TODO: Replace to FaceIsland after refactor
 
     def execute(self, context):
         self.umeshes = utils.UMeshes.calc(self.report)
         self.umeshes.filter_selected_faces()
-        self.islands_of_mesh = []
-        self.xyz_to_uv()
+        self.umeshes.set_sync(True)
+        if self.individual:
+            self.xyz_to_uv_individual()
+        else:
+            self.xyz_to_uv()
         return self.umeshes.update(info='Not selected face')
 
     def xyz_to_uv(self):
-        crop = self.crop
-        vector_nor = self.avg_normal_and_calc_selected_faces()
+        vector_nor, islands_of_mesh = self.avg_normal_and_calc_selected_faces()
         rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
 
-        xmin = math.inf
-        xmax = -math.inf
-        ymin = math.inf
-        ymax = -math.inf
-
-        for island, umesh in zip(self.islands_of_mesh, self.umeshes):
-            uv = island.uv_layer
-            mtx = rot_mtx_from_normal @ umesh.obj.matrix_world
+        points = []
+        points_append = points.append
+        for island in islands_of_mesh:
+            uv = island.umesh.uv_layer
+            mtx = rot_mtx_from_normal @ island.umesh.obj.matrix_world
             for f in island[0]:
                 for crn in f.loops:
                     uv_co = (mtx @ crn.vert.co).to_2d()
                     crn[uv].uv = uv_co
-                    if crop:
-                        x, y = uv_co
-                        if xmin > x:
-                            xmin = x
-                        if xmax < x:
-                            xmax = x
-                        if ymin > y:
-                            ymin = y
-                        if ymax < y:
-                            ymax = y
+                    points_append(uv_co)
 
-        bbox = BBox(xmin, xmax, ymin, ymax)
+        if not (self.orient or self.crop):
+            return
+
+        uv_islands_of_mesh = [island.to_adv_islands() for island in islands_of_mesh]
 
         if self.orient:
-            points = []
-            for island in self.islands_of_mesh:
-                if not points:
-                    points = island[0].calc_convex_points()
-                else:
-                    points.extend(island[0].calc_convex_points())
             angle = utils.calc_min_align_angle(points)
-
-            for island in self.islands_of_mesh:
+            for island in uv_islands_of_mesh:
                 island.rotate_simple(angle)
-            bbox = BBox.calc_bbox(points)
 
-        if crop:
-            UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=self.islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
+        if self.crop:
+            bbox = BBox()
+            for isl in uv_islands_of_mesh:
+                bbox.union(isl.calc_bbox())
+
+            UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=uv_islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
 
     def avg_normal_and_calc_selected_faces(self):
         tot_weight = Vector()
+        islands_of_mesh: list[MeshIslands] = []
         for umesh in self.umeshes:
             weight = Vector()
-            selected_faces: list[BMFace] = []
-            selected_faces_append = selected_faces.append
+            selected_faces = utils.calc_selected_uv_faces_b(umesh)
 
-            selected_faces_iter = (f for f in umesh.bm.faces if f.select)
-            for f, _ in zip(selected_faces_iter, range(umesh.total_face_sel)):
-                selected_faces_append(f)
+            for f in selected_faces:
                 weight += f.normal * f.calc_area()
 
             _, r, s = umesh.obj.matrix_world.decompose()
             mtx = Matrix.LocRotScale(Vector(), r, s)
             tot_weight += mtx @ weight
 
-            self.islands_of_mesh.append(AdvIslands([AdvIsland(selected_faces, umesh.bm, umesh.uv_layer)], umesh.bm, umesh.uv_layer))
+            islands_of_mesh.append(MeshIslands([MeshIsland(selected_faces, umesh)], umesh))
 
-        return tot_weight
+        return tot_weight, islands_of_mesh
+
+    def xyz_to_uv_individual(self):
+        points = []
+        points_append = points.append
+        mesh_islands = []
+        for vector_nor, mesh_isl in self.avg_normal_and_calc_selected_faces_individual():
+            uv = mesh_isl.umesh.uv_layer
+            mesh_islands.append(mesh_isl)
+            rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
+            mtx = rot_mtx_from_normal @ mesh_isl.umesh.obj.matrix_world
+
+            for f in mesh_isl:
+                for crn in f.loops:
+                    uv_co = (mtx @ crn.vert.co).to_2d()
+                    crn[uv].uv = uv_co
+                    points_append(uv_co)
+
+        if not (self.orient or self.crop):
+            return
+
+        uv_islands_of_mesh = [island.to_adv_island() for island in mesh_islands]
+
+        # if self.mark_seam:  # TODO: Implement Mark Seam after island struct refactoring (umesh)
+        #     for isl in uv_islands_of_mesh:
+        #         isl.mark_seam()
+
+        if self.orient:
+            angle = utils.calc_min_align_angle(points)  # TODO: Optimize, calc convex, rotate and calc bbox
+            for island in uv_islands_of_mesh:
+                island.rotate_simple(angle)
+
+        if self.crop:
+            bbox = BBox()
+            for isl in uv_islands_of_mesh:
+                bbox.union(isl.calc_bbox())
+
+            UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=uv_islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
+
+    def avg_normal_and_calc_selected_faces_individual(self):
+        for umesh in self.umeshes:
+            _, r, s = umesh.obj.matrix_world.decompose()
+            mtx = Matrix.LocRotScale(Vector(), r, s)
+            for mesh_isl in MeshIslands.calc_selected(umesh):
+                weight = Vector()
+                for f in mesh_isl:
+                    weight += f.normal * f.calc_area()
+                weight = mtx @ weight
+                yield weight, mesh_isl
 
     @staticmethod
     def calc_rot_mtx_from_normal(normal):

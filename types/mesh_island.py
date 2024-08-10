@@ -1,21 +1,8 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import typing  # noqa: F401
+from . import island
 from ..utils import UMesh
 from bmesh.types import *
 
@@ -55,6 +42,9 @@ class MeshIsland:
             return self.__select_force(False)
         self._select_ex(False, mode)
 
+    def to_adv_island(self) -> island.AdvIsland:
+        return island.AdvIsland(self.faces, self.umesh.bm, self.umesh.uv_layer)
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -76,7 +66,7 @@ class MeshIslandsBase:
 
     @classmethod
     def calc_iter_ex(cls, umesh: UMesh):
-        island: 'list[BMFace]' = []
+        mesh_island: 'list[BMFace]' = []
 
         for face in umesh.bm.faces:
             if not face.tag:
@@ -105,12 +95,12 @@ class MeshIslandsBase:
                                 temp.append(ll.face)
                                 ll.face.tag = False
 
-                island.extend(parts_of_island)
+                mesh_island.extend(parts_of_island)
                 parts_of_island = temp
                 temp = []
 
-            yield island
-            island = []
+            yield mesh_island
+            mesh_island = []
 
 
 class MeshIslands(MeshIslandsBase):
@@ -122,6 +112,17 @@ class MeshIslands(MeshIslandsBase):
     def calc_visible(cls, umesh: UMesh):
         cls.tag_filter_visible(umesh)
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
+
+    @classmethod
+    def calc_selected(cls, umesh: UMesh):
+        umesh.tag_selected_faces()
+        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
+
+    def to_adv_islands(self) -> island.AdvIslands:
+        adv_islands = []
+        for mesh_isl in self:
+            adv_islands.append(island.AdvIsland(mesh_isl.faces, self.umesh.bm, self.umesh.uv_layer))
+        return island.AdvIslands(adv_islands, self.umesh.bm, self.umesh.uv_layer)
 
     def __iter__(self) -> typing.Iterator[MeshIsland]:
         return iter(self.mesh_islands)

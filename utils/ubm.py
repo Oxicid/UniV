@@ -1,20 +1,7 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
-
+import bpy
 import typing
 # from . import UMesh
 from ..types import PyBMesh
@@ -430,6 +417,27 @@ def calc_selected_uv_faces(bm, uv_layer, sync) -> list[BMFace]:
         return [f for f in bm.faces if all(l[uv_layer].select for l in f.loops) and f.select]
     else:
         return [f for f in bm.faces if all(l[uv_layer].select_edge for l in f.loops) and f.select]
+
+def calc_selected_uv_faces_b(umesh: 'UMesh') -> list[BMFace]:  # noqa
+    if umesh.is_full_face_deselected:
+        return []
+
+    if umesh.sync:
+        if umesh.is_full_face_selected:
+            return umesh.bm.faces
+        return [f for f in umesh.bm.faces if f.select]
+
+    uv = umesh.uv_layer
+    if umesh.is_full_face_selected:
+        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            return [f for f in umesh.bm.faces if all(l[uv].select for l in f.loops)]
+        else:
+            return [f for f in umesh.bm.faces if all(l[uv].select_edge for l in f.loops)]
+
+    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        return [f for f in umesh.bm.faces if all(l[uv].select for l in f.loops) and f.select]
+    else:
+        return [f for f in umesh.bm.faces if all(l[uv].select_edge for l in f.loops) and f.select]
 
 def calc_selected_uv_faces_iter(bm, uv_layer, sync) -> 'typing.Generator[BMFace] | tuple':
     if PyBMesh.is_full_face_deselected(bm):

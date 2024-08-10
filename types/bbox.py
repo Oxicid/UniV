@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
 import copy
@@ -268,6 +254,17 @@ class BBox:
             self.ymin = xy[1]
         if xy[1] > self.ymax:
             self.ymax = xy[1]
+
+    def add(self, co):
+        x, y = co
+        if self.xmin > x:
+            self.xmin = x
+        if self.xmax < x:
+            self.xmax = x
+        if self.ymin > y:
+            self.ymin = y
+        if self.ymax < y:
+            self.ymax = y
 
     def clamp(self, xmin=0, ymin=0, xmax=1, ymax=1):
         if self.xmin < xmin:
