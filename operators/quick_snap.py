@@ -633,7 +633,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
     def recalc_island_kd_meshes(self):
         kdmeshes = []
         for umesh in self.umeshes:
-            if islands := Islands.calc_non_selected(umesh.bm, umesh.uv_layer, self.sync):
+            if islands := Islands.calc_non_selected_extended(umesh.bm, umesh.uv_layer, self.sync):
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)

@@ -352,7 +352,7 @@ class UNIV_OT_Align(Operator):
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         for umesh in umeshes:
             if island_mode:
-                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                if islands := Islands.calc(umesh, selected=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         all_groups.append((island, bbox, umesh.uv_layer))
@@ -387,7 +387,7 @@ class UNIV_OT_Align(Operator):
         all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
         general_bbox = BBox()
         for umesh in umeshes:
-            if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
+            if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):  # TODO: Implement bbox by individual modes
                 all_groups.append((corners, umesh.uv_layer))
                 bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
                 general_bbox.union(bbox)
@@ -424,7 +424,7 @@ class UNIV_OT_Align(Operator):
         island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
-                if islands := Islands.calc(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                if islands := Islands.calc(umesh, selected=selected):
                     match direction:
                         case 'CENTER':
                             for island in islands:
