@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 0, 3),
+    "version": (1, 1, 5),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -35,6 +35,7 @@ from .operators import select
 from .operators import seam
 from .operators import quick_snap
 from .operators import project
+from .operators import stack
 from . import ui
 from . import keymaps
 from . import preferences
@@ -86,6 +87,8 @@ classes = (
     # Project
     project.UNIV_Planner,
     project.UNIV_BoxProject,
+    # Stack
+    stack.UNIV_OT_Stack,
 )
 
 is_enabled = False

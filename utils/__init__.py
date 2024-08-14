@@ -5,9 +5,9 @@ import typing  # noqa
 import math  # noqa
 
 import bmesh
-import mathutils  # noqa
+import mathutils
 
-import numpy as np
+import numpy as np  # noqa
 
 # from mathutils import Vector
 from collections import defaultdict
@@ -17,6 +17,7 @@ from . import umath
 from .umath import *
 from .other import *
 from .ubm import *
+from .draw import *
 from ..types import PyBMesh
 
 class UMesh:
@@ -314,6 +315,9 @@ class UMesh:
         if self.is_full_face_selected:
             return self.bm.faces
         return [f for f in self.bm.faces if f.select]
+
+    def __hash__(self):
+        return hash(self.bm)
 
     def __del__(self):
         if not self.is_edit_bm:

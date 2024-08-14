@@ -96,6 +96,9 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_weld', text='Weld')
         row.operator('uv.univ_stitch', text='Stitch')
 
+        split = col_align.split(align=True)
+        split.operator('mesh.univ_stack', text='Stack')
+
         # Select
         col_align.label(text='Select')
         col_align = col.column(align=True)
@@ -163,3 +166,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row = self.layout.row(align=True)
         row.operator('mesh.univ_planner', text='Planner')
         row.operator('mesh.univ_box_project', text='Box')
+
+        self.layout.label(text='Stack')
+        row = self.layout.row(align=True)
+        row.operator('mesh.univ_stack', text='Stack')
