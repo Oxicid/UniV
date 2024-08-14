@@ -4,9 +4,12 @@
 import bpy
 import typing
 # from . import UMesh
-from ..types import PyBMesh
+
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
 from mathutils import Vector
+from collections import deque
+
+from ..types import PyBMesh
 
 def set_faces_tag(faces, tag=True):
     for f in faces:
@@ -160,6 +163,30 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv_layer: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_uv_by_face_index_b(first: BMLoop, uv: BMLayerItem, idx: int):
+    first_co = first[uv].uv
+    linked = [first]
+    bm_iter = first
+    while True:
+        if (bm_iter := prev_disc(bm_iter)) == first:
+            break
+        if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
+            linked.append(bm_iter)
+    return linked
+
+def linked_crn_by_face_index(crn):
+    idx = crn.face.index
+    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
+    linked.rotate(-linked.index(crn))
+    linked.popleft()
+    return linked
+
+def linked_crn_by_face_index_including(crn):
+    idx = crn.face.index
+    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
+    linked.rotate(-linked.index(crn))
+    return linked
+
 def select_linked_crn_uv_vert(first: BMLoop, uv_layer: BMLayerItem):
     bm_iter = first
     while True:
@@ -295,16 +322,6 @@ def shared_crn(crn: BMLoop) -> BMLoop | None:
     if shared != crn:
         return shared
 
-def linked_crn_uv_by_face_index_b(first: BMLoop, uv: BMLayerItem, idx: int):
-    first_co = first[uv].uv
-    linked = [first]
-    bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
-            linked.append(bm_iter)
-    return linked
 
 def copy_pos_to_target(crn, uv, idx):
     next_crn_co = crn.link_loop_next[uv].uv
