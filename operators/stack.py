@@ -58,8 +58,9 @@ class StackIsland:  # TODO: Split for source and target islands
     def preprocessing(self):
         self.ensure_ngons_with_faces()
         self.calc_min_sequence()
+        self.min_sequence.sort(key=lambda face: face.calc_area(), reverse=True)
         self.ngons_to_np()
-        self.face_start_pattern, self.face_start_pattern_crn = self.calc_linked_corners_pattern(self.min_sequence_last_index)
+        self.face_start_pattern, self.face_start_pattern_crn = self.calc_linked_corners_pattern(0)
 
     def ensure_ngons_with_faces(self):
         for f in self.island:
@@ -163,7 +164,6 @@ class StackIsland:  # TODO: Split for source and target islands
 
     def calc_source_stack_island(self, source: 'typing.Self'):
         for source_pattern in self.compared_matching_first_pattern(source):
-            # print('1111')
             source_island_walked: list[list[FacePattern]] = []
             source.island.set_tag(True)  # TODO: Tagging source_island_walked
 
@@ -178,14 +178,12 @@ class StackIsland:  # TODO: Split for source and target islands
             break_ = False
 
             for generation_of_shared_face in self.walked_island_from_init_face:
-                # print('22222')
                 for target_face__, source_face__ in zip(generation_of_shared_face, parts_of_island):
                     if len(target_face__.ordered_corners) != len(source_face__.ordered_corners):
                         break_ = True
                         break
 
                     for target_face_size, source_crn in zip(target_face__.shared_crn_face_sizes, source_face__.ordered_corners):
-                        # print('3333')
                         if target_face_size == 0:
                             continue
 
@@ -215,7 +213,7 @@ class StackIsland:  # TODO: Split for source and target islands
         """Create an island that saves a sequence of found faces and its shared corner"""
         self.island.set_tag(True)
 
-        init_face = self.min_sequence[self.min_sequence_last_index]
+        init_face = self.min_sequence[0]
         parts_of_island = [FacePattern.calc_init(init_face, init_face.loops[0])]  # Container collector of island elements
         init_face.tag = False
 
@@ -295,13 +293,6 @@ class UNIV_OT_Stack(bpy.types.Operator):
         self.source: list[StackIsland] = []
 
         self.islands_preprocessing()
-
-        print(f'{len(self.targets) = }')
-        print(f'{len(self.source) = }')
-
-        from itertools import chain
-        for i in chain(self.targets, self.source):
-            print({idxs_.index for idxs_ in i.island})
 
         if not self.targets:
             self.report({'WARNING'}, 'Not found target islands')
