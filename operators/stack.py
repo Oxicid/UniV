@@ -46,7 +46,6 @@ class StackIsland:  # TODO: Split for source and target islands
         self.walked_island_from_init_face: list[list[FacePattern]] = []
 
         self.min_sequence: list[BMFace] = []
-        self.min_sequence_last_index: int = 0
         self.face_start_pattern: deque[np.array] = deque()
         self.face_start_pattern_crn: deque[BMLoop] = deque()
 
@@ -95,9 +94,12 @@ class StackIsland:  # TODO: Split for source and target islands
         face_idx = init_face.index
 
         face_start_pattern: deque[np.array] = deque()  # [shared face size, linked face size]
-        face_start_pattern_crn: deque[BMLoop] = deque()
+        face_start_pattern_crn: deque[BMLoop] = deque(init_face.loops)
 
-        for crn in init_face.loops:
+        index_of_max_elem = face_start_pattern_crn.index(max(face_start_pattern_crn, key=lambda _crn: _crn.edge.calc_length()))
+        face_start_pattern_crn.rotate(-index_of_max_elem)
+
+        for crn in face_start_pattern_crn:
             linked_crn_face_size = []
             for crn_ in linked_crn_by_face_index(crn):
                 linked_crn_face_size.append(len(crn_.face.loops))
@@ -112,8 +114,6 @@ class StackIsland:  # TODO: Split for source and target islands
                 face_start_pattern.append(np.array((shared_face_size, *linked_crn_face_size), dtype='uint16'))
             else:
                 face_start_pattern.append(np.array((shared_face_size, *linked_crn_face_size), dtype='uint16'))
-
-            face_start_pattern_crn.append(crn)
 
         return [face_start_pattern, face_start_pattern_crn]
 
@@ -214,7 +214,8 @@ class StackIsland:  # TODO: Split for source and target islands
         self.island.set_tag(True)
 
         init_face = self.min_sequence[0]
-        parts_of_island = [FacePattern.calc_init(init_face, init_face.loops[0])]  # Container collector of island elements
+        # For the future be careful, maybe face_start_pattern_crn should be copied
+        parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn[0], self.face_start_pattern_crn)]  # Container collector of island elements
         init_face.tag = False
 
         init_idx = init_face.index
