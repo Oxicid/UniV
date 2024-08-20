@@ -170,3 +170,6 @@ class UNIV_PT_General_VIEW_3D(Panel):
         self.layout.label(text='Stack')
         row = self.layout.row(align=True)
         row.operator('mesh.univ_stack', text='Stack')
+
+        self.layout.label(text='Transform')
+        self.layout.operator('mesh.univ_orient_view3d', text='Orient')

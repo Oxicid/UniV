@@ -11,7 +11,7 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
-from math import pi
+from math import pi, cos, atan2
 from mathutils import Vector
 from collections import defaultdict
 
@@ -19,6 +19,7 @@ from bmesh.types import BMLoop
 
 from .. import utils
 from .. import info
+from ..preferences import force_debug
 from ..utils import UMeshes
 from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands, LoopGroup
 
@@ -1773,27 +1774,18 @@ class UNIV_OT_Orient(Operator):
         ('VERTICAL', 'Vertical', ''),
     ))
 
-    world_mode: bpy.props.BoolProperty(name='World', default=False, description="Align selected UV islands or faces to world / gravity directions")
-    axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
-                                    ('AUTO', 'Auto', 'Detect World axis to align to.'),
-                                    ('U', 'X', 'Align to the X axis of the World.'),
-                                    ('V', 'Y', 'Align to the Y axis of the World.'),
-                                    ('W', 'Z', 'Align to the Z axis of the World.')
-    )
-                                 )
+    mode: EnumProperty(name='Mode', default='ISLAND', items=(
+        ('ISLAND', 'Island', ''),
+        ('EDGE', 'Edge', ''),
+    ))
 
     def draw(self, context):
-        if self.world_mode:
-            layout = self.layout.row()
-            layout.prop(self, 'axis', expand=True)
-        layout = self.layout
-        layout.prop(self, 'world_mode')
+        self.layout.row().prop(self, 'mode', expand=True)
+        self.layout.row().prop(self, 'edge_dir', expand=True)
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
-            return self.execute(context)
-        # self.overlapped = event.shift
-        self.world_mode = event.alt
+        if not (event.value == 'PRESS'):
+            self.mode = 'EDGE' if event.alt else 'ISLAND'
         return self.execute(context)
 
     @classmethod
@@ -1810,22 +1802,12 @@ class UNIV_OT_Orient(Operator):
     def __init__(self):
         self.skip_count: int = 0
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.elem_mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes(report=self.report)
-        # World Orient
-        if self.world_mode:
-            self.world_orient(extended=True)
-            if self.skip_count == len(self.umeshes):
-                self.world_orient(extended=False)
-                if self.skip_count == len(self.umeshes):
-                    return self.umeshes.update(info="No uv for manipulate")
-            return self.umeshes.update(info="All islands oriented")
-
         # Island Orient
-        if self.elem_mode in ('FACE', 'ISLAND'):
+        if self.mode == 'ISLAND':
             self.orient_island(extended=True)
             if self.skip_count == len(self.umeshes):
                 self.orient_island(extended=False)
@@ -1862,7 +1844,7 @@ class UNIV_OT_Orient(Operator):
                     if not any(diff):
                         continue
                     if self.edge_dir == 'BOTH':
-                        current_angle = math.atan2(*diff)
+                        current_angle = atan2(*diff)
                         angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
                     elif self.edge_dir == 'HORIZONTAL':
                         vec = diff.normalized()
@@ -1895,7 +1877,7 @@ class UNIV_OT_Orient(Operator):
                     if not any(diff):
                         continue
                     if self.edge_dir == 'BOTH':
-                        current_angle = math.atan2(*diff)
+                        current_angle = atan2(*diff)
                         angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
                     elif self.edge_dir == 'HORIZONTAL':
                         vec = diff.normalized()
@@ -1931,32 +1913,78 @@ class UNIV_OT_Orient(Operator):
             else:
                 self.skip_count += 1
 
-    # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
-    def world_orient(self, extended):
+
+# The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
+class UNIV_OT_Orient_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_orient_view3d'
+    bl_label = 'Orient'
+    bl_description = "Align selected UV islands or faces to world / gravity directions"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
+                                    ('AUTO', 'Auto', 'Detect World axis to align to.'),
+                                    ('U', 'X', 'Align to the X axis of the World.'),
+                                    ('V', 'Y', 'Align to the Y axis of the World.'),
+                                    ('W', 'Z', 'Align to the Z axis of the World.')))
+
+    def draw(self, context):
+        self.layout.row().prop(self, 'axis', expand=True)
+
+    @classmethod
+    def poll(cls, context):
+        if not context.active_object:
+            return False
+        if context.active_object.type != 'MESH':
+            return False
+        if context.active_object.mode != 'EDIT':
+            return False
+
+        return True
+
+    def __init__(self):
+        self.skip_count: int = 0
+        self.umeshes: utils.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes.set_sync(True)
+        if force_debug():
+            self.world_orient_debug(extended=True)
+            if self.skip_count == len(self.umeshes):
+                self.world_orient_debug(extended=False)
+                if self.skip_count == len(self.umeshes):
+                    return self.umeshes.update(info="No uv for manipulate")
+        else:
+            self.world_orient(extended=True)
+            if self.skip_count == len(self.umeshes):
+                self.world_orient(extended=False)
+                if self.skip_count == len(self.umeshes):
+                    return self.umeshes.update(info="No uv for manipulate")
+        return self.umeshes.update(info="All islands oriented")
+
+    def world_orient_debug(self, extended):  # TODO: Delete, if ok
         self.skip_count = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
             full_selected = umesh.is_full_face_selected
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+                uv = islands.uv_layer
+                _, r, _ = umesh.obj.matrix_world.decompose()
+                mtx = r.to_matrix()
 
                 for island in islands:
                     if extended:
-                        if self.sync:
-                            if full_selected:
-                                pre_calc_faces = island
-                            else:
-                                pre_calc_faces = [f for f in island if f.select]
+                        if full_selected:
+                            pre_calc_faces = island
                         else:
-                            pre_calc_faces = [f for f in island if all(l[umesh.uv_layer].select for l in f.loops)]
-                            if not pre_calc_faces:
-                                pre_calc_faces = island
+                            pre_calc_faces = [f for f in island if f.select]
                     else:
                         pre_calc_faces = island
 
                     if len(pre_calc_faces) == 1:
                         selected_face = next(iter(pre_calc_faces))
                         calc_loops = selected_face.loops
-                        avg_normal = selected_face.normal
+                        avg_normal = mtx @ selected_face.normal
                     else:
                         calc_loops = []
                         calc_edges = set()
@@ -1980,21 +2008,62 @@ class UNIV_OT_Orient(Operator):
                             self.report({'ERROR_INVALID_INPUT'}, "Invalid selection in an island: no faces formed by unique edges.")
                             continue
                         for face in calc_faces:
-                            avg_normal += face.normal
+                            avg_normal += face.normal * face.calc_area()
                         avg_normal /= len(calc_faces)
+                        avg_normal.rotate(mtx)
 
                     # Which Side
                     x = 0
                     y = 1
                     z = 2
-                    max_size = max(map(abs, avg_normal))
 
-                    if (self.axis == 'AUTO' and abs(avg_normal.z) == max_size) or self.axis == 'W':
-                        angle = self.calc_world_orient_angle(island, calc_loops, x, y, False, avg_normal.z < 0)
-                    elif (self.axis == 'AUTO' and abs(avg_normal.y) == max_size) or self.axis == 'V':
-                        angle = self.calc_world_orient_angle(island, calc_loops, x, z, avg_normal.y > 0, False)
+                    max_size = max(avg_normal, key=lambda v: abs(v))
+
+                    if (self.axis == 'AUTO' and avg_normal.z == max_size) or self.axis == 'W':
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, y, False, avg_normal.z < 0)
+                    elif (self.axis == 'AUTO' and avg_normal.y == max_size) or self.axis == 'V':
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, z, avg_normal.y > 0, False)
                     else:  # (self.axis == 'AUTO' and abs(avg_normal.x) == max_size) or self.axis == 'U':
-                        angle = self.calc_world_orient_angle(island, calc_loops, y, z, avg_normal.x < 0, False)
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False)
+
+                    if angle:
+                        umesh.update_tag |= island.rotate(angle, pivot=island.calc_bbox().center)
+            else:
+                self.skip_count += 1
+
+    def world_orient(self, extended):
+        self.skip_count = 0
+        for umesh in self.umeshes:
+            umesh.update_tag = False
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+                uv = islands.uv_layer
+                _, r, _ = umesh.obj.matrix_world.decompose()
+                mtx = r.to_matrix()
+
+                for island in islands:
+                    if extended:
+                        pre_calc_faces = (f for f in island if f.select)
+                    else:
+                        pre_calc_faces = island
+
+                        # Get average viewport normal of UV island
+                    calc_loops = []
+                    avg_normal = Vector()
+                    for face in pre_calc_faces:
+                        avg_normal += face.normal * face.calc_area()
+                        calc_loops.extend(face.loops)
+                    avg_normal.rotate(mtx)
+
+                    # Which Side
+                    x, y, z = 0, 1, 2
+                    max_size = max(avg_normal, key=lambda v: abs(v))
+
+                    if (self.axis == 'AUTO' and avg_normal.z == max_size) or self.axis == 'W':
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, y, False, avg_normal.z < 0)
+                    elif (self.axis == 'AUTO' and avg_normal.y == max_size) or self.axis == 'V':
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, z, avg_normal.y > 0, False)
+                    else:  # (self.axis == 'AUTO' and avg_normal.x == max_size) or self.axis == 'U':
+                        angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False)
 
                     if angle:
                         umesh.update_tag |= island.rotate(angle, pivot=island.calc_bbox().center)
@@ -2002,13 +2071,13 @@ class UNIV_OT_Orient(Operator):
                 self.skip_count += 1
 
     @staticmethod
-    def calc_world_orient_angle(island, loops, x=0, y=1, flip_x=False, flip_y=False):
+    def calc_world_orient_angle(uv, mtx, loops, x=0, y=1, flip_x=False, flip_y=False):
         n_edges = 0
         avg_angle = 0
-        uv = island.uv_layer
         for loop in loops:
-            co0 = loop.vert.co
-            co1 = loop.link_loop_next.vert.co
+            co0 = mtx @ loop.vert.co
+            co1 = mtx @ loop.link_loop_next.vert.co
+
             delta = co1 - co0
             max_side = max(map(abs, delta))
 
@@ -2030,12 +2099,12 @@ class UNIV_OT_Orient(Operator):
 
                 delta_uvs = uv1 - uv0
 
-                a0 = math.atan2(*delta_verts)
-                a1 = math.atan2(*delta_uvs)
+                a0 = atan2(*delta_verts)
+                a1 = atan2(*delta_uvs)
 
-                a_delta = math.atan2(math.sin(a0 - a1), math.cos(a0 - a1))
+                a_delta = atan2(math.sin(a0 - a1), cos(a0 - a1))
 
-                # Consolidation (math.atan2 gives the lower angle between -Pi and Pi,
+                # Consolidation (atan2 gives the lower angle between -Pi and Pi,
                 # this triggers errors when using the average avg_angle /= n_edges for rotation angles close to Pi)
                 if n_edges > 1:
                     if abs((avg_angle / (n_edges - 1)) - a_delta) > 3.12:
