@@ -9,15 +9,15 @@ from .. import utils
 from ..types import BBox, MeshIsland, MeshIslands
 from mathutils import Vector, Euler, Matrix
 
-class UNIV_Planner(bpy.types.Operator):
-    bl_idname = "mesh.univ_planner"
+class UNIV_Plane(bpy.types.Operator):
+    bl_idname = "mesh.univ_plane"
     bl_label = "Project by Normal"
     bl_description = "Projection by faces normal"
     bl_options = {'REGISTER', 'UNDO'}
 
     crop: bpy.props.BoolProperty(name='Crop', default=True)
     orient: bpy.props.BoolProperty(name='Orient', default=True)
-    individual: bpy.props.BoolProperty(name='Individual', default=False)
+    individual: bpy.props.BoolProperty(name='Individual', default=False, description='Individual by Island Meshes')
 
     @classmethod
     def poll(cls, context):
@@ -41,7 +41,7 @@ class UNIV_Planner(bpy.types.Operator):
         self.umeshes.filter_selected_faces()
         self.umeshes.set_sync(True)
         if self.individual:
-            self.xyz_to_uv_individual()
+                self.xyz_to_uv_individual()
         else:
             self.xyz_to_uv()
         return self.umeshes.update(info='Not selected face')

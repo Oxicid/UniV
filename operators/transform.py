@@ -29,16 +29,10 @@ class UNIV_OT_Crop(Operator):
     bl_description = info.operator.crop_info
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('TO_CURSOR', 'To cursor', ''),
-        ('TO_CURSOR_INDIVIDUAL', 'To cursor individual', ''),
-        ('INDIVIDUAL', 'Individual', ''),
-        ('INPLACE', 'Inplace', ''),
-        ('INDIVIDUAL_INPLACE', 'Individual Inplace', ''),
-    ))
-
-    axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'XY', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    to_cursor: BoolProperty(name='To Cursor', default=False)
+    individual: BoolProperty(name='Individual', default=False)
+    inplace: BoolProperty(name='Inplace', default=False)
     padding: FloatProperty(name='Padding', description='Padding=1/TextureSize (1/256=0.0039)', default=0, soft_min=0, soft_max=1/256*4, max=0.49)
 
     @classmethod
@@ -49,10 +43,37 @@ class UNIV_OT_Crop(Operator):
             return False
         return True
 
+    def draw(self, context):
+        layout = self.layout
+        layout.row(align=True).prop(self, 'axis', expand=True)
+        layout.prop(self, 'to_cursor')
+        layout.prop(self, 'individual')
+        if not self.to_cursor:
+            layout.prop(self, 'inplace')
+        layout.prop(self, 'padding', slider=True)
+
+    def __init__(self):
+        self.mode: str = 'DEFAULT'
+
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        match event.ctrl, event.shift, event.alt:
+
+        self.to_cursor = event.ctrl
+        self.individual = event.shift
+        self.inplace = event.alt
+
+        if all((event.ctrl, event.alt)):
+            self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
+                                  f"See all variations:\n\n{self.get_event_info()}")
+            self.to_cursor = False
+        return self.execute(context)
+
+    def execute(self, context):
+        if all((self.to_cursor, self.inplace)):
+            self.inplace = False
+
+        match self.to_cursor, self.individual, self.inplace:
             case False, False, False:
                 self.mode = 'DEFAULT'
             case True, False, False:
@@ -65,13 +86,7 @@ class UNIV_OT_Crop(Operator):
                 self.mode = 'INPLACE'
             case False, True, True:
                 self.mode = 'INDIVIDUAL_INPLACE'
-            case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n{self.get_event_info()}")
-                return {'CANCELLED'}
-        return self.execute(context)
 
-    def execute(self, context):
         sync = context.scene.tool_settings.use_uv_select_sync
         return self.crop(self.mode, self.axis, self.padding, proportional=True, sync=sync, report=self.report)
 
@@ -79,6 +94,7 @@ class UNIV_OT_Crop(Operator):
     def crop(mode, axis, padding, proportional, sync, report=None):
         umeshes = utils.UMeshes(report=report)
         crop_args = [axis, padding, umeshes, proportional, sync]
+
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Crop.crop_default(*crop_args, extended=True)
@@ -256,6 +272,10 @@ class UNIV_OT_Align(Operator):
         if context.active_object.mode != 'EDIT':
             return False
         return True
+
+    def draw(self, context):
+        self.layout.prop(self, 'direction')
+        self.layout.column(align=True).prop(self, 'mode', expand=True)
 
     def invoke(self, context, event):
         match event.ctrl, event.shift, event.alt:
@@ -664,6 +684,10 @@ class UNIV_OT_Flip(Operator):
             return False
         return True
 
+    def draw(self, context):
+        self.layout.row(align=True).prop(self, 'axis', expand=True)
+        self.layout.column(align=True).prop(self, 'mode', expand=True)
+
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -846,6 +870,11 @@ class UNIV_OT_Rotate(Operator):
             return False
         return True
 
+    def draw(self, context):
+        self.layout.prop(self, 'angle', slider=True)
+        self.layout.row(align=True).prop(self, 'rot_dir', expand=True)
+        self.layout.row(align=True).prop(self, 'mode', expand=True)
+
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -932,7 +961,7 @@ class UNIV_OT_Sort(Operator):
     area_subgroups: IntProperty(name='Area Subgroups', default=4, min=1, max=200, soft_max=8)
     reverse: BoolProperty(name='Reverse', default=True)
     to_cursor: BoolProperty(name='To Cursor', default=False)
-    align: BoolProperty(name='Align', default=False)
+    align: BoolProperty(name='Orient', default=False)  # TODO: Rename align to orient
     overlapped: BoolProperty(name='Overlapped', default=False)
     subgroup_type: EnumProperty(name='Subgroup Type', default='NONE', items=(
         ('NONE', 'None', ''),
@@ -1159,7 +1188,8 @@ class UNIV_OT_Distribute(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    space: EnumProperty(name='Space', default='ALIGN', items=(('ALIGN', 'Align', ''), ('SPACE', 'Space', '')))
+    space: EnumProperty(name='Space', default='ALIGN', items=(('ALIGN', 'Align', ''), ('SPACE', 'Space', '')),
+                        description='Distribution of islands at equal distances')
     padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     to_cursor: BoolProperty(name='To Cursor', default=False)
     overlapped: BoolProperty(name='Overlapped', default=False)
@@ -1391,15 +1421,13 @@ class UNIV_OT_Distribute(Operator):
 class UNIV_OT_Home(Operator):
     bl_idname = 'uv.univ_home'
     bl_label = 'Home'
-    bl_description = 'Home'
+    bl_description = info.operator.home_info
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('TO_CURSOR', 'To Cursor', ''),
     ))
-
-    # ('OVERLAPPED', 'Overlapped', '')
 
     @classmethod
     def poll(cls, context):
@@ -1421,7 +1449,7 @@ class UNIV_OT_Home(Operator):
             #     self.mode = 'OVERLAPPED'
             case _:
                 self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement.\n\n"
-                                      f"See all variations:\n\n")
+                                      f"See all variations: {info.operator.home_event_info_ex}\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
 
@@ -2332,7 +2360,7 @@ class UNIV_OT_Stitch(Operator):
     bl_description = 'Stitch'
     bl_options = {'REGISTER', 'UNDO'}
 
-    between: BoolProperty(name='Between', default=False)
+    between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     flip: BoolProperty(name='Flip', default=False)
 
     @classmethod

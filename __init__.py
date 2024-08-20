@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 1, 5),
+    "version": (1, 1, 8),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -85,7 +85,7 @@ classes = (
     seam.UNIV_OT_Cut_VIEW3D,
     seam.UNIV_OT_Angle,
     # Project
-    project.UNIV_Planner,
+    project.UNIV_Plane,
     project.UNIV_BoxProject,
     # Stack
     stack.UNIV_OT_Stack,
