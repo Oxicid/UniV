@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
 import rna_keymap_ui
@@ -29,6 +15,13 @@ def force_debug():
 
 def debug():
     return prefs().debug == 'ENABLED'
+
+def stable():
+    return prefs().mode == 'STABLE'
+
+def experimental():
+    return prefs().mode == 'EXPERIMENTAL'
+
 
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
@@ -50,6 +43,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='DISABLED')
 
+    mode: EnumProperty(name='Mode',
+        items=(
+            ('STABLE', 'Stable', ''),
+            ('EXTENDED', 'Extended', ''),
+            ('EXPERIMENTAL', 'Experimental', ''),
+        ),
+        default='EXTENDED')
+
     snap_points_default: EnumProperty(name='Default Snap Points',
         items=(
             ('ALL', 'All', ''),
@@ -67,7 +68,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         row.prop(self, "tab", expand=True)
 
         if self.tab == 'GENERAL':
-            layout.prop(self, "debug")
+            layout.prop(self, 'debug')
+            layout.prop(self, 'mode')
             layout.separator()
             layout.label(text='QuickSnap:')
             layout.prop(self, 'snap_points_default')
