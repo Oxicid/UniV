@@ -75,7 +75,9 @@ class UNIV_OT_SplitUVToggle(Operator):
             for area in context.screen.areas:
                 if area.ui_type == 'UV':
                     if context.area.height == area.height:
-                        bpy.ops.screen.area_close({'area': area})
+                        with context.temp_override(area=area):
+                            bpy.ops.screen.area_close()
+
                         return {'FINISHED'}
 
             # Change area_type (if area != ui_type) from 3D VIEW
@@ -83,6 +85,10 @@ class UNIV_OT_SplitUVToggle(Operator):
                 if area.type == 'IMAGE_EDITOR':
                     if context.area.height == area.height:
                         area.ui_type = 'UV'
+
+                        image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
+                        image_editor.show_gizmo_navigate = False
+
                         area.tag_redraw()
                         c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
                         c_region.info()
@@ -95,6 +101,10 @@ class UNIV_OT_SplitUVToggle(Operator):
                 if (area != active_area) and (area.type == 'VIEW_3D') and (active_area.height == area.height):
                     active_area.type = 'IMAGE_EDITOR'
                     active_area.ui_type = 'UV'
+
+                    image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
+                    image_editor.show_gizmo_navigate = False
+
                     self.category_setter_register(active_area)
                     return {'FINISHED'}
 
@@ -105,6 +115,10 @@ class UNIV_OT_SplitUVToggle(Operator):
                 if area.ui_type == 'VIEW_3D' and area != active_area:
                     if area.height == area.height:
                         area.ui_type = 'UV'
+
+                        image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
+                        image_editor.show_gizmo_navigate = False
+
                         self.category_setter_register(area)
                         return {'FINISHED'}
 
@@ -130,8 +144,8 @@ class UNIV_OT_SplitUVToggle(Operator):
             for area in context.screen.areas:
                 if area.ui_type == 'VIEW_3D':
                     if active_area.height == area.height:
-                        with context.temp_override(area=area):
-                            bpy.ops.screen.area_close({'area': active_area})
+                        with context.temp_override(area=active_area):
+                            bpy.ops.screen.area_close()
                         return {'FINISHED'}
 
             # Split from UV
@@ -184,6 +198,7 @@ class UNIV_OT_SplitUVToggle(Operator):
                     image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                     image_editor.uv_editor.show_stretch = True
                     image_editor.uv_editor.display_stretch_type = 'AREA'
+                    image_editor.show_gizmo_navigate = False
 
             self.category_setter_register(area)
 
@@ -210,6 +225,7 @@ class UNIV_OT_SplitUVToggle(Operator):
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                         image_editor.uv_editor.show_stretch = True
                         image_editor.uv_editor.display_stretch_type = 'AREA'
+                        image_editor.show_gizmo_navigate = False
 
                         active_area.tag_redraw()
                         return {'FINISHED'}
@@ -228,6 +244,7 @@ class UNIV_OT_SplitUVToggle(Operator):
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                         image_editor.uv_editor.show_stretch = True
                         image_editor.uv_editor.display_stretch_type = 'AREA'
+                        image_editor.show_gizmo_navigate = False
 
                         area.tag_redraw()
                         return {'FINISHED'}
@@ -265,6 +282,7 @@ class UNIV_OT_SplitUVToggle(Operator):
                             bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
                             bpy.context.space_data.uv_editor.show_stretch = True
                             bpy.context.space_data.uv_editor.display_stretch_type = 'AREA'
+                            bpy.context.space_data.show_gizmo_navigate = False
                         break
             except TypeError:
                 if force_debug():
