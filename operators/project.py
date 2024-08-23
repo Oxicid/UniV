@@ -41,7 +41,7 @@ class UNIV_Plane(bpy.types.Operator):
         self.umeshes.filter_selected_faces()
         self.umeshes.set_sync(True)
         if self.individual:
-                self.xyz_to_uv_individual()
+            self.xyz_to_uv_individual()
         else:
             self.xyz_to_uv()
         return self.umeshes.update(info='Not selected face')

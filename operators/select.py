@@ -14,7 +14,6 @@ from gpu_extras.batch import batch_for_shader
 from time import perf_counter as time
 
 from .. import utils
-from .. import info
 from .. import types
 from ..types import Islands, AdvIslands, AdvIsland,  MeshIslands, BBox
 
@@ -82,7 +81,7 @@ class UNIV_OT_SelectLinked(Operator):
     bl_label = 'Select Linked'
     bl_options = {'REGISTER', 'UNDO'}
 
-    deselect: bpy.props.BoolProperty(name='Mode', default=False)
+    deselect: bpy.props.BoolProperty(name='Deselect', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -95,14 +94,7 @@ class UNIV_OT_SelectLinked(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.deselect = False
-            case True, False, False:
-                self.deselect = True
-            case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n")
-                return {'CANCELLED'}
+        self.deselect = event.ctrl
         return self.execute(context)
 
     def execute(self, context):
