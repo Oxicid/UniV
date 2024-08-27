@@ -65,6 +65,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.visible: bool | None = None
         self.radius: float = 0.0
         self.axis: str = ''
+        self.grid_snap: bool = False
         self.snap_points_mode: eSnapPointMode = eSnapPointMode.VERTEX
 
         self._cancel: bool = False
@@ -131,7 +132,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     self.axis = 'Y'
 
         if event.type == 'G' and event.value == 'PRESS':
-            bpy.context.scene.tool_settings.use_snap_uv_grid_absolute ^= 1
+            self.grid_snap ^= 1
             self.area.tag_redraw()
 
         if event.value == 'PRESS' and event.type in {'ONE', 'TWO', 'THREE', 'FOUR'}:
@@ -187,7 +188,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             kd_data = self.find()
             if not kd_data:
                 self.quick_start = False
-                self.report({'INFO'}, 'Not found nearest elem')
+                self.report({'WARNING'}, 'Not found nearest elem')
                 return {'PASS_THROUGH'}
 
             self.dragged = True
@@ -655,7 +656,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
         dist = (pos - m_pos).length
 
-        if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute \
+        if self.grid_snap \
                 and dist <= self.radius and dist < kd_data.distance:
             kd_data.found = (pos, 0, 0.0)
             kd_data.kdmesh = True
@@ -733,9 +734,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         blf.draw(font_id, 'G')
         blf.position(font_id, second_col, 20 + text_y_size*2, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
-        blf.draw(font_id, f"Grid: {'Enabled' if bpy.context.scene.tool_settings.use_snap_uv_grid_absolute else 'Disabled'}")
+        blf.draw(font_id, f"Grid: {'Enabled' if self.grid_snap else 'Disabled'}")
 
-        text = str(self.snap_points_mode).split('.')[1] if self.snap_points_mode else 'NONE'
+        if (text := self.snap_points_mode.name if self.snap_points_mode else 'NONE') is None:
+            text = str(self.snap_points_mode).split('.')[1]
         blf.position(font_id, first_col, 20 + text_y_size*3, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, '(Shift) 1-4')
