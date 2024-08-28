@@ -1,6 +1,8 @@
 # UniV
 Blender Addon for UV Editor which aims to cover all sorts of operators for working with UV
 
+[![Watch the video](https://i.ytimg.com/vi/KxYE8IHpVbE/maxresdefault.jpg)](https://youtu.be/KxYE8IHpVbE)
+
 There is much more to UniV operators than you might think at first glance. 
 Many operators are context-dependent, for example, on Sync state, selection mode (Verts, Edge, Face and Islands), as well as on pressed Ctrl, Shift, Alt (CSA) keys and combinations thereof. 
 
@@ -26,14 +28,14 @@ __Weld__ - [W] connects selected vertices by common vertexes, if there is nothin
  __Stitch__ - [Shift+W] connects islands to each other, preserving the islands' proportions. When called via keymap with sync enabled, the target island becomes the closest.
 * __Alt__ - finds all common island edges that have at least one __face__ selected, and connects through them.
 
-
 __Unwrap__ - differs from the built-in operator in that it unwrap inplace.
 
 __Relax__ - combination of minimize stretch and unwrap borders.
 
 __Cut__ - [C] - sets mark seams by border selection and at the same time expands the island
 
-__Quadrify__ - \[E\] align selected UV to rectangular distribution
+__Quadrify__ - [E] align selected UV to rectangular distribution
+
 __Straight__ - [Shift+E] straighten selected edge-chain and relax the rest of the UV Island
 
 __Sort__ - sorts islands, also aligns for more compactness.
@@ -60,10 +62,15 @@ __Align__ - straightens, moves islands or vertices, places a 2D cursor on bound 
 __Random__ - randomly transforms islands to break down repetitive patterns.
 
 __Linked__ - [Ctrl+Shift+Mouse Scroll] - Select Linked
+
 __Cursor__ - Select by Cursor
+
 __Border__ - Select border edges
+
 __Border by Angle__ - Select border edges by angle from 2D
+
 __Inner__ - Select inner edges by mark sharps, angle
+
 __Square__ - Select square, horizontal or vertical island
 
 __SyncUVToggle__ - [~] toggle sync mode with element selection preserve
