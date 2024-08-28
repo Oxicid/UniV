@@ -87,7 +87,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         area.ui_type = 'UV'
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.show_gizmo_navigate = False
+                        if hasattr(image_editor, 'show_gizmo_navigate'):
+                            image_editor.show_gizmo_navigate = False
 
                         area.tag_redraw()
                         c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
@@ -103,7 +104,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                     active_area.ui_type = 'UV'
 
                     image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                    image_editor.show_gizmo_navigate = False
+                    if hasattr(image_editor, 'show_gizmo_navigate'):
+                        image_editor.show_gizmo_navigate = False
 
                     self.category_setter_register(active_area)
                     return {'FINISHED'}
@@ -117,7 +119,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         area.ui_type = 'UV'
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.show_gizmo_navigate = False
+                        if hasattr(image_editor, 'show_gizmo_navigate'):
+                            image_editor.show_gizmo_navigate = False
 
                         self.category_setter_register(area)
                         return {'FINISHED'}
@@ -198,7 +201,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                     image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                     image_editor.uv_editor.show_stretch = True
                     image_editor.uv_editor.display_stretch_type = 'AREA'
-                    image_editor.show_gizmo_navigate = False
+                    if hasattr(image_editor, 'show_gizmo_navigate'):
+                        image_editor.show_gizmo_navigate = False
 
             self.category_setter_register(area)
 
@@ -225,7 +229,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                         image_editor.uv_editor.show_stretch = True
                         image_editor.uv_editor.display_stretch_type = 'AREA'
-                        image_editor.show_gizmo_navigate = False
+                        if hasattr(image_editor, 'show_gizmo_navigate'):
+                            image_editor.show_gizmo_navigate = False
 
                         active_area.tag_redraw()
                         return {'FINISHED'}
@@ -244,7 +249,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
                         image_editor.uv_editor.show_stretch = True
                         image_editor.uv_editor.display_stretch_type = 'AREA'
-                        image_editor.show_gizmo_navigate = False
+                        if hasattr(image_editor, 'show_gizmo_navigate'):
+                            image_editor.show_gizmo_navigate = False
 
                         area.tag_redraw()
                         return {'FINISHED'}
@@ -282,7 +288,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                             bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
                             bpy.context.space_data.uv_editor.show_stretch = True
                             bpy.context.space_data.uv_editor.display_stretch_type = 'AREA'
-                            bpy.context.space_data.show_gizmo_navigate = False
+                            if hasattr(bpy.context.space_data, 'show_gizmo_navigate'):
+                                bpy.context.space_data.show_gizmo_navigate = False
                         break
             except TypeError:
                 if force_debug():
