@@ -66,8 +66,8 @@ def add_draw_rect(data):
     global uv_handle
 
     start = time()
-    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
 
+    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
     batch = batch_for_shader(shader, 'LINES', {"pos": data})
 
     if not (uv_handle is None):

@@ -673,8 +673,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         if bpy.app.version < (3, 5, 0):
             import bgl
-            bgl.glLineWidth(4)
-            bgl.glEnable(bgl.GL_BLEND)
+            bgl.glPointSize(4)
+            bgl.glEnable(bgl.GL_ALPHA)
         else:
             gpu.state.point_size_set(4)
             gpu.state.blend_set('ALPHA')
