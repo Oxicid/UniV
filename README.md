@@ -3,6 +3,18 @@ Blender Addon for UV Editor which aims to cover all sorts of operators for worki
 
 [![Watch the video](https://i.ytimg.com/vi/KxYE8IHpVbE/maxresdefault.jpg)](https://youtu.be/KxYE8IHpVbE)
 
+Buy:
+
+ * [Gumroad](https://oxicid.gumroad.com/l/hblxa)
+
+ * [Blender Market](https://blendermarket.com/products/univ?search_id=32308413)
+
+Free Download:
+
+ * [GitHub](https://github.com/Oxicid/UniV/releases)
+
+ * [Blender Extension](https://extensions.blender.org/approval-queue/univ/)
+
 There is much more to UniV operators than you might think at first glance. 
 Many operators are context-dependent, for example, on Sync state, selection mode (Verts, Edge, Face and Islands), as well as on pressed Ctrl, Shift, Alt (CSA) keys and combinations thereof. 
 
