@@ -28,17 +28,23 @@ But you don't have to use the CSA keys, because a panel appears in the lower lef
 Also, the addon doesn't impose its hotkeys on you, but you can easily enable them in Settings->Extensions->UniV->Keymaps. But some operators due to their specificity can be called only through keymaps (QuickSnap, SplitUVToggle, SyncUVToggle).
 
 ## Operators
-__Quick Snap__ - allows you to transform an island or geometry elements by Vertex, Edge Center and Face Center. There are two methods of calling the operator via the keys: 
+__Quick Snap__ - allows you to transform an island or geometry elements by Vertex, Edge Center and Face Center. There are two methods of calling the operator via the keys:
  * __V__ - quick start, the nearest transformation element is selected immediately
  * __Alt+V__ - here you can safely select the necessary element and change the modes to __Island__ or __Element__ mode
 
-__Stack__ - overlap islands with similar geometry
+![QuickSnap](https://github.com/user-attachments/assets/9ef6a4eb-f82b-4070-9794-75a1660d2340)
+
+__Stack__ - overlap islands with similar geometry:
+
+![Stack](https://github.com/user-attachments/assets/dd521f1f-e6c3-4708-8b69-f42a3e2fce21)
 
 __Weld__ - [W] connects selected vertices by common vertexes, if there is nothing to connect, it works as __Stitch__
  * __Alt+Weld Button__ - connect by distance
 
- __Stitch__ - [Shift+W] connects islands to each other, preserving the islands' proportions. When called via keymap with sync enabled, the target island becomes the closest.
+ __Stitch__ - [Shift+W] connects islands to each other, preserving the islands' proportions. When called via keymap with sync enabled, the target island becomes the closest:
 * __Alt__ - finds all common island edges that have at least one __face__ selected, and connects through them.
+
+![Stitch](https://github.com/user-attachments/assets/272e1186-a558-4c8a-9f70-505a38f30f29)
 
 __Unwrap__ - differs from the built-in operator in that it unwrap inplace.
 
