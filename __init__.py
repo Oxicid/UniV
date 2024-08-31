@@ -40,74 +40,78 @@ from . import ui
 from . import keymaps
 from . import preferences
 
-classes = (
-    preferences.UNIV_AddonPreferences,
-    keymaps.UNIV_RestoreKeymaps,
-    # Transforms
-    transform.UNIV_OT_Orient,
-    transform.UNIV_OT_Orient_VIEW3D,
-    transform.UNIV_OT_Align,
-    transform.UNIV_OT_Fill,
-    transform.UNIV_OT_Crop,
-    transform.UNIV_OT_Flip,
-    transform.UNIV_OT_Rotate,
-    transform.UNIV_OT_Sort,
-    transform.UNIV_OT_Distribute,
-    transform.UNIV_OT_Home,
-    transform.UNIV_OT_Random,
-    transform.UNIV_OT_Weld,
-    transform.UNIV_OT_Stitch,
-    # Quadrify
-    quadrify.UNIV_OT_Quadrify,
-    straight.UNIV_OT_Straight,
-    relax.UNIV_OT_Relax,
-    unwrap.UNIV_OT_Unwrap,
-    # Toggles
-    toggle.UNIV_OT_SplitUVToggle,
-    toggle.UNIV_OT_SyncUVToggle,
-    # Selects
-    select.UNIV_OT_SelectLinked,
-    select.UNIV_OT_Select_By_Cursor,
-    select.UNIV_OT_SelectView,
-    select.UNIV_OT_Single,
-    select.UNIV_OT_Select_Square_Island,
-    select.UNIV_OT_Select_Border,
-    select.UNIV_OT_Select_Inner,
-    select.UNIV_OT_Select_Zero,
-    select.UNIV_OT_Select_Flipped,
-    select.UNIV_OT_Select_Border_Edge_by_Angle,
-    # QuickSnap
-    quick_snap.UNIV_OT_QuickSnap,
-    # UI
-    ui.UNIV_PT_General,
-    ui.UNIV_PT_General_VIEW_3D,
-    # Seam
-    seam.UNIV_OT_Cut_VIEW2D,
-    seam.UNIV_OT_Cut_VIEW3D,
-    seam.UNIV_OT_Angle,
-    # Project
-    project.UNIV_Plane,
-    project.UNIV_BoxProject,
-    # Stack
-    stack.UNIV_OT_Stack,
-)
+try:
+    classes = (
+        preferences.UNIV_AddonPreferences,
+        keymaps.UNIV_RestoreKeymaps,
+        # Transforms
+        transform.UNIV_OT_Orient,
+        transform.UNIV_OT_Orient_VIEW3D,
+        transform.UNIV_OT_Align,
+        transform.UNIV_OT_Fill,
+        transform.UNIV_OT_Crop,
+        transform.UNIV_OT_Flip,
+        transform.UNIV_OT_Rotate,
+        transform.UNIV_OT_Sort,
+        transform.UNIV_OT_Distribute,
+        transform.UNIV_OT_Home,
+        transform.UNIV_OT_Random,
+        transform.UNIV_OT_Weld,
+        transform.UNIV_OT_Stitch,
+        # Quadrify
+        quadrify.UNIV_OT_Quadrify,
+        straight.UNIV_OT_Straight,
+        relax.UNIV_OT_Relax,
+        unwrap.UNIV_OT_Unwrap,
+        # Toggles
+        toggle.UNIV_OT_SplitUVToggle,
+        toggle.UNIV_OT_SyncUVToggle,
+        # Selects
+        select.UNIV_OT_SelectLinked,
+        select.UNIV_OT_Select_By_Cursor,
+        select.UNIV_OT_SelectView,
+        select.UNIV_OT_Single,
+        select.UNIV_OT_Select_Square_Island,
+        select.UNIV_OT_Select_Border,
+        select.UNIV_OT_Select_Inner,
+        select.UNIV_OT_Select_Zero,
+        select.UNIV_OT_Select_Flipped,
+        select.UNIV_OT_Select_Border_Edge_by_Angle,
+        # QuickSnap
+        quick_snap.UNIV_OT_QuickSnap,
+        # UI
+        ui.UNIV_PT_General,
+        ui.UNIV_PT_General_VIEW_3D,
+        # Seam
+        seam.UNIV_OT_Cut_VIEW2D,
+        seam.UNIV_OT_Cut_VIEW3D,
+        seam.UNIV_OT_Angle,
+        # Project
+        project.UNIV_Plane,
+        project.UNIV_BoxProject,
+        # Stack
+        stack.UNIV_OT_Stack,
+    )
+except AttributeError:
+    traceback.print_exc()
+    classes = ()
 
 is_enabled = False
 
 def register():
-    # Force reload by kaio: https://devtalk.blender.org/t/blender-2-91-addon-dev-workflow/15320/6
     global is_enabled
-    if is_enabled:
-        import sys
-        import importlib
-        sys.modules[__name__] = importlib.reload(sys.modules[__name__])
-        for name, module in sys.modules.copy().items():
-            if name.startswith(f"{__package__}."):
-                globals()[name] = importlib.reload(module)
+    if is_enabled or not classes:
+        from . import reload
+        reload.reload(globals())
+        if not classes:
+            raise AttributeError('Failed to load operators, try re-enabling or restarting Blender')
     is_enabled = True
 
     for c in classes:
-        bpy.utils.register_class(c)
+        try:
+            bpy.utils.register_class(c)
+        except Exception:  # noqa
+            traceback.print_exc()
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -122,11 +126,11 @@ def register():
 def unregister():
     keymaps.remove_keymaps()
 
-    try:
-        for c in reversed(classes):
+    for c in reversed(classes):
+        try:
             bpy.utils.unregister_class(c)
-    except Exception:  # noqa
-        traceback.print_exc()
+        except Exception:  # noqa
+            traceback.print_exc()
 
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
