@@ -32,21 +32,27 @@ __Quick Snap__ - allows you to transform an island or geometry elements by Verte
  * __V__ - quick start, the nearest transformation element is selected immediately
  * __Alt+V__ - here you can safely select the necessary element and change the modes to __Island__ or __Element__ mode
 
-![QuickSnap](https://github.com/user-attachments/assets/9ef6a4eb-f82b-4070-9794-75a1660d2340)
+<img src="https://github.com/user-attachments/assets/9ef6a4eb-f82b-4070-9794-75a1660d2340" width="350">
 
 __Stack__ - overlap islands with similar geometry:
 
-![Stack](https://github.com/user-attachments/assets/dd521f1f-e6c3-4708-8b69-f42a3e2fce21)
+<img src="https://github.com/user-attachments/assets/dd521f1f-e6c3-4708-8b69-f42a3e2fce21" width="350">
 
-__Weld__ - [W] connects selected vertices by common vertexes, if there is nothing to connect, it works as __Stitch__
+__Weld__ - [W] connects selected vertices by common vertexes, if there is nothing to connect, it works as __Stitch__ 
+<img src="https://github.com/user-attachments/assets/8da45e1f-36f8-4f6a-94a2-a9240c5773a2" width="350">
+
  * __Alt+Weld Button__ - connect by distance
+  
+   <img src="https://github.com/user-attachments/assets/f78a3492-c64b-435c-8878-6dda1b062999" width="350">
 
  __Stitch__ - [Shift+W] connects islands to each other, preserving the islands' proportions. When called via keymap with sync enabled, the target island becomes the closest:
 * __Alt__ - finds all common island edges that have at least one __face__ selected, and connects through them.
 
-![Stitch](https://github.com/user-attachments/assets/272e1186-a558-4c8a-9f70-505a38f30f29)
+<img src="https://github.com/user-attachments/assets/272e1186-a558-4c8a-9f70-505a38f30f29" width="350">
 
 __Unwrap__ - differs from the built-in operator in that it unwrap inplace.
+
+<img src="https://github.com/user-attachments/assets/55fd93cf-4ad1-46e6-a2be-df9f4fc861a0" width="350">
 
 __Relax__ - combination of minimize stretch and unwrap borders.
 
@@ -54,7 +60,13 @@ __Cut__ - [C] - sets mark seams by border selection and at the same time expands
 
 __Quadrify__ - [E] align selected UV to rectangular distribution
 
+<img src="https://github.com/user-attachments/assets/8bf353f6-8dc0-45bb-bd0f-ee269ea2165b" width="350">
+
+
 __Straight__ - [Shift+E] straighten selected edge-chain and relax the rest of the UV Island
+
+<img src="https://github.com/user-attachments/assets/c724dd15-e949-4529-aa93-5eb6e218fa59" width="350">
+
 
 __Sort__ - sorts islands, also aligns for more compactness.
  * __Axis__ - default is auto, which gives double priority to width, from the original boundary box
