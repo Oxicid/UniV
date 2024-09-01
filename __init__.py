@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 2, 0),
+    "version": (1, 2, 4),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -69,7 +69,6 @@ try:
         # Selects
         select.UNIV_OT_SelectLinked,
         select.UNIV_OT_Select_By_Cursor,
-        select.UNIV_OT_SelectView,
         select.UNIV_OT_Select_Square_Island,
         select.UNIV_OT_Select_Border,
         select.UNIV_OT_Select_Inner,

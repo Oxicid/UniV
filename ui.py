@@ -110,7 +110,6 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_select_by_cursor', text='Cursor')
-        row.operator('uv.univ_select_view', text='View')
 
         row = col.split().row(align=True)
         row.operator('uv.univ_select_border', text='Border')
