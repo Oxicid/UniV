@@ -13,6 +13,6 @@ def reload(globals_: dict[str, object]):
     unexpected results, so you should restart blender in strange situations"""
     for name, module in globals_.copy().items():
         if inspect.ismodule(module):
-            module_path = module.__file__
+            module_path = getattr(module, '__file__', None)
             if module_path and __package__ in module_path and 'reload' not in module_path:
                 globals_[name] = importlib.reload(module)

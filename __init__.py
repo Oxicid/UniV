@@ -119,7 +119,7 @@ def register():
 
     try:
         keymaps.add_keymaps()
-    except AttributeError:  # noqa
+    except AttributeError:
         traceback.print_exc()
 
 
@@ -129,7 +129,9 @@ def unregister():
     for c in reversed(classes):
         try:
             bpy.utils.unregister_class(c)
-        except Exception:  # noqa
+        except RuntimeError:
+            if not hasattr(c, 'rna_type'):
+                continue
             traceback.print_exc()
 
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
