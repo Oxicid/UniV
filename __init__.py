@@ -70,7 +70,6 @@ try:
         select.UNIV_OT_SelectLinked,
         select.UNIV_OT_Select_By_Cursor,
         select.UNIV_OT_SelectView,
-        select.UNIV_OT_Single,
         select.UNIV_OT_Select_Square_Island,
         select.UNIV_OT_Select_Border,
         select.UNIV_OT_Select_Inner,

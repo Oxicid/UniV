@@ -15,7 +15,7 @@ from time import perf_counter as time
 
 from .. import utils
 from .. import types
-from ..types import Islands, AdvIslands, AdvIsland,  MeshIslands, BBox
+from ..types import Islands, AdvIslands, AdvIsland,  BBox
 
 
 from ..utils import (
@@ -473,110 +473,6 @@ class UNIV_OT_Select_By_Cursor(UNIV_OT_SelectView):
 
         return umeshes.update()
 
-class UNIV_OT_Single(Operator):
-    bl_idname = 'uv.univ_single'
-    bl_label = 'Single'
-    bl_options = {'REGISTER', 'UNDO'}
-
-    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
-        ('SELECT', 'Select', ''),
-        ('ADDITIONAL', 'Additional', ''),
-        ('DESELECT', 'Deselect', ''),
-    ))
-    invert: BoolProperty(name='Invert', default=False)
-
-    def __init__(self):
-        self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.umeshes: UMeshes | None = None
-
-    @classmethod
-    def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
-
-    def invoke(self, context, event):
-        if event.value == 'PRESS':
-            return self.execute(context)
-
-        self.invert = event.alt
-
-        if event.ctrl:
-            self.mode = 'DESELECT'
-        elif event.shift:
-            self.mode = 'ADDITIONAL'
-        else:
-            self.mode = 'SELECT'
-
-        return self.execute(context)
-
-    def execute(self, context):
-
-        if not self.sync:
-            if self.mode == 'ADDITIONAL':
-                bpy.ops.uv.univ_sync_uv_toggle()  # noqa
-            bpy.context.scene.tool_settings.use_uv_select_sync = True
-            self.sync = True
-
-        if utils.get_select_mode_mesh() != 'FACE':
-            utils.set_select_mode_mesh('FACE')
-
-        self.umeshes = utils.UMeshes(report=self.report)
-        self.select()
-
-        return self.umeshes.update()
-
-    def select(self):
-        total_selected = 0
-        total_deselected = 0
-
-        for umesh in self.umeshes:
-            if self.mode == 'ADDITIONAL' and types.PyBMesh.is_full_face_selected(umesh.bm):
-                umesh.update_tag = False
-                continue
-            elif self.mode == 'DESELECT' and types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
-            selected = 0
-            deselected = 0
-            if islands := AdvIslands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
-                islands.indexing()
-
-                for mesh_island in MeshIslands.calc_visible(umesh):
-                    indexes = {f.index for f in mesh_island}
-                    state = len(indexes) == 1
-                    if self.invert:
-                        state ^= 1
-
-                    if self.mode == 'SELECT':
-                        if state:
-                            mesh_island.select = True
-                            selected += 1
-                        else:
-                            mesh_island.deselect(mode='FACE')
-                            deselected += 1
-                    elif self.mode == 'DESELECT':
-                        if state:
-                            mesh_island.deselect(mode='FACE')
-                            deselected += 1
-                    else:
-                        if state:
-                            mesh_island.select = True
-                            deselected += 1
-
-            umesh.update_tag = bool(selected + deselected)
-
-        if total_selected or total_deselected:
-            selected_deselected_info = ''
-            if total_selected:
-                selected_deselected_info = f'Total selected = {total_selected}. '
-            if total_deselected:
-                selected_deselected_info += f'Total deselected = {total_deselected}'
-
-            self.report({'INFO'}, selected_deselected_info)
 
 class UNIV_OT_Select_Square_Island(Operator):
     bl_idname = 'uv.univ_select_square_island'
