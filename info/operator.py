@@ -7,8 +7,7 @@ align_event_info_ex = \
         "Ctrl - Align to cursor. Mnemonic - Cursor(Ctrl) faces/verts\n" \
         "Ctrl+Shift+Alt - Align to cursor union\n" \
         "Alt - Align to faces/verts\n" \
-        "Ctrl+Alt - Cursor to Tile. Mnemonic - Current(Ctrl) tile cursor Align(Alt)\n" \
-        "Shift+Alt - Move Cursor. Mnemonic - Move(Shift) Acros(Alt) cursor"
+        "Ctrl+Alt - Cursor to Tile. Mnemonic - Current(Ctrl) tile cursor Align(Alt)"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 align_info = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
 

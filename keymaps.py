@@ -212,31 +212,6 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
-    ## Move Cursor
-    kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', shift=True, alt=True)
-    kmi.properties.mode = 'MOVE_CURSOR'
-    kmi.properties.direction = 'UPPER'
-    kmi.active = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', shift=True, alt=True)
-    kmi.properties.mode = 'MOVE_CURSOR'
-    kmi.properties.direction = 'BOTTOM'
-    kmi.active = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', shift=True, alt=True)
-    kmi.properties.mode = 'MOVE_CURSOR'
-    kmi.properties.direction = 'RIGHT'
-    kmi.active = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', shift=True, alt=True)
-    kmi.properties.mode = 'MOVE_CURSOR'
-    kmi.properties.direction = 'LEFT'
-    kmi.active = False
-    keys.append((km, kmi))
-
     ## Cursor to Tile
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', ctrl=True, alt=True)
     kmi.properties.mode = 'CURSOR_TO_TILE'

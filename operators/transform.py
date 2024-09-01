@@ -260,7 +260,6 @@ class UNIV_OT_Align(Operator):
         ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
         ('CURSOR_TO_TILE', 'Align cursor to tile', ''),
-        ('MOVE_CURSOR', 'Move cursor', ''),
         # ('MOVE_COLLISION', 'Collision move', '')
     ))
 
@@ -290,8 +289,6 @@ class UNIV_OT_Align(Operator):
                 self.mode = 'ALIGN_CURSOR'
             case True, False, True:
                 self.mode = 'CURSOR_TO_TILE'
-            case False, True, True:
-                self.mode = 'MOVE_CURSOR'
             case False, True, False:
                 self.mode = 'MOVE'
             case _:
@@ -347,13 +344,6 @@ class UNIV_OT_Align(Operator):
                     umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
                 UNIV_OT_Align.align_cursor_to_tile(direction, cursor_loc)
-                return {'FINISHED'}
-
-            case 'MOVE_CURSOR':
-                if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                UNIV_OT_Align.move_cursor(direction, cursor_loc)
                 return {'FINISHED'}
 
             case 'MOVE':
@@ -629,14 +619,6 @@ class UNIV_OT_Align(Operator):
                 raise NotImplementedError(direction)
         utils.set_cursor_location((x, y))
 
-    @staticmethod
-    def move_cursor(direction: str, cursor_loc):
-        match direction:
-            case 'CENTER' | 'HORIZONTAL' | 'VERTICAL':
-                UNIV_OT_Align.align_cursor_to_tile(direction, cursor_loc)
-            case _:
-                delta = Vector(UNIV_OT_Align.get_move_value(direction))
-                utils.set_cursor_location(cursor_loc+delta)
 
     @staticmethod
     def get_move_value(direction):
