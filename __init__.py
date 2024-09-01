@@ -87,7 +87,7 @@ try:
         seam.UNIV_OT_Cut_VIEW3D,
         seam.UNIV_OT_Angle,
         # Project
-        project.UNIV_Plane,
+        project.UNIV_Normal,
         project.UNIV_BoxProject,
         # Stack
         stack.UNIV_OT_Stack,

@@ -1,23 +1,28 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+if 'bpy' in locals():
+    from . import btypes
+    from . import bbox
+    from . import island
+    from . import loop_group
+    from . import mesh_island
+    from . import ray
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    from .. import reload
+    reload.reload(globals())
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+    del btypes
+    del bbox
+    del island
+    del mesh_island
+    del loop_group
+    del ray
 
+import bpy  # noqa: F401
 from .btypes import *
 from .bbox import *
 from .island import *
-from .mesh_island import *
 from .loop_group import *
+from .mesh_island import *
 from .ray import *

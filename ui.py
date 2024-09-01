@@ -164,7 +164,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         self.layout.label(text='Project')
         row = self.layout.row(align=True)
-        row.operator('mesh.univ_plane', text='Plane')
+        row.operator('mesh.univ_normal', text='Normal')
         row.operator('mesh.univ_box_project', text='Box')
 
         self.layout.label(text='Stack')

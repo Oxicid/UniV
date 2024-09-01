@@ -1,16 +1,22 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 
 from math import pi
+from . import transform  # noqa: F401
 from .transform import UNIV_OT_Crop
 from .. import utils
+from .. import types  # noqa: F401
 from ..types import BBox, MeshIsland, MeshIslands
 from mathutils import Vector, Euler, Matrix
 
-class UNIV_Plane(bpy.types.Operator):
-    bl_idname = "mesh.univ_plane"
+class UNIV_Normal(bpy.types.Operator):
+    bl_idname = "mesh.univ_normal"
     bl_label = "Project by Normal"
     bl_description = "Projection by faces normal"
     bl_options = {'REGISTER', 'UNDO'}
