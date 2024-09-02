@@ -129,6 +129,8 @@ class SaveTransform:
         self.island.move(Vector((x if sign_x else -x, y if sign_y else -y)))
 
     def inplace(self):
+        if not self.rotate:
+            return
         uv = self.island.uv_layer
 
         crn_co = self.target_crn[uv].uv if self.target_crn else Vector((0.0, 0.0))
@@ -146,9 +148,8 @@ class SaveTransform:
                 self.island.scale(Vector((scale, scale)), pivot)  # TODO: Optimize when implement simple scale_with_set_position
             self.island.set_position(self.bbox.center, pivot)
         else:  # TODO: Fix large islands
-            if self.rotate:
-                if angle := old_dir.angle_signed(new_dir, 0):
-                    self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
+            if angle := old_dir.angle_signed(new_dir, 0):
+                self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.island.calc_bbox()
 
             if self.bbox.width > self.bbox.height:
