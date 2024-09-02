@@ -1,12 +1,17 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import bmesh
 import math
 import mathutils
 import typing
 import enum
+import itertools
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
@@ -27,76 +32,141 @@ class eInfoSelectFaceIsland(enum.IntEnum):
     FULL_SELECTED = 2
 
 class SaveTransform:
-    def __init__(self, island: 'FaceIsland | AdvIsland', fast=False):
+    def __init__(self, island: 'FaceIsland | AdvIsland'):
         self.island = island
+        self.old_crn_pos: list[Vector | float] = []  # need for mix co
+        self.rotate = True
+        self.is_full_selected = False
+        self.target_crn: BMLoop | None = None
+        self.old_coords: list[Vector] = [Vector((0, 0)), Vector((0, 0))]
         uv = island.uv_layer
-        if not fast:
-            if utils.sync():
-                if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
-                    corners = [crn for f in island if not f.select for crn in f.loops]
-                elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
-                    corners = [crn for f in island for crn in f.loops if not crn.edge.select]
-                else:  # VERTS
-                    corners = [crn for f in island for crn in f.loops if not crn.vert.select]
-            else:
-                corners = [crn for f in island for crn in f.loops if not crn[uv].select]
 
-            if not corners:
-                corners = [crn for f in island for crn in f.loops]
-            else:
-                first = corners[0]
-                if all(first == _crn for _crn in corners):
-                    corners = [crn for f in island for crn in f.loops]
+        corners, pinned_corners = self.calc_static_corners(island, uv)
+        if corners or pinned_corners:
+            corners_iter = itertools.chain(corners, pinned_corners)
+            co = next(corners_iter)[uv].uv
+            for crn_ in corners_iter:
+                if co != crn_[uv].uv:
+                    self.rotate = False
+                    break
+            if self.rotate:
+                max_length = -1.0
+                max_length_crn = None
+                for crn_ in itertools.chain(corners, pinned_corners):
+                    if max_length < (new_length := (crn_[uv].uv - crn_.link_loop_next[uv].uv).length_squared):
+                        max_length = new_length
+                        max_length_crn = crn_
+
+                self.target_crn = max_length_crn  # TODO: Get neutral stretched corner
+                self.old_coords = [max_length_crn[uv].uv.copy(), max_length_crn.link_loop_next[uv].uv.copy()]
+
         else:
-            corners = [crn for f in island for crn in f.loops]
+            self.is_full_selected = True
+            max_uv_area_face = island.calc_max_uv_area_face()
+            max_length_crn = utils.calc_max_length_uv_crn(max_uv_area_face.loops, uv)
+            max_length_crn[uv].pin_uv = True
+            self.target_crn = max_length_crn
+            self.old_coords = [max_length_crn[uv].uv.copy(), max_length_crn.link_loop_next[uv].uv.copy()]
 
-        self.bbox, self.corners = BBox.calc_bbox_with_corners(corners, island.uv_layer)
-        self.corners_co: list[Vector] = [crn[uv].uv.copy() for crn in self.corners]
-        self.old_crn_pos: list[Vector | float] = []
+        self.bbox = self.island.calc_bbox()
+
+    @staticmethod
+    def calc_static_corners(island, uv) -> tuple[list[BMLoop], list[BMLoop]]:
+        corners = []
+        pinned_corners = []
+        if utils.sync():
+            if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
+                for f in island:
+                    if f.select:
+                        for crn in f.loops:
+                            if crn[uv].pin_uv:
+                                pinned_corners.append(crn)
+                    else:
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if crn_uv.pin_uv:
+                                pinned_corners.append(crn)
+                            else:
+                                # crn_uv.pin_uv = True
+                                corners.append(crn)
+            elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+                for f in island:
+                    for crn in f.loops:
+                        crn_uv = crn[uv]
+                        if not crn.edge.select:
+                            # crn_uv.pin_uv = True
+                            corners.append(crn)
+                        elif crn_uv.pin_uv:
+                            pinned_corners.append(crn)
+
+            else:  # VERTS
+                for f in island:
+                    for crn in f.loops:
+                        crn_uv = crn[uv]
+                        if not crn.vert.select:
+                            # crn_uv.pin_uv = True
+                            corners.append(crn)
+                        elif crn_uv.pin_uv:
+                            pinned_corners.append(crn)
+        else:
+            for f in island:
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    if not crn_uv.select:
+                        # crn_uv.pin_uv = True
+                        corners.append(crn)
+                    elif crn_uv.pin_uv:
+                        pinned_corners.append(crn)
+
+        return corners, pinned_corners
 
     def shift(self):
+        """A small shift to keep the island from merging."""
         sign_x = hash(self.bbox.width) % 2 == 0
         sign_y = hash(self.bbox.width) % 2 == 0
         x = self.bbox.width * 0.005
         y = self.bbox.height * 0.005
-        for co in self.corners_co:
-            co += Vector((x if sign_x else -x, y if sign_y else -y))
+        self.island.move(Vector((x if sign_x else -x, y if sign_y else -y)))
 
     def inplace(self):
-        if self.bbox.max_length < 2e-08:
-            self.island.set_position(self.corners_co[0], self.island.calc_bbox().center)
-        else:
-            width_a1 = self.corners_co[0]
-            width_a2 = self.corners_co[1]
-            width_b1 = self.corners[0][self.island.uv_layer].uv
-            width_b2 = self.corners[1][self.island.uv_layer].uv
+        uv = self.island.uv_layer
 
-            height_a1 = self.corners_co[2]
-            height_a2 = self.corners_co[3]
-            height_b1 = self.corners[2][self.island.uv_layer].uv
-            height_b2 = self.corners[3][self.island.uv_layer].uv
+        crn_co = self.target_crn[uv].uv if self.target_crn else Vector((0.0, 0.0))
+        crn_next_co = self.target_crn.link_loop_next[uv].uv if self.target_crn else Vector((0.0, 0.0))
 
-            width_old_vec = width_a1 - width_a2
-            width_new_vec = width_b1 - width_b2
+        old_dir = self.old_coords[0] - self.old_coords[1]
+        new_dir = crn_co - crn_next_co
 
-            height_old_vec = height_a1 - height_a2
-            height_new_vec = height_b1 - height_b2
-
-            self.island.rotate_simple(max(width_old_vec.angle_signed(width_new_vec, 0), height_old_vec.angle_signed(height_new_vec, 0)))
+        if self.bbox.max_length < 2e-05:  # Small and zero area island protection
+            new_bbox = self.island.calc_bbox()
+            pivot = new_bbox.center
+            if new_bbox.max_length != 0:
+                self.island.rotate(old_dir.angle_signed(new_dir, 0), pivot)
+                scale = 0.15 / new_bbox.max_length
+                self.island.scale(Vector((scale, scale)), pivot)  # TODO: Optimize when implement simple scale_with_set_position
+            self.island.set_position(self.bbox.center, pivot)
+        else:  # TODO: Fix large islands
+            if self.rotate:
+                if angle := old_dir.angle_signed(new_dir, 0):
+                    self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
+            new_bbox = self.island.calc_bbox()
 
             if self.bbox.width > self.bbox.height:
-                scale = width_old_vec.length / width_new_vec.length
-                self.island.scale_simple(Vector((scale, scale)))
 
-                old_center = (width_a1 + width_a2) / 2
-                new_center = (width_b1 + width_b2) / 2
+                scale = self.bbox.width / new_bbox.width
+                self.island.scale(Vector((scale, scale)), new_bbox.center)
+
+                old_center = self.bbox.center
+                new_center = new_bbox.center
             else:
-                scale = height_old_vec.length / height_new_vec.length
-                self.island.scale_simple(Vector((scale, scale)))
+                scale = self.bbox.height / new_bbox.height
+                self.island.scale(Vector((scale, scale)), new_bbox.center)
 
-                old_center = (height_a1 + height_a2) / 2
-                new_center = (height_b1 + height_b2) / 2
+                old_center = self.bbox.center
+                new_center = new_bbox.center
             self.island.set_position(old_center, new_center)
+        if self.is_full_selected:
+            self.target_crn[uv].pin_uv = False
 
     def save_coords(self, axis, mix):
         if mix == 1:
@@ -113,7 +183,7 @@ class SaveTransform:
         if mix == 1:
             return
         uv = self.island.uv_layer
-        corners = [crn[uv].uv for f in self.island for crn in f.loops]
+        corners = (crn[uv].uv for f in self.island for crn in f.loops)
         if mix == 0:
             if axis == 'X':
                 for crn_uv, old_co in zip(corners, self.old_crn_pos):
@@ -464,6 +534,16 @@ class FaceIsland:
                         crn.edge.seam |= seam
                     else:
                         crn.edge.seam = seam
+
+    def calc_max_uv_area_face(self):
+        uv = self.uv_layer
+        area = -1.0
+        face = None
+        for f in self.faces:
+            if area < (area_ := utils.calc_face_area_uv(f, uv)):
+                area = area_
+                face = f
+        return face
 
     def clear(self):
         self.faces = []

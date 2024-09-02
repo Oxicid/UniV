@@ -22,6 +22,20 @@ def face_centroid_uv(f: BMFace, uv_layer: BMLayerItem):
         value += l[uv_layer].uv
     return value / len(loops)
 
+def calc_face_area_uv(f, uv) -> float:
+    area = 0.0
+    for crn in f.loops:
+        area += abs(crn[uv].uv.cross(crn.link_loop_next[uv].uv))
+    return area
+
+def calc_max_length_uv_crn(corners, uv) -> BMLoop:
+    length = -1.0
+    crn_ = None
+    for crn in corners:
+        if length < (length_ := (crn[uv].uv - crn.link_loop_next[uv].uv).length_squared):
+            crn_ = crn
+            length = length_
+    return crn_
 
 # Need implement disc_next disc_prev
 # def calc_non_manifolds_uv(bm, uv_layer):
