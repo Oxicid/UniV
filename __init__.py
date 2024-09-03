@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 3, 0),
+    "version": (1, 3, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -48,6 +48,7 @@ try:
         # Inspect
         inspect.UNIV_OT_Check_Zero,
         inspect.UNIV_OT_Check_Flipped,
+        inspect.UNIV_OT_Check_Non_Splitted,
         # Transforms
         transform.UNIV_OT_Orient,
         transform.UNIV_OT_Orient_VIEW3D,
@@ -75,7 +76,6 @@ try:
         select.UNIV_OT_Select_By_Cursor,
         select.UNIV_OT_Select_Square_Island,
         select.UNIV_OT_Select_Border,
-        select.UNIV_OT_Select_Inner,
         select.UNIV_OT_Select_Border_Edge_by_Angle,
         # QuickSnap
         quick_snap.UNIV_OT_QuickSnap,

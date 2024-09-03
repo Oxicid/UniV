@@ -555,9 +555,12 @@ def calc_selected_uv_corners_iter(bm, uv_layer, sync) -> 'typing.Generator[BMLoo
 def calc_visible_uv_corners(bm, sync) -> list[BMLoop]:
     if sync:
         return [luv for f in bm.faces if not f.hide for luv in f.loops]
+
     if PyBMesh.fields(bm).totfacesel == 0:
         return []
-    return [luv for f in bm.faces if (f.select and not f.hide) for luv in f.loops]
+    if PyBMesh.is_full_face_deselected(bm):
+        return [luv for f in bm.faces for luv in f.loops]
+    return [luv for f in bm.faces if f.select for luv in f.loops]
 
 def calc_uv_corners(bm, uv_layer, sync, *, selected) -> list[BMLoop]:
     if selected:

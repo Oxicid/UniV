@@ -113,7 +113,6 @@ class UNIV_PT_General(Panel):
 
         row = col.split().row(align=True)
         row.operator('uv.univ_select_border', text='Border')
-        row.operator('uv.univ_select_inner', text='Inner')
 
         split = col.split(factor=0.65, align=True)
         split.operator('uv.univ_select_border_edge_by_angle', text='Border by Angle').edge_dir = 'BOTH'
@@ -134,6 +133,9 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_check_zero', text='Zero')
         split.operator('uv.univ_check_flipped', text='Flipped')
+
+        split = col_align.split(align=True)
+        split.row(align=True).operator('uv.univ_check_non_splitted', text='Non-Splitted')
 
         # Seam
         col_align = col.column(align=True)
