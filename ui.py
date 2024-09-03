@@ -132,8 +132,8 @@ class UNIV_PT_General(Panel):
         col_align.label(text='Inspect')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_select_zero', text='Zero')
-        split.operator('uv.univ_select_flipped', text='Flipped')
+        split.operator('uv.univ_check_zero', text='Zero')
+        split.operator('uv.univ_check_flipped', text='Flipped')
 
         # Seam
         col_align = col.column(align=True)

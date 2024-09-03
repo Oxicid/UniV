@@ -332,6 +332,7 @@ class UMeshes:
             self.umeshes: list[UMesh] = umeshes
         self.report_obj = report
         self._cancel = False
+        self.sync: bool = sync()
 
     def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self.report_obj is None:
@@ -392,6 +393,7 @@ class UMeshes:
     def set_sync(self, state=True):
         for umesh in self:
             umesh.sync = state
+        self.sync = state
 
     def free(self):
         for umesh in self:

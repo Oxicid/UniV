@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 2, 9),
+    "version": (1, 3, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -25,17 +25,18 @@ from .types import bbox    # noqa: F401
 from .types import btypes  # noqa: F401
 from .types import island  # noqa: F401
 from .types import mesh_island  # noqa: F401
-from .operators import straight
-from .operators import quadrify
-from .operators import relax
-from .operators import unwrap
-from .operators import transform
-from .operators import toggle
-from .operators import select
-from .operators import seam
-from .operators import quick_snap
+from .operators import inspect
 from .operators import project
+from .operators import quadrify
+from .operators import quick_snap
+from .operators import relax
+from .operators import seam
+from .operators import select
 from .operators import stack
+from .operators import straight
+from .operators import toggle
+from .operators import transform
+from .operators import unwrap
 from . import ui
 from . import keymaps
 from . import preferences
@@ -44,6 +45,9 @@ try:
     classes = (
         preferences.UNIV_AddonPreferences,
         keymaps.UNIV_RestoreKeymaps,
+        # Inspect
+        inspect.UNIV_OT_Check_Zero,
+        inspect.UNIV_OT_Check_Flipped,
         # Transforms
         transform.UNIV_OT_Orient,
         transform.UNIV_OT_Orient_VIEW3D,
@@ -72,8 +76,6 @@ try:
         select.UNIV_OT_Select_Square_Island,
         select.UNIV_OT_Select_Border,
         select.UNIV_OT_Select_Inner,
-        select.UNIV_OT_Select_Zero,
-        select.UNIV_OT_Select_Flipped,
         select.UNIV_OT_Select_Border_Edge_by_Angle,
         # QuickSnap
         quick_snap.UNIV_OT_QuickSnap,
