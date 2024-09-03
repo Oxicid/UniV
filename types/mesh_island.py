@@ -102,6 +102,36 @@ class MeshIslandsBase:
             yield mesh_island
             mesh_island = []
 
+    @classmethod
+    def calc_with_markseam_iter_ex(cls, umesh: UMesh):
+        isl: list[BMFace] = []
+        for face in umesh.bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            parts_of_island = [face]
+            temp = []
+
+            while parts_of_island:
+                for f in parts_of_island:
+                    for l in f.loops:
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
+                            continue
+                        if l.edge.seam:  # Skip if seam
+                            continue
+                        temp.append(ff)
+                        ff.tag = False
+
+                isl.extend(parts_of_island)
+                parts_of_island = temp
+                temp = []
+
+            yield isl
+            isl = []
+
 
 class MeshIslands(MeshIslandsBase):
     def __init__(self, islands, umesh: UMesh):

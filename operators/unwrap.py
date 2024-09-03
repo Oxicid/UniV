@@ -1,9 +1,14 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import bpy
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
 
+import bpy
+from .. import types  # noqa: F401
 from ..types import Islands
+from ..types import island as __isl  # noqa: F401
 from .. import utils
 from ..utils import UMeshes
 
@@ -22,6 +27,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=(('ANGLE_BASED', 'Angle Based', ''), ('CONFORMAL', 'Conformal', '')))
     axis: bpy.props.EnumProperty(name='Axis', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
+    mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
+                                      items=(('UV_BORDER', 'UV Borders', 'Marks seams where there are split edges'),
+                                             ('UV_INDEX', 'UV Index', 'No additional seams are created within the island itself')))
 
     @classmethod
     def poll(cls, context):
@@ -35,6 +43,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
         self.layout.row(align=True).prop(self, 'axis', expand=True)
         self.layout.prop(self, 'blend_factor', slider=True)
+        self.layout.row(align=True).prop(self, 'mark_seam_type', expand=True)
 
     def invoke(self, context, event):
         return self.execute(context)
@@ -44,6 +53,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.umeshes: UMeshes | None = None
 
     def execute(self, context):
+        if context.area.ui_type != 'UV':
+            self.umeshes.set_sync(True)
+            self.sync = True
+
         self.umeshes = UMeshes()
         if self.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:
@@ -75,8 +88,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             uv = umesh.uv_layer
             islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
+            if self.mark_seam_type == 'UV_INDEX':
+                islands.indexing(force=True)
+
             for isl in islands:
-                isl.mark_seam(additional=True)
+                if self.mark_seam_type == 'UV_BORDER':
+                    isl.mark_seam(additional=True)
+                else:
+                    isl.mark_seam_by_index(additional=True)
 
             faces_to_select = set()
             verts_to_select = set()
@@ -144,13 +163,18 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             uv = umesh.uv_layer
             islands_extended = Islands.calc_extended_with_mark_seam(umesh)
+            if self.mark_seam_type == 'UV_INDEX':
+                islands_extended.indexing(force=True)
 
             selected_islands = Islands.calc_selected_with_mark_seam(umesh)
             selected_islands.indexing(force=True)
 
             save_transform_islands = []
             for isl in islands_extended:
-                isl.mark_seam(additional=True)
+                if self.mark_seam_type == 'UV_BORDER':
+                    isl.mark_seam(additional=True)
+                else:
+                    isl.mark_seam_by_index(additional=True)
                 save_t = isl.save_transform()
                 save_t.save_coords(self.axis, self.blend_factor)
                 save_transform_islands.append(save_t)
@@ -222,9 +246,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 continue
 
             islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            if self.mark_seam_type == 'UV_INDEX':
+                islands.indexing(force=True)
 
             for isl in islands:
-                isl.mark_seam(additional=True)
+                if self.mark_seam_type == 'UV_BORDER':
+                    isl.mark_seam(additional=True)
+                else:
+                    isl.mark_seam_by_index(additional=True)
 
             for isl in islands:
                 save_t = isl.save_transform()
@@ -236,3 +265,17 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         for isl in save_transform_islands:
             isl.inplace()
             isl.apply_saved_coords(self.axis, self.blend_factor)
+
+class UNIV_OT_Unwrap_VIEW3D(UNIV_OT_Unwrap):
+    bl_idname = "mesh.univ_unwrap"
+    bl_label = "Unwrap"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    axis: bpy.props.EnumProperty(name='Axis', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
+    mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
+                                      items=(('UV_BORDER', 'Angle Based', ''), ('SELECTED_BORDER', 'Selected Border', '')))
+
+    def draw(self, context):
+        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
+        self.layout.row(align=True).prop(self, 'mark_seam_type', expand=True)

@@ -515,7 +515,7 @@ class FaceIsland:
             for f in self.faces:
                 for crn in f.loops:
                     shared_crn = crn.link_loop_radial_prev
-                    if crn == shared_crn and shared_crn.face.select:
+                    if crn == shared_crn and shared_crn.face.select:  # TODO: Test without shared_crn.face.select
                         crn.edge.seam = True
                         continue
                     seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
@@ -527,7 +527,7 @@ class FaceIsland:
             for f in self.faces:
                 for crn in f.loops:
                     shared_crn = crn.link_loop_radial_prev
-                    if crn == shared_crn and all(_crn[uv].select_edge for _crn in shared_crn.face.loops):
+                    if crn == shared_crn and all(_crn[uv].select_edge for _crn in shared_crn.face.loops):  # TODO: Test without second compare
                         crn.edge.seam = True
                         continue
                     seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
@@ -535,6 +535,22 @@ class FaceIsland:
                         crn.edge.seam |= seam
                     else:
                         crn.edge.seam = seam
+
+    def mark_seam_by_index(self, additional: bool = False):
+        # assert (enum.INDEXING in self.tags)  # TODO: Uncomment after implement tags
+        index = self.faces[0].index
+
+        for f in self.faces:
+            for crn in f.loops:
+                shared_crn = crn.link_loop_radial_prev
+                if crn == shared_crn:
+                    crn.edge.seam = True
+                    continue
+
+                if additional:
+                    crn.edge.seam |= shared_crn.face.index != index
+                else:
+                    crn.edge.seam = shared_crn.face.index != index
 
     def calc_max_uv_area_face(self):
         uv = self.uv_layer
