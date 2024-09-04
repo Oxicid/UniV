@@ -318,7 +318,7 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
         tool_settings = context.tool_settings

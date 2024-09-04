@@ -88,11 +88,7 @@ class UNIV_OT_SelectLinked(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -228,11 +224,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -459,11 +451,7 @@ class UNIV_OT_Select_Square_Island(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -614,11 +602,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1023,11 +1007,7 @@ class UNIV_OT_Select_Border(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':

@@ -35,11 +35,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def __init__(self):
         self.sync: bool = utils.sync()

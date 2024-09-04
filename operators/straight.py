@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_straighten_edge_loops.py
 
@@ -35,23 +21,15 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if bpy.context.area.ui_type != 'UV':
+        tool_settings = context.scene.tool_settings
+        if tool_settings.use_uv_select_sync:
             return False
-        if not bpy.context.active_object:
+        if tool_settings.uv_select_mode not in ('VERTEX', 'EDGE'):
             return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-        if bpy.context.active_object.type != 'MESH':
-            return False
-        if bpy.context.scene.tool_settings.uv_select_mode not in ('VERTEX', 'EDGE'):
-            return False
-        if bpy.context.scene.tool_settings.use_uv_select_sync:
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        # if context.scene.tool_settings.uv_select_mode == 'VERTEX':
-        #     utils.set_select_mode_uv('EDGE')
+        assert (context.area.ui_type == 'UV')
 
         umeshes = utils.UMeshes(report=self.report)
         for umesh in umeshes.loop():

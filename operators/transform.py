@@ -38,11 +38,7 @@ class UNIV_OT_Crop(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         layout = self.layout
@@ -267,11 +263,7 @@ class UNIV_OT_Align(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         self.layout.prop(self, 'direction')
@@ -661,11 +653,7 @@ class UNIV_OT_Flip(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         self.layout.row(align=True).prop(self, 'axis', expand=True)
@@ -847,11 +835,7 @@ class UNIV_OT_Rotate(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         self.layout.prop(self, 'angle', slider=True)
@@ -971,11 +955,7 @@ class UNIV_OT_Sort(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1199,11 +1179,7 @@ class UNIV_OT_Distribute(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1414,11 +1390,7 @@ class UNIV_OT_Home(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1500,11 +1472,7 @@ class UNIV_OT_Random(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         layout = self.layout
@@ -1772,14 +1740,7 @@ class UNIV_OT_Orient(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not bpy.context.active_object:
-            return False
-        if bpy.context.active_object.type != 'MESH':
-            return False
-        if bpy.context.active_object.mode != 'EDIT':
-            return False
-
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def __init__(self):
         self.skip_count: int = 0
@@ -1914,14 +1875,7 @@ class UNIV_OT_Orient_VIEW3D(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.type != 'MESH':
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def __init__(self):
         self.skip_count: int = 0
@@ -2117,11 +2071,7 @@ class UNIV_OT_Weld(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         if self.mode == 'SELF':
@@ -2416,11 +2366,7 @@ class UNIV_OT_Stitch(Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':

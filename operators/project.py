@@ -8,10 +8,10 @@ if 'bpy' in locals():
 import bpy
 
 from math import pi
-from . import transform  # noqa: F401
+from . import transform  # noqa: F401 # pylint:disable=unused-import
 from .transform import UNIV_OT_Crop
 from .. import utils
-from .. import types  # noqa: F401
+from .. import types  # noqa: F401 # pylint:disable=unused-import
 from ..types import BBox, MeshIsland, MeshIslands
 from mathutils import Vector, Euler, Matrix
 
@@ -27,11 +27,7 @@ class UNIV_Normal(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -186,9 +182,7 @@ class UNIV_BoxProject(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        return True
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
         self.layout.prop(self, 'scale', slider=True)

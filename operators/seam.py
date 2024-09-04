@@ -24,11 +24,7 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         self.layout.prop(self, 'addition')
@@ -139,11 +135,7 @@ class UNIV_OT_Cut_VIEW3D(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -204,11 +196,7 @@ class UNIV_OT_Angle(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        if not context.active_object:
-            return False
-        if context.active_object.mode != 'EDIT':
-            return False
-        return True
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         layout = self.layout
