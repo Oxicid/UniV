@@ -1,24 +1,18 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
 
 import math
 from bl_math import lerp
 from mathutils import Vector
 
+def all_equal(sequence):
+    sequence_iter = iter(sequence)
+    first = next(sequence_iter)
+    for i in sequence_iter:
+        if i != first:
+            return False
+    return True
 
 def vec_isclose(a, b, abs_tol: float = 0.00001):
     return all(math.isclose(a1, b1, abs_tol=abs_tol) for a1, b1 in zip(a, b))

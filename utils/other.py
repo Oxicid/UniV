@@ -28,12 +28,12 @@ def is_island_mode():
     return selection_mode in ('FACE', 'ISLAND')
 
 def get_select_mode_mesh() -> str:
-    if bpy.context.tool_settings.mesh_select_mode[0]:
-        return 'VERTEX'
+    if bpy.context.tool_settings.mesh_select_mode[2]:
+        return 'FACE'
     elif bpy.context.tool_settings.mesh_select_mode[1]:
         return 'EDGE'
     else:
-        return 'FACE'
+        return 'VERTEX'
 
 def set_select_mode_mesh(mode: str):
     if get_select_mode_mesh() == mode:

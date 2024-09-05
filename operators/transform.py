@@ -611,7 +611,6 @@ class UNIV_OT_Align(Operator):
                 raise NotImplementedError(direction)
         utils.set_cursor_location((x, y))
 
-
     @staticmethod
     def get_move_value(direction):
         match direction:
@@ -2062,28 +2061,34 @@ class UNIV_OT_Weld(Operator):
     bl_description = "Weld"
     bl_options = {'REGISTER', 'UNDO'}
 
+    use_by_distance: BoolProperty(name='By Distance', default=False)
     distance: FloatProperty(name='Distance', default=0.0005, min=0, soft_max=0.05, step=0.0001)  # noqa
-    flip: BoolProperty(name='Flip', default=False, options={'HIDDEN'})
-    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('SELF', 'Self', ''),
+    weld_by_distance_type: EnumProperty(name='Weld by', default='BY_ISLANDS', items=(
+        ('ALL', 'All', ''),
+        ('BY_ISLANDS', 'By Islands', '')
     ))
+
+    flip: BoolProperty(name='Flip', default=False, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
-        if self.mode == 'SELF':
-            self.layout.prop(self, 'distance', slider=True)
-        self.layout.row(align=True).prop(self, 'mode', expand=True)
+        layout = self.layout
+        if self.use_by_distance:
+            layout.row(align=True).prop(self, 'weld_by_distance_type', expand=True)
+        row = layout.row(align=True)
+        row.prop(self, "use_by_distance", text="")
+        row.active = self.use_by_distance
+        row.prop(self, 'distance', slider=True)
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
                 self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
-        self.mode = 'SELF' if event.alt else 'DEFAULT'
+        self.use_by_distance = event.alt
 
         return self.execute(context)
 
@@ -2103,10 +2108,15 @@ class UNIV_OT_Weld(Operator):
         self.edge_weld_counter = 0
         self.stitched_islands = 0
 
-        if self.mode == 'SELF':
-            self.weld_self(extended=True)
-            if not self.umeshes.final():
-                self.weld_self(extended=False)
+        if self.use_by_distance:
+            if self.weld_by_distance_type == 'BY_ISLANDS':
+                self.weld_by_distance_island(extended=True)
+                if not self.umeshes.final():
+                    self.weld_by_distance_island(extended=False)
+            else:
+                self.weld_by_distance_all(selected=True)
+                if not self.umeshes.final():
+                    self.weld_by_distance_all(selected=False)
         else:
             if self.sync:
                 self.weld_sync()
@@ -2268,7 +2278,7 @@ class UNIV_OT_Weld(Operator):
 
         UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
 
-    def weld_self(self, extended):
+    def weld_by_distance_island(self, extended):
         for umesh in self.umeshes:
             uv = umesh.uv_layer
             local_counter = 0
@@ -2279,44 +2289,19 @@ class UNIV_OT_Weld(Operator):
                         crn.tag = False
                 for isl in islands:
                     if extended:
-                        if self.sync:
-                            for f in isl:
-                                for crn in f.loops:
-                                    crn.tag = crn.vert.select
-                        else:
-                            for f in isl:
-                                for crn in f.loops:
-                                    crn.tag = crn[uv].select
+                        isl.tag_selected_corner_verts_by_verts(umesh)
                     else:
-                        for f in isl:
-                            for crn in f.loops:
-                                crn.tag = True
+                        isl.set_corners_tag(True)
 
                     corners = (crn for f in isl for crn in f.loops if crn.tag)
                     for crn in corners:
                         crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
-                        coords = {_crn[uv].uv.copy().freeze() for _crn in crn_in_vert}
-
-                        if len(coords) == 1:
-                            for crn_t in crn_in_vert:
-                                crn_t.tag = False
-                            continue
-
-                        for group in self.calc_distance_groups(crn_in_vert, uv):
-                            value = Vector((0, 0))
-                            for c in group:
-                                value += c[uv].uv
-                            size = len(group)
-                            avg = value / size
-                            for c in group:
-                                c[uv].uv = avg
-                            local_counter += size
+                        local_counter += self.weld_corners_in_vert(crn_in_vert, uv)
 
             if local_counter:
                 for _isl in islands:
                     _isl.mark_seam()
-
-            umesh.update_tag = bool(local_counter)
+            umesh.update_tag = bool(islands)
             self.global_counter += local_counter
 
         if self.umeshes.final() and self.global_counter == 0:
@@ -2324,6 +2309,69 @@ class UNIV_OT_Weld(Operator):
 
         if self.global_counter:
             self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
+
+    def weld_by_distance_all(self, selected):
+        # TODO: Refactor this, use iterator
+        for umesh in self.umeshes:
+            umesh.tag_visible_corners()
+            uv = umesh.uv_layer
+            local_counter = 0
+            if selected:
+                init_corners = utils.calc_selected_uv_corners(umesh.bm, umesh.uv_layer, umesh.sync)
+            else:
+                init_corners = utils.calc_visible_uv_corners(umesh.bm, umesh.sync)
+            if init_corners:
+                # Tagging
+                is_face_mesh_mode = (self.sync and utils.get_select_mode_mesh() == 'FACE')
+                if not is_face_mesh_mode:
+                    for f in umesh.bm.faces:
+                        for crn in f.loops:
+                            crn.tag = False
+
+                for crn in init_corners:
+                    crn.tag = True
+
+                if is_face_mesh_mode:
+                    if selected:
+                        for f in umesh.bm.faces:
+                            for crn in f.loops:
+                                if not crn.face.select:
+                                    crn.tag = False
+
+                corners = (crn for crn in init_corners if crn.tag)
+                for crn in corners:
+                    crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
+                    local_counter += self.weld_corners_in_vert(crn_in_vert, uv)
+
+            if local_counter:
+                umesh.tag_visible_faces()
+                umesh.mark_seam_tagged_faces()
+
+            umesh.update_tag = bool(init_corners)
+            self.global_counter += local_counter
+
+        if self.umeshes.final() and self.global_counter == 0:
+            self.umeshes.cancel_with_report(info='Not found verts for weld')
+
+        if self.global_counter:
+            self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
+
+    def weld_corners_in_vert(self, crn_in_vert, uv):
+        if utils.all_equal(_crn[uv].uv for _crn in crn_in_vert):
+            for crn_t in crn_in_vert:
+                crn_t.tag = False
+            return 0
+        sub_local_counter = 0
+        for group in self.calc_distance_groups(crn_in_vert, uv):
+            value = Vector((0, 0))
+            for c in group:
+                value += c[uv].uv
+            size = len(group)
+            avg = value / size
+            for c in group:
+                c[uv].uv = avg
+            sub_local_counter += size
+        return sub_local_counter
 
     def calc_distance_groups(self, crn_in_vert: list[BMLoop], uv) -> list[list[BMLoop]]:
         corners_groups = []
@@ -2337,8 +2385,7 @@ class UNIV_OT_Weld(Operator):
             compare_index = 0
             while True:
                 if compare_index > len(union_corners) - 1:
-                    coords = {_crn[uv].uv.copy().freeze() for _crn in union_corners}
-                    if len(coords) == 1:
+                    if utils.all_equal(_crn[uv].uv for _crn in union_corners):
                         union_corners = []
                         break
                     corners_groups.append(union_corners)

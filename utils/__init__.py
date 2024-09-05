@@ -219,20 +219,40 @@ class UMesh:
                     for crn in f.loops:
                         crn.tag = s_tag
 
-    def tag_selected_corners(self, both=False):
+    def tag_selected_corners(self, both=False, edges_tag=True):
         corners = (_crn for f in self.bm.faces for _crn in f.loops)
         if self.sync:
             if self.is_full_face_selected:
                 for crn in corners:
                     crn.tag = True
             else:
-                for f in self.bm.faces:
-                    if f.hide:
-                        for crn in f.loops:
+                if get_select_mode_mesh() == 'FACE':
+                    if self.is_full_face_deselected:
+                        for crn in corners:
                             crn.tag = False
-                    else:
+                        return
+
+                    for f in self.bm.faces:
+                        state = f.select
                         for crn in f.loops:
-                            crn.tag = crn.edge.select
+                            crn.tag = state
+                else:
+                    if edges_tag:  # TODO: Need for loop groups???
+                        for f in self.bm.faces:
+                            if f.hide:
+                                for crn in f.loops:
+                                    crn.tag = False
+                            else:
+                                for crn in f.loops:
+                                    crn.tag = crn.edge.select
+                    else:
+                        for f in self.bm.faces:
+                            if f.hide:
+                                for crn in f.loops:
+                                    crn.tag = False
+                            else:
+                                for crn in f.loops:
+                                    crn.tag = crn.vert.select
         else:
             if self.is_full_face_deselected:
                 for crn in corners:
@@ -263,7 +283,7 @@ class UMesh:
                 self.set_face_tag()
             else:
                 for f in self.bm.faces:
-                    f.tag = not f.hide
+                    f.tag = f.select
         else:
             if self.is_full_face_deselected:
                 self.set_face_tag(False)
@@ -281,6 +301,22 @@ class UMesh:
                             f.tag = all(crn[uv].select_edge for crn in f.loops)
                         else:
                             f.tag = False
+
+    def tag_visible_faces(self):
+        if self.sync:
+            if self.is_full_face_selected:
+                self.set_face_tag()
+            else:
+                for f in self.bm.faces:
+                    f.tag = not f.hide
+        else:
+            if self.is_full_face_selected:
+                self.set_face_tag(True)
+            elif self.is_full_face_deselected:
+                self.set_face_tag(False)
+            else:
+                for f in self.bm.faces:
+                    f.tag = f.select
 
     def tag_selected_edge_linked_crn_sync(self):
         if PyBMesh.is_full_edge_selected(self.bm):
@@ -315,6 +351,35 @@ class UMesh:
         if self.is_full_face_selected:
             return self.bm.faces
         return [f for f in self.bm.faces if f.select]
+
+    def mark_seam_tagged_faces(self, additional=False):
+        uv = self.uv_layer
+        if self.sync:
+            for f in self.bm.faces:
+                if not f.tag:
+                    continue
+                for crn in f.loops:
+                    shared_crn_ = crn.link_loop_radial_prev
+                    if crn == shared_crn_ or not shared_crn_.face.tag:
+                        crn.edge.seam = True
+                        continue
+                    seam = not (crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                    if additional:
+                        crn.edge.seam |= seam
+                    else:
+                        crn.edge.seam = seam
+        else:
+            for f in self.bm.faces:
+                for crn in f.loops:
+                    shared_crn_ = crn.link_loop_radial_prev
+                    if crn == shared_crn_ or not shared_crn_.face.tag:
+                        crn.edge.seam = True
+                        continue
+                    seam = not (crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                    if additional:
+                        crn.edge.seam |= seam
+                    else:
+                        crn.edge.seam = seam
 
     def __hash__(self):
         return hash(self.bm)

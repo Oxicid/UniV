@@ -285,6 +285,27 @@ class FaceIsland:
         for f in self:
             f.tag = tag
 
+    def set_corners_tag(self, tag=True):
+        for f in self:
+            for crn in f.loops:
+                crn.tag = tag
+
+    def tag_selected_corner_verts_by_verts(self, umesh):
+        corners = (_crn for f in self for _crn in f.loops)
+
+        if umesh.sync:
+            if umesh.is_full_vert_selected:
+                for crn in corners:
+                    crn.tag = True
+            else:
+                for crn in corners:
+                    crn.tag = crn.vert.select
+        else:
+            uv = self.uv_layer
+            for f in self.bm.faces:
+                for crn in f.loops:
+                    crn.tag = crn[uv].select
+
     def is_flipped(self) -> bool:
         for f in self.faces:
             area = 0.0
