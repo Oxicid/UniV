@@ -48,6 +48,9 @@ class UNIV_OT_SplitUVToggle(Operator):
         return self.execute(context)
 
     def execute(self, context):
+        if context.area is None or context.area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
+            self.report({'WARNING'}, f"Active area must be a 3D Viewport, UV Editor or Image Editor")
+            return {'CANCELLED'}
         if context.window.screen.show_fullscreen is True and self.mode != 'SWITCH':
             if self.mode == 'SPLIT':
                 self.report({'INFO'}, "You can't split in full screen mode. Switch Mode is used instead.")
