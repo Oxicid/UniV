@@ -289,14 +289,10 @@ class UNIV_OT_Stack(bpy.types.Operator):
             self.umeshes.set_sync(True)
 
         if self.between_selected:
-            umeshes_for_update = self.stack_selected_between()
+            self.stack_selected_between()
         else:
-            umeshes_for_update = self.stack_target_source()
+            self.stack_target_source()
 
-        if not umeshes_for_update:
-            self.report({'WARNING'}, 'No found islands for stacking')
-        self.umeshes.umeshes = list(umeshes_for_update)
-        self.umeshes.silent_update()
         return {'FINISHED'}
 
     # Between Selected
@@ -307,10 +303,11 @@ class UNIV_OT_Stack(bpy.types.Operator):
 
         if not self.targets:
             self.report({'WARNING'}, 'Not found selected islands')
-            return {'FINISHED'}
+            return
 
         if not(sort_stack_islands_groups := self.sort_stack_islands_selected_between()):
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
+            return
 
         umeshes_for_update = set()
         for sort_stack_islands in sort_stack_islands_groups:
@@ -327,7 +324,13 @@ class UNIV_OT_Stack(bpy.types.Operator):
                                 umeshes_for_update.add(source.umesh)
                                 source.island.tag = False
                             source.island.set_tag(False)  # TODO: Check when else
-        return umeshes_for_update
+
+        if not umeshes_for_update:
+            self.report({'WARNING'}, 'No found islands for stacking')
+        else:
+            self.umeshes.umeshes = list(umeshes_for_update)
+            self.umeshes.silent_update()
+        return
 
     def islands_preprocessing_selected_between(self):
         for umesh in reversed(self.umeshes):
@@ -360,11 +363,11 @@ class UNIV_OT_Stack(bpy.types.Operator):
 
         if not self.targets:
             self.report({'WARNING'}, 'Not found target islands')
-            return {'FINISHED'}
+            return
 
         if not self.source:
             self.report({'WARNING'}, 'Not found source islands')
-            return {'FINISHED'}
+            return
 
         if not(sort_stack_islands := self.sort_stack_islands_target_source()):
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
@@ -378,7 +381,13 @@ class UNIV_OT_Stack(bpy.types.Operator):
                         umeshes_for_update.add(stacks_source_isl.umesh)
                         stacks_source_isl.island.tag = False
                     stacks_source_isl.island.set_tag(False)
-        return umeshes_for_update
+
+        if not umeshes_for_update:
+            self.report({'WARNING'}, 'No found islands for stacking')
+        else:
+            self.umeshes.umeshes = list(umeshes_for_update)
+            self.umeshes.silent_update()
+        return
 
     def islands_preprocessing_target_source(self):
         for umesh in reversed(self.umeshes):
