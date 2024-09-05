@@ -3,6 +3,7 @@
 
 import bpy
 import typing
+import itertools
 import numpy as np
 
 from .. import utils
@@ -12,7 +13,7 @@ from collections import deque, defaultdict
 
 from bmesh.types import BMFace, BMLoop
 
-def py_container_with_np_arrays_compare(a, b):
+def py_container_with_np_arrays_compare(a: deque[np.array], b: deque[np.array]):
     return len(a) == len(b) and all(np.array_equal(a[i], b[i]) for i in range(len(a)))
 
 class FacePattern:
@@ -45,19 +46,19 @@ class StackIsland:  # TODO: Split for source and target islands
         self.island: AdvIsland = island
         self.walked_island_from_init_face: list[list[FacePattern]] = []
 
-        self.min_sequence: list[BMFace] = []
+        self.unique_faces: list[BMFace] = []
         self.face_start_pattern: deque[np.array] = deque()
         self.face_start_pattern_crn: deque[BMLoop] = deque()
 
-        self.sequence_of_face_start_pattern: list[list[deque[np.array], deque[BMLoop]]] = []
+        self.start_faces_patterns: list[list[deque[np.array], deque[BMLoop]]] = []
 
         self.ngons_with_faces: defaultdict[int | list[BMFace]] = defaultdict(list)
         self.np_ngons_with_faces: np.array = np.array([], dtype='int32')
 
     def preprocessing(self):
         self.ensure_ngons_with_faces()
-        self.calc_min_sequence()
-        self.min_sequence.sort(key=lambda face: face.calc_area(), reverse=True)
+        self.calc_unique_faces()
+        self.unique_faces.sort(key=lambda face: face.calc_area(), reverse=True)
         self.ngons_to_np()
         self.face_start_pattern, self.face_start_pattern_crn = self.calc_linked_corners_pattern(0)
 
@@ -65,7 +66,7 @@ class StackIsland:  # TODO: Split for source and target islands
         for f in self.island:
             self.ngons_with_faces[len(f.loops)].append(f)
 
-    def calc_min_sequence(self) -> list[BMFace]:
+    def calc_unique_faces(self) -> list[BMFace]:
         assert self.ngons_with_faces
 
         min_sequence: tuple[int | list[BMFace]] | tuple = ()
@@ -78,8 +79,8 @@ class StackIsland:  # TODO: Split for source and target islands
             elif len(faces) == len(min_sequence[1]) and ngons_size > min_sequence[0]:
                 min_sequence = ngons_size, faces
 
-        self.min_sequence = min_sequence[1]
-        return self.min_sequence
+        self.unique_faces = min_sequence[1]
+        return self.unique_faces
 
     def ngons_to_np(self):
         np_ngons_with_faces = np.empty(shape=(len(self.ngons_with_faces), 2), dtype='int32')
@@ -90,7 +91,7 @@ class StackIsland:  # TODO: Split for source and target islands
         self.np_ngons_with_faces = np_ngons_with_faces[np_ngons_with_faces[:, 0].argsort()]
 
     def calc_linked_corners_pattern(self, idx):  # TODO: Implement patterns by shared crn
-        init_face: BMFace = self.min_sequence[idx]
+        init_face: BMFace = self.unique_faces[idx]
         face_idx = init_face.index
 
         face_start_pattern: deque[np.array] = deque()  # [shared face size, linked face size]
@@ -118,17 +119,17 @@ class StackIsland:  # TODO: Split for source and target islands
         return [face_start_pattern, face_start_pattern_crn]
 
     def calc_all_linked_corners_pattern(self):
-        sequence_of_face_start_pattern: list[list[deque[np.array], deque[BMLoop]]] = []
-        for idx, sequ in enumerate(self.min_sequence):
+        start_faces_patterns: list[list[deque[np.array], deque[BMLoop]]] = []
+        for idx, sequ in enumerate(self.unique_faces):
             if not idx:
                 continue
-            sequence_of_face_start_pattern.append(self.calc_linked_corners_pattern(idx))
-        self.sequence_of_face_start_pattern = sequence_of_face_start_pattern
+            start_faces_patterns.append(self.calc_linked_corners_pattern(idx))
+        self.start_faces_patterns = start_faces_patterns
 
     def compared_matching_first_pattern(self, other: 'typing.Self'):
         if len(self.face_start_pattern) != len(other.face_start_pattern):
             return
-        # self.min_sequence[0].select = False
+        # self.unique_face_sequence[0].select = False
 
         for _ in range(len(other.face_start_pattern) - 1):
             # print(f'\n{self.face_start_pattern = }')
@@ -143,12 +144,12 @@ class StackIsland:  # TODO: Split for source and target islands
             other.face_start_pattern.rotate(1)
             other.face_start_pattern_crn.rotate(1)
 
-        if not other.sequence_of_face_start_pattern:
+        if not other.start_faces_patterns:
             other.calc_all_linked_corners_pattern()
 
         # print('='*80)
 
-        for face_start_pattern, face_start_pattern_crn in other.sequence_of_face_start_pattern:
+        for face_start_pattern, face_start_pattern_crn in other.start_faces_patterns:
             for _ in range(len(face_start_pattern) - 1):
                 # print(f'\n{self.face_start_pattern = }')
                 # print(f'{face_start_pattern = }')
@@ -209,11 +210,11 @@ class StackIsland:  # TODO: Split for source and target islands
             if not break_:
                 return source_island_walked
 
-    def calc_target_stack_island(self):
+    def calc_walked_target_island(self):
         """Create an island that saves a sequence of found faces and its shared corner"""
         self.island.set_tag(True)
 
-        init_face = self.min_sequence[0]
+        init_face = self.unique_faces[0]
         # For the future be careful, maybe face_start_pattern_crn should be copied
         parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn[0], self.face_start_pattern_crn)]  # Container collector of island elements
         init_face.tag = False
@@ -264,13 +265,14 @@ class UNIV_OT_Stack(bpy.types.Operator):
     #                                       ('BACKWARD', 'Backward', 'For mirror islands'),
     #                                       ('BOTH', 'Both', '')
     #                                   ))
+    between_selected: bpy.props.BoolProperty(name='Between Selected', default=False)
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
-    # def draw(self, context):
-    #     pass
+    def draw(self, context):
+        self.layout.prop(self, 'between_selected', toggle=1)
 
     # def invoke(self, context, event):
     #     return self.execute(context)
@@ -286,10 +288,75 @@ class UNIV_OT_Stack(bpy.types.Operator):
         if not self.sync and context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
 
+        if self.between_selected:
+            umeshes_for_update = self.stack_selected_between()
+        else:
+            umeshes_for_update = self.stack_target_source()
+
+        if not umeshes_for_update:
+            self.report({'WARNING'}, 'No found islands for stacking')
+        self.umeshes.umeshes = list(umeshes_for_update)
+        self.umeshes.silent_update()
+        return {'FINISHED'}
+
+    # Between Selected
+    def stack_selected_between(self):
+        self.targets: list[StackIsland] = []
+
+        self.islands_preprocessing_selected_between()
+
+        if not self.targets:
+            self.report({'WARNING'}, 'Not found selected islands')
+            return {'FINISHED'}
+
+        if not(sort_stack_islands_groups := self.sort_stack_islands_selected_between()):
+            self.report({'WARNING'}, 'Islands have different set and number of polygons')
+
+        umeshes_for_update = set()
+        for sort_stack_islands in sort_stack_islands_groups:
+            for target in sort_stack_islands:
+                if target.island.tag:
+                    target.island.tag = False
+                    if not any(i.island.tag for i in sort_stack_islands):
+                        break
+                    target.calc_walked_target_island()
+                    for source in sort_stack_islands:
+                        if source.island.tag:
+                            if res := target.calc_source_stack_island(source):
+                                target.transfer_co_to(res, source.island.uv_layer)
+                                umeshes_for_update.add(source.umesh)
+                                source.island.tag = False
+                            source.island.set_tag(False)  # TODO: Check when else
+        return umeshes_for_update
+
+    def islands_preprocessing_selected_between(self):
+        for umesh in reversed(self.umeshes):
+            selected = AdvIslands.calc_selected(umesh)
+            if not selected:
+                self.umeshes.umeshes.remove(umesh)
+                continue
+            selected.indexing(force=True)
+
+            for sel_isl in selected:
+                stack_isl = StackIsland(sel_isl, umesh)
+                stack_isl.preprocessing()
+                # stack_isl.calc_target_stack_island()
+                self.targets.append(stack_isl)
+
+    def sort_stack_islands_selected_between(self):
+        sorted_groups: list[list[StackIsland]] = []
+        for _, groups in itertools.groupby(self.targets):
+            tar_groups = list(groups)
+            if len(tar_groups) >= 2:
+                sorted_groups.append(tar_groups)
+        return sorted_groups
+
+    # Target Source
+    def stack_target_source(self):
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []
 
-        self.islands_preprocessing()
+        self.islands_preprocessing_target_source()
 
         if not self.targets:
             self.report({'WARNING'}, 'Not found target islands')
@@ -299,7 +366,7 @@ class UNIV_OT_Stack(bpy.types.Operator):
             self.report({'WARNING'}, 'Not found source islands')
             return {'FINISHED'}
 
-        if not(sort_stack_islands := self.sort_stack_islands()):
+        if not(sort_stack_islands := self.sort_stack_islands_target_source()):
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
 
         umeshes_for_update = set()
@@ -311,14 +378,9 @@ class UNIV_OT_Stack(bpy.types.Operator):
                         umeshes_for_update.add(stacks_source_isl.umesh)
                         stacks_source_isl.island.tag = False
                     stacks_source_isl.island.set_tag(False)
+        return umeshes_for_update
 
-        if not umeshes_for_update:
-            self.report({'WARNING'}, 'No found islands for stacking')
-        self.umeshes.umeshes = list(umeshes_for_update)
-        self.umeshes.silent_update()
-        return {'FINISHED'}
-
-    def islands_preprocessing(self):
+    def islands_preprocessing_target_source(self):
         for umesh in reversed(self.umeshes):
             selected = AdvIslands.calc_selected(umesh)
             non_selected = AdvIslands.calc_non_selected(umesh)
@@ -331,7 +393,7 @@ class UNIV_OT_Stack(bpy.types.Operator):
             for sel_isl in selected:
                 stack_isl = StackIsland(sel_isl, umesh)
                 stack_isl.preprocessing()
-                stack_isl.calc_target_stack_island()
+                stack_isl.calc_walked_target_island()
                 self.targets.append(stack_isl)
 
             for non_sel_isl in non_selected:
@@ -339,7 +401,7 @@ class UNIV_OT_Stack(bpy.types.Operator):
                 stack_isl.preprocessing()
                 self.source.append(stack_isl)
 
-    def sort_stack_islands(self):
+    def sort_stack_islands_target_source(self):
         sorted_groups: list[tuple[StackIsland, list[StackIsland]]] = []
         for tar in self.targets:
             group: list[StackIsland] = []
