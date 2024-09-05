@@ -282,8 +282,10 @@ class UNIV_OT_Stack(bpy.types.Operator):
         self.umeshes: utils.UMeshes | None = None
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []
+        self.counter: int = 0
 
     def execute(self, context) -> set[str]:
+        self.counter = 0
         self.umeshes = utils.UMeshes(report=self.report)
         if not self.sync and context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
@@ -292,6 +294,8 @@ class UNIV_OT_Stack(bpy.types.Operator):
             self.stack_selected_between()
         else:
             self.stack_target_source()
+        if self.counter:
+            self.report({'INFO'}, f'Found {self.counter} islands for stacking')
 
         return {'FINISHED'}
 
@@ -323,6 +327,7 @@ class UNIV_OT_Stack(bpy.types.Operator):
                                 target.transfer_co_to(res, source.island.uv_layer)
                                 umeshes_for_update.add(source.umesh)
                                 source.island.tag = False
+                                self.counter += 1
                             source.island.set_tag(False)  # TODO: Check when else
 
         if not umeshes_for_update:
@@ -380,6 +385,7 @@ class UNIV_OT_Stack(bpy.types.Operator):
                         stack_target.transfer_co_to(res, stacks_source_isl.island.uv_layer)
                         umeshes_for_update.add(stacks_source_isl.umesh)
                         stacks_source_isl.island.tag = False
+                        self.counter += 1
                     stacks_source_isl.island.set_tag(False)
 
         if not umeshes_for_update:
