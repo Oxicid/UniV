@@ -645,7 +645,6 @@ class UNIV_OT_Flip(Operator):
         ('BY_CURSOR', 'By cursor', ''),
         ('INDIVIDUAL', 'Individual', ''),
         ('FLIPPED', 'Flipped', ''),
-        ('FLIPPED_INDIVIDUAL', 'Flipped Individual', ''),
     ))
 
     axis: EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
@@ -670,60 +669,40 @@ class UNIV_OT_Flip(Operator):
                 self.mode = 'INDIVIDUAL'
             case False, False, True:
                 self.mode = 'FLIPPED'
-            case False, True, True:
-                self.mode = 'FLIPPED_INDIVIDUAL'
             case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n")
+                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n")
                 return {'CANCELLED'}
         return self.execute(context)
 
+    def __init__(self):
+        self.umeshes = []
+        self.scale = Vector((1, 1))
+
     def execute(self, context):
-        return self.flip(self.mode, self.axis, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.scale = self.get_flip_scale_from_axis(self.axis)
 
-    @staticmethod
-    def flip(mode, axis, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
-        flip_args = (axis, sync,  umeshes)
-
-        match mode:
+        match self.mode:
             case 'DEFAULT':
-                UNIV_OT_Flip.flip_ex(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Flip.flip_ex(*flip_args, extended=False)
-
+                self.flip_ex(extended=self.umeshes.has_selected_uv_faces)
             case 'BY_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
-                UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Flip.flip_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
-
+                    self.umeshes.report({'INFO'}, "Cursor not found")
+                self.flip_by_cursor(cursor=cursor_loc, extended=self.umeshes.has_selected_uv_faces)
             case 'INDIVIDUAL':
-                UNIV_OT_Flip.flip_individual(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Flip.flip_individual(*flip_args, extended=False)
-
+                self.flip_individual(extended=self.umeshes.has_selected_uv_faces)
             case 'FLIPPED':
-                UNIV_OT_Flip.flip_flipped(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Flip.flip_flipped(*flip_args, extended=False)
-
-            case 'FLIPPED_INDIVIDUAL':
-                UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Flip.flip_flipped_individual(*flip_args, extended=False)
+                self.flip_flipped(extended=self.umeshes.has_selected_uv_faces)
             case _:
-                raise NotImplementedError(mode)
+                raise NotImplementedError(self.mode)
 
-        return umeshes.update()
+        return self.umeshes.update()
 
-    @staticmethod
-    def flip_ex(axis, sync,  umeshes,  extended):
+    def flip_ex(self, extended):
         islands_of_mesh = []
         general_bbox = BBox()
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -732,85 +711,55 @@ class UNIV_OT_Flip(Operator):
             return
 
         pivot = general_bbox.center
-        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
         for islands in islands_of_mesh:
-            islands.scale(scale=scale, pivot=pivot)
+            islands.scale(scale=self.scale, pivot=pivot)
 
-    @staticmethod
-    def flip_by_cursor(axis, sync,  umeshes,  cursor, extended):
-        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                islands.scale(scale=scale, pivot=cursor)
+    def flip_by_cursor(self, cursor, extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+                islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
-    @staticmethod
-    def flip_individual(axis, sync,  umeshes,  extended):
-        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+    def flip_individual(self, extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
                 for island in islands:
-                    island.scale(scale=scale, pivot=island.calc_bbox().center)
+                    island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
 
-    @staticmethod
-    def flip_flipped(axis, sync,  umeshes, extended):
-        flipped_islands_of_mesh = []
-        general_bbox = BBox()
-        umeshes_for_update = []
-        has_islands = False
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                flipped_islands = Islands([isl for isl in islands if isl.is_flipped()], umesh.bm, umesh.uv_layer)
-                if flipped_islands:
-                    general_bbox.union(flipped_islands.calc_bbox())
-                    flipped_islands_of_mesh.append(flipped_islands)
-                    umeshes_for_update.append(umesh)
-            umesh.update_tag = bool(islands)
-            has_islands |= bool(islands)
-
-        if umeshes_for_update and has_islands:
-            for umesh in umeshes:
-                umesh.update_tag = umesh in umeshes_for_update
-
-        if not has_islands:
-            return
-
-        if has_islands and len(flipped_islands_of_mesh) == 0:
-            return umeshes.cancel_with_report(info='Flipped islands not found')
-        umeshes.report(info=f'Found {sum(len(f_isl) for f_isl in flipped_islands_of_mesh)} Flipped islands')
-
-        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
-        pivot = general_bbox.center
-        for islands in flipped_islands_of_mesh:
-            islands.scale(scale, pivot)
-
-    @staticmethod
-    def flip_flipped_individual(axis, sync,  umeshes,  extended):
-        scale = UNIV_OT_Flip.get_flip_scale_from_axis(axis)
-        umeshes_for_update = []
-        has_islands = False
-        has_flipped_islands = False
+    def flip_flipped(self, extended):
         islands_count = 0
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                flipped_islands = [isl for isl in islands if isl.is_flipped()]
-                for island in flipped_islands:
-                    island.scale(scale=scale, pivot=island.calc_bbox().center)
-                if flipped_islands:
-                    umeshes_for_update.append(umesh)
-                has_flipped_islands |= bool(flipped_islands)
-                islands_count += len(flipped_islands)
+
+        for umesh in self.umeshes:
+            if islands := self.calc_extended_or_visible_flipped_islands(umesh, extended=extended):
+                for island in islands:
+                    island.scale(scale=self.scale, pivot=island.calc_bbox().center)
+                islands_count += len(islands)
             umesh.update_tag = bool(islands)
-            has_islands |= bool(islands)
 
-        if umeshes_for_update and has_islands:
-            for umesh in umeshes:
-                umesh.update_tag = umesh in umeshes_for_update
+        if not islands_count:
+            return self.report({'INFO'}, 'Flipped islands not found')
+        return self.report({'INFO'}, f'Found {islands_count} Flipped islands')
 
-        if has_islands and not has_flipped_islands:
-            return umeshes.cancel_with_report(info='Flipped islands not found')
-        umeshes.report(info=f'Found {islands_count} Flipped islands')
+    @staticmethod
+    def calc_extended_or_visible_flipped_islands(umesh_: utils.UMesh, extended):
+        uv = umesh_.uv_layer
+        if extended:
+            if umesh_.is_full_face_deselected:
+                return Islands([], None, None)
+
+        Islands.tag_filter_visible(umesh_.bm, umesh_.sync)
+
+        for f_ in umesh_.bm.faces:
+            if f_.tag:
+                f_.tag = utils.is_flipped_uv(f_, uv)
+
+        if extended:
+            islands_ = [Islands.island_type(i, umesh_.bm, uv) for i in Islands.calc_iter_ex(umesh_.bm, uv) if
+                       Islands.island_filter_is_any_face_selected(i, uv, umesh_.sync)]
+        else:
+            islands_ = [Islands.island_type(i, umesh_.bm, uv) for i in Islands.calc_iter_ex(umesh_.bm, uv)]
+        return Islands(islands_, umesh_.bm, umesh_.uv_layer)
 
     @staticmethod
     def get_flip_scale_from_axis(axis):

@@ -405,6 +405,12 @@ def weld_crn_edge(crn: BMLoop, uv: BMLayerItem):
     for crn_b in corners_b:
         crn_b[uv].uv = avg_co_b
 
+def is_flipped_uv(f, uv) -> bool:
+    area = 0.0
+    uvs = [l[uv].uv for l in f.loops]
+    for i in range(len(uvs)):
+        area += uvs[i - 1].cross(uvs[i])
+    return area < 0
 
 def is_boundary(crn: BMLoop, uv_layer: BMLayerItem):
     # assert(not l.face.select)

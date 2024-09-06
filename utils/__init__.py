@@ -532,6 +532,19 @@ class UMeshes:
             if umesh.is_full_face_deselected:
                 self.umeshes.remove(umesh)
 
+    @property
+    def has_selected_uv_faces(self):
+        if self.sync:
+            return any(umesh.total_face_sel for umesh in self)
+        else:
+            for umesh in self:
+                uv = umesh.uv_layer
+                if umesh.total_face_sel:
+                    for f in umesh.bm.faces:
+                        if all(crn[uv].select for crn in f.loops) and f.select:
+                            return True
+        return False
+
     def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)
 
