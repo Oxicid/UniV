@@ -4,11 +4,12 @@
 import bpy
 import blf
 
-def get_aspect_y(context):
-    area = context.area
+def get_aspect_ratio():
+    """Aspect Y"""
+    area = bpy.context.area
     if not area:
         return 1.0
-    space_data = context.area.spaces.active
+    space_data = bpy.context.area.spaces.active
     if not space_data:
         return 1.0
     if not space_data.image:

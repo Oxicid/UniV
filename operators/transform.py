@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import math
 import random
@@ -18,6 +22,7 @@ from collections import defaultdict
 from bmesh.types import BMLoop
 
 from .. import utils
+from .. import types  # noqa: F401 # pylint:disable=unused-import
 from .. import info
 from ..preferences import force_debug
 from ..utils import UMeshes
@@ -779,14 +784,16 @@ class UNIV_OT_Rotate(Operator):
                               ('BY_CURSOR', 'By Cursor', ''))
                        )
     rot_dir: EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
-    angle: FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
+    user_angle: FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
-        self.layout.prop(self, 'angle', slider=True)
+        self.layout.prop(self, 'user_angle', slider=True)
+        self.layout.prop(self, 'use_correct_aspect', toggle=1)
         self.layout.row(align=True).prop(self, 'rot_dir', expand=True)
         self.layout.row(align=True).prop(self, 'mode', expand=True)
 
@@ -803,64 +810,56 @@ class UNIV_OT_Rotate(Operator):
             self.mode = 'DEFAULT'
         return self.execute(context)
 
-    def execute(self, context):
-        return self.rotate(sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
+    def __init__(self):
+        self.umeshes = []
+        self.angle = 0.0
+        self.aspect = 1.0
 
-    def rotate(self, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
-        angle = (-self.angle) if self.rot_dir == 'CCW' else self.angle
-        flip_args = (angle, sync, umeshes)
+    def execute(self, context):
+        self.umeshes = utils.UMeshes(report=self.report)
+        self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
+        self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         if self.mode == 'DEFAULT':
-            UNIV_OT_Rotate.rotate_ex(*flip_args, extended=True)
-            if not umeshes.final():
-                UNIV_OT_Rotate.rotate_ex(*flip_args, extended=False)
+            self.rotate(extended=self.umeshes.has_selected_uv_faces)
 
         elif self.mode == 'BY_CURSOR':
             if not (cursor_loc := utils.get_cursor_location()):
-                if report:
-                    report({'INFO'}, "Cursor not found")
+                self.report({'INFO'}, "Cursor not found")
                 return {'CANCELLED'}
-            UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=True)
-            if not umeshes.final():
-                UNIV_OT_Rotate.rotate_by_cursor(*flip_args, cursor=cursor_loc, extended=False)
+            self.rotate_by_cursor(cursor=cursor_loc, extended=self.umeshes.has_selected_uv_faces)
 
         elif self.mode == 'INDIVIDUAL':
-            UNIV_OT_Rotate.rotate_individual(*flip_args, extended=True)
-            if not umeshes.final():
-                UNIV_OT_Rotate.rotate_individual(*flip_args, extended=False)
+            self.rotate_individual(extended=self.umeshes.has_selected_uv_faces)
         else:
             raise NotImplementedError()
 
-        return umeshes.update()
+        return self.umeshes.update()
 
-    @staticmethod
-    def rotate_ex(angle, sync,  umeshes,  extended):
+    def rotate(self, extended):
         islands_of_mesh = []
         general_bbox = BBox()
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
 
         pivot = general_bbox.center
         for islands in islands_of_mesh:
-            islands.rotate(angle, pivot=pivot)
+            islands.rotate(self.angle, pivot=pivot, aspect=self.aspect)
 
-    @staticmethod
-    def rotate_by_cursor(angle, sync,  umeshes, cursor, extended):
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
-                islands.rotate(angle, pivot=cursor)
+    def rotate_by_cursor(self, cursor, extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+                islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
             umesh.update_tag = bool(islands)
 
-    @staticmethod
-    def rotate_individual(angle, sync,  umeshes,  extended):
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+    def rotate_individual(self,  extended):
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
                 for island in islands:
-                    island.rotate(angle, pivot=island.calc_bbox().center)
+                    island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=self.aspect)
             umesh.update_tag = bool(islands)
 
 

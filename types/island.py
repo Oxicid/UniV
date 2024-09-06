@@ -234,14 +234,14 @@ class FaceIsland:
         """Rotate a list of faces by angle (in radians) around a pivot
         :param angle: Angle in radians
         :param pivot: Pivot
-        :param aspect: Aspect Ratio = Height / Width
+        :param aspect: Aspect Ratio = Width / Height
         """
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
         rot_matrix = Matrix.Rotation(angle, 2)
 
-        rot_matrix[0][1] = rot_matrix[0][1] / aspect
-        rot_matrix[1][0] = aspect * rot_matrix[1][0]
+        rot_matrix[0][1] = aspect * rot_matrix[0][1]
+        rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
         diff = pivot-(pivot @ rot_matrix)
         for face in self.faces:
