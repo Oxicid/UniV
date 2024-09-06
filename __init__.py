@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 4, 8),
+    "version": (1, 4, 9),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -91,6 +91,7 @@ try:
         project.UNIV_BoxProject,
         # Stack
         stack.UNIV_OT_Stack,
+        stack.UNIV_OT_Stack_VIEW3D,
     )
 except AttributeError:
     traceback.print_exc()

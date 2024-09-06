@@ -279,6 +279,11 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Stack
+    kmi = km.keymap_items.new('uv.univ_stack', 'S', 'PRESS', alt=True)
+    kmi.active = False
+    keys.append((km, kmi))
+
 def remove_keymaps():
     global keys
     import traceback

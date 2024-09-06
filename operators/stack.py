@@ -253,7 +253,7 @@ class StackIsland:  # TODO: Split for source and target islands
     def __eq__(self, other: 'typing.Self'):
         return np.array_equal(self.np_ngons_with_faces, other.np_ngons_with_faces)
 
-class UNIV_OT_Stack(bpy.types.Operator):
+class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     bl_idname = "mesh.univ_stack"
     bl_label = "Stack"
     bl_description = "Stack to selected"
@@ -426,3 +426,6 @@ class UNIV_OT_Stack(bpy.types.Operator):
             if group:
                 sorted_groups.append((tar, group))
         return sorted_groups
+
+class UNIV_OT_Stack(UNIV_OT_Stack_VIEW3D):
+    bl_idname = "uv.univ_stack"
