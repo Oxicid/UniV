@@ -179,6 +179,8 @@ class UNIV_BoxProject(bpy.types.Operator):
     scale_individual: bpy.props.FloatVectorProperty(name='Scale Individual', default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2)
     rotation: bpy.props.FloatVectorProperty(name='Rotate', subtype='EULER', soft_min=-pi, soft_max=pi)
     move: bpy.props.FloatVectorProperty(name='Move', subtype='XYZ')
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
+                                               description='Gets Aspect Correct from the active image from the shader node editor')
 
     @classmethod
     def poll(cls, context):
@@ -190,6 +192,8 @@ class UNIV_BoxProject(bpy.types.Operator):
         col.prop(self, 'scale_individual', expand=True, slider=True)
         col.prop(self, 'rotation', expand=True, slider=True)
         col.prop(self, 'move', expand=True)
+        col.separator()
+        col.prop(self, 'use_correct_aspect', toggle=1)
 
     def __init__(self):
         self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
@@ -213,13 +217,23 @@ class UNIV_BoxProject(bpy.types.Operator):
         scale = Vector(self.scale_individual)*self.scale
         for umesh in self.umeshes:
             uv = umesh.uv_layer
+
             mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
             mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
             mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
 
-            mtx_x = umesh.obj.matrix_world @ mtx_from_prop_x
-            mtx_y = umesh.obj.matrix_world @ mtx_from_prop_y
-            mtx_z = umesh.obj.matrix_world @ mtx_from_prop_z
+            if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
+                aspect_x_mtx = Matrix.Diagonal((1, 1/aspect, 1))
+                aspect_y_mtx = Matrix.Diagonal((1/aspect, 1, 1))
+                aspect_z_mtx = Matrix.Diagonal((1/aspect, 1, 1))
+            else:
+                aspect_x_mtx = Matrix.Diagonal((1, 1, aspect))
+                aspect_y_mtx = Matrix.Diagonal((1, 1, aspect))
+                aspect_z_mtx = Matrix.Diagonal((1, aspect, 1))
+
+            mtx_x = aspect_x_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_x
+            mtx_y = aspect_y_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_y
+            mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
 
             _, r, _ = umesh.obj.matrix_world.decompose()
             faces = umesh.bm.faces if self.is_obj_mode else (f for f in umesh.bm.faces if f.select)
