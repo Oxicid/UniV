@@ -7,7 +7,7 @@ import traceback
 from .. import info
 from .. import utils
 from ..preferences import force_debug, prefs, stable
-from ..types import ARegion, PyBMesh
+from ..types import ARegion
 
 from bpy.props import *
 from bpy.types import Operator
@@ -360,46 +360,44 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @staticmethod
     def disable_sync(umesh):
-        uv_layer = umesh.uv_layer
+        uv = umesh.uv_layer
         if utils.get_select_mode_mesh() == 'FACE':
-            if PyBMesh.is_full_face_selected(umesh.bm):
+            if umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
                     for loop in face.loops:
-                        loop_uv = loop[uv_layer]
+                        loop_uv = loop[uv]
                         loop_uv.select = True
                         loop_uv.select_edge = True
                 return
             for face in umesh.bm.faces:
                 sel_state = face.select
                 for loop in face.loops:
-                    loop_uv = loop[uv_layer]
+                    loop_uv = loop[uv]
                     loop_uv.select = sel_state
                     loop_uv.select_edge = sel_state
                 face.select = True
-
-        elif utils.get_select_mode_mesh() == 'VERTEX':
+        else:
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
                     sel_state = vert.select
                     for loop in vert.link_loops:
-                        loop_uv = loop[uv_layer]
-                        loop_uv.select = sel_state
-                        loop_uv.select_edge = sel_state
-            if not PyBMesh.is_full_face_selected(umesh.bm):
+                        loop[uv].select = sel_state
+            if not umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
                     face.select = True
 
-        else:
-            for edge in umesh.bm.edges:
-                if hasattr(edge, 'link_loops'):
-                    sel_state = edge.select
-                    for loop in edge.link_loops:
-                        loop_uv = loop[uv_layer]
-                        loop_uv.select = sel_state
-                        loop_uv.select_edge = sel_state
-            if not PyBMesh.is_full_face_selected(umesh.bm):
+            if umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
-                    face.select = True
+                    for crn in face.loops:
+                        crn_uv = crn[uv]
+                        crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
+            else:
+                for face in umesh.bm.faces:
+                    if face.select:
+                        for crn in face.loops:
+                            crn_uv = crn[uv]
+                            crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
+            # TODO: Deselect boundary crn.select
 
     @staticmethod
     def to_sync(umesh):
@@ -411,11 +409,11 @@ class UNIV_OT_SyncUVToggle(Operator):
         elif utils.get_select_mode_uv() == 'VERTEX':
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
-                    vert.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in vert.link_loops)
+                    vert.select = any(loop[uv_layer].select for loop in vert.link_loops)
         else:
             for edge in umesh.bm.edges:
                 if hasattr(edge, 'link_loops'):
-                    edge.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in edge.link_loops)
+                    edge.select = any(loop[uv_layer].select_edge for loop in edge.link_loops)
         umesh.bm.select_flush_mode()
 
 
