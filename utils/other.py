@@ -4,20 +4,33 @@
 import bpy
 import blf
 
-def get_aspect_ratio():
+def get_aspect_ratio(umesh=None):
     """Aspect Y"""
-    area = bpy.context.area
-    if not area:
+    # Aspect from material
+    if umesh and (mtl := umesh.obj.active_material):
+        if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
+            if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
+                image_width, image_height = image.size
+                if image_height:
+                    return image_width / image_height
         return 1.0
-    space_data = bpy.context.area.spaces.active
-    if not space_data:
-        return 1.0
-    if not space_data.image:
-        return 1.0
-    image_width = space_data.image.size[0]
-    image_height = space_data.image.size[1]
-    if image_height:
-        return image_width / image_height
+    # Aspect from active area
+    if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+        space_data = area.spaces.active
+        if space_data and space_data.image:
+            image_width, image_height = space_data.image.size
+            if image_height:
+                return image_width / image_height
+    else:
+        # Aspect from VIEW3D
+        for area in bpy.context.screen.areas:
+            if not area.type == 'IMAGE_EDITOR':
+                continue
+            space_data = area.spaces.active
+            if space_data and space_data.image:
+                image_width, image_height = space_data.image.size
+                if image_height:
+                    return image_width / image_height
     return 1.0
 
 def is_island_mode():

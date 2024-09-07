@@ -594,7 +594,10 @@ def find_min_rotate_angle(angle):
     return -(round(angle / (math.pi / 2)) * (math.pi / 2) - angle)
 
 
-def calc_min_align_angle(points):
+def calc_min_align_angle(points, aspect=1.0):
+    if aspect != 1.0:
+        vec_aspect = Vector((aspect, 1.0))
+        points = [pt*vec_aspect for pt in points]
     align_angle_pre = mathutils.geometry.box_fit_2d(points)
     return find_min_rotate_angle(align_angle_pre)
 
