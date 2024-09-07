@@ -289,9 +289,11 @@ class BBox:
         self.xmin = x
         self.ymin = y
 
-    def rotate_expand(self, angle):
+    def rotate_expand(self, angle, aspect=1.0):
         center = self.center
         rot_matrix = Matrix.Rotation(-angle, 2)
+        rot_matrix[0][1] = aspect * rot_matrix[0][1]
+        rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
         corner = self.right_upper - center
         corner_rot = corner @ rot_matrix

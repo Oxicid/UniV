@@ -1404,6 +1404,7 @@ class UNIV_OT_Random(Operator):
     steps: FloatVectorProperty(name='Steps', description="Incorrectly works with Within Image Bounds",
                                default=(0, 0), min=0, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
     strength: FloatVectorProperty(name='Strength', default=(1, 1), min=-10, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     rotation: FloatProperty(name='Rotation Range', default=0, min=0, soft_max=math.pi * 2, subtype='ANGLE',
         update=lambda self, _: setattr(self, 'rotation_steps', self.rotation) if self.rotation < self.rotation_steps else None)
     rotation_steps: FloatProperty(name='Rotation Steps', default=0, min=0, max=math.pi, subtype='ANGLE',
@@ -1439,6 +1440,7 @@ class UNIV_OT_Random(Operator):
         layout.prop(self, 'rotation', slider=True)
         if self.rotation != 0:
             layout.prop(self, 'rotation_steps', slider=True)
+            layout.prop(self, 'use_correct_aspect', toggle=1)  # TODO: Implement for crop and clamp
 
         if not self.between:
             layout.prop(self, 'bool_bounds')
@@ -1460,6 +1462,7 @@ class UNIV_OT_Random(Operator):
 
     def __init__(self):
         self.seed = 1000
+        self.aspect = 1.0
         self.non_valid_counter = 0
         self.umeshes: utils.UMeshes | None = None
         self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
@@ -1469,6 +1472,7 @@ class UNIV_OT_Random(Operator):
     def execute(self, context):
         self.non_valid_counter = 0
         self.umeshes = utils.UMeshes(report=self.report)
+        self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         if self.is_obj_mode:
             self.umeshes.ensure(face=True)
@@ -1541,8 +1545,8 @@ class UNIV_OT_Random(Operator):
                         elif angle < -self.rotation:
                             angle += self.rotation_steps
 
-                    if island.rotate(angle, vec_origin):
-                        bb.rotate_expand(angle)
+                    if island.rotate(angle, vec_origin, self.aspect):
+                        bb.rotate_expand(angle, self.aspect)
 
                 scale = bl_math.lerp(1.0, rand_scale, self.scale_factor)
 
@@ -1627,7 +1631,7 @@ class UNIV_OT_Random(Operator):
                         elif angle < -self.rotation:
                             angle += self.rotation_steps
 
-                    island.rotate(angle, vec_origin)
+                    island.rotate(angle, vec_origin, self.aspect)
                     # if island.rotate(angle, vec_origin):
                     #     bb.rotate_expand(angle)
                 if self.bound_between != 'CROP':
