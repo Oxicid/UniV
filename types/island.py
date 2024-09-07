@@ -740,8 +740,8 @@ class AdvIsland(FaceIsland):
 
 class IslandsBase:
     @staticmethod
-    def tag_filter_any(bm: BMesh, tag=True):
-        for face in bm.faces:
+    def tag_filter_all(umesh: UMesh, tag=True):
+        for face in umesh.bm.faces:
             face.tag = tag
 
     @staticmethod
@@ -1263,10 +1263,10 @@ class Islands(IslandsBase):
         return cls.calc_visible_b(umesh)
 
     @classmethod
-    def calc_with_hidden(cls, bm: BMesh, uv_layer: BMLayerItem):
-        cls.tag_filter_any(bm)
-        islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
-        return cls(islands, bm, uv_layer)
+    def calc_with_hidden(cls, umesh: UMesh):
+        cls.tag_filter_all(umesh)
+        islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_ex(umesh.bm, umesh.uv_layer)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     def move(self, delta: Vector) -> bool:
         return bool(sum(island.move(delta) for island in self.islands))

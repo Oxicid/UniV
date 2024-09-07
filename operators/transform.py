@@ -1827,30 +1827,49 @@ class UNIV_OT_Orient_VIEW3D(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def __init__(self):
         self.skip_count: int = 0
+        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
-
         self.umeshes = utils.UMeshes(report=self.report)
         self.umeshes.set_sync(True)
 
-        self.world_orient(extended=True)
-        if self.skip_count == len(self.umeshes):
+        if self.is_obj_mode:
+            self.umeshes.ensure(face=True)
             self.world_orient(extended=False)
             if self.skip_count == len(self.umeshes):
-                return self.umeshes.update(info="No uv for manipulate")
-        return self.umeshes.update(info="All islands oriented")
+                self.umeshes.free()
+                return self.umeshes.update(info="Faces not found")
+        else:
+            self.world_orient(extended=True)
+            if self.skip_count == len(self.umeshes):
+                self.world_orient(extended=False)
+                if self.skip_count == len(self.umeshes):
+                    return self.umeshes.update(info="No uv for manipulate")
+
+        self.umeshes.update(info="All islands oriented")
+
+        if self.is_obj_mode:
+            self.umeshes.free()
+            bpy.context.area.tag_redraw()
+
+        return {'FINISHED'}
 
     def world_orient(self, extended):
         self.skip_count = 0
         for umesh in self.umeshes:
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if self.is_obj_mode:
+                islands = Islands.calc_with_hidden(umesh)
+            else:
+                islands = Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended)
+
+            if islands:
                 uv = islands.uv_layer
                 _, r, _ = umesh.obj.matrix_world.decompose()
                 mtx = r.to_matrix()
