@@ -628,3 +628,10 @@ def set_cursor_location(loc):
             if area.ui_type == 'UV':
                 area.spaces.active.cursor_location = loc
                 return
+
+def update_by_area_type(area_type: str):
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        for area in screen.areas:
+            if area.type == area_type:
+                area.tag_redraw()

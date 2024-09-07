@@ -1418,7 +1418,7 @@ class UNIV_OT_Random(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -1462,16 +1462,21 @@ class UNIV_OT_Random(Operator):
         self.seed = 1000
         self.non_valid_counter = 0
         self.umeshes: utils.UMeshes | None = None
+        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
         self.all_islands: list[UnionIslands | AdvIsland] | None = None
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
 
     def execute(self, context):
         self.non_valid_counter = 0
         self.umeshes = utils.UMeshes(report=self.report)
-        self.random_preprocessing()
 
-        if not self.all_islands:
-            self.random_preprocessing(extended=False)
+        if self.is_obj_mode:
+            self.umeshes.ensure(face=True)
+
+        self.random_preprocessing()
+        if not self.is_obj_mode:
+            if not self.all_islands:
+                self.random_preprocessing(extended=False)
 
         if self.between:
             self.random_between()
@@ -1479,7 +1484,12 @@ class UNIV_OT_Random(Operator):
             self.random()
         if self.non_valid_counter:
             self.report({'INFO'}, f"Found {self.non_valid_counter} zero-sized islands that will not be affected by some effects")
-        return self.umeshes.update(info="No object for randomize.")
+        self.umeshes.update(info="No object for randomize.")
+
+        if self.is_obj_mode:
+            self.umeshes.free()
+            utils.update_by_area_type('VIEW_3D')
+        return {'FINISHED'}
 
     def random_preprocessing(self, extended=True):
         self.seed = sum(id(umesh.obj) for umesh in self.umeshes) // len(self.umeshes) + self.rand_seed
@@ -1487,7 +1497,11 @@ class UNIV_OT_Random(Operator):
         self.all_islands = []
         _islands = []
         for umesh in self.umeshes:
-            if islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if self.is_obj_mode:
+                islands = AdvIslands.calc_with_hidden(umesh)
+            else:
+                islands = AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended)
+            if islands:
                 if self.overlapped:
                     islands.calc_tris()
                     islands.calc_flat_coords()
