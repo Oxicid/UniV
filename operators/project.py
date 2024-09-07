@@ -27,7 +27,7 @@ class UNIV_Normal(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -36,20 +36,31 @@ class UNIV_Normal(bpy.types.Operator):
         return self.execute(context)
 
     def __init__(self):
+        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes.calc(self.report)
-        self.umeshes.filter_selected_faces()
-        self.umeshes.set_sync(True)
+        if not self.is_obj_mode:
+            self.umeshes.filter_selected_faces()
+            self.umeshes.set_sync(True)
+        else:
+            self.umeshes.ensure(face=True)
+
         if self.individual:
             self.xyz_to_uv_individual()
         else:
             self.xyz_to_uv()
+
+        if self.is_obj_mode:
+            self.umeshes.update('No found faces for manipulate')
+            self.umeshes.free()
+            bpy.context.area.tag_redraw()
+            return {'FINISHED'}
         return self.umeshes.update(info='Not selected face')
 
     def xyz_to_uv(self):
-        vector_nor, islands_of_mesh = self.avg_normal_and_calc_selected_faces()
+        vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces()
         rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
 
         points = []
@@ -80,21 +91,24 @@ class UNIV_Normal(bpy.types.Operator):
 
             UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=uv_islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
 
-    def avg_normal_and_calc_selected_faces(self):
+    def avg_normal_and_calc_faces(self):
         tot_weight = Vector()
         islands_of_mesh: list[MeshIslands] = []
         for umesh in self.umeshes:
             weight = Vector()
-            selected_faces = utils.calc_selected_uv_faces_b(umesh)
+            if self.is_obj_mode:
+                faces = umesh.bm.faces
+            else:
+                faces = utils.calc_selected_uv_faces_b(umesh)
 
-            for f in selected_faces:
+            for f in faces:
                 weight += f.normal * f.calc_area()
 
             _, r, s = umesh.obj.matrix_world.decompose()
             mtx = Matrix.LocRotScale(Vector(), r, s)
             tot_weight += mtx @ weight
 
-            islands_of_mesh.append(MeshIslands([MeshIsland(selected_faces, umesh)], umesh))
+            islands_of_mesh.append(MeshIslands([MeshIsland(faces, umesh)], umesh))
 
         return tot_weight, islands_of_mesh
 
@@ -102,7 +116,7 @@ class UNIV_Normal(bpy.types.Operator):
         points = []
         points_append = points.append
         mesh_islands = []
-        for vector_nor, mesh_isl in self.avg_normal_and_calc_selected_faces_individual():
+        for vector_nor, mesh_isl in self.avg_normal_and_calc_faces_individual():
             uv = mesh_isl.umesh.uv_layer
             mesh_islands.append(mesh_isl)
             rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
@@ -135,11 +149,17 @@ class UNIV_Normal(bpy.types.Operator):
 
             UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=uv_islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
 
-    def avg_normal_and_calc_selected_faces_individual(self):
+    def avg_normal_and_calc_faces_individual(self):
+        calc_mesh_isl_obj = MeshIslands.calc_all if self.is_obj_mode else MeshIslands.calc_selected
+        # if self.is_obj_mode:
+        #     calc_mesh_isl_obj = MeshIslands.calc_all
+        # else:
+        #     calc_mesh_isl_obj = MeshIslands.calc_selected
+
         for umesh in self.umeshes:
             _, r, s = umesh.obj.matrix_world.decompose()
             mtx = Matrix.LocRotScale(Vector(), r, s)
-            for mesh_isl in MeshIslands.calc_selected(umesh):
+            for mesh_isl in calc_mesh_isl_obj(umesh):  # noqa
                 weight = Vector()
                 for f in mesh_isl:
                     weight += f.normal * f.calc_area()
@@ -205,7 +225,7 @@ class UNIV_BoxProject(bpy.types.Operator):
             self.umeshes.filter_selected_faces()
         self.box()
         if self.is_obj_mode:
-            self.umeshes.update()
+            self.umeshes.update('No faces for manipulate')
             self.umeshes.free()
             bpy.context.area.tag_redraw()
             return {'FINISHED'}

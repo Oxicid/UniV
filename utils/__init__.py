@@ -336,7 +336,7 @@ class UMesh:
 
     def set_tag(self, state=True):
         for f in self.bm.faces:
-            if f.select:
+            if f.select:  # TODO: Check that strange behavior
                 for crn in f.loops:
                     crn.tag = state
 

@@ -139,6 +139,11 @@ class MeshIslands(MeshIslandsBase):
         self.umesh: UMesh = umesh
 
     @classmethod
+    def calc_all(cls, umesh: UMesh):
+        umesh.set_face_tag()
+        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
+
+    @classmethod
     def calc_visible(cls, umesh: UMesh):
         cls.tag_filter_visible(umesh)
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
