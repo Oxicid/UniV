@@ -36,12 +36,12 @@ class UNIV_Normal(bpy.types.Operator):
         return self.execute(context)
 
     def __init__(self):
-        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
+        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes.calc(self.report)
-        if not self.is_obj_mode:
+        if self.is_edit_mode:
             self.umeshes.filter_selected_faces()
             self.umeshes.set_sync(True)
         else:
@@ -52,7 +52,7 @@ class UNIV_Normal(bpy.types.Operator):
         else:
             self.xyz_to_uv()
 
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.update('No found faces for manipulate')
             self.umeshes.free()
             bpy.context.area.tag_redraw()
@@ -96,7 +96,7 @@ class UNIV_Normal(bpy.types.Operator):
         islands_of_mesh: list[MeshIslands] = []
         for umesh in self.umeshes:
             weight = Vector()
-            if self.is_obj_mode:
+            if not self.is_edit_mode:
                 faces = umesh.bm.faces
             else:
                 faces = utils.calc_selected_uv_faces_b(umesh)
@@ -150,11 +150,7 @@ class UNIV_Normal(bpy.types.Operator):
             UNIV_OT_Crop.crop_ex('XY', bbox, inplace=False, islands_of_mesh=uv_islands_of_mesh, offset=Vector((0, 0)), padding=0.001, proportional=True)
 
     def avg_normal_and_calc_faces_individual(self):
-        calc_mesh_isl_obj = MeshIslands.calc_all if self.is_obj_mode else MeshIslands.calc_selected
-        # if self.is_obj_mode:
-        #     calc_mesh_isl_obj = MeshIslands.calc_all
-        # else:
-        #     calc_mesh_isl_obj = MeshIslands.calc_selected
+        calc_mesh_isl_obj = MeshIslands.calc_selected if self.is_edit_mode else MeshIslands.calc_all
 
         for umesh in self.umeshes:
             _, r, s = umesh.obj.matrix_world.decompose()
@@ -216,15 +212,15 @@ class UNIV_BoxProject(bpy.types.Operator):
         col.prop(self, 'use_correct_aspect', toggle=1)
 
     def __init__(self):
-        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
+        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes.calc(self.report)
-        if not self.is_obj_mode:
+        if self.is_edit_mode:
             self.umeshes.filter_selected_faces()
         self.box()
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.update('No faces for manipulate')
             self.umeshes.free()
             bpy.context.area.tag_redraw()
@@ -256,7 +252,7 @@ class UNIV_BoxProject(bpy.types.Operator):
             mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
 
             _, r, _ = umesh.obj.matrix_world.decompose()
-            faces = umesh.bm.faces if self.is_obj_mode else (f for f in umesh.bm.faces if f.select)
+            faces = (f for f in umesh.bm.faces if f.select) if self.is_edit_mode else umesh.bm.faces
             for f in faces:
                 n = f.normal.copy()
                 n.rotate(r)

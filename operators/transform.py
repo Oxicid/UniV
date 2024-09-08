@@ -1465,7 +1465,7 @@ class UNIV_OT_Random(Operator):
         self.aspect = 1.0
         self.non_valid_counter = 0
         self.umeshes: utils.UMeshes | None = None
-        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
+        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.all_islands: list[UnionIslands | AdvIsland] | None = None
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
 
@@ -1474,11 +1474,11 @@ class UNIV_OT_Random(Operator):
         self.umeshes = utils.UMeshes(report=self.report)
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.ensure(face=True)
 
         self.random_preprocessing()
-        if not self.is_obj_mode:
+        if self.is_edit_mode:
             if not self.all_islands:
                 self.random_preprocessing(extended=False)
 
@@ -1490,7 +1490,7 @@ class UNIV_OT_Random(Operator):
             self.report({'INFO'}, f"Found {self.non_valid_counter} zero-sized islands that will not be affected by some effects")
         self.umeshes.update(info="No object for randomize.")
 
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.free()
             utils.update_by_area_type('VIEW_3D')
         return {'FINISHED'}
@@ -1501,10 +1501,10 @@ class UNIV_OT_Random(Operator):
         self.all_islands = []
         _islands = []
         for umesh in self.umeshes:
-            if self.is_obj_mode:
-                islands = AdvIslands.calc_with_hidden(umesh)
-            else:
+            if self.is_edit_mode:
                 islands = AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended)
+            else:
+                islands = AdvIslands.calc_with_hidden(umesh)
             if islands:
                 if self.overlapped:
                     islands.calc_tris()
@@ -1849,14 +1849,14 @@ class UNIV_OT_Orient_VIEW3D(Operator):
 
     def __init__(self):
         self.skip_count: int = 0
-        self.is_obj_mode: bool = bpy.context.mode == 'OBJECT'
+        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: utils.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = utils.UMeshes(report=self.report)
         self.umeshes.set_sync(True)
 
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.ensure(face=True)
             self.world_orient(extended=False)
             if self.skip_count == len(self.umeshes):
@@ -1871,7 +1871,7 @@ class UNIV_OT_Orient_VIEW3D(Operator):
 
         self.umeshes.update(info="All islands oriented")
 
-        if self.is_obj_mode:
+        if not self.is_edit_mode:
             self.umeshes.free()
             bpy.context.area.tag_redraw()
 
@@ -1882,10 +1882,10 @@ class UNIV_OT_Orient_VIEW3D(Operator):
         for umesh in self.umeshes:
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
-            if self.is_obj_mode:
-                islands = Islands.calc_with_hidden(umesh)
-            else:
+            if self.is_edit_mode:
                 islands = Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended)
+            else:
+                islands = Islands.calc_with_hidden(umesh)
 
             if islands:
                 uv = islands.uv_layer
