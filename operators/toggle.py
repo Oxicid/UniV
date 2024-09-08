@@ -9,6 +9,7 @@ from .. import utils
 from ..preferences import force_debug, prefs, stable
 from ..types import ARegion
 
+from collections import defaultdict
 from bpy.props import *
 from bpy.types import Operator
 
@@ -380,12 +381,13 @@ class UNIV_OT_SyncUVToggle(Operator):
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
                     sel_state = vert.select
-                    for loop in vert.link_loops:
-                        loop[uv].select = sel_state
+                    for crn in vert.link_loops:
+                        crn[uv].select = sel_state
             if not umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
                     face.select = True
 
+            # Select corner edge
             if umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
                     for crn in face.loops:
@@ -397,7 +399,22 @@ class UNIV_OT_SyncUVToggle(Operator):
                         for crn in face.loops:
                             crn_uv = crn[uv]
                             crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
-            # TODO: Deselect boundary crn.select
+
+            # Deselect corner vertex, without linked selected corner edge
+            if utils.get_select_mode_mesh() == 'EDGE':
+                for vert in umesh.bm.verts:
+                    if not (vert.select and hasattr(vert, 'link_loops')):
+                        continue
+                    if any(crn_[uv].select for crn_ in vert.link_loops if crn_.face.select):
+                        crn_groups = defaultdict(list)
+                        for crn in vert.link_loops:
+                            if crn.face.select:
+                                crn_groups[crn[uv].uv.copy().freeze()].append(crn)
+
+                        for corners in crn_groups.values():
+                            if not any(crn[uv].select_edge or crn.link_loop_prev[uv].select_edge for crn in corners):
+                                for crn in corners:
+                                    crn[uv].select = False
 
     @staticmethod
     def to_sync(umesh):
