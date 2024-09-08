@@ -369,15 +369,39 @@ class UNIV_OT_SyncUVToggle(Operator):
                         loop_uv = loop[uv]
                         loop_uv.select = True
                         loop_uv.select_edge = True
-                return
-            for face in umesh.bm.faces:
-                sel_state = face.select
-                for loop in face.loops:
-                    loop_uv = loop[uv]
-                    loop_uv.select = sel_state
-                    loop_uv.select_edge = sel_state
-                face.select = True
+            elif umesh.is_full_face_deselected:
+                for face in umesh.bm.faces:
+                    if not face.hide:
+                        face.select = True
+                        for loop in face.loops:
+                            loop_uv = loop[uv]
+                            loop_uv.select = False
+                            loop_uv.select_edge = False
+            else:
+                for face in umesh.bm.faces:
+                    sel_state = face.select
+                    for loop in face.loops:
+                        loop_uv = loop[uv]
+                        loop_uv.select = sel_state
+                        loop_uv.select_edge = sel_state
+                    face.select = True
         else:
+            if umesh.is_full_face_selected:
+                for face in umesh.bm.faces:
+                    for crn in face.loops:
+                        crn_uv = crn[uv]
+                        crn_uv.select = True
+                        crn_uv.select_edge = True
+                return
+            if umesh.is_full_face_deselected:
+                for face in umesh.bm.faces:
+                    for crn in face.loops:
+                        crn_uv = crn[uv]
+                        crn_uv.select = False
+                        crn_uv.select_edge = False
+                    face.select = True
+                return
+
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
                     sel_state = vert.select
@@ -387,18 +411,18 @@ class UNIV_OT_SyncUVToggle(Operator):
                 for face in umesh.bm.faces:
                     face.select = True
 
+            if umesh.is_full_face_deselected:
+                return
+
             # Select corner edge
             if umesh.is_full_face_selected:
-                for face in umesh.bm.faces:
-                    for crn in face.loops:
-                        crn_uv = crn[uv]
-                        crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
+                corners = (crn__ for face in umesh.bm.faces for crn__ in face.loops)
             else:
-                for face in umesh.bm.faces:
-                    if face.select:
-                        for crn in face.loops:
-                            crn_uv = crn[uv]
-                            crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
+                corners = (crn__ for face in umesh.bm.faces if face.select for crn__ in face.loops)
+
+            for crn in corners:
+                crn_uv = crn[uv]
+                crn_uv.select_edge = crn_uv.select and crn.link_loop_next[uv].select
 
             # Deselect corner vertex, without linked selected corner edge
             if utils.get_select_mode_mesh() == 'EDGE':
