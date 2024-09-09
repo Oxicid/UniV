@@ -1837,9 +1837,11 @@ class UNIV_OT_Orient_VIEW3D(Operator):
                                     ('U', 'X', 'Align to the X axis of the World.'),
                                     ('V', 'Y', 'Align to the Y axis of the World.'),
                                     ('W', 'Z', 'Align to the Z axis of the World.')))
+    additional_angle: FloatProperty(name='Additional Angle', default=0.0, soft_min=-pi/2, soft_max=pi, subtype='ANGLE')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True, description='Gets Aspect Correct from the active image from the shader node editor')
 
     def draw(self, context):
+        self.layout.prop(self, 'additional_angle', slider=True)
         self.layout.prop(self, 'use_correct_aspect', toggle=1)
         self.layout.row().prop(self, 'axis', expand=True)
 
@@ -1917,7 +1919,7 @@ class UNIV_OT_Orient_VIEW3D(Operator):
                     else:  # (self.axis == 'AUTO' and avg_normal.x == max_size) or self.axis == 'U':
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False, aspect)
 
-                    if angle:
+                    if angle := (angle + self.additional_angle):
                         umesh.update_tag |= island.rotate(angle, pivot=island.calc_bbox().center, aspect=aspect)
             else:
                 self.skip_count += 1
