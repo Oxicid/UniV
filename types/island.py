@@ -218,9 +218,11 @@ class FaceIsland:
     def move(self, delta: Vector) -> bool:
         if umath.vec_isclose_to_zero(delta):
             return False
+
+        uv = self.uv_layer
         for face in self.faces:
-            for loop in face.loops:
-                loop[self.uv_layer].uv += delta
+            for crn in face.loops:
+                crn[uv].uv += delta
         return True
 
     def set_position(self, to: Vector, _from: Vector = None):
@@ -244,11 +246,12 @@ class FaceIsland:
             rot_matrix[0][1] = aspect * rot_matrix[0][1]
             rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
+        uv = self.uv_layer
         diff = pivot-(pivot @ rot_matrix)
         for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = uv.uv @ rot_matrix + diff
+            for crn in face.loops:
+                crn_uv = crn[uv]
+                crn_uv.uv = crn_uv.uv @ rot_matrix + diff  # TODO: Find aspect ratio for Vector.rotate method
         return True
 
     def rotate_simple(self, angle: float, aspect: float = 1.0) -> bool:
@@ -260,10 +263,11 @@ class FaceIsland:
             rot_matrix[0][1] = aspect * rot_matrix[0][1]
             rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
+        uv = self.uv_layer
         for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = uv.uv @ rot_matrix
+            for crn in face.loops:
+                crn_uv = crn[uv]
+                crn_uv.uv = crn_uv.uv @ rot_matrix
         return True
 
     def scale(self, scale: Vector, pivot: Vector) -> bool:
@@ -271,19 +275,24 @@ class FaceIsland:
         if umath.vec_isclose_to_uniform(scale):
             return False
         diff = pivot - pivot * scale
+
+        uv = self.uv_layer
         for face in self.faces:
-            for loop in face.loops:
-                uv = loop[self.uv_layer]
-                uv.uv = (uv.uv * scale) + diff
+            for crn in face.loops:
+                crn_co = crn[uv].uv
+                crn_co *= scale
+                crn_co += diff
         return True
 
     def scale_simple(self, scale: Vector) -> bool:
         """Scale a list of faces by world center"""
         if umath.vec_isclose_to_uniform(scale):
             return False
+
+        uv = self.uv_layer
         for face in self.faces:
-            for loop in face.loops:
-                loop[self.uv_layer].uv *= scale
+            for crn in face.loops:
+                crn[uv].uv *= scale
         return True
 
     def set_tag(self, tag=True):
