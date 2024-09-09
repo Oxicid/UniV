@@ -340,6 +340,11 @@ class UMesh:
                 for crn in f.loops:
                     crn.tag = state
 
+    def set_corners_tag(self, state=True):
+        for f in self.bm.faces:
+            for crn in f.loops:
+                crn.tag = state
+
     def set_face_tag(self, state=True):
         for f in self.bm.faces:
             f.tag = state

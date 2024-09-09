@@ -2040,10 +2040,7 @@ class UNIV_OT_Weld(Operator):
                 if not self.umeshes.final():
                     self.weld_by_distance_all(selected=False)
         else:
-            if self.sync:
-                self.weld_sync()
-            else:
-                self.weld()
+            self.weld()
 
             if self.stitched_islands:
                 self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
@@ -2062,43 +2059,58 @@ class UNIV_OT_Weld(Operator):
         islands_of_mesh = []
         for umesh in reversed(self.umeshes):
             uv = umesh.uv_layer
-            if umesh.is_full_face_deselected or \
-                    not any(l[uv].select_edge for f in umesh.bm.faces if f.select for l in f.loops):
-                self.umeshes.umeshes.remove(umesh)
-                continue
+            if not umesh.sync:
+                if umesh.is_full_face_deselected or \
+                        not any(l[uv].select_edge for f in umesh.bm.faces if f.select for l in f.loops):
+                    self.umeshes.umeshes.remove(umesh)
+                    continue
+            else:
+                if umesh.is_full_edge_deselected:
+                    self.umeshes.umeshes.remove(umesh)
+                    continue
 
             local_seam_clear_counter = 0
             local_edge_weld_counter = 0
 
-            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=False):  # TODO: Add any edge select method
+            if islands := Islands.calc_extended_any_edge_non_manifold(umesh):
+                umesh.set_corners_tag(False)
                 islands.indexing(force=True)
-                for isl in reversed(islands):
-                    corners = [_crn for f in isl for _crn in f.loops if _crn[uv].select_edge]  # TODO: Add tag system
-                    if not corners:
-                        islands.islands.remove(isl)
-                        continue
 
-                    isl_idx = isl[0].index
-                    for crn in corners:
+                for idx, isl in enumerate(islands):
+                    isl.set_selected_crn_edge_tag(umesh)
+
+                    idx = isl[0].index
+                    for crn in isl.iter_corners_by_tag():
                         shared = crn.link_loop_radial_prev
-                        if shared == crn or shared.face.index != isl_idx:
+                        if shared == crn:
+                            crn.tag = False
                             continue
-                        if not shared[uv].select_edge:
+
+                        if shared.face.index != idx:  # island boundary skip
+                            crn.tag = False
+                            shared.tag = False
                             continue
-                        weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
-                        weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
+
+                        if not shared.tag:  # single select preserve system
+                            continue
+
+                        is_welded_a = crn[uv].uv == shared.link_loop_next[uv].uv
+                        is_welded_b = crn.link_loop_next[uv].uv == shared[uv].uv
 
                         edge = crn.edge
-                        if weld_a and weld_b:
+                        if is_welded_a and is_welded_b:
                             if edge.seam:
                                 edge.seam = False
                                 local_seam_clear_counter += 1
                         else:
-                            utils.weld_crn_edge(crn, uv)
+                            utils.weld_crn_edge(crn, uv)  # TODO: Simplify
                             if edge.seam:
                                 edge.seam = False
                                 local_seam_clear_counter += 1
                             local_edge_weld_counter += 1
+
+                        crn.tag = False
+                        shared.tag = False
 
             self.seam_clear_counter += local_seam_clear_counter
             self.edge_weld_counter += local_edge_weld_counter
@@ -2110,93 +2122,29 @@ class UNIV_OT_Weld(Operator):
         if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
             return
 
-        for umesh, islands in islands_of_mesh:
-            islands.indexing(force=True)
-            uv = islands.uv_layer
+        if not self.umeshes.sync:
+            for umesh, islands in islands_of_mesh:
+                uv = islands.uv_layer
 
-            local_seam_clear_counter = 0
-            local_edge_weld_counter = 0
+                local_seam_clear_counter = 0
+                local_edge_weld_counter = 0
 
-            for isl in reversed(islands):
-                corners = (_crn for f in isl for _crn in f.loops if _crn[uv].select_edge)  # TODO: Add tag system
+                for idx, isl in enumerate(islands):
+                    for crn in isl.iter_corners_by_tag():
+                        utils.copy_pos_to_target_with_select(crn, uv, idx)
 
-                isl_idx = isl[0].index
-                for crn in corners:
-                    shared = crn.link_loop_radial_prev
-                    if shared == crn or shared.face.index != isl_idx:
-                        continue
-                    if shared[uv].select_edge:
-                        continue
-
-                    weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
-                    weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
-
-                    edge = crn.edge
-                    if weld_a and weld_b:
-                        if edge.seam:
-                            edge.seam = False
-                            local_seam_clear_counter += 1
-                    else:
-                        utils.copy_pos_to_target_with_select(crn, uv, isl_idx)
-                        if edge.seam:
+                        edge = crn.edge
+                        if crn.edge.seam:
                             edge.seam = False
                             local_seam_clear_counter += 1
                         local_edge_weld_counter += 1
 
-            self.seam_clear_counter += local_seam_clear_counter
-            self.edge_weld_counter += local_edge_weld_counter
-            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+                self.seam_clear_counter += local_seam_clear_counter
+                self.edge_weld_counter += local_edge_weld_counter
+                umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
 
-        if self.seam_clear_counter + self.edge_weld_counter:
-            return
-
-        UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
-
-    def weld_sync(self):
-        for umesh in reversed(self.umeshes):
-            uv = umesh.uv_layer
-            if umesh.is_full_edge_deselected:
-                self.umeshes.umeshes.remove(umesh)
-                continue
-
-            local_seam_clear_counter = 0
-            local_edge_weld_counter = 0
-
-            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=False):  # TODO: Add any edge select method
-                islands.indexing(force=True)
-                for isl in reversed(islands):
-                    corners = [_crn for f in isl for _crn in f.loops if _crn.edge.select]  # TODO: Add tag system
-                    if not corners:
-                        islands.islands.remove(isl)
-                        continue
-
-                    isl_idx = isl[0].index
-                    for crn in corners:
-                        shared = crn.link_loop_radial_prev
-                        if shared == crn or shared.face.index != isl_idx:
-                            continue
-
-                        weld_a = crn[uv].uv == shared.link_loop_next[uv].uv
-                        weld_b = crn.link_loop_next[uv].uv == shared[uv].uv
-
-                        edge = crn.edge
-                        if weld_a and weld_b:
-                            if edge.seam:
-                                edge.seam = False
-                                local_seam_clear_counter += 1
-                        else:
-                            utils.weld_crn_edge(crn, uv)
-                            if edge.seam:
-                                edge.seam = False
-                                local_seam_clear_counter += 1
-                            local_edge_weld_counter += 1
-
-            self.seam_clear_counter += local_seam_clear_counter
-            self.edge_weld_counter += local_edge_weld_counter
-            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
-
-        if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
-            return
+            if self.seam_clear_counter + self.edge_weld_counter:
+                return
 
         UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
 
@@ -2204,7 +2152,7 @@ class UNIV_OT_Weld(Operator):
         for umesh in self.umeshes:
             uv = umesh.uv_layer
             local_counter = 0
-            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh.bm, uv, self.sync, extended=extended):
+            if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh, extended=extended):
                 # Tagging
                 for f in umesh.bm.faces:
                     for crn in f.loops:

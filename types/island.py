@@ -304,6 +304,20 @@ class FaceIsland:
             for crn in f.loops:
                 crn.tag = tag
 
+    def set_selected_crn_edge_tag(self, umesh):
+        if umesh.sync:
+            for f in self:
+                for crn in f.loops:
+                    crn.tag = crn.edge.select
+        else:
+            uv = umesh.uv_layer
+            for f in self:
+                for crn in f.loops:
+                    crn.tag = crn[uv].select_edge
+
+    def iter_corners_by_tag(self):
+        return (crn for f in self for crn in f.loops if crn.tag)
+
     def tag_selected_corner_verts_by_verts(self, umesh):
         corners = (_crn for f in self for _crn in f.loops)
 
@@ -878,11 +892,19 @@ class IslandsBase:
             return any(all(l[uv_layer].select_edge for l in face.loops) for face in island)
 
     @staticmethod
-    def island_filter_is_any_elem_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
+    def island_filter_is_any_vert_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
         if sync:
             return any(v.select for face in island for v in face.verts)
         else:
             return any(l[uv_layer].select for face in island for l in face.loops)
+
+    @staticmethod
+    def island_filter_is_any_edge_selected(island: list[BMFace], umesh: UMesh) -> bool:
+        if umesh.sync:
+            return any(e.select for face in island for e in face.edges)
+        else:
+            uv = umesh.uv_layer
+            return any(crn[uv].select_edge for face in island for crn in face.loops)
 
     @staticmethod
     def island_filter_is_all_corner_selected(island: list[BMFace], uv_layer: BMLayerItem, sync: bool) -> bool:
@@ -1161,7 +1183,7 @@ class Islands(IslandsBase):
             islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
         else:
             islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)
-                       if cls.island_filter_is_any_elem_selected(i, uv_layer, sync)]
+                       if cls.island_filter_is_any_vert_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
 
     @classmethod
@@ -1186,39 +1208,65 @@ class Islands(IslandsBase):
             islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)]
         else:
             islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_with_markseam_iter_ex(umesh.bm, umesh.uv_layer)
-                       if cls.island_filter_is_any_elem_selected(i, umesh.uv_layer, umesh.sync)]
+                       if cls.island_filter_is_any_vert_selected(i, umesh.uv_layer, umesh.sync)]
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_extended_any_elem_non_manifold(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool):
-        if not sync:
-            if btypes.PyBMesh.is_full_face_deselected(bm):
+    def calc_extended_any_vert_non_manifold(cls, umesh: UMesh):
+        """Calc any verts selected islands"""
+        if not umesh.sync:
+            if umesh.is_full_face_deselected:
                 return cls([], None, None)
         else:
             elem_mode = utils.get_select_mode_mesh()
             if elem_mode == 'FACE':
-                if btypes.PyBMesh.is_full_face_deselected(bm):
+                if umesh.is_full_face_deselected:
                     return cls([], None, None)
             elif elem_mode == 'VERTEX':
-                if btypes.PyBMesh.is_full_vert_deselected(bm):
+                if umesh.is_full_vert_deselected:
                     return cls([], None, None)
             else:
-                if btypes.PyBMesh.is_full_edge_deselected(bm):
+                if umesh.is_full_edge_deselected:
                     return cls([], None, None)
 
-        cls.tag_filter_visible(bm, sync)
-        if sync and PyBMesh.is_full_face_selected(bm):
-            islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_non_manifold_ex(bm, uv_layer)]
+        cls.tag_filter_visible(umesh.bm, umesh.sync)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_non_manifold_ex(umesh.bm, umesh.uv_layer)]
         else:
-            islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_non_manifold_ex(bm, uv_layer)
-                       if cls.island_filter_is_any_elem_selected(i, uv_layer, sync)]
-        return cls(islands, bm, uv_layer)
+            islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_non_manifold_ex(umesh.bm, umesh.uv_layer)
+                       if cls.island_filter_is_any_vert_selected(i, umesh.uv_layer, umesh.sync)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_visible_non_manifold(cls, bm: BMesh, uv_layer: BMLayerItem,  sync: bool):
-        cls.tag_filter_visible(bm, sync)
-        islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_iter_ex(bm, uv_layer)]
-        return cls(islands, bm, uv_layer)
+    def calc_extended_any_edge_non_manifold(cls, umesh: UMesh):
+        """Calc any edges selected islands"""
+        if umesh.sync:
+            if (elem_mode := utils.get_select_mode_mesh()) == 'FACE':
+                if umesh.is_full_face_deselected:
+                    return cls([], None, None)
+            elif elem_mode == 'VERTEX':
+                if umesh.is_full_vert_deselected:
+                    return cls([], None, None)
+            else:
+                if umesh.is_full_edge_deselected:
+                    return cls([], None, None)
+        else:
+            if umesh.is_full_face_deselected:
+                return cls([], None, None)
+
+        cls.tag_filter_visible(umesh.bm, umesh.sync)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_non_manifold_ex(umesh.bm, umesh.uv_layer)]
+        else:
+            islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_non_manifold_ex(umesh.bm, umesh.uv_layer)
+                       if cls.island_filter_is_any_edge_selected(i, umesh)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
+
+    @classmethod
+    def calc_visible_non_manifold(cls, umesh: UMesh):
+        cls.tag_filter_visible(umesh.bm, umesh.sync)
+        islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_ex(umesh.bm, umesh.uv_layer)]
+        return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
     def calc_visible(cls, bm: BMesh, uv_layer: BMLayerItem,  sync: bool):
@@ -1243,7 +1291,7 @@ class Islands(IslandsBase):
         if btypes.PyBMesh.fields(bm).totfacesel == 0:
             return cls([], None, None)
         cls.tag_filter_visible(bm, sync)
-        islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_all_ex(bm, uv_layer, angle) if cls.island_filter_is_any_elem_selected(i, uv_layer, sync)]
+        islands = [cls.island_type(i, bm, uv_layer) for i in cls.calc_all_ex(bm, uv_layer, angle) if cls.island_filter_is_any_vert_selected(i, uv_layer, sync)]
         return cls(islands, bm, uv_layer)
 
     @classmethod
@@ -1259,10 +1307,10 @@ class Islands(IslandsBase):
         return cls.calc_visible(bm, uv_layer, sync)
 
     @classmethod
-    def calc_any_extended_or_visible_non_manifold(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, *, extended) -> 'Islands':
+    def calc_any_extended_or_visible_non_manifold(cls, umesh: UMesh, *, extended) -> 'Islands':
         if extended:
-            return cls.calc_extended_any_elem_non_manifold(bm, uv_layer, sync)
-        return cls.calc_visible_non_manifold(bm, uv_layer, sync)
+            return cls.calc_extended_any_vert_non_manifold(umesh)
+        return cls.calc_visible_non_manifold(umesh)
 
     @classmethod
     def calc_extended_or_visible_all(cls, bm: BMesh, uv_layer: BMLayerItem, sync: bool, angle: float, *, extended) -> 'Islands':
