@@ -213,6 +213,7 @@ class FaceIsland:
         self.faces: list[BMFace] = faces
         self.bm: BMesh = bm
         self.uv_layer: BMLayerItem = uv_layer
+        self.value: float | int = -1  # value for different purposes
 
     def move(self, delta: Vector) -> bool:
         if umath.vec_isclose_to_zero(delta):
@@ -239,9 +240,9 @@ class FaceIsland:
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
         rot_matrix = Matrix.Rotation(angle, 2)
-
-        rot_matrix[0][1] = aspect * rot_matrix[0][1]
-        rot_matrix[1][0] = rot_matrix[1][0] / aspect
+        if aspect != 1.0:
+            rot_matrix[0][1] = aspect * rot_matrix[0][1]
+            rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
         diff = pivot-(pivot @ rot_matrix)
         for face in self.faces:
@@ -250,11 +251,15 @@ class FaceIsland:
                 uv.uv = uv.uv @ rot_matrix + diff
         return True
 
-    def rotate_simple(self, angle: float) -> bool:
+    def rotate_simple(self, angle: float, aspect: float = 1.0) -> bool:
         """Rotate a list of faces by angle (in radians) around a world center"""
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
         rot_matrix = Matrix.Rotation(-angle, 2)
+        if aspect != 1.0:
+            rot_matrix[0][1] = aspect * rot_matrix[0][1]
+            rot_matrix[1][0] = rot_matrix[1][0] / aspect
+
         for face in self.faces:
             for loop in face.loops:
                 uv = loop[self.uv_layer]
@@ -1051,6 +1056,7 @@ class Islands(IslandsBase):
         self.islands: list[FaceIsland] = islands
         self.bm: BMesh = bm
         self.uv_layer: BMLayerItem = uv_layer
+        self.value: float | int = -1  # value for different purposes
 
     @classmethod
     def calc_selected(cls, umesh: UMesh):
@@ -1283,8 +1289,8 @@ class Islands(IslandsBase):
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         return bool(sum(island.rotate(angle, pivot, aspect) for island in self.islands))
 
-    def rotate_simple(self, angle: float):
-        return bool(sum(island.rotate_simple(angle) for island in self.islands))
+    def rotate_simple(self, angle: float, aspect: float = 1.0):
+        return bool(sum(island.rotate_simple(angle, aspect) for island in self.islands))
 
     def calc_bbox(self) -> BBox:
         general_bbox = BBox()

@@ -593,6 +593,8 @@ def calc_avg_normal():
 def find_min_rotate_angle(angle):
     return -(round(angle / (math.pi / 2)) * (math.pi / 2) - angle)
 
+def calc_convex_points(points_append):
+    return [points_append[i] for i in mathutils.geometry.convex_hull_2d(points_append)]
 
 def calc_min_align_angle(points, aspect=1.0):
     if aspect != 1.0:

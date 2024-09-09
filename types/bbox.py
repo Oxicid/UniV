@@ -342,15 +342,25 @@ class BBox:
         self.ymax = self.ymin + xy[1]
 
     def update(self, coords):
+        xmin = self.xmin
+        ymin = self.ymin
+        xmax = self.xmax
+        ymax = self.ymax
+
         for x, y in coords:
-            if x < self.xmin:
-                self.xmin = x
-            if x > self.xmax:
-                self.xmax = x
-            if y < self.ymin:
-                self.ymin = y
-            if y > self.ymax:
-                self.ymax = y
+            if x < xmin:
+                xmin = x
+            if x > xmax:
+                xmax = x
+            if y < ymin:
+                ymin = y
+            if y > ymax:
+                ymax = y
+
+        self.xmin = xmin
+        self.ymin = ymin
+        self.xmax = xmax
+        self.ymax = ymax
 
     def isect_x(self, x) -> bool:
         if x < self.xmin:

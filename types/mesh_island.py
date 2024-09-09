@@ -10,6 +10,7 @@ class MeshIsland:
     def __init__(self, faces: list[BMFace], umesh: UMesh):
         self.faces: list[BMFace] = faces
         self.umesh: UMesh = umesh
+        self.value: float | int = -1  # value for different purposes
 
     def __select_force(self, state):
         for face in self.faces:
@@ -43,7 +44,9 @@ class MeshIsland:
         self._select_ex(False, mode)
 
     def to_adv_island(self) -> island.AdvIsland:
-        return island.AdvIsland(self.faces, self.umesh.bm, self.umesh.uv_layer)
+        adv_isl = island.AdvIsland(self.faces, self.umesh.bm, self.umesh.uv_layer)
+        adv_isl.value = self.value
+        return adv_isl
 
     def __iter__(self):
         return iter(self.faces)
@@ -137,6 +140,7 @@ class MeshIslands(MeshIslandsBase):
     def __init__(self, islands, umesh: UMesh):
         self.mesh_islands: list[MeshIsland] = islands
         self.umesh: UMesh = umesh
+        self.value: float | int = -1  # value for different purposes
 
     @classmethod
     def calc_all(cls, umesh: UMesh):
@@ -156,8 +160,12 @@ class MeshIslands(MeshIslandsBase):
     def to_adv_islands(self) -> island.AdvIslands:
         adv_islands = []
         for mesh_isl in self:
-            adv_islands.append(island.AdvIsland(mesh_isl.faces, self.umesh.bm, self.umesh.uv_layer))
-        return island.AdvIslands(adv_islands, self.umesh.bm, self.umesh.uv_layer)
+            adv_isl = island.AdvIsland(mesh_isl.faces, self.umesh.bm, self.umesh.uv_layer)
+            adv_isl.value = mesh_isl.value
+            adv_islands.append(adv_isl)
+        adv_islands_t = island.AdvIslands(adv_islands, self.umesh.bm, self.umesh.uv_layer)
+        adv_islands_t.value = self.value
+        return adv_islands_t
 
     def __iter__(self) -> typing.Iterator[MeshIsland]:
         return iter(self.mesh_islands)
