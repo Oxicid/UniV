@@ -2055,7 +2055,9 @@ class UNIV_OT_Weld(Operator):
         self.umeshes.update(info='Not found verts for weld')
         return {'FINISHED'}
 
+    @utils.timer()
     def weld(self):
+        from ..utils import weld_crn_edge_by_idx
         islands_of_mesh = []
         for umesh in reversed(self.umeshes):
             uv = umesh.uv_layer
@@ -2094,20 +2096,28 @@ class UNIV_OT_Weld(Operator):
                         if not shared.tag:  # single select preserve system
                             continue
 
-                        is_welded_a = crn[uv].uv == shared.link_loop_next[uv].uv
-                        is_welded_b = crn.link_loop_next[uv].uv == shared[uv].uv
+                        # CPU Bound
+                        crn_next = crn.link_loop_next
+                        shared_next = shared.link_loop_next
+
+                        is_splitted_a = crn[uv].uv != shared_next[uv].uv
+                        is_splitted_b = crn_next[uv].uv != shared[uv].uv
+
+                        if is_splitted_a and is_splitted_b:
+                            weld_crn_edge_by_idx(crn, shared_next, idx, uv)
+                            weld_crn_edge_by_idx(crn_next, shared, idx, uv)
+                            local_edge_weld_counter += 1
+                        elif is_splitted_a:
+                            weld_crn_edge_by_idx(crn, shared_next, idx, uv)
+                            local_edge_weld_counter += 1
+                        elif is_splitted_b:
+                            weld_crn_edge_by_idx(crn_next, shared, idx, uv)
+                            local_edge_weld_counter += 1
 
                         edge = crn.edge
-                        if is_welded_a and is_welded_b:
-                            if edge.seam:
-                                edge.seam = False
-                                local_seam_clear_counter += 1
-                        else:
-                            utils.weld_crn_edge(crn, uv)  # TODO: Simplify
-                            if edge.seam:
-                                edge.seam = False
-                                local_seam_clear_counter += 1
-                            local_edge_weld_counter += 1
+                        if edge.seam:
+                            edge.seam = False
+                            local_seam_clear_counter += 1
 
                         crn.tag = False
                         shared.tag = False

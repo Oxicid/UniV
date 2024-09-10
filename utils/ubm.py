@@ -177,16 +177,9 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv_layer: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
-def linked_crn_uv_by_face_index_b(first: BMLoop, uv: BMLayerItem, idx: int):
-    first_co = first[uv].uv
-    linked = [first]
-    bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
-            linked.append(bm_iter)
-    return linked
+def linked_crn_uv_by_face_index_b(crn: BMLoop, uv: BMLayerItem, idx: int):
+    first_co = crn[uv].uv
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
 def linked_crn_by_face_index(crn):
     idx = crn.face.index
@@ -341,15 +334,13 @@ def copy_pos_to_target(crn, uv, idx):
     next_crn_co = crn.link_loop_next[uv].uv
     shared = shared_crn(crn)
 
-    source_corners = linked_crn_uv_by_face_index_b(shared, uv, idx)
-    for _crn in source_corners:
+    for _crn in linked_crn_uv_by_face_index_b(shared, uv, idx):
         _crn[uv].uv = next_crn_co
 
     crn_co = crn[uv].uv
     shared_next = shared_crn(crn).link_loop_next
 
-    source_corners = linked_crn_uv_by_face_index_b(shared_next, uv, idx)
-    for _crn in source_corners:
+    for _crn in linked_crn_uv_by_face_index_b(shared_next, uv, idx):
         _crn[uv].uv = crn_co
 
 def copy_pos_to_target_with_select(crn, uv, idx):
@@ -358,8 +349,7 @@ def copy_pos_to_target_with_select(crn, uv, idx):
     shared = shared_crn(crn)
     shared[uv].select_edge = True
 
-    source_corners = linked_crn_uv_by_face_index_b(shared, uv, idx)
-    for _crn in source_corners:
+    for _crn in linked_crn_uv_by_face_index_b(shared, uv, idx):
         _crn_uv = _crn[uv]
         _crn_uv.uv = next_crn_co
         _crn_uv.select = True
@@ -367,43 +357,40 @@ def copy_pos_to_target_with_select(crn, uv, idx):
     crn_co = crn[uv].uv
     shared_next = shared_crn(crn).link_loop_next
 
-    source_corners = linked_crn_uv_by_face_index_b(shared_next, uv, idx)
-    for _crn in source_corners:
+    for _crn in linked_crn_uv_by_face_index_b(shared_next, uv, idx):
         _crn_uv = _crn[uv]
         _crn_uv.uv = crn_co
         _crn_uv.select = True
 
-def weld_crn_edge(crn: BMLoop, uv: BMLayerItem):
-    crn_next = crn.link_loop_next
-    shared = shared_crn(crn)
-    shared_next = shared.link_loop_next
-
-    index_a = crn.face.index
-    index_b = shared.face.index
-
-    corners_a = linked_crn_uv_by_face_index_b(crn, uv, index_a)
-    corners_b = linked_crn_uv_by_face_index_b(crn_next, uv, index_a)
-
-    corners_a += linked_crn_uv_by_face_index_b(shared_next, uv, index_b)
-    corners_b += linked_crn_uv_by_face_index_b(shared, uv, index_b)
-
+def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv: BMLayerItem):
+    """For Weld OT"""
     coords_sum_a = Vector((0.0, 0.0))
-    coords_sum_b = Vector((0.0, 0.0))
 
-    for crn_a in corners_a:
-        coords_sum_a += crn_a[uv].uv
+    corners = []
+    corners_append = corners.append
 
-    for crn_b in corners_b:
-        coords_sum_b += crn_b[uv].uv
+    first_co = crn[uv].uv
+    for crn_a in crn.vert.link_loops:
+        if crn_a.face.index == idx:
+            crn_a_uv = crn_a[uv]
+            crn_a_co = crn_a_uv.uv
+            if crn_a_co == first_co:
+                coords_sum_a += crn_a_co
+                corners_append(crn_a_uv)
 
-    avg_co_a = coords_sum_a / len(corners_a)
-    avg_co_b = coords_sum_b / len(corners_b)
+    second_co = crn_pair[uv].uv
+    for crn_b in crn_pair.vert.link_loops:
+        if crn_b.face.index == idx:
+            crn_b_uv = crn_b[uv]
+            crn_b_co = crn_b_uv.uv
+            if crn_b_co == second_co:
+                coords_sum_a += crn_b_co
+                corners_append(crn_b_uv)
 
-    for crn_a in corners_a:
-        crn_a[uv].uv = avg_co_a
+    avg_co_a = coords_sum_a / len(corners)
 
-    for crn_b in corners_b:
-        crn_b[uv].uv = avg_co_b
+    for crn_ in corners:
+        crn_.uv = avg_co_a
 
 def is_flipped_uv(f, uv) -> bool:
     area = 0.0
