@@ -25,21 +25,28 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=(('ANGLE_BASED', 'Angle Based', ''), ('CONFORMAL', 'Conformal', '')))
-    axis: bpy.props.EnumProperty(name='Axis', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
+                description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-    mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
-                                      items=(('UV_BORDER', 'UV Borders', 'Marks seams where there are split edges'),
-                                             ('UV_INDEX', 'UV Index', 'No additional seams are created within the island itself')))
+    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Inner Island', default=True, description='Marks seams where there are split edges')
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
-        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
-        self.layout.row(align=True).prop(self, 'axis', expand=True)
+
+        self.layout.prop(self, 'mark_seam_inner_island')
+
+        # col = self.layout.column(align=True)
+        col = self.layout.column(align=False)
+        split = col.split(factor=0.3, align=True)
+        split.label(text='Unwrap Along')
+        row = split.row(align=True)
+        row.prop(self, 'unwrap_along', expand=True)
+
         self.layout.prop(self, 'blend_factor', slider=True)
-        self.layout.row(align=True).prop(self, 'mark_seam_type', expand=True)
+        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
         return self.execute(context)
@@ -84,11 +91,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             uv = umesh.uv_layer
             islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
-            if self.mark_seam_type == 'UV_INDEX':
+            if not self.mark_seam_inner_island:
                 islands.indexing(force=True)
 
             for isl in islands:
-                if self.mark_seam_type == 'UV_BORDER':
+                if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
                     isl.mark_seam_by_index(additional=True)
@@ -126,7 +133,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
                     save_t = isl.save_transform()
-                    save_t.save_coords(self.axis, self.blend_factor)
+                    save_t.save_coords(self.unwrap_along, self.blend_factor)
                     save_transform_islands.append(save_t)
 
             pin_and_inplace.append((unpin_uvs, save_transform_islands))
@@ -138,8 +145,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for pin in ud.pins:
                 pin.pin_uv = False
             for isl in ud.islands:
-                isl.inplace()
-                isl.apply_saved_coords(self.axis, self.blend_factor)
+                isl.inplace(self.unwrap_along)
+                isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
             for v in ud.temp_selected:
                 v.select = False
 
@@ -159,7 +166,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             uv = umesh.uv_layer
             islands_extended = Islands.calc_extended_with_mark_seam(umesh)
-            if self.mark_seam_type == 'UV_INDEX':
+            if not self.mark_seam_inner_island:
                 islands_extended.indexing(force=True)
 
             selected_islands = Islands.calc_selected_with_mark_seam(umesh)
@@ -167,17 +174,18 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             save_transform_islands = []
             for isl in islands_extended:
-                if self.mark_seam_type == 'UV_BORDER':
+                if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
                     isl.mark_seam_by_index(additional=True)
                 save_t = isl.save_transform()
-                save_t.save_coords(self.axis, self.blend_factor)
+                save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
 
             pinned = []
             to_select = []
             if not umesh.is_full_face_selected:
+                # TODO: Comment that
                 for f in selected_islands.faces_iter():
                     for crn in f.loops:
                         for linked_crn in linked_crn_uv(crn, uv):
@@ -230,8 +238,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for f in faces:
                 f.select = False
             for isl in islands:
-                isl.inplace()
-                isl.apply_saved_coords(self.axis, self.blend_factor)
+                isl.inplace(self.unwrap_along)
+                isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
 
     def unwrap_non_sync(self):
         save_transform_islands = []
@@ -242,36 +250,35 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 continue
 
             islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
-            if self.mark_seam_type == 'UV_INDEX':
+            if not self.mark_seam_inner_island:
                 islands.indexing(force=True)
 
             for isl in islands:
-                if self.mark_seam_type == 'UV_BORDER':
+                if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
                     isl.mark_seam_by_index(additional=True)
 
             for isl in islands:
                 save_t = isl.save_transform()
-                save_t.save_coords(self.axis, self.blend_factor)
+                save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
 
         bpy.ops.uv.unwrap(method=self.unwrap)
 
         for isl in save_transform_islands:
-            isl.inplace()
-            isl.apply_saved_coords(self.axis, self.blend_factor)
+            isl.inplace(self.unwrap_along)
+            isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
 
-class UNIV_OT_Unwrap_VIEW3D(UNIV_OT_Unwrap):
-    bl_idname = "mesh.univ_unwrap"
-    bl_label = "Unwrap"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    axis: bpy.props.EnumProperty(name='Axis', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-    mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
-                                      items=(('UV_BORDER', 'Angle Based', ''), ('SELECTED_BORDER', 'Selected Border', '')))
-
-    def draw(self, context):
-        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
-        self.layout.row(align=True).prop(self, 'mark_seam_type', expand=True)
+# class UNIV_OT_Unwrap_VIEW3D(UNIV_OT_Unwrap):
+#     bl_idname = "mesh.univ_unwrap"
+#     bl_label = "Unwrap"
+#     bl_options = {'REGISTER', 'UNDO'}
+#
+#     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
+#     mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
+#                                       items=(('UV_BORDER', 'Angle Based', ''), ('SELECTED_BORDER', 'Selected Border', '')))
+#
+#     def draw(self, context):
+#         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
+#         self.layout.prop(self, 'mark_seam_inner_island')

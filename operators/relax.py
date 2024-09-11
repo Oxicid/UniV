@@ -5,7 +5,7 @@ import bpy
 
 from ..types import Islands
 from .. import utils
-from ..utils import UMeshes, vec_lerp
+from ..utils import UMeshes
 
 class RelaxData:
     def __init__(self, _umesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
@@ -135,8 +135,8 @@ class UNIV_OT_Relax(bpy.types.Operator):
             for rd in relax_data:
                 uv = rd.umesh.uv_layer
                 for co, crn in zip(rd.coords_before, rd.border_corners):
-                    crn_uv = crn[uv]
-                    crn_uv.uv = vec_lerp(co, crn_uv.uv, self.border_blend)
+                    crn_uv_co = crn[uv].uv
+                    crn_uv_co[:] = co.lerp(crn_uv_co, self.border_blend)
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
 
         for rd in relax_data:
@@ -230,7 +230,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 uv = rd.umesh.uv_layer
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv = crn[uv]
-                    crn_uv.uv = vec_lerp(co, crn_uv.uv, self.border_blend)
+                    crn_uv.uv = co.lerp(crn_uv.uv, self.border_blend)
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
 
         for rd in relax_data:

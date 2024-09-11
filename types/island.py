@@ -128,7 +128,7 @@ class SaveTransform:
         y = self.bbox.height * 0.005
         self.island.move(Vector((x if sign_x else -x, y if sign_y else -y)))
 
-    def inplace(self):
+    def inplace(self, axis='BOTH'):
         if not self.rotate:
             return
         uv = self.island.uv_layer
@@ -152,20 +152,39 @@ class SaveTransform:
                 self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.island.calc_bbox()
 
-            if self.bbox.width > self.bbox.height:
+            if axis == 'BOTH':
+                if self.bbox.width > self.bbox.height:
 
-                scale = self.bbox.width / new_bbox.width
-                self.island.scale(Vector((scale, scale)), new_bbox.center)
+                    scale = self.bbox.width / new_bbox.width
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
 
-                old_center = self.bbox.center
-                new_center = new_bbox.center
+                    old_center = self.bbox.center
+                    new_center = new_bbox.center
+                else:
+                    scale = self.bbox.height / new_bbox.height
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
+
+                    old_center = self.bbox.center
+                    new_center = new_bbox.center
+                self.island.set_position(old_center, new_center)
             else:
-                scale = self.bbox.height / new_bbox.height
-                self.island.scale(Vector((scale, scale)), new_bbox.center)
+                if axis == 'X':
+                    scale = self.bbox.height / new_bbox.height
 
-                old_center = self.bbox.center
-                new_center = new_bbox.center
-            self.island.set_position(old_center, new_center)
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
+
+                    old_center = self.bbox.center
+                    new_center = new_bbox.center
+                else:
+                    scale = self.bbox.width / new_bbox.width
+
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
+
+                    old_center = self.bbox.center
+                    new_center = new_bbox.center
+
+                self.island.set_position(old_center, new_center)
+
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
 
@@ -181,32 +200,36 @@ class SaveTransform:
             self.old_crn_pos = [crn[uv].uv.copy() for f in self.island for crn in f.loops]
 
     def apply_saved_coords(self, axis, mix):
-        if mix == 1:
-            return
         uv = self.island.uv_layer
         corners = (crn[uv].uv for f in self.island for crn in f.loops)
-        if mix == 0:
+
+        if axis == 'BOTH':
+            if mix == 1:
+                return
+            if mix == 0:
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv.xy = old_co
+            else:
+                for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                    crn_uv[:] = old_co.lerp(crn_uv, mix)
+            return
+
+        if mix == 1:
             if axis == 'X':
                 for crn_uv, old_co in zip(corners, self.old_crn_pos):
                     crn_uv.x = old_co
-            elif axis == 'Y':
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.y = old_co
             else:
                 for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.xy = old_co
+                    crn_uv.y = old_co
         else:
             from bl_math import lerp
             if axis == 'X':
                 for crn_uv, old_co in zip(corners, self.old_crn_pos):
                     crn_uv.x = lerp(old_co, crn_uv.x, mix)
-            elif axis == 'Y':
+            else:
                 for crn_uv, old_co in zip(corners, self.old_crn_pos):
                     crn_uv.y = lerp(old_co, crn_uv.y, mix)
-            else:
-                from ..utils import vec_lerp
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv[:] = vec_lerp(old_co, crn_uv, mix)
+
 
 class FaceIsland:
     def __init__(self, faces: list[BMFace], bm: BMesh, uv_layer: BMLayerItem):
