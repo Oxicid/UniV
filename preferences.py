@@ -30,6 +30,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         items=(
             ('GENERAL', 'General', ''),
             ('KEYMAPS', 'Keymaps', ''),
+            ('INFO', 'Info', ''),
         ),
         default='KEYMAPS')
 
@@ -76,7 +77,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.separator()
             layout.prop(self, 'show_split_toggle_uv_button')
 
-        if self.tab == 'KEYMAPS':
+        elif self.tab == 'KEYMAPS':
             row = layout.row()
             row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
             # row.operator('wm.univ_keymaps_config', text='Default').mode = 'DEFAULT'
@@ -108,3 +109,15 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                 if '.univ_' in kmi.idname and kmi.idname == 'uv.univ_align':
                     col.context_pointer_set("keymap", km)
                     rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+
+        # elif self.tab == 'INFO':
+        else:
+            enable = True
+            if hasattr(bpy.app, 'online_access'):
+                enable = bpy.app.online_access
+            row = layout.row(align=True)
+            row.enabled = enable
+            row.operator("wm.url_open", text="YouTube").url = r"https://www.youtube.com/@oxicid6058"
+            row.operator("wm.url_open", text="Discord").url = r"https://discord.gg/SAvEbGTkjR"
+            row.operator("wm.url_open", text="GitHub").url = r"https://github.com/Oxicid/UniV"
+            row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
