@@ -15,6 +15,8 @@ Free Download:
 
  * [Blender Extension](https://extensions.blender.org/approval-queue/univ/)
 
+[Discord](https://discord.gg/SAvEbGTkjR)
+
 There is much more to UniV operators than you might think at first glance. 
 Many operators are context-dependent, for example, on Sync state, selection mode (Verts, Edge, Face and Islands), as well as on pressed Ctrl, Shift, Alt (CSA) keys and combinations thereof. 
 
