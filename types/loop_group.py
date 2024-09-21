@@ -1,31 +1,22 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
 
 import typing
 from mathutils import Vector
 from collections import defaultdict
 from bmesh.types import BMLoop, BMLayerItem
 from ..utils import prev_disc, linked_crn_uv_by_tag, vec_isclose_to_zero
+from . import umesh as _umesh
 from .. import utils
 
 class LoopGroup:
-    def __init__(self, umesh: utils.UMesh):
+    def __init__(self, umesh: _umesh.UMesh):
         self.uv: BMLayerItem = umesh.uv_layer
-        self.umesh: utils.UMesh = umesh
+        self.umesh: _umesh.UMesh = umesh
         self.corners: list[BMLoop] = []
         self.tag = True
         self.dirt = False
@@ -304,7 +295,7 @@ class LoopGroup:
 class LoopGroups:
     def __init__(self, loop_groups, umesh):
         self.loop_groups: list[LoopGroup] = loop_groups
-        self.umesh: utils.UMesh | None = umesh
+        self.umesh: _umesh.UMesh | None = umesh
 
     def indexing(self, _=None):
         for f in self.umesh.bm.faces:

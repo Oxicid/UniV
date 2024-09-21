@@ -3,6 +3,10 @@
 
 # The code was taken and modified from the UvSquares addon: https://github.com/Radivarig/UvSquares/blob/master/uv_squares.py
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 
 from math import hypot
@@ -12,6 +16,7 @@ from bmesh.types import BMLoopUV
 from mathutils.geometry import area_tri
 
 from .. import utils
+from .. import types
 from ..types import Islands, FaceIsland
 
 class UNIV_OT_Quadrify(bpy.types.Operator):
@@ -30,7 +35,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             return {'CANCELLED'}
 
         sync = context.scene.tool_settings.use_uv_select_sync
-        umeshes = utils.UMeshes(report=self.report)
+        umeshes = types.UMeshes(report=self.report)
         for umesh in umeshes:
             if islands := Islands.calc_selected_quad(umesh.bm, umesh.uv_layer, sync):
                 for island in islands:

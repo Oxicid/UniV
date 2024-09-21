@@ -3,6 +3,10 @@
 
 # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_straighten_edge_loops.py
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 
 from math import copysign
@@ -10,8 +14,7 @@ from mathutils import Vector
 from collections import defaultdict
 from itertools import chain
 
-from ..types import Islands
-from .. import utils
+from .. import types
 
 class UNIV_OT_Straight(bpy.types.Operator):
     bl_idname = "uv.univ_straight"
@@ -31,7 +34,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
     def execute(self, context):
         assert (context.area.ui_type == 'UV')
 
-        umeshes = utils.UMeshes(report=self.report)
+        umeshes = types.UMeshes(report=self.report)
         for umesh in umeshes.loop():
             main(self, umesh)
         return {'FINISHED'}
@@ -41,7 +44,7 @@ class StraightIsland:
 
 def main(self, umesh):
     uv_layer = umesh.uv_layer
-    _islands = Islands.calc_visible(umesh.bm, uv_layer, bpy.context.scene.tool_settings.use_uv_select_sync)
+    _islands = types.Islands.calc_visible(umesh.bm, uv_layer, umesh.sync)
     if not _islands:
         umesh.update_tag = False
         return

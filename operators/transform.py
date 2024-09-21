@@ -22,10 +22,17 @@ from collections import defaultdict
 from bmesh.types import BMLoop
 
 from .. import utils
-from .. import types  # noqa: F401 # pylint:disable=unused-import
+from .. import types
 from .. import info
-from ..utils import UMeshes
-from ..types import BBox, Islands, AdvIslands, AdvIsland, FaceIsland, UnionIslands, LoopGroup
+from ..types import (
+    BBox,
+    Islands,
+    AdvIslands,
+    AdvIsland,
+    FaceIsland,
+    UnionIslands,
+    LoopGroup
+)
 
 
 class UNIV_OT_Crop(Operator):
@@ -93,7 +100,7 @@ class UNIV_OT_Crop(Operator):
 
     @staticmethod
     def crop(mode, axis, padding, proportional, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
+        umeshes = types.UMeshes(report=report)
         crop_args = [axis, padding, umeshes, proportional, sync]
 
         match mode:
@@ -298,7 +305,7 @@ class UNIV_OT_Align(Operator):
 
     @staticmethod
     def align(mode, direction, sync, report=None):
-        umeshes = utils.UMeshes(report=report)
+        umeshes = types.UMeshes(report=report)
 
         match mode:
             case 'ALIGN':
@@ -683,7 +690,7 @@ class UNIV_OT_Flip(Operator):
         self.scale = Vector((1, 1))
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.scale = self.get_flip_scale_from_axis(self.axis)
 
         match self.mode:
@@ -746,7 +753,7 @@ class UNIV_OT_Flip(Operator):
         return self.report({'INFO'}, f'Found {islands_count} Flipped islands')
 
     @staticmethod
-    def calc_extended_or_visible_flipped_islands(umesh_: utils.UMesh, extended):
+    def calc_extended_or_visible_flipped_islands(umesh_: types.UMesh, extended):
         uv = umesh_.uv_layer
         if extended:
             if umesh_.is_full_face_deselected:
@@ -815,7 +822,7 @@ class UNIV_OT_Rotate(Operator):
         self.aspect = 1.0
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
@@ -915,11 +922,11 @@ class UNIV_OT_Sort(Operator):
         self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
         self.update_tag: bool = False
         self.cursor_loc: Vector | None = None
-        self.umeshes: UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         self.update_tag = False
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         if self.to_cursor:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")
@@ -1137,12 +1144,12 @@ class UNIV_OT_Distribute(Operator):
 
     def __init__(self):
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.cursor_loc: Vector | None = None
         self.update_tag = False
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         if self.to_cursor and not self.break_:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")
@@ -1359,7 +1366,7 @@ class UNIV_OT_Home(Operator):
 
     @staticmethod
     def home(mode, sync, report):
-        umeshes = utils.UMeshes(report=report)
+        umeshes = types.UMeshes(report=report)
         match mode:
             case 'DEFAULT':
                 UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
@@ -1464,14 +1471,14 @@ class UNIV_OT_Random(Operator):
         self.seed = 1000
         self.aspect = 1.0
         self.non_valid_counter = 0
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.all_islands: list[UnionIslands | AdvIsland] | None = None
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
 
     def execute(self, context):
         self.non_valid_counter = 0
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         if not self.is_edit_mode:
@@ -1712,11 +1719,11 @@ class UNIV_OT_Orient(Operator):
         self.skip_count: int = 0
         self.aspect: float = 1.0
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         # Island Orient
         if self.mode == 'ISLAND':
             self.orient_island(extended=True)
@@ -1852,10 +1859,10 @@ class UNIV_OT_Orient_VIEW3D(Operator):
     def __init__(self):
         self.skip_count: int = 0
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.umeshes.set_sync(True)
 
         if not self.is_edit_mode:
@@ -2016,7 +2023,7 @@ class UNIV_OT_Weld(Operator):
 
     def __init__(self):
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.global_counter = 0
         self.seam_clear_counter = 0
         self.edge_weld_counter = 0
@@ -2024,7 +2031,7 @@ class UNIV_OT_Weld(Operator):
         self.stitched_islands = 0
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.global_counter = 0
         self.seam_clear_counter = 0
         self.edge_weld_counter = 0
@@ -2305,13 +2312,13 @@ class UNIV_OT_Stitch(Operator):
 
     def __init__(self):
         self.sync = utils.sync()
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.global_counter = 0
         self.mouse_position: Vector | None = None
         self.stitched_islands = 0
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.global_counter = 0
         self.stitched_islands = 0
         if self.between:

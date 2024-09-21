@@ -18,11 +18,10 @@ from time import perf_counter as time
 
 from .. import utils
 from .. import types
-from ..types import Islands, AdvIslands, AdvIsland,  BBox
+from ..types import Islands, AdvIslands, AdvIsland,  BBox, UMeshes
 
 
 from ..utils import (
-    UMeshes,
     face_centroid_uv,
     select_linked_crn_uv_vert,
     deselect_linked_crn_uv_vert,
@@ -109,7 +108,7 @@ class UNIV_OT_SelectLinked(Operator):
             return self.deselect_linked(sync=sync)
 
     def deselect_linked(self, sync):
-        umeshes = utils.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
         mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
         if sync and mode == 'VERTEX':
@@ -247,7 +246,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
             return {'CANCELLED'}
 
         sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        umeshes = utils.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
         elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
         tile_co = utils.get_tile_from_cursor()
@@ -471,7 +470,7 @@ class UNIV_OT_Select_Square_Island(Operator):
                 utils.set_select_mode_mesh('FACE')
                 self.elem_mode = 'FACE'
 
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         if self.mode == 'DESELECT':
             self.deselect()
@@ -625,7 +624,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             utils.set_select_mode_uv('EDGE')
 
         self.edge_orient = self.x_vec if self.edge_dir == 'HORIZONTAL' else self.y_vec
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         self.negative_ange = math.pi - self.angle
 
@@ -1030,7 +1029,7 @@ class UNIV_OT_Select_Border(Operator):
         if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
             utils.set_select_mode_uv('EDGE')
 
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         if self.border_mode == 'ALL':
             self.select_border()
         else:

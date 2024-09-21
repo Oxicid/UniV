@@ -6,11 +6,8 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
-from .. import types  # noqa: F401
-from ..types import Islands
-from ..types import island as __isl  # noqa: F401
+from .. import types
 from .. import utils
-from ..utils import UMeshes
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
@@ -53,14 +50,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def __init__(self):
         self.sync: bool = utils.sync()
-        self.umeshes: UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         if context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
             self.sync = True
 
-        self.umeshes = UMeshes()
+        self.umeshes = types.UMeshes()
         if self.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:
                 self.unwrap_sync_faces()
@@ -89,7 +86,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 raise NotImplemented
 
             uv = umesh.uv_layer
-            islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
             if not self.mark_seam_inner_island:
                 islands.indexing(force=True)
@@ -165,11 +162,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 continue
 
             uv = umesh.uv_layer
-            islands_extended = Islands.calc_extended_with_mark_seam(umesh)
+            islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
                 islands_extended.indexing(force=True)
 
-            selected_islands = Islands.calc_selected_with_mark_seam(umesh)
+            selected_islands = types.Islands.calc_selected_with_mark_seam(umesh)
             selected_islands.indexing(force=True)
 
             save_transform_islands = []
@@ -249,7 +246,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
                 islands.indexing(force=True)
 

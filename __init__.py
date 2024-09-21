@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (1, 8, 8),
+    "version": (1, 8, 9),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -14,17 +14,17 @@ bl_info = {
 import bpy
 import traceback
 
-from . import types        # noqa: F401
-from . import preferences  # noqa: F401
-from .utils import bench   # noqa: F401
-from .utils import other   # noqa: F401
-from .utils import text    # noqa: F401
-from .utils import ubm     # noqa: F401
-from .utils import umath   # noqa: F401
-from .types import bbox    # noqa: F401
-from .types import btypes  # noqa: F401
-from .types import island  # noqa: F401
-from .types import mesh_island  # noqa: F401
+from . import types        # noqa: F401 # pylint:disable=unused-import
+from . import preferences  # noqa: F401 # pylint:disable=unused-import
+from .utils import bench   # noqa: F401 # pylint:disable=unused-import
+from .utils import other   # noqa: F401 # pylint:disable=unused-import
+from .utils import text    # noqa: F401 # pylint:disable=unused-import
+from .utils import ubm     # noqa: F401 # pylint:disable=unused-import
+from .utils import umath   # noqa: F401 # pylint:disable=unused-import
+from .types import bbox    # noqa: F401 # pylint:disable=unused-import
+from .types import btypes  # noqa: F401 # pylint:disable=unused-import
+from .types import island  # noqa: F401 # pylint:disable=unused-import
+from .types import mesh_island  # noqa: F401 # pylint:disable=unused-import
 from .operators import inspect
 from .operators import project
 from .operators import quadrify

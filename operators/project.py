@@ -8,10 +8,9 @@ if 'bpy' in locals():
 import bpy
 
 from math import pi
-from . import transform  # noqa: F401 # pylint:disable=unused-import
-from .transform import UNIV_OT_Crop
+from . import transform
 from .. import utils
-from .. import types  # noqa: F401 # pylint:disable=unused-import
+from .. import types
 from ..types import BBox, MeshIsland, MeshIslands
 from mathutils import Vector, Euler, Matrix
 
@@ -40,10 +39,10 @@ class UNIV_Normal(bpy.types.Operator):
 
     def __init__(self):
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes.calc(self.report)
+        self.umeshes = types.UMeshes.calc(self.report)
         if self.is_edit_mode:
             self.umeshes.filter_selected_faces()
             self.umeshes.set_sync(True)
@@ -143,7 +142,7 @@ class UNIV_Normal(bpy.types.Operator):
                     bbox_.scale(Vector((1/island.value, 1)), pivot=pivot)
             else:
                 bbox_ = bbox
-            UNIV_OT_Crop.crop_ex('XY', bbox_, inplace=False, islands_of_mesh=[island], offset=Vector((0, 0)), padding=0.001, proportional=True)
+            transform.UNIV_OT_Crop.crop_ex('XY', bbox_, inplace=False, islands_of_mesh=[island], offset=Vector((0, 0)), padding=0.001, proportional=True)
 
     def avg_normal_and_calc_faces_individual(self):
         calc_mesh_isl_obj = MeshIslands.calc_selected if self.is_edit_mode else MeshIslands.calc_all
@@ -230,10 +229,10 @@ class UNIV_BoxProject(bpy.types.Operator):
 
     def __init__(self):
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utils.UMeshes.calc(self.report)
+        self.umeshes = types.UMeshes.calc(self.report)
         if self.is_edit_mode:
             self.umeshes.filter_selected_faces()
         self.box()

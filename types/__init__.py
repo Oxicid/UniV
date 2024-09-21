@@ -8,6 +8,7 @@ if 'bpy' in locals():
     from . import loop_group
     from . import mesh_island
     from . import ray
+    from . import umesh
 
     from .. import reload
     reload.reload(globals())
@@ -18,6 +19,7 @@ if 'bpy' in locals():
     del mesh_island
     del loop_group
     del ray
+    del umesh
 
 import bpy  # noqa: F401
 from .btypes import *
@@ -26,3 +28,4 @@ from .island import *
 from .loop_group import *
 from .mesh_island import *
 from .ray import *
+from .umesh import *

@@ -14,9 +14,8 @@ from bpy.props import *
 from bpy.types import Operator
 
 from .. import utils
+from .. import types
 
-
-from ..utils import UMeshes
 
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
@@ -35,7 +34,7 @@ class UNIV_OT_Check_Zero(Operator):
 
     def execute(self, context):
         sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        umeshes = UMeshes()
+        umeshes = types.UMeshes()
         total_counter = self.zero(self.precision, umeshes, sync)
 
         if not total_counter:
@@ -94,7 +93,7 @@ class UNIV_OT_Check_Flipped(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = UMeshes()
+        umeshes = types.UMeshes()
         total_counter = self.flipped(umeshes)
 
         if not total_counter:
@@ -163,7 +162,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = utils.UMeshes()
+        umeshes = types.UMeshes()
         bpy.ops.uv.select_all(action='DESELECT')
 
         # clamp angle

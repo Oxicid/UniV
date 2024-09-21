@@ -1,9 +1,14 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import typing  # noqa: F401
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
+import typing  # noqa: F401 # pylint:disable=unused-import
 from . import island
-from ..utils import UMesh
+from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
+from .umesh import UMesh
 from bmesh.types import *
 
 class MeshIsland:

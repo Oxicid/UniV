@@ -1,12 +1,17 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import traceback
 
 from .. import info
 from .. import utils
 from ..preferences import force_debug, prefs, stable
+from .. import types
 from ..types import ARegion
 
 from collections import defaultdict
@@ -331,7 +336,7 @@ class UNIV_OT_SyncUVToggle(Operator):
 
         self.sync_uv_selection_mode(convert_to_sync)
 
-        umeshes = utils.UMeshes()
+        umeshes = types.UMeshes()
         for umesh in umeshes:
             if convert_to_sync:
                 self.to_sync(umesh)

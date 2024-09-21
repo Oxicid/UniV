@@ -20,9 +20,10 @@ from mathutils.geometry import area_tri
 from bmesh.types import BMesh, BMFace, BMLoop, BMLayerItem
 
 from .. import utils
-from ..utils import umath, UMesh
+from ..utils import umath
 from .btypes import PyBMesh
 from . import btypes
+from . import umesh as _umesh
 from. import BBox
 
 
@@ -566,7 +567,7 @@ class FaceIsland:
             else:
                 return self.__info_face_select_sync()
 
-    def calc_materials(self, umesh: utils.UMesh) -> tuple[str]:
+    def calc_materials(self, umesh: _umesh.UMesh) -> tuple[str]:
         indexes = set()
         for f in self.faces:
             indexes.add(f.material_index)
@@ -772,7 +773,7 @@ class AdvIsland(FaceIsland):
             self.info = AdvIslandInfo()
         self.info.edge_length = total_length
 
-    def calc_materials(self, umesh: utils.UMesh):
+    def calc_materials(self, umesh: _umesh.UMesh):
         materials = super().calc_materials(umesh)
         if self.info is None:
             self.info = AdvIslandInfo()
@@ -791,7 +792,7 @@ class AdvIsland(FaceIsland):
 
 class IslandsBase:
     @staticmethod
-    def tag_filter_all(umesh: UMesh, tag=True):
+    def tag_filter_all(umesh: _umesh.UMesh, tag=True):
         for face in umesh.bm.faces:
             face.tag = tag
 
@@ -822,7 +823,7 @@ class IslandsBase:
                 face.tag = all(l[uv_layer].select_edge for l in face.loops) and face.select
 
     @staticmethod
-    def tag_filter_non_selected(umesh: UMesh):
+    def tag_filter_non_selected(umesh: _umesh.UMesh):
         if umesh.sync:
             if umesh.is_full_face_deselected:
                 for face in umesh.bm.faces:
@@ -922,7 +923,7 @@ class IslandsBase:
             return any(l[uv_layer].select for face in island for l in face.loops)
 
     @staticmethod
-    def island_filter_is_any_edge_selected(island: list[BMFace], umesh: UMesh) -> bool:
+    def island_filter_is_any_edge_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
         if umesh.sync:
             return any(e.select for face in island for e in face.edges)
         else:
@@ -1113,7 +1114,7 @@ class Islands(IslandsBase):
         self.value: float | int = -1  # value for different purposes
 
     @classmethod
-    def calc_selected(cls, umesh: UMesh):
+    def calc_selected(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls([], None, None)
         cls.tag_filter_selected(umesh.bm, umesh.uv_layer, umesh.sync)
@@ -1121,7 +1122,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_non_selected(cls, umesh: UMesh):
+    def calc_non_selected(cls, umesh: _umesh.UMesh):
         if umesh.sync and umesh.is_full_face_selected:
             return cls([], None, None)
 
@@ -1130,7 +1131,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_selected_with_mark_seam(cls, umesh: UMesh):
+    def calc_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls([], None, None)
         cls.tag_filter_selected(umesh.bm, umesh.uv_layer, umesh.sync)
@@ -1173,7 +1174,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_extended_with_mark_seam(cls, umesh: UMesh):
+    def calc_extended_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls([], None, None)
         cls.tag_filter_visible(umesh.bm, umesh.sync)
@@ -1210,7 +1211,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_extended_any_elem_with_mark_seam(cls, umesh: UMesh):
+    def calc_extended_any_elem_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.sync:
             elem_mode = utils.get_select_mode_mesh()
             if elem_mode == 'FACE':
@@ -1235,7 +1236,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_extended_any_vert_non_manifold(cls, umesh: UMesh):
+    def calc_extended_any_vert_non_manifold(cls, umesh: _umesh.UMesh):
         """Calc any verts selected islands"""
         if not umesh.sync:
             if umesh.is_full_face_deselected:
@@ -1261,7 +1262,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_extended_any_edge_non_manifold(cls, umesh: UMesh):
+    def calc_extended_any_edge_non_manifold(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         if umesh.sync:
             if (elem_mode := utils.get_select_mode_mesh()) == 'FACE':
@@ -1286,7 +1287,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh.bm, umesh.uv_layer)
 
     @classmethod
-    def calc_visible_non_manifold(cls, umesh: UMesh):
+    def calc_visible_non_manifold(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh.bm, umesh.sync)
         islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_ex(umesh.bm, umesh.uv_layer)]
         return cls(islands, umesh.bm, umesh.uv_layer)
@@ -1298,7 +1299,7 @@ class Islands(IslandsBase):
         return cls(islands, bm, uv_layer)
 
     @classmethod
-    def calc_visible_b(cls, umesh: UMesh):
+    def calc_visible_b(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh.bm, umesh.sync)
         islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_ex(umesh.bm, umesh.uv_layer)]
         return cls(islands, umesh.bm, umesh.uv_layer)
@@ -1330,7 +1331,7 @@ class Islands(IslandsBase):
         return cls.calc_visible(bm, uv_layer, sync)
 
     @classmethod
-    def calc_any_extended_or_visible_non_manifold(cls, umesh: UMesh, *, extended) -> 'Islands':
+    def calc_any_extended_or_visible_non_manifold(cls, umesh: _umesh.UMesh, *, extended) -> 'Islands':
         if extended:
             return cls.calc_extended_any_vert_non_manifold(umesh)
         return cls.calc_visible_non_manifold(umesh)
@@ -1343,13 +1344,13 @@ class Islands(IslandsBase):
         return cls.calc_visible_all(bm, uv_layer, sync, angle)
 
     @classmethod
-    def calc(cls, umesh: UMesh, *, selected) -> 'Islands':
+    def calc(cls, umesh: _umesh.UMesh, *, selected) -> 'Islands':
         if selected:
             return cls.calc_selected(umesh)
         return cls.calc_visible_b(umesh)
 
     @classmethod
-    def calc_with_hidden(cls, umesh: UMesh):
+    def calc_with_hidden(cls, umesh: _umesh.UMesh):
         cls.tag_filter_all(umesh)
         islands = [cls.island_type(i, umesh.bm, umesh.uv_layer) for i in cls.calc_iter_ex(umesh.bm, umesh.uv_layer)]
         return cls(islands, umesh.bm, umesh.uv_layer)
@@ -1561,6 +1562,6 @@ class AdvIslands(Islands):
         for isl in self:
             isl.calc_area()
 
-    def calc_materials(self, umesh: utils.UMesh):
+    def calc_materials(self, umesh: _umesh.UMesh):
         for isl in self:
             isl.calc_materials(umesh)

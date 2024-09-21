@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import gpu
 import blf
@@ -9,13 +13,13 @@ import typing
 from gpu_extras.batch import batch_for_shader
 
 from math import inf
+from mathutils import Vector
 from bmesh.types import BMFace, BMLoop
 
+from .. import utils
+from .. import types
 from ..preferences import debug, prefs
 from ..types import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup
-from .. import utils
-from ..utils import UMeshes, blf_size
-from mathutils import Vector
 
 
 class eSnapPointMode(enum.IntFlag):
@@ -39,7 +43,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     def __init__(self):
         self.sync: bool = utils.sync()
-        self.umeshes: UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.kdmeshes: KDMeshes | None = None
         self.rmesh: KDMesh | None = None
 
@@ -80,7 +84,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         self.snap_mode_init()
 
-        self.umeshes = UMeshes()
+        self.umeshes = types.UMeshes()
         self.preprocessing()
 
         wm = context.window_manager
@@ -705,7 +709,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         gpu.state.blend_set('ALPHA')
 
         font_id = 0
-        blf_size(font_id, 16)
+        utils.blf_size(font_id, 16)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
 
         text_y_size = blf.dimensions(0, 'T')[1]

@@ -1,14 +1,19 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import typing
 import itertools
 import numpy as np
 
 from .. import utils
-from ..utils import UMesh, linked_crn_by_face_index
-from ..types import AdvIsland, AdvIslands
+from ..utils import linked_crn_by_face_index
+from .. import types
+from ..types import AdvIsland, AdvIslands, UMesh
 from collections import deque, defaultdict
 
 from bmesh.types import BMFace, BMLoop
@@ -279,14 +284,14 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def __init__(self):
         self.sync = utils.sync()
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []
         self.counter: int = 0
 
     def execute(self, context) -> set[str]:
         self.counter = 0
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         if not self.sync and context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
 

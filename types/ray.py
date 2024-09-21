@@ -1,29 +1,23 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
 
 import typing
+
+from math import inf
 from bmesh.types import BMFace, BMLoop
 from mathutils import Vector
 from mathutils.kdtree import KDTree
+from itertools import chain
+
 from . import Islands, AdvIslands, LoopGroups
 from .. import utils
-from ..utils import UMesh, UMeshes
-from math import inf
-from itertools import chain
+from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
+from .umesh import UMesh, UMeshes
+
 
 class KDData:
     def __init__(self, found, elem, kdmesh):

@@ -1,11 +1,16 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
+
+from .. import types
 
 from ..types import Islands
 from .. import utils
-from ..utils import UMeshes
 
 class RelaxData:
     def __init__(self, _umesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
@@ -37,10 +42,10 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
     def __init__(self):
         self.sync: bool = utils.sync()
-        self.umeshes: UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = UMeshes()
+        self.umeshes = types.UMeshes()
         if self.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:
                 self.relax_sync_faces()

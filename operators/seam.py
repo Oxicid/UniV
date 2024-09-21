@@ -1,11 +1,16 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy
 import math
 import bl_math
 
 from .. import utils
+from .. import types
 from ..types import Islands
 
 class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
@@ -38,10 +43,10 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
 
     def __init__(self):
         self.sync = utils.sync()
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
 
         if self.sync:
             self.cut_view_2d_sync()
@@ -145,10 +150,10 @@ class UNIV_OT_Cut_VIEW3D(bpy.types.Operator):
 
     def __init__(self):
         self.sync = utils.sync()
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
         self.cut_view_3d()
         self.umeshes.update()
         return {'FINISHED'}
@@ -220,10 +225,10 @@ class UNIV_OT_Angle(bpy.types.Operator):
 
     def __init__(self):
         self.sync = utils.sync()
-        self.umeshes: utils.UMeshes | None = None
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = utils.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
 
         # clamp angle
         if self.obj_smooth:
