@@ -88,7 +88,7 @@ class UNIV_Normal(bpy.types.Operator):
         self.crop_islands(adv_islands_of_mesh, global_bbox)
 
     def project_orient_and_calc_crop_data(self, umesh, adv_island, global_bbox, rot_mtx_from_normal):
-        uv = umesh.uv_layer
+        uv = umesh.uv
 
         if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
             aspect_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
@@ -165,7 +165,7 @@ class UNIV_Normal(bpy.types.Operator):
             if not self.is_edit_mode:
                 faces = umesh.bm.faces
             else:
-                faces = utils.calc_selected_uv_faces_b(umesh)
+                faces = utils.calc_selected_uv_faces(umesh)
 
             for f in faces:
                 weight += f.normal * f.calc_area()
@@ -248,7 +248,7 @@ class UNIV_BoxProject(bpy.types.Operator):
         move = Vector(self.move) * -1
         scale = Vector(self.scale_individual)*self.scale
         for umesh in self.umeshes:
-            uv = umesh.uv_layer
+            uv = umesh.uv
 
             mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
             mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)

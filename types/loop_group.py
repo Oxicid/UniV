@@ -8,14 +8,13 @@ if 'bpy' in locals():
 import typing
 from mathutils import Vector
 from collections import defaultdict
-from bmesh.types import BMLoop, BMLayerItem
+from bmesh.types import BMLoop
 from ..utils import prev_disc, linked_crn_uv_by_tag, vec_isclose_to_zero
 from . import umesh as _umesh
 from .. import utils
 
 class LoopGroup:
     def __init__(self, umesh: _umesh.UMesh):
-        self.uv: BMLayerItem = umesh.uv_layer
         self.umesh: _umesh.UMesh = umesh
         self.corners: list[BMLoop] = []
         self.tag = True
@@ -51,11 +50,12 @@ class LoopGroup:
             crn_next.tag = False
             return crn_next
 
+        uv = self.umesh.uv
         bm_iter = crn_next
         while True:
             if (bm_iter := prev_disc(bm_iter)) == crn_next:
                 break
-            if bm_iter.tag and crn_next[self.uv].uv == bm_iter[self.uv].uv:
+            if bm_iter.tag and crn_next[uv].uv == bm_iter[uv].uv:
                 bm_iter.tag = False
                 return bm_iter
 
@@ -65,11 +65,12 @@ class LoopGroup:
             crn_prev.tag = False
             return crn_prev
 
+        uv = self.umesh.uv
         bm_iter = crn
         while True:
             if (bm_iter := prev_disc(bm_iter)) == crn:
                 break
-            if bm_iter.link_loop_prev.tag and crn[self.uv].uv == bm_iter[self.uv].uv:
+            if bm_iter.link_loop_prev.tag and crn[uv].uv == bm_iter[uv].uv:
                 bm_iter.link_loop_prev.tag = False
                 return bm_iter.link_loop_prev
 
@@ -79,7 +80,8 @@ class LoopGroup:
             return True
         if shared_crn.face.hide:  # Change
             return True
-        return not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+        uv = self.umesh.uv
+        return not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     def is_boundary(self, crn):
         shared_crn = crn.link_loop_radial_prev  # We get a clockwise corner, but linked to the end of the current corner
@@ -87,7 +89,8 @@ class LoopGroup:
             return True
         if not shared_crn.face.select:  # Change
             return True
-        return not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+        uv = self.umesh.uv
+        return not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     def calc_shared_group(self) -> 'typing.Self':
         shared_group = []
@@ -98,6 +101,7 @@ class LoopGroup:
         return lg
 
     def boundary_tag_by_face_index(self, crn: BMLoop):
+        uv = self.umesh.uv
         shared_crn = crn.link_loop_radial_prev
         if shared_crn == crn:
             crn.tag = False
@@ -108,22 +112,24 @@ class LoopGroup:
             crn.tag = False
             return
 
-        crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     def boundary_tag(self, crn: BMLoop):
+        uv = self.umesh.uv
         shared_crn = crn.link_loop_radial_prev
         if shared_crn == crn:
             crn.tag = False
             return
-        if not crn[self.uv].select_edge:
+        if not crn[uv].select_edge:
             crn.tag = False
             return
         if not shared_crn.face.select:  # Change
             crn.tag = False
             return
-        crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     def boundary_tag_sync(self, crn: BMLoop):
+        uv = self.umesh.uv
         shared_crn = crn.link_loop_radial_prev
         if shared_crn == crn:
             crn.tag = False
@@ -134,7 +140,7 @@ class LoopGroup:
         if shared_crn.face.hide:  # Change
             crn.tag = False
             return
-        crn.tag = not (crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv)
+        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     @staticmethod
     def calc_island_index_for_stitch(island) -> defaultdict[int | list[BMLoop]]:
@@ -186,6 +192,7 @@ class LoopGroup:
     def has_non_sync_crn(self):
         assert utils.sync()
         count_non_shared = 0
+        uv = self.umesh.uv
         for crn in self.corners:
             shared_crn = crn.link_loop_radial_prev
             if shared_crn == crn:
@@ -194,7 +201,7 @@ class LoopGroup:
             if not shared_crn.tag:
                 count_non_shared += 1
                 continue
-            if crn[self.uv].uv == shared_crn.link_loop_next[self.uv].uv and crn.link_loop_next[self.uv].uv == shared_crn[self.uv].uv:
+            if crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv:
                 return True
         return count_non_shared == len(self.corners)
 
@@ -217,7 +224,7 @@ class LoopGroup:
     def move(self, delta: Vector) -> bool:
         if vec_isclose_to_zero(delta):
             return False
-        uv = self.uv
+        uv = self.umesh.uv
         for loop in self.corners:
             loop[uv].uv += delta
         return True
@@ -227,7 +234,7 @@ class LoopGroup:
 
     @classmethod
     def calc_dirt_loop_groups(cls, umesh):
-        uv = umesh.uv_layer
+        uv = umesh.uv
         # Tagging
         if utils.sync():
             assert utils.get_select_mode_mesh() != 'FACE'
@@ -272,7 +279,7 @@ class LoopGroup:
         self.set_tag(False)
 
         move_corners = []
-        uv = self.uv
+        uv = self.umesh.uv
         for crn in self:
             move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
         self.corners.extend(move_corners)

@@ -13,7 +13,7 @@ from ..types import Islands
 from .. import utils
 
 class RelaxData:
-    def __init__(self, _umesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
+    def __init__(self, _umesh: types.UMesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
         self.umesh = _umesh
         self.selected_elem = _selected_elem
         self.coords_before = _coords_before
@@ -74,8 +74,8 @@ class UNIV_OT_Relax(bpy.types.Operator):
             else:
                 raise NotImplemented
 
-            uv = umesh.uv_layer
-            islands = Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync)
+            uv = umesh.uv
+            islands = Islands.calc_visible(umesh)
 
             for isl in islands:
                 isl.mark_seam()
@@ -131,14 +131,14 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
         self.relax_a(relax_data)
 
-    def relax_a(self, relax_data):
+    def relax_a(self, relax_data: list[RelaxData]):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
             for rd in relax_data:
-                uv = rd.umesh.uv_layer
+                uv = rd.umesh.uv
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv_co = crn[uv].uv
                     crn_uv_co[:] = co.lerp(crn_uv_co, self.border_blend)
@@ -154,7 +154,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 elem.select = True
 
         for rd in relax_data:
-            uv = rd.umesh.uv_layer
+            uv = rd.umesh.uv
             for f in rd.umesh.bm.faces:
                 for crn in f.loops:
                     crn[uv].pin_uv = False
@@ -169,8 +169,8 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            uv = umesh.uv_layer
-            islands = Islands.calc_extended(umesh.bm, umesh.uv_layer, self.sync)
+            uv = umesh.uv
+            islands = Islands.calc_extended(umesh)
 
             for isl in islands:
                 isl.mark_seam()
@@ -225,14 +225,14 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
         self.relax_b(relax_data)
 
-    def relax_b(self, relax_data):
+    def relax_b(self, relax_data: list[RelaxData]):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
             for rd in relax_data:
-                uv = rd.umesh.uv_layer
+                uv = rd.umesh.uv
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv = crn[uv]
                     crn_uv.uv = co.lerp(crn_uv.uv, self.border_blend)
@@ -247,7 +247,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 elem.select = False
 
         for rd in relax_data:
-            uv = rd.umesh.uv_layer
+            uv = rd.umesh.uv
             for f in rd.umesh.bm.faces:
                 for crn in f.loops:
                     crn[uv].pin_uv = False
@@ -257,12 +257,12 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
         relax_data: list[RelaxData] = []
         for umesh in reversed(self.umeshes):
-            uv = umesh.uv_layer
+            uv = umesh.uv
             if umesh.is_full_face_deselected or not any(crn[uv].select for f in umesh.bm.faces if f.select for crn in f.loops):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            islands = Islands.calc_extended_any_elem(umesh.bm, umesh.uv_layer, self.sync)
+            islands = Islands.calc_extended_any_elem(umesh)
 
             for isl in islands:
                 isl.mark_seam()

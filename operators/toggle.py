@@ -366,7 +366,7 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @staticmethod
     def disable_sync(umesh):
-        uv = umesh.uv_layer
+        uv = umesh.uv
         if utils.get_select_mode_mesh() == 'FACE':
             if umesh.is_full_face_selected:
                 for face in umesh.bm.faces:
@@ -447,19 +447,19 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @staticmethod
     def to_sync(umesh):
-        uv_layer = umesh.uv_layer
+        uv = umesh.uv
         if utils.get_select_mode_uv() in ('FACE', 'ISLAND'):
             for face in umesh.bm.faces:
-                face.select = all(loop[uv_layer].select_edge or loop[uv_layer].select for loop in face.loops)
+                face.select = all(loop[uv].select_edge or loop[uv].select for loop in face.loops)
 
         elif utils.get_select_mode_uv() == 'VERTEX':
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
-                    vert.select = any(loop[uv_layer].select for loop in vert.link_loops)
+                    vert.select = any(loop[uv].select for loop in vert.link_loops)
         else:
             for edge in umesh.bm.edges:
                 if hasattr(edge, 'link_loops'):
-                    edge.select = any(loop[uv_layer].select_edge for loop in edge.link_loops)
+                    edge.select = any(loop[uv].select_edge for loop in edge.link_loops)
         umesh.bm.select_flush_mode()
 
 

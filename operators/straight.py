@@ -43,8 +43,8 @@ class StraightIsland:
     pass
 
 def main(self, umesh):
-    uv_layer = umesh.uv_layer
-    _islands = types.Islands.calc_visible(umesh.bm, uv_layer, umesh.sync)
+    uv = umesh.uv
+    _islands = types.Islands.calc_visible(umesh)
     if not _islands:
         umesh.update_tag = False
         return
@@ -54,7 +54,7 @@ def main(self, umesh):
         island_of_corns = []
         for f in i:
             corners = f.loops
-            selected_loops = [crn for crn in corners if crn[uv_layer].select]
+            selected_loops = [crn for crn in corners if crn[uv].select]
             if len(selected_loops) == len(corners):
                 self.report({'INFO'}, "No face should be selected.")
                 return
@@ -71,23 +71,23 @@ def main(self, umesh):
         umesh.update_tag = False
         return
 
-    selected_corns_edge = [crn for isl in selected_corns_islands for crn in isl if crn[uv_layer].select_edge]
+    selected_corns_edge = [crn for isl in selected_corns_islands for crn in isl if crn[uv].select_edge]
 
     for island, selected_corns in zip(islands, selected_corns_islands):
-        openSegment = get_loops_segments(self, umesh.uv_layer, selected_corns)
+        openSegment = get_loops_segments(self, umesh.uv, selected_corns)
         if not openSegment:
             continue
 
-        straighten(self, umesh.uv_layer, island, openSegment)
+        straighten(self, umesh.uv, island, openSegment)
 
     bpy.ops.uv.select_all(action='DESELECT')
 
     for crn in selected_corns_edge:
-        crn[uv_layer].select_edge = True
+        crn[uv].select_edge = True
 
     for isl in selected_corns_islands:
         for crn in isl:
-            crn[uv_layer].select = True
+            crn[uv].select = True
 
     for isl in _islands:
         for f in isl:
@@ -97,46 +97,46 @@ def main(self, umesh):
     umesh.update(force=True)
 
 
-def straighten(self, uv_layers, island, segment_loops):
+def straighten(self, uv, island, segment_loops):
     bpy.ops.uv.select_all(action='DESELECT')
     bpy.ops.mesh.select_all(action='DESELECT')
     for face in island:
         face.select_set(True)
         for loop in face.loops:
-            loop[uv_layers].select = True
+            loop[uv].select = True
 
-    bbox = segment_loops[-1][uv_layers].uv - segment_loops[0][uv_layers].uv
+    bbox = segment_loops[-1][uv].uv - segment_loops[0][uv].uv
     straighten_in_x = True
     sign = copysign(1, bbox.x)
     if abs(bbox.y) >= abs(bbox.x):
         straighten_in_x = False
         sign = copysign(1, bbox.y)
 
-    origin = segment_loops[0][uv_layers].uv
+    origin = segment_loops[0][uv].uv
     edge_lengths = []
     length = 0
     newly_pinned = set()
 
     for i, loop in enumerate(segment_loops):
         if i > 0:
-            vect = loop[uv_layers].uv - segment_loops[i - 1][uv_layers].uv
+            vect = loop[uv].uv - segment_loops[i - 1][uv].uv
             edge_lengths.append(vect.length)
 
     for i, loop in enumerate(segment_loops):
         if i == 0:
-            if not loop[uv_layers].pin_uv:
-                loop[uv_layers].pin_uv = True
+            if not loop[uv].pin_uv:
+                loop[uv].pin_uv = True
                 newly_pinned.add(loop)
         else:
             length += edge_lengths[i - 1]
             for nodeLoop in loop.vert.link_loops:
-                if nodeLoop[uv_layers].uv == loop[uv_layers].uv:
+                if nodeLoop[uv].uv == loop[uv].uv:
                     if straighten_in_x:
-                        nodeLoop[uv_layers].uv = origin + Vector((sign * length, 0))
+                        nodeLoop[uv].uv = origin + Vector((sign * length, 0))
                     else:
-                        nodeLoop[uv_layers].uv = origin + Vector((0, sign * length))
-                    if not nodeLoop[uv_layers].pin_uv:
-                        nodeLoop[uv_layers].pin_uv = True
+                        nodeLoop[uv].uv = origin + Vector((0, sign * length))
+                    if not nodeLoop[uv].pin_uv:
+                        nodeLoop[uv].pin_uv = True
                         newly_pinned.add(nodeLoop)
 
     try:  # Unwrapping may fail on certain mesh topologies
@@ -146,17 +146,17 @@ def straighten(self, uv_layers, island, segment_loops):
         pass
 
     for nodeLoop in newly_pinned:
-        nodeLoop[uv_layers].pin_uv = False
+        nodeLoop[uv].pin_uv = False
 
-def get_loops_segments(self, uv_layers, island_loops_dirty):
+def get_loops_segments(self, uv, island_loops_dirty):
     island_loops = set()
     island_loops_nexts = set()  # noqa
     processed_edges = set()
     processed_coords = defaultdict(list)
     start_loops = []
     boundary_splitted_edges = {loop.edge for loop in island_loops_dirty if
-                               (not loop.edge.is_boundary) and loop[uv_layers].uv != loop.link_loop_radial_next.link_loop_next[
-                                   uv_layers].uv}
+                               (not loop.edge.is_boundary) and loop[uv].uv != loop.link_loop_radial_next.link_loop_next[
+                                   uv].uv}
 
     for loop in island_loops_dirty:
         if loop.link_loop_next in island_loops_dirty and (loop.edge in boundary_splitted_edges or loop.edge not in processed_edges):
@@ -169,7 +169,7 @@ def get_loops_segments(self, uv_layers, island_loops_dirty):
         return None
 
     for loop in chain(island_loops, island_loops_nexts):
-        processed_coords[loop[uv_layers].uv.copy().freeze()].append(loop)
+        processed_coords[loop[uv].uv.copy().freeze()].append(loop)
 
     for node_loops in processed_coords.values():
         if len(node_loops) > 2:
@@ -216,20 +216,20 @@ def get_loops_segments(self, uv_layers, island_loops_dirty):
             def get_prev(found_prev):
                 if found_prev:
                     for foundLoop in found_prev:
-                        if foundLoop[uv_layers].uv == loop.link_loop_prev[uv_layers].uv:
+                        if foundLoop[uv].uv == loop.link_loop_prev[uv].uv:
                             segment.append(foundLoop)
                             for anyLoop in found_prev:
-                                if anyLoop[uv_layers].uv == loop.link_loop_prev[uv_layers].uv:
+                                if anyLoop[uv].uv == loop.link_loop_prev[uv].uv:
                                     island_nodal_loops.remove(anyLoop)
                             return foundLoop, False
                 return None, True
 
             def get_next(found_next):  # noqa
                 for foundLoop in found_next:
-                    if foundLoop[uv_layers].uv == loop.link_loop_next[uv_layers].uv:
+                    if foundLoop[uv].uv == loop.link_loop_next[uv].uv:
                         segment.append(foundLoop)
                         for anyLoop in found_next:
-                            if anyLoop[uv_layers].uv == loop.link_loop_next[uv_layers].uv:
+                            if anyLoop[uv].uv == loop.link_loop_next[uv].uv:
                                 island_nodal_loops.remove(anyLoop)
                         return foundLoop, False
                 get_prev(set(island_nodal_loops).intersection(loop.link_loop_prev.vert.link_loops))

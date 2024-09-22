@@ -34,18 +34,17 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             self.report({'WARNING'}, 'Active area must be UV')
             return {'CANCELLED'}
 
-        sync = context.scene.tool_settings.use_uv_select_sync
         umeshes = types.UMeshes(report=self.report)
         for umesh in umeshes:
-            if islands := Islands.calc_selected_quad(umesh.bm, umesh.uv_layer, sync):
+            if islands := Islands.calc_selected_quad(umesh):
                 for island in islands:
-                    quad(umesh, island)
+                    quad(island)
             umesh.update_tag = bool(islands)
         return umeshes.update()
 
-def quad(umesh, island):
+def quad(island: FaceIsland):
     co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(island)
-    uv = island.uv_layer
+    uv = island.umesh.uv
 
     def max_quad_uv_face_area(f):
         f_loops = f.loops
@@ -57,24 +56,24 @@ def quad(umesh, island):
         return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
 
     target_face = max(island, key=max_quad_uv_face_area)
-    shape_face(island.uv_layer, target_face, co_and_linked_uv_corners)
-    follow_active_uv(umesh, target_face, island)
+    shape_face(uv, target_face, co_and_linked_uv_corners)
+    follow_active_uv(target_face, island)
 
 def calc_co_and_linked_uv_corners_dict(island: FaceIsland) -> defaultdict[Vector | list[BMLoopUV]]:
-    uv_layer = island.uv_layer
+    uv = island.umesh.uv
     co_and_linked_uv_corners = defaultdict(list)
     for f in island:
         for corner in f.loops:
-            uv_corner = corner[uv_layer]
+            uv_corner = corner[uv]
             co: Vector = uv_corner.uv.copy().freeze()
             co_and_linked_uv_corners[co].append(uv_corner)  # noqa
 
     return co_and_linked_uv_corners
 
-def shape_face(uv_layer, target_face, co_and_linked_uv_corners):
+def shape_face(uv, target_face, co_and_linked_uv_corners):
     corners = []
     for l in target_face.loops:
-        corners.append(l[uv_layer])
+        corners.append(l[uv])
 
     first_highest = corners[0]
     for c in corners:
@@ -178,13 +177,13 @@ def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, ri
         v.uv[:] = curr_row_x, curr_row_y - final_scale_y
 
 
-def follow_active_uv(umesh, f_act, faces):
-    uv_layer = umesh.uv_layer
+def follow_active_uv(f_act, island: FaceIsland):
+    uv = island.umesh.uv
 
     # our own local walker
     def walk_face_init(faces, f_act):  # noqa
         # first tag all faces True (so we don't uv map them)
-        utils.set_faces_tag(umesh.bm.faces)
+        utils.set_faces_tag(faces.umesh.bm.faces)
         # then tag faces arg False
         utils.set_faces_tag(faces, False)
         # tag the active face True since we begin there
@@ -276,8 +275,8 @@ def follow_active_uv(umesh, f_act, faces):
             l_b[2] = l_b[1].link_loop_next
             l_b[3] = l_b[2].link_loop_next
 
-        l_a_uv = [l[uv_layer].uv for l in l_a]  # noqa
-        l_b_uv = [l[uv_layer].uv for l in l_b]  # noqa
+        l_a_uv = [l[uv].uv for l in l_a]  # noqa
+        l_b_uv = [l[uv].uv for l in l_b]  # noqa
 
         try:
             fac = edge_lengths[l_b[2].edge.index][0] / edge_lengths[l_a[1].edge.index][0]
@@ -293,10 +292,10 @@ def follow_active_uv(umesh, f_act, faces):
                        l_b_uv[2], l_b_uv[1])
 
     # Calculate average length per loop if needed
-    umesh.bm.edges.index_update()
-    edge_lengths: list[None | list[float]] = [None] * len(umesh.bm.edges)
+    island.umesh.bm.edges.index_update()
+    edge_lengths: list[None | list[float]] = [None] * len(island.umesh.bm.edges)
 
-    for f in faces:
+    for f in island:
         # we know it's a quad
         l_quad = f.loops
         l_pair_a = (l_quad[0], l_quad[2])
@@ -319,7 +318,7 @@ def follow_active_uv(umesh, f_act, faces):
 
                 edge_length_store[0] = edge_length_accum / edge_length_total
 
-    walk_face_init(faces, f_act)
+    walk_face_init(island, f_act)
     for l_prev_ in walk_face(f_act):
         apply_uv(l_prev_)
 

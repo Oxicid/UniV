@@ -27,7 +27,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_uv(cls, group, uv_layers):
+    def calc_bbox_uv(cls, group, uv):
         xmin = math.inf
         xmax = -math.inf
         ymin = math.inf
@@ -35,7 +35,7 @@ class BBox:
 
         for face in group:
             for loop in face.loops:
-                x, y = loop[uv_layers].uv
+                x, y = loop[uv].uv
                 if xmin > x:
                     xmin = x
                 if xmax < x:
@@ -48,7 +48,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_with_corners(cls, corners: typing.Sequence[BMLoop], uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
+    def calc_bbox_with_corners(cls, corners: typing.Sequence[BMLoop] | typing.Any, uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
         first_co: Vector = corners[0][uv].uv
         xmin = xmax = ymin = ymax = first_co
         xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
@@ -70,14 +70,14 @@ class BBox:
         return cls(xmin.x, xmax.x, ymin.y, ymax.y), (xmin_crn, xmax_crn, ymin_crn, ymax_crn)
 
     @classmethod
-    def calc_bbox_uv_corners(cls, group, uv_layers):
+    def calc_bbox_uv_corners(cls, group, uv):
         xmin = math.inf
         xmax = -math.inf
         ymin = math.inf
         ymax = -math.inf
 
         for loop in group:
-            x, y = loop[uv_layers].uv
+            x, y = loop[uv].uv
             if xmin > x:
                 xmin = x
             if xmax < x:

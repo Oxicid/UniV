@@ -58,7 +58,7 @@ class UNIV_OT_Check_Zero(Operator):
                 continue
 
             local_counter = 0
-            uv = umesh.uv_layer
+            uv = umesh.uv
             loop_triangles = umesh.bm.calc_loop_triangles()
             for tris in loop_triangles:
                 if sync:
@@ -117,7 +117,7 @@ class UNIV_OT_Check_Flipped(Operator):
                 continue
 
             local_counter = 0
-            uv = umesh.uv_layer
+            uv = umesh.uv
             loop_triangles = umesh.bm.calc_loop_triangles()
             for tris in loop_triangles:
                 if sync:
@@ -206,8 +206,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             else:
                 angle = user_angle
 
-            uv = umesh.uv_layer
-            for crn in utils.calc_visible_uv_corners(umesh.bm, umesh.sync):
+            uv = umesh.uv
+            for crn in utils.calc_visible_uv_corners(umesh):
                 edge = crn.edge
                 shared_crn = crn.link_loop_radial_prev
                 if sync:

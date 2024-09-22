@@ -14,7 +14,6 @@ from mathutils.kdtree import KDTree
 from itertools import chain
 
 from . import Islands, AdvIslands, LoopGroups
-from .. import utils
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 
@@ -86,7 +85,7 @@ class KDMesh:
         kd_crn_pt_insert = self.kdtree_crn_points.insert
         kd_crn_center_pt_insert = self.kdtree_crn_center_points.insert
 
-        uv = self.islands.uv_layer
+        uv = self.islands.umesh.uv
         idx_ = 0
         cnr_append = self.corners_vert.append
         for idx, f in enumerate(self.faces):
@@ -109,7 +108,7 @@ class KDMesh:
         self.islands = []
         self.loop_groups = None
         self.clear_containers()
-        uv = self.umesh.uv_layer
+        uv = self.umesh.uv
 
         corners_vert_append = self.corners_vert.append
         corners_center_append = self.corners_center.append
@@ -158,7 +157,7 @@ class KDMesh:
             if all(_crn.tag for _crn in f.loops):
                 faces_append(f)
 
-        uv = self.loop_groups.umesh.uv_layer
+        uv = self.loop_groups.umesh.uv
 
         self.kdtree_crn_points = KDTree(len(self.corners_center) * 2)
         self.kdtree_crn_center_points = KDTree(len(self.corners_center))
@@ -201,7 +200,7 @@ class KDMesh:
         self.kdtree_face_points = KDTree(len(self.faces))
         kd_f_pt_insert = self.kdtree_face_points.insert
 
-        uv = self.umesh.uv_layer
+        uv = self.umesh.uv
         for idx, f in enumerate(self.faces):
             sum_crn = Vector((0.0, 0.0))
             for crn in f.loops:
@@ -246,10 +245,9 @@ class KDMeshes:
 
     @classmethod
     def calc_island_rmeshes(cls, umeshes: UMeshes, extended=False):
-        sync = utils.sync()
         rmeshes = []
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 rmeshes.append(kdmesh)

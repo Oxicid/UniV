@@ -95,13 +95,12 @@ class UNIV_OT_Crop(Operator):
             case False, True, True:
                 self.mode = 'INDIVIDUAL_INPLACE'
 
-        sync = context.scene.tool_settings.use_uv_select_sync
-        return self.crop(self.mode, self.axis, self.padding, proportional=True, sync=sync, report=self.report)
+        return self.crop(self.mode, self.axis, self.padding, proportional=True, report=self.report)
 
     @staticmethod
-    def crop(mode, axis, padding, proportional, sync, report=None):
+    def crop(mode, axis, padding, proportional, report=None):
         umeshes = types.UMeshes(report=report)
-        crop_args = [axis, padding, umeshes, proportional, sync]
+        crop_args = [axis, padding, umeshes, proportional]
 
         match mode:
             case 'DEFAULT':
@@ -142,11 +141,11 @@ class UNIV_OT_Crop(Operator):
         return umeshes.update()
 
     @staticmethod
-    def crop_default(axis, padding, umeshes, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
+    def crop_default(axis, padding, umeshes, proportional, offset=Vector((0, 0)), inplace=False, extended=True):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -157,18 +156,18 @@ class UNIV_OT_Crop(Operator):
         UNIV_OT_Crop.crop_ex(axis, general_bbox, inplace, islands_of_mesh, offset, padding, proportional)
 
     @staticmethod
-    def crop_individual(axis, padding, umeshes, proportional, sync, offset=Vector((0, 0)), inplace=False, extended=True):
+    def crop_individual(axis, padding, umeshes, proportional, offset=Vector((0, 0)), inplace=False, extended=True):
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
                     UNIV_OT_Crop.crop_ex(axis, island.calc_bbox(), inplace, (island, ), offset, padding, proportional)
             umesh.update_tag = bool(islands)
 
     @staticmethod
-    def crop_inplace(axis, padding, umeshes, proportional, sync, inplace=True, extended=True):
+    def crop_inplace(axis, padding, umeshes, proportional, inplace=True, extended=True):
         islands_of_tile: dict[int | list[tuple[FaceIsland | BBox]]] = {}
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
                     bbox = island.calc_bbox()
                     islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
@@ -233,8 +232,7 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        sync = context.scene.tool_settings.use_uv_select_sync
-        return self.crop(self.mode, self.axis, self.padding, proportional=False, sync=sync, report=self.report)
+        return self.crop(self.mode, self.axis, self.padding, proportional=False, report=self.report)
 
     @staticmethod
     def get_event_info():
@@ -301,41 +299,41 @@ class UNIV_OT_Align(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return self.align(self.mode, self.direction, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return self.align(self.mode, self.direction, report=self.report)
 
     @staticmethod
-    def align(mode, direction, sync, report=None):
+    def align(mode, direction, report=None):
         umeshes = types.UMeshes(report=report)
 
         match mode:
             case 'ALIGN':
-                UNIV_OT_Align.align_ex(direction, sync,  umeshes, selected=True)
+                UNIV_OT_Align.align_ex(direction, umeshes, selected=True)
                 if not umeshes.final():
-                    UNIV_OT_Align.align_ex(direction, sync,  umeshes,  selected=False)
+                    UNIV_OT_Align.align_ex(direction, umeshes,  selected=False)
 
             case 'ALIGN_TO_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
                     umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=True)
+                UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, selected=True)
                 if not umeshes.final():
-                    UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=False)
+                    UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, selected=False)
 
             case 'ALIGN_TO_CURSOR_UNION':
                 if not (cursor_loc := utils.get_cursor_location()):
                     umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=True)
+                UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=True)
                 if not umeshes.final():
-                    UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=False)
+                    UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=False)
 
             case 'ALIGN_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
                     umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, sync, selected=True)
+                general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, selected=True)
                 if not general_bbox.is_valid:
-                    general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, sync, selected=False)
+                    general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, selected=False)
                 if not general_bbox.is_valid:
                     umeshes.report()
                     return {'CANCELLED'}
@@ -350,9 +348,9 @@ class UNIV_OT_Align(Operator):
                 return {'FINISHED'}
 
             case 'MOVE':
-                UNIV_OT_Align.move_ex(direction, sync, umeshes, selected=True)
+                UNIV_OT_Align.move_ex(direction, umeshes, selected=True)
                 if not umeshes.final():
-                    UNIV_OT_Align.move_ex(direction, sync, umeshes, selected=False)
+                    UNIV_OT_Align.move_ex(direction, umeshes, selected=False)
 
             case _:
                 raise NotImplementedError(mode)
@@ -360,8 +358,8 @@ class UNIV_OT_Align(Operator):
         return umeshes.update()
 
     @staticmethod
-    def move_to_cursor_ex(cursor_loc, direction, umeshes, sync, selected=True):
-        all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
+    def move_to_cursor_ex(cursor_loc, direction, umeshes, selected=True):
+        all_groups = []  # islands, bboxes, uv or corners, uv
         island_mode = utils.is_island_mode()
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         for umesh in umeshes:
@@ -369,11 +367,11 @@ class UNIV_OT_Align(Operator):
                 if islands := Islands.calc(umesh, selected=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
-                        all_groups.append((island, bbox, umesh.uv_layer))
+                        all_groups.append((island, bbox, umesh.uv))
                 umesh.update_tag = bool(islands)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
-                    all_groups.append((corners, umesh.uv_layer))
+                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                    all_groups.append((corners, umesh.uv))
                 umesh.update_tag = bool(corners)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox, invert=True)
@@ -381,52 +379,52 @@ class UNIV_OT_Align(Operator):
             UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)
 
     @staticmethod
-    def move_to_cursor_union_ex(cursor_loc, direction, umeshes, sync, selected=True):
-        all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
+    def move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=True):
+        all_groups = []  # islands, bboxes, uv or corners, uv
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
         for umesh in umeshes:
-            if faces := utils.calc_uv_faces(umesh.bm, umesh.uv_layer, sync, selected=selected):
-                island = FaceIsland(faces, umesh.bm, umesh.uv_layer)
+            if faces := utils.calc_uv_faces(umesh, selected=selected):
+                island = FaceIsland(faces, umesh)
                 bbox = island.calc_bbox()
                 general_bbox.union(bbox)
-                all_groups.append([island, bbox, umesh.uv_layer])
+                all_groups.append([island, bbox, umesh.uv])
             umesh.update_tag = bool(faces)
         for group in all_groups:
             group[1] = general_bbox
         UNIV_OT_Align.align_islands(all_groups, direction, target_bbox, invert=True)
 
     @staticmethod
-    def align_cursor_ex(umeshes, sync, selected):
-        all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
+    def align_cursor_ex(umeshes, selected):
+        all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
         for umesh in umeshes:
-            if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):  # TODO: Implement bbox by individual modes
-                all_groups.append((corners, umesh.uv_layer))
-                bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
+            if corners := utils.calc_uv_corners(umesh, selected=selected):  # TODO: Implement bbox by individual modes
+                all_groups.append((corners, umesh.uv))
+                bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
                 general_bbox.union(bbox)
         return general_bbox
 
     @staticmethod
-    def align_ex(direction, sync, umeshes, selected=True):
-        all_groups = []  # islands, bboxes, uv_layer or corners, uv_layer
+    def align_ex(direction, umeshes: types.UMeshes, selected=True):
+        all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
         island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
-                if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=selected):
+                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         general_bbox.union(bbox)
 
-                        all_groups.append((island, bbox, umesh.uv_layer))
+                        all_groups.append((island, bbox, umesh.uv))
                 umesh.update_tag = bool(islands)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
-                    bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv_layer)
+                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                    bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
                     general_bbox.union(bbox)
 
-                    all_groups.append((corners, umesh.uv_layer))
+                    all_groups.append((corners, umesh.uv))
                 umesh.update_tag = bool(corners)
         if island_mode:
             UNIV_OT_Align.align_islands(all_groups, direction, general_bbox)
@@ -434,7 +432,7 @@ class UNIV_OT_Align(Operator):
             UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
 
     @staticmethod
-    def move_ex(direction, sync, umeshes, selected=True):
+    def move_ex(direction, umeshes, selected=True):
         island_mode = utils.is_island_mode()
         for umesh in umeshes:
             if island_mode:
@@ -461,26 +459,27 @@ class UNIV_OT_Align(Operator):
                                 island.move(move_value)
                 umesh.update_tag = bool(islands)
             else:
-                if corners := utils.calc_uv_corners(umesh.bm, umesh.uv_layer, sync, selected=selected):
+                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                    uv = umesh.uv
                     match direction:
                         case 'CENTER':
                             for corner in corners:
-                                corner[umesh.uv_layer].uv = 0.5, 0.5
+                                corner[uv].uv = 0.5, 0.5
                         case 'HORIZONTAL':
                             for corner in corners:
-                                corner[umesh.uv_layer].uv.x = 0.5
+                                corner[uv].uv.x = 0.5
                         case 'VERTICAL':
                             for corner in corners:
-                                corner[umesh.uv_layer].uv.y = 0.5
+                                corner[uv].uv.y = 0.5
                         case _:
                             move_value = Vector(UNIV_OT_Align.get_move_value(direction))
                             for corner in corners:
-                                corner[umesh.uv_layer].uv += move_value
+                                corner[uv].uv += move_value
                 umesh.update_tag = bool(corners)
 
     @staticmethod
     def align_islands(groups, direction, general_bbox, invert=False):
-        for island, bounds, uv_layer in groups:
+        for island, bounds, _ in groups:
             center = bounds.center
             match direction:
                 case 'UPPER':
@@ -527,9 +526,9 @@ class UNIV_OT_Align(Operator):
                 else:
                     destination = general_bbox.center.x
 
-                for luvs, uv_layer in groups:
+                for luvs, uv in groups:
                     for luv in luvs:
-                        luv[uv_layer].uv[0] = destination
+                        luv[uv].uv[0] = destination
             case 'UPPER' | 'BOTTOM' | 'HORIZONTAL':
                 if direction == 'UPPER':
                     destination = general_bbox.max.y
@@ -538,9 +537,9 @@ class UNIV_OT_Align(Operator):
                 else:
                     destination = general_bbox.center.y
 
-                for luvs, uv_layer in groups:
+                for luvs, uv in groups:
                     for luv in luvs:
-                        luv[uv_layer].uv[1] = destination
+                        luv[uv].uv[1] = destination
             case _:
                 if direction == 'CENTER':
                     destination = general_bbox.center
@@ -555,9 +554,9 @@ class UNIV_OT_Align(Operator):
                 else:
                     raise NotImplementedError(direction)
 
-                for luvs, uv_layer in groups:
+                for luvs, uv in groups:
                     for luv in luvs:
-                        luv[uv_layer].uv = destination
+                        luv[uv].uv = destination
 
     @staticmethod
     def align_cursor(direction: str, general_bbox, cursor_loc):
@@ -713,7 +712,7 @@ class UNIV_OT_Flip(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -727,13 +726,13 @@ class UNIV_OT_Flip(Operator):
 
     def flip_by_cursor(self, cursor, extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
     def flip_individual(self, extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
@@ -753,24 +752,24 @@ class UNIV_OT_Flip(Operator):
         return self.report({'INFO'}, f'Found {islands_count} Flipped islands')
 
     @staticmethod
-    def calc_extended_or_visible_flipped_islands(umesh_: types.UMesh, extended):
-        uv = umesh_.uv_layer
+    def calc_extended_or_visible_flipped_islands(umesh: types.UMesh, extended):
+        uv = umesh.uv
         if extended:
-            if umesh_.is_full_face_deselected:
-                return Islands([], None, None)
+            if umesh.is_full_face_deselected:
+                return Islands()
 
-        Islands.tag_filter_visible(umesh_.bm, umesh_.sync)
+        Islands.tag_filter_visible(umesh)
 
-        for f_ in umesh_.bm.faces:
+        for f_ in umesh.bm.faces:
             if f_.tag:
                 f_.tag = utils.is_flipped_uv(f_, uv)
 
         if extended:
-            islands_ = [Islands.island_type(i, umesh_.bm, uv) for i in Islands.calc_iter_ex(umesh_.bm, uv) if
-                       Islands.island_filter_is_any_face_selected(i, uv, umesh_.sync)]
+            islands_ = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(umesh) if
+                       Islands.island_filter_is_any_face_selected(i, umesh)]
         else:
-            islands_ = [Islands.island_type(i, umesh_.bm, uv) for i in Islands.calc_iter_ex(umesh_.bm, uv)]
-        return Islands(islands_, umesh_.bm, umesh_.uv_layer)
+            islands_ = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(umesh)]
+        return Islands(islands_, umesh)
 
     @staticmethod
     def get_flip_scale_from_axis(axis):
@@ -846,7 +845,7 @@ class UNIV_OT_Rotate(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -857,13 +856,13 @@ class UNIV_OT_Rotate(Operator):
 
     def rotate_by_cursor(self, cursor, extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
             umesh.update_tag = bool(islands)
 
     def rotate_individual(self,  extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
                     island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=self.aspect)
             umesh.update_tag = bool(islands)
@@ -954,7 +953,7 @@ class UNIV_OT_Sort(Operator):
     def sort_overlapped_preprocessing(self, extended=True):
         _islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 _islands.extend(adv_islands)
@@ -986,7 +985,7 @@ class UNIV_OT_Sort(Operator):
         _islands: list[AdvIsland] | list[AdvIslands] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 if self.align:
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
@@ -1181,11 +1180,12 @@ class UNIV_OT_Distribute(Operator):
         for umesh in self.umeshes:
             self.update_tag = False
             angle = min(self.angle, umesh.smooth_angle)
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            umesh.value = angle
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 for isl in adv_islands:
                     if len(isl) == 1:
                         continue
-                    sub_islands = isl.calc_sub_islands_all(angle)
+                    sub_islands = isl.calc_sub_islands_all()
                     if len(sub_islands) > 1:
                         self.distribute_ex(list(sub_islands), isl.bbox)
             umesh.update_tag = self.update_tag
@@ -1299,7 +1299,7 @@ class UNIV_OT_Distribute(Operator):
         _islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 general_bbox.union(adv_islands.calc_bbox())
                 _islands.extend(adv_islands)
             umesh.update_tag = bool(adv_islands)
@@ -1308,7 +1308,7 @@ class UNIV_OT_Distribute(Operator):
     def distribute_preprocessing_overlap(self, extended):
         _islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 _islands.extend(adv_islands)
@@ -1362,24 +1362,24 @@ class UNIV_OT_Home(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        return UNIV_OT_Home.home(self.mode, sync=context.scene.tool_settings.use_uv_select_sync, report=self.report)
+        return UNIV_OT_Home.home(self.mode, report=self.report)
 
     @staticmethod
-    def home(mode, sync, report):
+    def home(mode, report):
         umeshes = types.UMeshes(report=report)
         match mode:
             case 'DEFAULT':
-                UNIV_OT_Home.home_ex(umeshes, sync, extended=True)
+                UNIV_OT_Home.home_ex(umeshes, extended=True)
                 if not umeshes.final():
-                    UNIV_OT_Home.home_ex(umeshes, sync, extended=False)
+                    UNIV_OT_Home.home_ex(umeshes, extended=False)
 
             case 'TO_CURSOR':
                 if not (cursor_loc := utils.get_tile_from_cursor()):
                     umeshes.report({'WARNING'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Home.home_ex(umeshes, sync, extended=True, cursor=cursor_loc)
+                UNIV_OT_Home.home_ex(umeshes, extended=True, cursor=cursor_loc)
                 if not umeshes.final():
-                    UNIV_OT_Home.home_ex(umeshes, sync, extended=False, cursor=cursor_loc)
+                    UNIV_OT_Home.home_ex(umeshes, extended=False, cursor=cursor_loc)
 
             case _:
                 raise NotImplementedError(mode)
@@ -1387,10 +1387,10 @@ class UNIV_OT_Home(Operator):
         return umeshes.update()
 
     @staticmethod
-    def home_ex(umeshes, sync, extended, cursor=Vector((0, 0))):
+    def home_ex(umeshes, extended, cursor=Vector((0, 0))):
         for umesh in umeshes:
             changed = False
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
                     center = island.calc_bbox().center
                     delta = Vector(round(-i + 0.5) for i in center) + cursor
@@ -1509,7 +1509,7 @@ class UNIV_OT_Random(Operator):
         _islands = []
         for umesh in self.umeshes:
             if self.is_edit_mode:
-                islands = AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended)
+                islands = AdvIslands.calc_extended_or_visible(umesh, extended=extended)
             else:
                 islands = AdvIslands.calc_with_hidden(umesh)
             if islands:
@@ -1746,19 +1746,19 @@ class UNIV_OT_Orient(Operator):
     def orient_edge(self):
         self.skip_count = 0
         for umesh in self.umeshes:
-            uv_layer = umesh.uv_layer
+            uv = umesh.uv
             umesh.update_tag = False
 
             if umesh.is_full_face_deselected or \
-                    not any(l[uv_layer].select_edge for f in umesh.bm.faces for l in f.loops):
+                    not any(crn[uv].select_edge for f in umesh.bm.faces for crn in f.loops):
                 self.skip_count += 1
                 continue
 
-            for island in Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync):
-                luvs = (l for f in island for l in f.loops if l[uv_layer].select_edge)
+            for island in Islands.calc_visible(umesh):
+                corners = (crn for f in island for crn in f.loops if crn[uv].select_edge)
 
-                for l in luvs:
-                    diff: Vector = (v1 := l[uv_layer].uv) - (v2 := l.link_loop_next[uv_layer].uv)
+                for crn_ in corners:
+                    diff: Vector = (v1 := crn_[uv].uv) - (v2 := crn_.link_loop_next[uv].uv)
                     if not any(diff):
                         continue
                     if self.edge_dir == 'BOTH':
@@ -1778,20 +1778,20 @@ class UNIV_OT_Orient(Operator):
     def orient_edge_sync(self):
         self.skip_count = 0
         for umesh in self.umeshes:
-            uv_layer = umesh.uv_layer
+            uv = umesh.uv
             umesh.update_tag = False
 
             if umesh.is_full_edge_deselected:
                 self.skip_count += 1
                 continue
 
-            _islands = Islands.calc_visible(umesh.bm, umesh.uv_layer, self.sync)
+            _islands = Islands.calc_visible(umesh)
             _islands.indexing()
             for idx, island in enumerate(_islands):
                 luvs = (l for f in island for e in f.edges if e.select for l in e.link_loops if l.face.index == idx and l.face.tag)
 
                 for l in luvs:
-                    diff: Vector = (v1 := l[uv_layer].uv) - (v2 := l.link_loop_next[uv_layer].uv)
+                    diff: Vector = (v1 := l[uv].uv) - (v2 := l.link_loop_next[uv].uv)
                     if not any(diff):
                         continue
                     if self.edge_dir == 'BOTH':
@@ -1811,7 +1811,7 @@ class UNIV_OT_Orient(Operator):
     def orient_island(self, extended):
         self.skip_count = 0
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
                 for island in adv_islands:
                     points = island.calc_convex_points()
 
@@ -1892,12 +1892,12 @@ class UNIV_OT_Orient_VIEW3D(Operator):
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
             if self.is_edit_mode:
-                islands = Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, umesh.sync, extended=extended)
+                islands = Islands.calc_extended_or_visible(umesh, extended=extended)
             else:
                 islands = Islands.calc_with_hidden(umesh)
 
             if islands:
-                uv = islands.uv_layer
+                uv = islands.umesh.uv
                 _, r, _ = umesh.obj.matrix_world.decompose()
                 mtx = r.to_matrix()
 
@@ -2062,12 +2062,11 @@ class UNIV_OT_Weld(Operator):
         self.umeshes.update(info='Not found verts for weld')
         return {'FINISHED'}
 
-    @utils.timer()
     def weld(self):
         from ..utils import weld_crn_edge_by_idx
         islands_of_mesh = []
         for umesh in reversed(self.umeshes):
-            uv = umesh.uv_layer
+            uv = umesh.uv
             if not umesh.sync:
                 if umesh.is_full_face_deselected or \
                         not any(l[uv].select_edge for f in umesh.bm.faces if f.select for l in f.loops):
@@ -2141,7 +2140,7 @@ class UNIV_OT_Weld(Operator):
 
         if not self.umeshes.sync:
             for umesh, islands in islands_of_mesh:
-                uv = islands.uv_layer
+                uv = islands.umesh.uv
 
                 local_seam_clear_counter = 0
                 local_edge_weld_counter = 0
@@ -2167,7 +2166,7 @@ class UNIV_OT_Weld(Operator):
 
     def weld_by_distance_island(self, extended):
         for umesh in self.umeshes:
-            uv = umesh.uv_layer
+            uv = umesh.uv
             local_counter = 0
             if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh, extended=extended):
                 # Tagging
@@ -2201,12 +2200,12 @@ class UNIV_OT_Weld(Operator):
         # TODO: Refactor this, use iterator
         for umesh in self.umeshes:
             umesh.tag_visible_corners()
-            uv = umesh.uv_layer
+            uv = umesh.uv
             local_counter = 0
             if selected:
-                init_corners = utils.calc_selected_uv_corners(umesh.bm, umesh.uv_layer, umesh.sync)
+                init_corners = utils.calc_selected_uv_corners(umesh)
             else:
-                init_corners = utils.calc_visible_uv_corners(umesh.bm, umesh.sync)
+                init_corners = utils.calc_visible_uv_corners(umesh)
             if init_corners:
                 # Tagging
                 is_face_mesh_mode = (self.sync and utils.get_select_mode_mesh() == 'FACE')
@@ -2336,8 +2335,9 @@ class UNIV_OT_Stitch(Operator):
                 umesh.update_tag = False
                 continue
 
-            uv = umesh.uv_layer
-            adv_islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=False)
+            uv = umesh.uv
+            adv_islands = AdvIslands.calc_extended_or_visible(umesh, extended=False)
+            print(adv_islands)
             if len(adv_islands) < 2:
                 umesh.update_tag = False
                 continue
@@ -2402,9 +2402,11 @@ class UNIV_OT_Stitch(Operator):
                 update_tag |= stitched
                 if not stitched:
                     break
+
             if update_tag:
                 for adv in adv_islands:
-                    adv.mark_seam()
+                    if adv:
+                        adv.mark_seam()
             self.stitched_islands += len(adv_islands) - sum(bool(isl) for isl in adv_islands)
             umesh.update_tag = update_tag
 
@@ -2413,8 +2415,8 @@ class UNIV_OT_Stitch(Operator):
             if umesh.is_full_face_deselected:
                 umesh.update_tag = False
                 continue
-            uv = umesh.uv_layer
-            _islands = AdvIslands.calc_extended_or_visible(umesh.bm, uv, self.sync, extended=True)
+            uv = umesh.uv
+            _islands = AdvIslands.calc_extended_or_visible(umesh, extended=True)
             if len(_islands) < 2:
                 umesh.update_tag = False
                 continue
@@ -2478,7 +2480,8 @@ class UNIV_OT_Stitch(Operator):
                     break
             if update_tag:
                 for adv in target_islands:
-                    adv.mark_seam()
+                    if adv:
+                        adv.mark_seam()
             umesh.update_tag = update_tag
 
     @staticmethod
@@ -2487,10 +2490,10 @@ class UNIV_OT_Stitch(Operator):
             (crn_b1[uv].uv - crn_b2[uv].uv).length < 1e-06
 
     @staticmethod
-    def calc_begin_end_points(tar, source):
+    def calc_begin_end_points(tar: LoopGroup, source: LoopGroup):
         if not tar or not source:
             return False
-        uv = tar.uv
+        uv = tar.umesh.uv
 
         crn_a1 = tar[0]
         crn_a2 = tar[-1].link_loop_next
@@ -2498,7 +2501,7 @@ class UNIV_OT_Stitch(Operator):
         crn_b2 = source[0]
 
         if UNIV_OT_Stitch.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(tar, tar.uv)
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(tar, tar.umesh.uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
             if bbox.max_length < 1e-06:
                 return False
@@ -2535,8 +2538,8 @@ class UNIV_OT_Stitch(Operator):
         for _crn in source_corners:
             _crn[uv].uv = co_b
 
-    def stitch_ex(self, tar, source, adv_islands, selected=True):
-        uv = tar.uv
+    def stitch_ex(self, tar: LoopGroup, source: LoopGroup, adv_islands: AdvIslands, selected=True):
+        uv = tar.umesh.uv
         # Equal indices occur after merging on non-stitch edges
         if tar[0].face.index == source[0].face.index:
             for target_crn in tar:

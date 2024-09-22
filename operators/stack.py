@@ -248,7 +248,7 @@ class StackIsland:  # TODO: Split for source and target islands
             temp = []
 
     def transfer_co_to(self, other: list[list[FacePattern]], other_uv):
-        uv = self.island.uv_layer
+        uv = self.island.umesh.uv
         for t_list_f, s_list_f in zip(self.walked_island_from_init_face, other):
             for t_f, s_f in zip(t_list_f, s_list_f):
                 s_f.start_crn[other_uv].uv = t_f.start_crn[uv].uv
@@ -329,7 +329,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                     for source in sort_stack_islands:
                         if source.island.tag:
                             if res := target.calc_source_stack_island(source):
-                                target.transfer_co_to(res, source.island.uv_layer)
+                                target.transfer_co_to(res, source.island.umesh.uv)
                                 umeshes_for_update.add(source.umesh)
                                 source.island.tag = False
                                 self.counter += 1
@@ -387,7 +387,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             for stacks_source_isl in stacks_source:
                 if stacks_source_isl.island.tag:
                     if res := stack_target.calc_source_stack_island(stacks_source_isl):
-                        stack_target.transfer_co_to(res, stacks_source_isl.island.uv_layer)
+                        stack_target.transfer_co_to(res, stacks_source_isl.island.umesh.uv)
                         umeshes_for_update.add(stacks_source_isl.umesh)
                         stacks_source_isl.island.tag = False
                         self.counter += 1
@@ -405,7 +405,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             selected = AdvIslands.calc_selected(umesh)
             non_selected = AdvIslands.calc_non_selected(umesh)
 
-            proxi = AdvIslands(islands=non_selected.islands + selected.islands, bm=umesh.bm, uv_layer=umesh.uv_layer)
+            proxi = AdvIslands(non_selected.islands + selected.islands, umesh)
             if not proxi:
                 self.umeshes.umeshes.remove(umesh)
             proxi.indexing(force=True)

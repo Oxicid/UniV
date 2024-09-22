@@ -16,10 +16,13 @@ class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True):
         self.bm: bmesh.types.BMesh = bm
         self.obj: bpy.types.Object = obj
-        self.uv_layer: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
+        self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
         self.is_edit_bm: bool = is_edit_bm
         self.update_tag: bool = True
         self.sync: bool = utils.sync()
+        # self.islands_calc_type
+        # self.islands_calc_subtype
+        self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
 
     def update(self, force=False):
         if not self.update_tag:
@@ -96,7 +99,7 @@ class UMesh:
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
 
-        uv = self.uv_layer
+        uv = self.uv
         if PyBMesh.is_full_face_selected(self.bm):
             for f in self.bm.faces:
                 for _crn in f.loops:
@@ -118,7 +121,7 @@ class UMesh:
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
 
-        uv = self.uv_layer
+        uv = self.uv
         if PyBMesh.is_full_face_selected(self.bm):
             for f in self.bm.faces:
                 for crn in f.loops:
@@ -138,7 +141,7 @@ class UMesh:
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
 
-        uv = self.uv_layer
+        uv = self.uv
         if PyBMesh.is_full_face_selected(self.bm):
             for f in self.bm.faces:
                 for crn in f.loops:
@@ -250,7 +253,7 @@ class UMesh:
                 for crn in corners:
                     crn.tag = False
             else:
-                uv = self.uv_layer
+                uv = self.uv
                 if both:
                     for f in self.bm.faces:
                         if f.select:
@@ -280,7 +283,7 @@ class UMesh:
             if self.is_full_face_deselected:
                 self.set_face_tag(False)
             else:
-                uv = self.uv_layer
+                uv = self.uv
                 if both:
                     for f in self.bm.faces:
                         if f.select:
@@ -350,7 +353,7 @@ class UMesh:
         return [f for f in self.bm.faces if f.select]
 
     def mark_seam_tagged_faces(self, additional=False):
-        uv = self.uv_layer
+        uv = self.uv
         if self.sync:
             for f in self.bm.faces:
                 if not f.tag:
@@ -535,7 +538,7 @@ class UMeshes:
             return any(umesh.total_face_sel for umesh in self)
         else:
             for umesh in self:
-                uv = umesh.uv_layer
+                uv = umesh.uv
                 if umesh.total_face_sel:
                     for f in umesh.bm.faces:
                         if all(crn[uv].select for crn in f.loops) and f.select:

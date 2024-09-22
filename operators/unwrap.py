@@ -85,7 +85,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             else:
                 raise NotImplemented
 
-            uv = umesh.uv_layer
+            uv = umesh.uv
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
             if not self.mark_seam_inner_island:
@@ -161,7 +161,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            uv = umesh.uv_layer
+            uv = umesh.uv
             islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
                 islands_extended.indexing(force=True)
@@ -241,7 +241,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     def unwrap_non_sync(self):
         save_transform_islands = []
         for umesh in reversed(self.umeshes):
-            uv = umesh.uv_layer
+            uv = umesh.uv
             if umesh.is_full_face_deselected or not any(crn[uv].select for f in umesh.bm.faces if f.select for crn in f.loops):
                 self.umeshes.umeshes.remove(umesh)
                 continue

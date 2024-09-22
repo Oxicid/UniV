@@ -49,7 +49,7 @@ class MeshIsland:
         self._select_ex(False, mode)
 
     def to_adv_island(self) -> island.AdvIsland:
-        adv_isl = island.AdvIsland(self.faces, self.umesh.bm, self.umesh.uv_layer)
+        adv_isl = island.AdvIsland(self.faces, self.umesh)
         adv_isl.value = self.value
         return adv_isl
 
@@ -165,10 +165,10 @@ class MeshIslands(MeshIslandsBase):
     def to_adv_islands(self) -> island.AdvIslands:
         adv_islands = []
         for mesh_isl in self:
-            adv_isl = island.AdvIsland(mesh_isl.faces, self.umesh.bm, self.umesh.uv_layer)
+            adv_isl = island.AdvIsland(mesh_isl.faces, self.umesh)
             adv_isl.value = mesh_isl.value
             adv_islands.append(adv_isl)
-        adv_islands_t = island.AdvIslands(adv_islands, self.umesh.bm, self.umesh.uv_layer)
+        adv_islands_t = island.AdvIslands(adv_islands, self.umesh)
         adv_islands_t.value = self.value
         return adv_islands_t
 

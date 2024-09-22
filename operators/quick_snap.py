@@ -351,7 +351,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                 if self.visible:
                     # Extract only one face without linked corners, and recalculate the snap points at the current KDMesh
                     _face = kd_data.elem if isinstance(kd_data.elem, BMFace) else kd_data.elem.face
-                    self.move_object = FaceIsland([_face], _kdmesh.umesh.bm, _kdmesh.umesh.uv_layer)
+                    self.move_object = FaceIsland([_face], _kdmesh.umesh)
                     islands = _kdmesh.islands
                     assert(len(islands) == 1)
 
@@ -475,7 +475,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     kdmesh.umesh.update_tag = False
 
                     move_corners = []
-                    uv = kdmesh.umesh.uv_layer
+                    uv = kdmesh.umesh.uv
                     for f in kdmesh.umesh.bm.faces:
                         if f.select:
                             for crn in f.loops:
@@ -519,7 +519,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     def extract_visible_linked_edge_or_face(self, _kdmesh, kd_data):
         # Extract only one edge or face with linked corners, and recalculate the snap points at one KDMesh.
-        uv = _kdmesh.umesh.uv_layer
+        uv = _kdmesh.umesh.uv
         _kdmesh.umesh.tag_visible_corners()
         elem = kd_data.elem
         corners = []
@@ -574,9 +574,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_visible_uv_faces(umesh.bm, umesh.uv_layer, self.sync):
-                f_isl = FaceIsland(faces, umesh.bm, umesh.uv_layer)
-                isl = Islands([f_isl], umesh.bm, umesh.uv_layer)
+            if faces := utils.calc_visible_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -588,9 +588,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_selected_uv_faces(umesh.bm, umesh.uv_layer, self.sync):
-                f_isl = FaceIsland(faces, umesh.bm, umesh.uv_layer)
-                isl = Islands([f_isl], umesh.bm, umesh.uv_layer)
+            if faces := utils.calc_selected_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -602,9 +602,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_unselected_uv_faces(umesh.bm, umesh.uv_layer, self.sync):
-                f_isl = FaceIsland(faces, umesh.bm, umesh.uv_layer)
-                isl = Islands([f_isl], umesh.bm, umesh.uv_layer)
+            if faces := utils.calc_unselected_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -625,7 +625,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
     def calc_island_kdmeshes(self, extended=False):
         kdmeshes = []
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh.bm, umesh.uv_layer, self.sync, extended=extended):
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -634,7 +634,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
     def recalc_island_kd_meshes(self):
         kdmeshes = []
         for umesh in self.umeshes:
-            if islands := Islands.calc_non_selected_extended(umesh.bm, umesh.uv_layer, self.sync):
+            if islands := Islands.calc_non_selected_extended(umesh):
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -772,31 +772,15 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     def calc_update_meshes(self):
         if isinstance(self.move_object, FaceIsland):
-            for umesh in self.umeshes:
-                if umesh.bm == self.move_object.bm:
-                    self.umeshes.umeshes = [umesh]
-                    return
+            self.umeshes.umeshes = [self.move_object.umesh]
 
         elif isinstance(self.move_object, UnionIslands):
-            bmeshes = {isl.bm for isl in self.move_object}
-            umeshes = []
-            for umesh in self.umeshes:
-                if umesh.bm in bmeshes:
-                    umeshes.append(umesh)
-            assert umeshes
+            assert (umeshes := list({isl.umesh for isl in self.move_object}))
             self.umeshes.umeshes = umeshes
 
         elif isinstance(self.move_object, UnionLoopGroup):
-            bmeshes = {lg.umesh.bm for lg in self.move_object}
-            umeshes = []
-            for umesh in self.umeshes:
-                if umesh.bm in bmeshes:
-                    umeshes.append(umesh)
-            assert umeshes
+            assert (umeshes := list({lg.umesh for lg in self.move_object}))
             self.umeshes.umeshes = umeshes
 
         elif isinstance(self.move_object, LoopGroup):
-            for umesh in self.umeshes:
-                if umesh == self.move_object.umesh:
-                    self.umeshes.umeshes = [umesh]
-                    return
+            self.umeshes.umeshes = [self.move_object.umesh]

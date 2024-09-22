@@ -63,7 +63,7 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            uv = umesh.uv_layer
+            uv = umesh.uv
             shared_is_linked = utils.shared_is_linked
             if umesh.is_full_edge_selected:
                 for f in umesh.bm.faces:
@@ -97,7 +97,7 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
                 continue
             umesh.tag_selected_faces()
 
-            uv = umesh.uv_layer
+            uv = umesh.uv
             for f in umesh.bm.faces:
                 if not f.select:
                     continue
