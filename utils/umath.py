@@ -23,9 +23,6 @@ def vec_isclose_to_uniform(delta: Vector, abs_tol: float = 0.00001):
 def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
     return math.isclose(delta.x, 0, abs_tol=abs_tol) and math.isclose(delta.y, 0, abs_tol=abs_tol)
 
-def vec_lerp(a: Vector, b: Vector, factor: float):
-    return a + factor * (b - a)
-
 # Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
 def inv_lerp(a: float, b: float, v: float) -> float:
     """Inverse Linear Interpolation, get the fraction between a and b on which v resides.

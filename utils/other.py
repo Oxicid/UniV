@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+import typing
 
 import bpy
 import blf
@@ -75,3 +76,14 @@ def blf_size(font_id, font_size):
         blf.size(font_id, font_size)
     else:
         blf.size(font_id, font_size, 72)
+
+def _get_areas():
+    return
+
+def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'], r_iter=False):
+    areas = (area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
+    if r_iter:
+        return areas
+    else:
+        for a in areas:
+            return a

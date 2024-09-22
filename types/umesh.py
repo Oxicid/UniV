@@ -435,9 +435,8 @@ class UMeshes:
     def loop(self):
         active = bpy.context.active_object
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        area = [a for a in bpy.context.screen.areas if a.type == 'VIEW_3D'][0]
-        with bpy.context.temp_override(area=area):  # noqa
-            bpy.ops.object.select_all(action='DESELECT')
+        for obj in bpy.context.selected_objects[:]:
+            obj.select_set(False)
 
         for umesh in self.umeshes:
             bpy.context.view_layer.objects.active = umesh.obj
