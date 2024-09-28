@@ -114,25 +114,25 @@ def add_keymaps():
 
     ## Move
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS', shift=True)
-    kmi.properties.mode = 'MOVE'
+    kmi.properties.mode = 'INDIVIDUAL_OR_MOVE'
     kmi.properties.direction = 'UPPER'
     kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'DOWN_ARROW', 'PRESS', shift=True)
-    kmi.properties.mode = 'MOVE'
+    kmi.properties.mode = 'INDIVIDUAL_OR_MOVE'
     kmi.properties.direction = 'BOTTOM'
     kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'RIGHT_ARROW', 'PRESS', shift=True)
-    kmi.properties.mode = 'MOVE'
+    kmi.properties.mode = 'INDIVIDUAL_OR_MOVE'
     kmi.properties.direction = 'RIGHT'
     kmi.active = False
     keys.append((km, kmi))
 
     kmi = km.keymap_items.new('uv.univ_align', 'LEFT_ARROW', 'PRESS', shift=True)
-    kmi.properties.mode = 'MOVE'
+    kmi.properties.mode = 'INDIVIDUAL_OR_MOVE'
     kmi.properties.direction = 'LEFT'
     kmi.active = False
     keys.append((km, kmi))

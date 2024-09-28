@@ -77,9 +77,6 @@ def blf_size(font_id, font_size):
     else:
         blf.size(font_id, font_size, 72)
 
-def _get_areas():
-    return
-
 def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'], r_iter=False):
     areas = (area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
     if r_iter:
@@ -87,3 +84,12 @@ def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'], r_ite
     else:
         for a in areas:
             return a
+
+def event_to_string(event, text=''):
+    if event.ctrl:
+        text += 'Ctrl + '
+    if event.shift:
+        text += 'Shift + '
+    if event.alt:
+        text += 'Alt + '
+    return f'{text} Left Mouse '

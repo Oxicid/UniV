@@ -157,6 +157,10 @@ def linked_crn_uv_by_tag(first, uv):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_uv_by_tag_c(crn: BMLoop, uv: BMLayerItem):
+    first_co = crn[uv].uv
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn.tag and l_crn[uv].uv == first_co]
+
 def calc_crn_in_vert_by_tag(first: BMLoop):
     if not first.tag:
         return []

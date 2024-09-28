@@ -11,6 +11,7 @@ from collections import defaultdict
 from bmesh.types import BMLoop
 from ..utils import prev_disc, linked_crn_uv_by_tag, vec_isclose_to_zero
 from . import umesh as _umesh
+from . import bbox
 from .. import utils
 
 class LoopGroup:
@@ -232,6 +233,9 @@ class LoopGroup:
     def set_position(self, to: Vector, _from: Vector):
         return self.move(to - _from)
 
+    def calc_bbox(self):
+        return bbox.BBox.calc_bbox_uv_corners(self.corners, self.umesh.uv)
+
     @classmethod
     def calc_dirt_loop_groups(cls, umesh):
         uv = umesh.uv
@@ -274,15 +278,30 @@ class LoopGroup:
         return LoopGroups(groups, umesh)
 
     def extend_from_linked(self):
-        # Need tag_visible_corners before use
-        assert utils.sync()
         self.set_tag(False)
 
-        move_corners = []
-        uv = self.umesh.uv
-        for crn in self:
-            move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
-        self.corners.extend(move_corners)
+        if utils.sync():
+            # Need tag_visible_corners before use
+            move_corners = []
+            uv = self.umesh.uv
+            for crn in self:
+                move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
+            self.corners.extend(move_corners)
+        else:
+            move_corners = []
+            uv = self.umesh.uv
+            for crn in self:
+                linked_corners = utils.linked_crn_uv_by_tag_c(crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
+                move_corners.extend(linked_corners)
+                for crn_ in linked_corners:
+                    crn_.tag = False
+
+                linked_corners = utils.linked_crn_uv_by_tag_c(crn.link_loop_next, uv)
+                move_corners.extend(linked_corners)
+                for crn_ in linked_corners:
+                    crn_.tag = False
+
+            self.corners.extend(move_corners)
 
     def __iter__(self):
         return iter(self.corners)

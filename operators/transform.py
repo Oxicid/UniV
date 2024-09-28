@@ -72,7 +72,7 @@ class UNIV_OT_Crop(Operator):
         self.inplace = event.alt
 
         if all((event.ctrl, event.alt)):
-            self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
+            self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
                                   f"See all variations:\n\n{self.get_event_info()}")
             self.to_cursor = False
         return self.execute(context)
@@ -258,9 +258,9 @@ class UNIV_OT_Align(Operator):
     bl_description = info.operator.align_info
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: EnumProperty(name="Mode", default='MOVE', items=(
+    mode: EnumProperty(name="Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', ''),
-        ('MOVE', 'Move', ''),
+        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', ''),
         ('ALIGN_CURSOR', 'Move cursor to selected', ''),
         ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
@@ -291,99 +291,102 @@ class UNIV_OT_Align(Operator):
             case True, False, True:
                 self.mode = 'CURSOR_TO_TILE'
             case False, True, False:
-                self.mode = 'MOVE'
+                self.mode = 'INDIVIDUAL_OR_MOVE'
             case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n"
+                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
                                       f"See all variations:\n\n{info.operator.align_event_info_ex}")
                 return {'CANCELLED'}
         return self.execute(context)
 
+    def __init__(self):
+        self.umeshes = None
+
     def execute(self, context):
-        return self.align(self.mode, self.direction, report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
+        return self.align()
 
-    @staticmethod
-    def align(mode, direction, report=None):
-        umeshes = types.UMeshes(report=report)
-
-        match mode:
+    def align(self):
+        match self.mode:
             case 'ALIGN':
-                UNIV_OT_Align.align_ex(direction, umeshes, selected=True)
-                if not umeshes.final():
-                    UNIV_OT_Align.align_ex(direction, umeshes,  selected=False)
+                self.align_ex(selected=True)
+                if not self.umeshes.final():
+                    self.align_ex(selected=False)
 
             case 'ALIGN_TO_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
+                    self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, selected=True)
-                if not umeshes.final():
-                    UNIV_OT_Align.move_to_cursor_ex(cursor_loc, direction, umeshes, selected=False)
+                self.move_to_cursor_ex(cursor_loc, selected=True)
+                if not self.umeshes.final():
+                    self.move_to_cursor_ex(cursor_loc, selected=False)
 
             case 'ALIGN_TO_CURSOR_UNION':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
+                    self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=True)
-                if not umeshes.final():
-                    UNIV_OT_Align.move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=False)
+                self.move_to_cursor_union_ex(cursor_loc, selected=True)
+                if not self.umeshes.final():
+                    self.move_to_cursor_union_ex(cursor_loc, selected=False)
 
             case 'ALIGN_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
+                    self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, selected=True)
+                general_bbox = self.align_cursor_ex(selected=True)
                 if not general_bbox.is_valid:
-                    general_bbox = UNIV_OT_Align.align_cursor_ex(umeshes, selected=False)
+                    general_bbox = self.align_cursor_ex(selected=False)
                 if not general_bbox.is_valid:
-                    umeshes.report()
+                    self.umeshes.report()
                     return {'CANCELLED'}
-                UNIV_OT_Align.align_cursor(direction, general_bbox, cursor_loc)
+                self.align_cursor(general_bbox, cursor_loc)
                 return {'FINISHED'}
 
             case 'CURSOR_TO_TILE':
                 if not (cursor_loc := utils.get_cursor_location()):
-                    umeshes.report({'INFO'}, "Cursor not found")
+                    self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                UNIV_OT_Align.align_cursor_to_tile(direction, cursor_loc)
+                self.align_cursor_to_tile(cursor_loc)
                 return {'FINISHED'}
 
-            case 'MOVE':
-                UNIV_OT_Align.move_ex(direction, umeshes, selected=True)
-                if not umeshes.final():
-                    UNIV_OT_Align.move_ex(direction, umeshes, selected=False)
+            case 'INDIVIDUAL_OR_MOVE':  # OR INDIVIDUAL
+                if not utils.is_island_mode():
+                    self.individual_scale_zero()
+                else:
+                    self.move_ex(selected=True)
+                if not self.umeshes.final():
+                    if self.direction in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:
+                        self.align_ex(selected=False)
+                    else:
+                        self.move_ex(selected=False)
 
             case _:
-                raise NotImplementedError(mode)
+                raise NotImplementedError(self.mode)
 
-        return umeshes.update()
+        return self.umeshes.update()
 
-    @staticmethod
-    def move_to_cursor_ex(cursor_loc, direction, umeshes, selected=True):
+    def move_to_cursor_ex(self, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
-        island_mode = utils.is_island_mode()
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
-        for umesh in umeshes:
-            if island_mode:
+        if utils.is_island_mode() or (not selected and self.direction not in {'LEFT', 'RIGHT', 'BOTTOM', 'UPPER'}):
+            for umesh in self.umeshes:
                 if islands := Islands.calc(umesh, selected=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         all_groups.append((island, bbox, umesh.uv))
                 umesh.update_tag = bool(islands)
-            else:
+            self.align_islands(all_groups, general_bbox, invert=True)
+        else:
+            for umesh in self.umeshes:
                 if corners := utils.calc_uv_corners(umesh, selected=selected):
                     all_groups.append((corners, umesh.uv))
                 umesh.update_tag = bool(corners)
-        if island_mode:
-            UNIV_OT_Align.align_islands(all_groups, direction, general_bbox, invert=True)
-        else:  # Vertices or Edges UV selection mode
-            UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)
+            self.align_corners(all_groups, general_bbox)
 
-    @staticmethod
-    def move_to_cursor_union_ex(cursor_loc, direction, umeshes, selected=True):
+    def move_to_cursor_union_ex(self, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
-        for umesh in umeshes:
+        for umesh in self.umeshes:
             if faces := utils.calc_uv_faces(umesh, selected=selected):
                 island = FaceIsland(faces, umesh)
                 bbox = island.calc_bbox()
@@ -392,26 +395,23 @@ class UNIV_OT_Align(Operator):
             umesh.update_tag = bool(faces)
         for group in all_groups:
             group[1] = general_bbox
-        UNIV_OT_Align.align_islands(all_groups, direction, target_bbox, invert=True)
+        self.align_islands(all_groups, target_bbox, invert=True)
 
-    @staticmethod
-    def align_cursor_ex(umeshes, selected):
+    def align_cursor_ex(self, selected):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
-        for umesh in umeshes:
+        for umesh in self.umeshes:
             if corners := utils.calc_uv_corners(umesh, selected=selected):  # TODO: Implement bbox by individual modes
                 all_groups.append((corners, umesh.uv))
                 bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
                 general_bbox.union(bbox)
         return general_bbox
 
-    @staticmethod
-    def align_ex(direction, umeshes: types.UMeshes, selected=True):
+    def align_ex(self, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
-        island_mode = utils.is_island_mode()
-        for umesh in umeshes:
-            if island_mode:
+        if utils.is_island_mode() or not selected:
+            for umesh in self.umeshes:
                 if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
@@ -419,25 +419,22 @@ class UNIV_OT_Align(Operator):
 
                         all_groups.append((island, bbox, umesh.uv))
                 umesh.update_tag = bool(islands)
-            else:
+            self.align_islands(all_groups, general_bbox)
+        else:
+            for umesh in self.umeshes:
                 if corners := utils.calc_uv_corners(umesh, selected=selected):
                     bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
                     general_bbox.union(bbox)
 
                     all_groups.append((corners, umesh.uv))
                 umesh.update_tag = bool(corners)
-        if island_mode:
-            UNIV_OT_Align.align_islands(all_groups, direction, general_bbox)
-        else:  # Vertices or Edges UV selection mode
-            UNIV_OT_Align.align_corners(all_groups, direction, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
+            self.align_corners(all_groups, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
 
-    @staticmethod
-    def move_ex(direction, umeshes, selected=True):
-        island_mode = utils.is_island_mode()
-        for umesh in umeshes:
-            if island_mode:
-                if islands := Islands.calc(umesh, selected=selected):
-                    match direction:
+    def move_ex(self, selected=True):
+        if utils.is_island_mode():
+            for umesh in self.umeshes:
+                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
+                    match self.direction:
                         case 'CENTER':
                             for island in islands:
                                 bbox = island.calc_bbox()
@@ -454,14 +451,15 @@ class UNIV_OT_Align(Operator):
                                 delta_x = 0.5 - bbox.center.x
                                 island.move(Vector((delta_x, 0.0)))
                         case _:
-                            move_value = Vector(UNIV_OT_Align.get_move_value(direction))
+                            move_value = Vector(self.get_move_value(self.direction))
                             for island in islands:
                                 island.move(move_value)
                 umesh.update_tag = bool(islands)
-            else:
+        else:
+            for umesh in self.umeshes:
                 if corners := utils.calc_uv_corners(umesh, selected=selected):
                     uv = umesh.uv
-                    match direction:
+                    match self.direction:
                         case 'CENTER':
                             for corner in corners:
                                 corner[uv].uv = 0.5, 0.5
@@ -472,16 +470,25 @@ class UNIV_OT_Align(Operator):
                             for corner in corners:
                                 corner[uv].uv.y = 0.5
                         case _:
-                            move_value = Vector(UNIV_OT_Align.get_move_value(direction))
+                            move_value = Vector(self.get_move_value(self.direction))
                             for corner in corners:
                                 corner[uv].uv += move_value
                 umesh.update_tag = bool(corners)
 
-    @staticmethod
-    def align_islands(groups, direction, general_bbox, invert=False):
+    def individual_scale_zero(self):
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            if lgs := types.LoopGroup.calc_dirt_loop_groups(umesh):
+                umesh.tag_visible_corners()
+                for lg in lgs:
+                    lg.extend_from_linked()
+                    self.align_corners(((lg, uv),), lg.calc_bbox())
+            umesh.update_tag = bool(lgs)
+
+    def align_islands(self, groups, general_bbox, invert=False):
         for island, bounds, _ in groups:
             center = bounds.center
-            match direction:
+            match self.direction:
                 case 'UPPER':
                     delta = (0, (general_bbox.min - bounds.min).y) if invert else (0, (general_bbox.max - bounds.max).y)
                 case 'BOTTOM':
@@ -511,28 +518,26 @@ class UNIV_OT_Align(Operator):
                     else:
                         delta = (general_bbox.max - bounds.max).x, (general_bbox.min - bounds.min).y
                 case _:
-                    raise NotImplementedError(direction)
+                    raise NotImplementedError(self.direction)
             island.move(Vector(delta))
 
-    @staticmethod
-    def align_corners(groups, direction, general_bbox):
-
-        match direction:
+    def align_corners(self, groups, general_bbox):
+        match self.direction:
             case 'LEFT' | 'RIGHT' | 'VERTICAL':
-                if direction == 'LEFT':
+                if self.direction == 'LEFT':
                     destination = general_bbox.min.x
-                elif direction == 'RIGHT':
+                elif self.direction == 'RIGHT':
                     destination = general_bbox.max.x
                 else:
                     destination = general_bbox.center.x
 
                 for luvs, uv in groups:
                     for luv in luvs:
-                        luv[uv].uv[0] = destination
+                        luv[uv].uv.x = destination
             case 'UPPER' | 'BOTTOM' | 'HORIZONTAL':
-                if direction == 'UPPER':
+                if self.direction == 'UPPER':
                     destination = general_bbox.max.y
-                elif direction == 'BOTTOM':
+                elif self.direction == 'BOTTOM':
                     destination = general_bbox.min.y
                 else:
                     destination = general_bbox.center.y
@@ -541,45 +546,42 @@ class UNIV_OT_Align(Operator):
                     for luv in luvs:
                         luv[uv].uv[1] = destination
             case _:
-                if direction == 'CENTER':
+                if self.direction == 'CENTER':
                     destination = general_bbox.center
-                elif direction == 'LEFT_BOTTOM':
+                elif self.direction == 'LEFT_BOTTOM':
                     destination = general_bbox.left_bottom
-                elif direction == 'RIGHT_UPPER':
+                elif self.direction == 'RIGHT_UPPER':
                     destination = general_bbox.right_upper
-                elif direction == 'LEFT_UPPER':
+                elif self.direction == 'LEFT_UPPER':
                     destination = general_bbox.left_upper
-                elif direction == 'RIGHT_BOTTOM':
+                elif self.direction == 'RIGHT_BOTTOM':
                     destination = general_bbox.right_bottom
                 else:
-                    raise NotImplementedError(direction)
+                    raise NotImplementedError(self.direction)
 
                 for luvs, uv in groups:
                     for luv in luvs:
                         luv[uv].uv = destination
 
-    @staticmethod
-    def align_cursor(direction: str, general_bbox, cursor_loc):
-
-        if direction in ('UPPER', 'BOTTOM'):
-            loc = getattr(general_bbox, direction.lower())
+    def align_cursor(self, general_bbox, cursor_loc):
+        if self.direction in ('UPPER', 'BOTTOM'):
+            loc = getattr(general_bbox, self.direction.lower())
             loc.x = cursor_loc.x
             utils.set_cursor_location(loc)
-        elif direction in ('RIGHT', 'LEFT'):
-            loc = getattr(general_bbox, direction.lower())
+        elif self.direction in ('RIGHT', 'LEFT'):
+            loc = getattr(general_bbox, self.direction.lower())
             loc.y = cursor_loc.y
             utils.set_cursor_location(loc)
-        elif loc := getattr(general_bbox, direction.lower(), False):
+        elif loc := getattr(general_bbox, self.direction.lower(), False):
             utils.set_cursor_location(loc)
-        elif direction == 'VERTICAL':
+        elif self.direction == 'VERTICAL':
             utils.set_cursor_location(Vector((general_bbox.center.x, cursor_loc.y)))
-        elif direction == 'HORIZONTAL':
+        elif self.direction == 'HORIZONTAL':
             utils.set_cursor_location(Vector((cursor_loc.x, general_bbox.center.y)))
         else:
-            raise NotImplementedError(direction)
+            raise NotImplementedError(self.direction)
 
-    @staticmethod
-    def align_cursor_to_tile(direction: str, cursor_loc):
+    def align_cursor_to_tile(self, cursor_loc):
         def pad_floor(value):
             f = np.floor(np.float16(value))
             return np.nextafter(f, f + np.float16(1.0))
@@ -589,7 +591,7 @@ class UNIV_OT_Align(Operator):
             return np.nextafter(f + np.float16(1.0), f)
 
         x, y = cursor_loc
-        match direction:
+        match self.direction:
             case 'UPPER':
                 y = pad_ceil(y)
             case 'BOTTOM':
@@ -618,7 +620,7 @@ class UNIV_OT_Align(Operator):
             case 'VERTICAL':
                 x = np.floor(x) + 0.5
             case _:
-                raise NotImplementedError(direction)
+                raise NotImplementedError(self.direction)
         utils.set_cursor_location((x, y))
 
     @staticmethod
@@ -680,7 +682,7 @@ class UNIV_OT_Flip(Operator):
             case False, False, True:
                 self.mode = 'FLIPPED'
             case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement. \n\n")
+                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n")
                 return {'CANCELLED'}
         return self.execute(context)
 
@@ -1356,7 +1358,7 @@ class UNIV_OT_Home(Operator):
             # case False, True, False:
             #     self.mode = 'OVERLAPPED'
             case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement.\n\n"
+                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement.\n\n"
                                       f"See all variations: {info.operator.home_event_info_ex}\n\n")
                 return {'CANCELLED'}
         return self.execute(context)
