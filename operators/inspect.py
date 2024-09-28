@@ -150,12 +150,15 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_label = 'Select Non-Splitted'
     bl_options = {'REGISTER', 'UNDO'}
 
+    use_non_seam: bpy.props.BoolProperty(name='Use Non-Seam', default=True)
     use_auto_smooth: bpy.props.BoolProperty(name='Use Auto Smooth', default=True)
     user_angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
-        self.layout.prop(self, 'use_auto_smooth')
-        self.layout.prop(self, 'user_angle', slider=True)
+        layout = self.layout
+        layout.prop(self, 'use_non_seam')
+        layout.prop(self, 'use_auto_smooth')
+        layout.prop(self, 'user_angle', slider=True)
 
     @classmethod
     def poll(cls, context):
@@ -176,7 +179,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         else:
             if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
                 utils.set_select_mode_uv('EDGE')
-        result = self.select_inner(umeshes, self.use_auto_smooth, self.user_angle)
+        result = self.select_inner(umeshes, self.use_non_seam, self.use_auto_smooth, self.user_angle)
         if formatted_text := self.data_formatting(result):
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
@@ -186,7 +189,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def select_inner(umeshes, use_auto_smooth, user_angle):
+    def select_inner(umeshes, use_non_seam, use_auto_smooth, user_angle):
+        non_seam_counter = 0
         angle_counter = 0
         sharps_counter = 0
         seam_counter = 0
@@ -196,6 +200,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         is_boundary = utils.is_boundary_sync if sync else utils.is_boundary
 
         for umesh in umeshes:
+            local_non_seam_counter = 0
             local_angle_counter = 0
             local_sharps_counter = 0
             local_seam_counter = 0
@@ -218,9 +223,15 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         continue
 
                 if is_boundary(crn, uv):
-                    continue
-
-                if not edge.smooth:
+                    if not use_non_seam or crn.edge.seam:
+                        continue
+                    local_non_seam_counter += 1
+                    if shared_crn != crn:
+                        shared_crn[uv].select = True
+                        shared_crn[uv].select_edge = True
+                        shared_crn.link_loop_next[uv].select = True
+                        shared_crn.link_loop_next[uv].select = True
+                elif not edge.smooth:
                     local_sharps_counter += 1
                 elif edge.calc_face_angle() >= angle:
                     local_angle_counter += 1
@@ -236,20 +247,27 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                 else:
                     utils.select_crn_uv_edge(crn, uv)
 
-            if update_tag := (local_angle_counter or local_sharps_counter or local_seam_counter or local_mtl_counter):
+            if update_tag := (local_non_seam_counter or
+                              local_angle_counter or
+                              local_sharps_counter or
+                              local_seam_counter or
+                              local_mtl_counter):
                 umesh.bm.select_flush_mode()
+                non_seam_counter += local_non_seam_counter
                 angle_counter += local_angle_counter
                 sharps_counter += local_sharps_counter
                 seam_counter += local_seam_counter
                 mtl_counter += local_mtl_counter
 
             umesh.update_tag = update_tag
-        return angle_counter, sharps_counter, seam_counter, mtl_counter
+        return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
     @staticmethod
     def data_formatting(counters):
-        angle_counter, sharps_counter, seam_counter, mtl_counter = counters
+        non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter = counters
         r_text = ''
+        if non_seam_counter:
+            r_text += f'Non-Seam - {non_seam_counter}. '
         if angle_counter:
             r_text += f'Sharp Angles - {angle_counter}. '
         if sharps_counter:
