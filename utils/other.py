@@ -93,3 +93,25 @@ def event_to_string(event, text=''):
     if event.alt:
         text += 'Alt + '
     return f'{text} Left Mouse '
+
+
+def true_groupby(seq):
+    """Groups and returns only identical elements"""
+    seq = seq.copy()
+    sorted_groups = []
+    while True:
+        if len(seq) <= 1:
+            break
+
+        tar_val = seq.pop()
+        groups = []
+        for i in range(len(seq) - 1, -1, -1):
+            v = seq[i]
+            if v == tar_val:
+                groups.append(v)
+                seq.pop(i)
+        if groups:
+            groups.append(tar_val)
+            sorted_groups.append(groups)
+
+    return sorted_groups

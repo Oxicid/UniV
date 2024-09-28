@@ -7,7 +7,6 @@ if 'bpy' in locals():
 
 import bpy
 import typing
-import itertools
 import numpy as np
 
 from .. import utils
@@ -314,7 +313,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             self.report({'WARNING'}, 'Not found selected islands')
             return
 
-        if not(sort_stack_islands_groups := self.sort_stack_islands_selected_between()):
+        if not(sort_stack_islands_groups := utils.true_groupby(self.targets)):
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
             return
 
@@ -355,14 +354,6 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 stack_isl.preprocessing()
                 # stack_isl.calc_target_stack_island()
                 self.targets.append(stack_isl)
-
-    def sort_stack_islands_selected_between(self):
-        sorted_groups: list[list[StackIsland]] = []
-        for _, groups in itertools.groupby(self.targets):
-            tar_groups = list(groups)
-            if len(tar_groups) >= 2:
-                sorted_groups.append(tar_groups)
-        return sorted_groups
 
     # Target Source
     def stack_target_source(self):
@@ -405,9 +396,22 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             selected = AdvIslands.calc_selected(umesh)
             non_selected = AdvIslands.calc_non_selected(umesh)
 
-            proxi = AdvIslands(non_selected.islands + selected.islands, umesh)
-            if not proxi:
+            if isinstance(selected.islands, utils.NoInit) and isinstance(non_selected.islands, utils.NoInit):
                 self.umeshes.umeshes.remove(umesh)
+                continue
+
+            if isinstance(selected.islands, utils.NoInit) or not selected:
+                proxi = non_selected
+            elif isinstance(non_selected.islands, utils.NoInit) or not non_selected:
+                proxi = selected
+            else:
+                proxi = AdvIslands(non_selected.islands + selected.islands, umesh)
+
+            if not proxi:
+                self.report({'WARNING'}, 'Undefined Behavior for stack OT')
+                self.umeshes.umeshes.remove(umesh)
+                continue
+
             proxi.indexing(force=True)
 
             for sel_isl in selected:
