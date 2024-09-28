@@ -62,6 +62,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
 
+    show_stretch: BoolProperty(name='Show Stretch', default=False)
+    display_stretch_type: EnumProperty(name='Stretch Type',
+        items=(
+            ('AREA', 'Area', ''),
+            ('ANGLE', 'Angle', '')
+        ),
+        default='AREA')
+
     def draw(self, context):
         layout = self.layout
 
@@ -76,6 +84,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, 'snap_points_default')
             layout.separator()
             layout.prop(self, 'show_split_toggle_uv_button')
+            row = layout.row()
+            row.active = self.show_stretch
+            row.prop(self, 'show_stretch')
+            row.prop(self, 'display_stretch_type', text='')
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()

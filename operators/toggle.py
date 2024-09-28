@@ -8,7 +8,6 @@ if 'bpy' in locals():
 import bpy
 import traceback
 
-from .. import info
 from .. import utils
 from ..preferences import force_debug, prefs, stable
 from .. import types
@@ -49,7 +48,7 @@ class UNIV_OT_SplitUVToggle(Operator):
             case False, False, True:
                 self.mode = 'SWAP'
             case _:
-                self.report({'INFO'}, f"Event: {info.event_to_string(event)} not implement.")
+                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement.")
                 return {'CANCELLED'}
         return self.execute(context)
 
@@ -208,8 +207,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                     bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
 
                     image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                    image_editor.uv_editor.show_stretch = True
-                    image_editor.uv_editor.display_stretch_type = 'AREA'
+                    image_editor.uv_editor.show_stretch = prefs().show_stretch
+                    image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                     if hasattr(image_editor, 'show_gizmo_navigate'):
                         image_editor.show_gizmo_navigate = False
 
@@ -236,8 +235,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         active_area.ui_type = 'UV'  # TODO: Implement N-Panel swap
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.uv_editor.show_stretch = True
-                        image_editor.uv_editor.display_stretch_type = 'AREA'
+                        image_editor.uv_editor.show_stretch = prefs().show_stretch
+                        image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                         if hasattr(image_editor, 'show_gizmo_navigate'):
                             image_editor.show_gizmo_navigate = False
 
@@ -256,8 +255,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                         area.ui_type = 'UV'
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.uv_editor.show_stretch = True
-                        image_editor.uv_editor.display_stretch_type = 'AREA'
+                        image_editor.uv_editor.show_stretch = prefs().show_stretch
+                        image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                         if hasattr(image_editor, 'show_gizmo_navigate'):
                             image_editor.show_gizmo_navigate = False
 
@@ -295,8 +294,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                     if AREA in scr.areas[:]:
                         with bpy.context.temp_override(area=AREA, screen=scr):  # noqa
                             bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
-                            bpy.context.space_data.uv_editor.show_stretch = True
-                            bpy.context.space_data.uv_editor.display_stretch_type = 'AREA'
+                            bpy.context.space_data.uv_editor.show_stretch = prefs().show_stretch
+                            bpy.context.space_data.uv_editor.display_stretch_type = prefs().display_stretch_type
                             if hasattr(bpy.context.space_data, 'show_gizmo_navigate'):
                                 bpy.context.space_data.show_gizmo_navigate = False
                         break
