@@ -642,8 +642,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
     def calc_radius_and_mouse_position(self, event):
         mouse_position = Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
-        dist = 15 if self.dragged else 25
-        self.radius = (Vector(self.view.region_to_view(event.mouse_region_x + dist, event.mouse_region_y)) - mouse_position).length
+        dist = prefs().max_pick_distance // 2 if self.dragged else prefs().max_pick_distance
+        self.radius = utils.get_max_distance_from_px(dist, self.view)
         self.mouse_position = mouse_position.to_3d()
 
     def find_nearest_target_pt(self):
