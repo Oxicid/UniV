@@ -3,6 +3,7 @@
 
 
 import math
+import numpy as np
 from bl_math import lerp
 from mathutils import Vector
 
@@ -46,3 +47,31 @@ def remap(i_min: float, i_max: float, o_min: float, o_max: float, v: float) -> f
 
 def round_threshold(a, min_clip):
     return round(float(a) / min_clip) * min_clip
+
+
+def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
+    line_vec = l_b - l_a
+    pt_vec = pt - l_a
+    line_len_squared = line_vec.dot(line_vec)
+
+    projection = pt_vec.dot(line_vec) / line_len_squared
+
+    if projection < 0:
+        return l_a
+    elif projection > 1:
+        return l_b
+    return l_a + projection * line_vec
+
+def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
+    line_vecs = l_b - l_a
+    pt_vecs = pt - l_a
+
+    line_len_squared = np.sum(line_vecs ** 2, axis=1)
+    projections = np.sum(pt_vecs * line_vecs, axis=1) / line_len_squared
+
+    # Restrict projections in the range [0, 1] for those that are inside segments
+    projections_clipped = np.clip(projections, 0, 1)
+
+    closest_pts = l_a + projections_clipped[:, np.newaxis] * line_vecs
+
+    return closest_pts

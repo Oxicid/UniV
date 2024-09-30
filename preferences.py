@@ -70,6 +70,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='AREA')
 
+    max_pick_distance: IntProperty(name='Max Pick Distance', default=40, min=15, soft_max=100, subtype='PIXEL')
+
     def draw(self, context):
         layout = self.layout
 
@@ -84,10 +86,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, 'snap_points_default')
             layout.separator()
             layout.prop(self, 'show_split_toggle_uv_button')
+
             row = layout.row()
             row.active = self.show_stretch
             row.prop(self, 'show_stretch')
             row.prop(self, 'display_stretch_type', text='')
+            row.separator()
+
+            layout.prop(self, 'max_pick_distance')
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()

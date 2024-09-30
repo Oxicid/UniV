@@ -150,13 +150,13 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_label = 'Select Non-Splitted'
     bl_options = {'REGISTER', 'UNDO'}
 
-    use_non_seam: bpy.props.BoolProperty(name='Use Non-Seam', default=True)
+    check_non_seam: bpy.props.BoolProperty(name='Check Non-Seam', default=True)
     use_auto_smooth: bpy.props.BoolProperty(name='Use Auto Smooth', default=True)
     user_angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, 'use_non_seam')
+        layout.prop(self, 'check_non_seam')
         layout.prop(self, 'use_auto_smooth')
         layout.prop(self, 'user_angle', slider=True)
 
@@ -179,7 +179,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         else:
             if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
                 utils.set_select_mode_uv('EDGE')
-        result = self.select_inner(umeshes, self.use_non_seam, self.use_auto_smooth, self.user_angle)
+        result = self.select_inner(umeshes, self.check_non_seam, self.use_auto_smooth, self.user_angle)
         if formatted_text := self.data_formatting(result):
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
@@ -189,7 +189,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def select_inner(umeshes, use_non_seam, use_auto_smooth, user_angle):
+    def select_inner(umeshes, check_non_seam, use_auto_smooth, user_angle):
         non_seam_counter = 0
         angle_counter = 0
         sharps_counter = 0
@@ -223,7 +223,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         continue
 
                 if is_boundary(crn, uv):
-                    if not use_non_seam or crn.edge.seam:
+                    if not check_non_seam or crn.edge.seam:
                         continue
                     local_non_seam_counter += 1
                     if shared_crn != crn:

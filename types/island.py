@@ -1132,6 +1132,12 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_visible_with_mark_seam(cls, umesh: _umesh.UMesh):
+        cls.tag_filter_visible(umesh)
+        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls()

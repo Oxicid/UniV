@@ -8,6 +8,7 @@ if 'bpy' in locals():
 import bpy
 import gpu
 import math
+import numpy as np
 
 from mathutils import Vector
 from bpy.props import *
@@ -18,6 +19,7 @@ from time import perf_counter as time
 
 from .. import utils
 from .. import types
+from ..preferences import prefs
 from ..types import Islands, AdvIslands, AdvIsland,  BBox, UMeshes
 
 from ..utils import (
@@ -1140,3 +1142,171 @@ class UNIV_OT_Select_Border(Operator):
                                 UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(crn, uv)
                                 UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(shared_crn, uv)
                 umesh.update_tag = bool(islands)
+
+class UNIV_OT_Select_Pick(Operator):
+    bl_idname = 'uv.univ_select_pick'
+    bl_label = 'Pick Select'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    select: BoolProperty(name='Select', default=True)
+
+    @staticmethod
+    def get_mouse_pos(event, view):
+        return Vector(view.region_to_view(event.mouse_region_x, event.mouse_region_y))
+
+    def __init__(self):
+        self.mouse_pos = Vector((0, 0))
+        self.max_distance: float | None = None
+        self.umeshes: UMeshes | None = None
+
+    def invoke(self, context, event):
+        self.umeshes = UMeshes()
+        self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+        self.mouse_pos = self.get_mouse_pos(event, context.region.view2d)
+        return self.pick_select()
+
+    def pick_select(self):
+        min_dist = float('inf')
+        min_isl = None
+        sync = self.umeshes.sync
+        is_sync_face_mode = utils.get_select_mode_mesh() == 'FACE'
+
+        for umesh in self.umeshes:
+            if self.select:
+                if sync and umesh.is_full_face_selected:
+                    continue
+            else:
+                if sync:
+                    if is_sync_face_mode:
+                        if umesh.is_full_face_deselected:
+                            continue
+                    else:
+                        if umesh.is_full_vert_deselected:
+                            continue
+
+            uv = umesh.uv
+            for isl in Islands.calc_visible_with_mark_seam(umesh):
+                if self.select:  # Skip full selected island
+                    if sync:
+                        if all(f.select for f in isl):
+                            continue
+                    else:
+                        if all(crn[uv].select for f in isl for crn in f.loops):
+                            continue
+                else:  # Skip full deselected islands
+                    if sync:
+                        if is_sync_face_mode:
+                            if all(not f.select for f in isl):
+                                continue
+                        else:
+                            if all(not v.select for f in isl for v in f.verts):
+                                continue
+                    else:
+                        if all(not crn[uv].select for f in isl for crn in f.loops):
+                            continue
+
+                if not (res := self.find_nearest_island(self.mouse_pos, min_dist, isl, uv)) is None:
+                    min_dist = res
+                    min_isl = isl
+
+        if not min_isl or (self.max_distance < min_dist):
+            return {'CANCELLED'}
+
+        umesh = min_isl.umesh
+
+        if sync:
+            if self.select:
+                for f in min_isl:
+                    f.select = True
+            else:
+                if utils.get_select_mode_mesh() == 'FACE':
+                    for f in min_isl:
+                        f.select = False
+                else:
+                    if any(f.select for f in min_isl):
+                        for f in min_isl:
+                            f.select = False
+
+                        for f in utils.calc_selected_uv_faces_iter(umesh):
+                            if f.select:
+                                for v in f.verts:
+                                    v.select = True
+                                for e in f.verts:
+                                    e.select = True
+                    else:
+                        for f in min_isl:
+                            for v in f.verts:
+                                v.select = False
+                            for e in f.verts:
+                                e.select = False
+                        umesh.bm.select_flush_mode()
+        else:
+            select_state = self.select
+            uv = umesh.uv
+            for f in min_isl:
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    crn_uv.select = select_state
+                    crn_uv.select_edge = select_state
+
+        umesh.update()
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def find_nearest_island(pt, min_dist, isl, uv):
+        from ..utils import closest_pt_to_line
+        first_dist = min_dist
+        for f in isl:
+            face_center = Vector((0.0, 0.0))
+            for crn in f.loops:
+                close_pt = closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
+
+                face_center += close_pt
+                if (dist := (close_pt-pt).length) < min_dist:
+                    min_dist = dist
+                # TODO: Check Point inside face, if crn.edge == other_crn.edge
+
+            if (dist := (face_center / len(f.loops) - pt).length) < min_dist:
+                min_dist = dist
+
+        if first_dist != min_dist:
+            return min_dist
+
+class UNIV_OT_Pick(utils.UNIV_OT_Draw_Test):
+    @utils.profile
+    def test(self, event):
+        from numpy import mean as np_mean
+        from numpy import array as np_array
+        from numpy import roll as np_roll
+        from numpy.linalg import norm as np_distance
+        from ..utils import closest_pts_to_lines
+
+        pt = self.get_mouse_pos(event)
+        pt_np = np.array([pt], dtype='float32')
+        u = self.umeshes[0]
+        uv = u.uv
+
+        min_pt = ()
+        min_dist = float('inf')
+
+        for f in u.bm.faces:
+            l_a = np_array([crn[uv].uv.to_tuple() for crn in f.loops], dtype='float32')
+            l_b = np_roll(l_a, shift=1, axis=0)
+
+            closest_points = closest_pts_to_lines(pt_np, l_a, l_b)
+            distance = np_distance(pt_np - closest_points, axis=1)
+
+            min_index = np.argmin(distance)
+            if distance[min_index] < min_dist:
+                min_dist = distance[min_index]
+                min_pt = closest_points[min_index]
+
+            face_center = np_mean(l_a, axis=0)
+            distance_face_center = np_distance(pt_np - face_center, axis=1)
+
+            if distance_face_center < min_dist:
+                min_dist = distance_face_center
+                min_pt = face_center
+
+        self.points = (min_pt,)

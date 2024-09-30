@@ -406,6 +406,15 @@ def is_flipped_uv(f, uv) -> bool:
         area += uvs[i - 1].cross(uvs[i])
     return area < 0
 
+def point_inside_face(pt, f, uv):
+    from mathutils.geometry import intersect_point_tri_2d
+    corners = f.loops
+    p1 = corners[0][uv].uv
+    for i in range(1, len(corners)-1):
+        if intersect_point_tri_2d(pt, p1, corners[i][uv].uv, corners[i+1][uv].uv):
+            return True
+    return False
+
 def is_boundary(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.select)
 

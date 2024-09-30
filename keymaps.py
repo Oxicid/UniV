@@ -27,6 +27,7 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Select
     kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = False
     kmi.active = False
@@ -34,6 +35,16 @@ def add_keymaps():
 
     kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = True
+    kmi.active = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_pick', 'WHEELUPMOUSE', 'PRESS', shift=True)
+    kmi.properties.select = True
+    kmi.active = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_pick', 'WHEELDOWNMOUSE', 'PRESS', shift=True)
+    kmi.properties.select = False
     kmi.active = False
     keys.append((km, kmi))
 
