@@ -48,6 +48,16 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('uv.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = True
+    kmi.active = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = False
+    kmi.active = False
+    keys.append((km, kmi))
+
     # Rotate
     ## Default. CW.
     kmi = km.keymap_items.new('uv.univ_rotate', 'R', 'DOUBLE_CLICK')  # Work if not selection.

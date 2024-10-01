@@ -101,7 +101,7 @@ def straighten(self, uv, island, segment_loops):
     bpy.ops.uv.select_all(action='DESELECT')
     bpy.ops.mesh.select_all(action='DESELECT')
     for face in island:
-        face.select_set(True)
+        face.select = True
         for loop in face.loops:
             loop[uv].select = True
 

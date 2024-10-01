@@ -10,7 +10,7 @@ import typing
 import numpy as np
 
 from .. import utils
-from ..utils import linked_crn_by_face_index
+from ..utils import linked_crn_to_vert_by_face_index
 from .. import types
 from ..types import AdvIsland, AdvIslands, UMesh
 from collections import deque, defaultdict
@@ -106,7 +106,7 @@ class StackIsland:  # TODO: Split for source and target islands
 
         for crn in face_start_pattern_crn:
             linked_crn_face_size = []
-            for crn_ in linked_crn_by_face_index(crn):
+            for crn_ in linked_crn_to_vert_by_face_index(crn):
                 linked_crn_face_size.append(len(crn_.face.loops))
 
             shared_face_size = 0

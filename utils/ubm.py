@@ -102,6 +102,25 @@ def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_uv_b(first: BMLoop, uv: BMLayerItem):
+    first_co = first[uv].uv
+    linked = deque(l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co)
+    linked.rotate(-linked.index(first))
+    linked.popleft()
+    return linked
+
+def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
+    first_co = first[uv].uv
+    linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
+    linked.remove(first)
+    return linked
+
+def linked_crn_uv_included(first: BMLoop, uv: BMLayerItem):
+    first_co = first[uv].uv
+    linked = deque(l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co)
+    linked.rotate(-linked.index(first))
+    return linked
+
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
     linked = []
     bm_iter = first
@@ -153,25 +172,13 @@ def linked_crn_uv_by_tag(first, uv):
             break
         if not (bm_iter.tag or bm_iter.link_loop_prev.tag):
             continue
-        if first[uv].uv == bm_iter[uv].uv:
+        if first[uv].uv == bm_iter[uv].uv:  # TODO: Optimize and test
             linked.append(bm_iter)
     return linked
 
 def linked_crn_uv_by_tag_c(crn: BMLoop, uv: BMLayerItem):
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.tag and l_crn[uv].uv == first_co]
-
-def calc_crn_in_vert_by_tag(first: BMLoop):
-    if not first.tag:
-        return []
-    linked = [first]
-    bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        if bm_iter.tag:
-            linked.append(bm_iter)
-    return linked
 
 def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
     face_index = first.face.index
@@ -184,18 +191,28 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
-def linked_crn_uv_by_face_index_b(crn: BMLoop, uv: BMLayerItem, idx: int):
+def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerItem, idx: int):
+    """Linked to arg corner by island index with arg corner"""
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
-def linked_crn_by_face_index(crn):
+def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: int):
+    """Linked to arg corner by island index without arg corner"""
+    first_co = crn[uv].uv
+    linked = [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
+    linked.remove(crn)
+    return linked
+
+def linked_crn_to_vert_by_face_index(crn):
+    """Linked to vertex by face index without arg corner"""
     idx = crn.face.index
     linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
     linked.rotate(-linked.index(crn))
     linked.popleft()
     return linked
 
-def linked_crn_by_face_index_including(crn):
+def linked_crn_to_vert_by_face_index_including(crn):
+    """Linked to vertex by face index with arg corner"""
     idx = crn.face.index
     linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
     linked.rotate(-linked.index(crn))
@@ -207,7 +224,7 @@ def select_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):
         if (bm_iter := prev_disc(bm_iter)) == first:
             break
         crn_uv_bm_iter = bm_iter[uv]
-        if first[uv].uv == crn_uv_bm_iter.uv:
+        if first[uv].uv == crn_uv_bm_iter.uv:  # TODO: Optimize and test
             crn_uv_bm_iter.select = True
 
 def select_crn_uv_edge(crn: BMLoop, uv):
@@ -227,7 +244,7 @@ def deselect_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):
         if (bm_iter := prev_disc(bm_iter)) == first:
             break
         crn_uv_bm_iter = bm_iter[uv]
-        if first[uv].uv == crn_uv_bm_iter.uv:
+        if first[uv].uv == crn_uv_bm_iter.uv:  # TODO: Optimize and test
             crn_uv_bm_iter.select = False
 
 def deselect_crn_uv(first: BMLoop, uv: BMLayerItem):
@@ -240,7 +257,7 @@ def deselect_crn_uv(first: BMLoop, uv: BMLayerItem):
         if not bm_iter.face.select:
             continue
         crn_uv_bm_iter = bm_iter[uv]
-        if first[uv].uv == crn_uv_bm_iter.uv:
+        if first[uv].uv == crn_uv_bm_iter.uv:  # TODO: Optimize and test
             if crn_uv_bm_iter.select:
                 break
         else:
@@ -287,50 +304,6 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
             crn_uv_bm_iter.select = False
 
 
-# def deselect_crn_uv_extend(first: BMLoop, uv: BMLayerItem):
-#     if not first[uv].select_edge:
-#         return
-#     first[uv].select_edge = False
-#
-#     shared_crn = first.link_loop_radial_prev
-#     if shared_crn != first:
-#         if first[uv].uv == shared_crn.link_loop_next[uv].uv and first.link_loop_next[uv].uv == shared_crn[uv].uv:
-#             shared_crn[uv].select_edge = False
-#             deselect_linked_crn_uv_vert(shared_crn, uv)
-#             deselect_linked_crn_uv_vert(first, uv)
-#         elif first[uv].uv == shared_crn.link_loop_next[uv].uv:
-#             deselect_linked_crn_uv_vert(first, uv)
-#         elif first.link_loop_next[uv].uv == shared_crn[uv].uv:
-#             deselect_linked_crn_uv_vert(shared_crn, uv)
-#
-#
-#     bm_iter = first
-#     while True:
-#         if (bm_iter := _prev_disc(bm_iter)) == first:
-#             break
-#         if not bm_iter.face.select:
-#             continue
-#         crn_uv_bm_iter = bm_iter[uv]
-#         if first[uv].uv == crn_uv_bm_iter.uv:
-#             if crn_uv_bm_iter.select:
-#                 break
-#         else:
-#             first[uv].select = False
-#
-#     second = first.link_loop_next
-#     bm_iter = first
-#     while True:
-#         if (bm_iter := _prev_disc(bm_iter)) == second:
-#             break
-#         if not bm_iter.face.select:
-#             continue
-#         crn_uv_bm_iter = bm_iter[uv]
-#         if second[uv].uv == crn_uv_bm_iter.uv:
-#             if crn_uv_bm_iter.select:
-#                 break
-#         else:
-#             second[uv].select = False
-
 def shared_crn(crn: BMLoop) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn:
@@ -341,13 +314,13 @@ def copy_pos_to_target(crn, uv, idx):
     next_crn_co = crn.link_loop_next[uv].uv
     shared = shared_crn(crn)
 
-    for _crn in linked_crn_uv_by_face_index_b(shared, uv, idx):
+    for _crn in linked_crn_uv_by_island_index_unordered_included(shared, uv, idx):
         _crn[uv].uv = next_crn_co
 
     crn_co = crn[uv].uv
     shared_next = shared_crn(crn).link_loop_next
 
-    for _crn in linked_crn_uv_by_face_index_b(shared_next, uv, idx):
+    for _crn in linked_crn_uv_by_island_index_unordered_included(shared_next, uv, idx):
         _crn[uv].uv = crn_co
 
 def copy_pos_to_target_with_select(crn, uv, idx):
@@ -356,7 +329,7 @@ def copy_pos_to_target_with_select(crn, uv, idx):
     shared = shared_crn(crn)
     shared[uv].select_edge = True
 
-    for _crn in linked_crn_uv_by_face_index_b(shared, uv, idx):
+    for _crn in linked_crn_uv_by_island_index_unordered_included(shared, uv, idx):
         _crn_uv = _crn[uv]
         _crn_uv.uv = next_crn_co
         _crn_uv.select = True
@@ -364,7 +337,7 @@ def copy_pos_to_target_with_select(crn, uv, idx):
     crn_co = crn[uv].uv
     shared_next = shared_crn(crn).link_loop_next
 
-    for _crn in linked_crn_uv_by_face_index_b(shared_next, uv, idx):
+    for _crn in linked_crn_uv_by_island_index_unordered_included(shared_next, uv, idx):
         _crn_uv = _crn[uv]
         _crn_uv.uv = crn_co
         _crn_uv.select = True

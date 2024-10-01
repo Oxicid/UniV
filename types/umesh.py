@@ -398,6 +398,8 @@ class UMeshes:
         self.report_obj = report
         self._cancel = False
         self.sync: bool = utils.sync()
+        self.elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
+            utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
 
     def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self.report_obj is None:
@@ -405,12 +407,12 @@ class UMeshes:
             return
         self.report_obj(info_type, info)
 
-    def cancel_with_report(self, info_type: set[str]={'INFO'}, info: str ="No uv for manipulate"): # noqa
+    def cancel_with_report(self, info_type: set[str]={'INFO'}, info: str ="No uv for manipulate"): # noqa #pylint: disable=dangerous-default-value
         self._cancel = True
         self.report(info_type, info)
         return {'CANCELLED'}
 
-    def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
+    def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
         if self._cancel is True:
             return {'CANCELLED'}
         if sum(umesh.update(force=force) for umesh in self.umeshes):

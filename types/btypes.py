@@ -129,7 +129,7 @@ class BArray(StructBase):
 
     def __iter__(self):
         self.value = 4
-        self.from_address = self.inline_buffer_._type_.from_address
+        self.from_address = self.inline_buffer_._type_.from_address  # noqa # pylint: disable=protected-access
         return self
 
     def __next__(self):
@@ -145,7 +145,7 @@ class BArray(StructBase):
             i = self.size_ + i
         if i < 0 or i >= self.size_:
             raise IndexError(f'array index {i - self.size_ if i < 0 else i} out of range')
-        return self.inline_buffer_._type_.from_address((self.data_ + 4) + 16 * i)
+        return self.inline_buffer_._type_.from_address((self.data_ + 4) + 16 * i)  # noqa # pylint: disable=protected-access
 
     def info(self):
         info_(self)
@@ -183,7 +183,7 @@ class BVector(StructBase):
 
     def __iter__(self):
         self.value = 0
-        self.from_address = POINTER(self.capacity_end._type_).from_address
+        self.from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
         return self
 
     def __next__(self):
@@ -199,11 +199,11 @@ class BVector(StructBase):
             i = len(self) + i
         if i < 0 or i >= len(self):
             raise IndexError(f'vector index {i} out of range')
-        from_address = POINTER(self.capacity_end._type_).from_address
+        from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
         return from_address(self.begin + 8 * i).contents
 
     def to_list(self):
-        from_address = POINTER(self.capacity_end._type_).from_address
+        from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
         return [from_address(self.begin + (i * 8)).contents for i in range(len(self))]
 
 class ListBase(Structure):

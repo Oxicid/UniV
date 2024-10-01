@@ -43,7 +43,7 @@ def is_island_mode():
         selection_mode = scene.tool_settings.uv_select_mode
     return selection_mode in ('FACE', 'ISLAND')
 
-def get_select_mode_mesh() -> str:
+def get_select_mode_mesh() -> typing.Literal["VERTEX", "EDGE", "FACE"]:
     if bpy.context.tool_settings.mesh_select_mode[2]:
         return 'FACE'
     elif bpy.context.tool_settings.mesh_select_mode[1]:
@@ -64,7 +64,7 @@ def set_select_mode_mesh(mode: str):
         raise TypeError(f"Mode: '{mode}' not found in ('VERTEX', 'EDGE', 'FACE')")
 
 
-def get_select_mode_uv() -> str:
+def get_select_mode_uv() -> typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']:
     return bpy.context.scene.tool_settings.uv_select_mode
 
 def set_select_mode_uv(mode: str):

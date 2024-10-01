@@ -391,14 +391,41 @@ class FaceIsland:
         points = [crn[uv].uv for f in self.faces for crn in f.loops]  # Warning: points referenced to uv
         return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
 
-    def __select_force(self, state, sync):
-        if sync:
+    # def _select_ex(self, state, sync, mode):
+    #     if sync:
+    #         if mode == 'FACE':
+    #             for face in self.faces:
+    #                 face.select = state
+    #         elif mode == 'VERTEX':
+    #             for face in self.faces:
+    #                 for v in face.verts:
+    #                     v.select = state
+    #         else:
+    #             for face in self.faces:
+    #                 for e in face.edges:
+    #                     e.select = state
+    #     else:
+    #         uv = self.umesh.uv
+    #         if mode == 'VERTEX':
+    #             for face in self.faces:
+    #                 for crn in face.loops:
+    #                     crn[uv].select = state
+    #         else:
+    #             for face in self.faces:
+    #                 for crn in face.loops:
+    #                     crn_uv = crn[uv]
+    #                     crn_uv.select = state
+    #                     crn_uv.select_edge = state
+
+    @property
+    def select(self):
+        raise NotImplementedError()
+
+    @select.setter
+    def select(self, state: bool):
+        if self.umesh.sync:
             for face in self.faces:
                 face.select = state
-                for e in face.edges:
-                    e.select = state
-                for v in face.verts:
-                    v.select = state
         else:
             uv = self.umesh.uv
             for face in self.faces:
@@ -407,51 +434,54 @@ class FaceIsland:
                     luv.select = state
                     luv.select_edge = state
 
-    def _select_ex(self, state, sync, mode):
-        if sync:
-            if mode == 'FACE':
-                for face in self.faces:
-                    face.select = state
-            elif mode == 'VERTEX':
-                for face in self.faces:
-                    for v in face.verts:
-                        v.select = state
-            else:
-                for face in self.faces:
-                    for e in face.edges:
-                        e.select = state
-        else:
-            uv = self.umesh.uv
-            if mode == 'VERTEX':
-                for face in self.faces:
-                    for crn in face.loops:
-                        crn[uv].select = state
-            else:
-                for face in self.faces:
-                    for crn in face.loops:
-                        crn_uv = crn[uv]
-                        crn_uv.select = state
-                        crn_uv.select_edge = state
-
     @property
-    def select(self):
+    def select_all_elem(self):
         raise NotImplementedError()
 
-    @select.setter
-    def select(self, state: bool):
-        sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
-        elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
-        self._select_ex(state, sync, elem_mode)
+    @select_all_elem.setter
+    def select_all_elem(self, state: bool):
+        if self.umesh.sync:
+            for face in self.faces:
+                face.select = state
+                for v in face.verts:
+                    v.select = state
+                for e in face.edges:
+                    e.select = state
+        else:
+            uv = self.umesh.uv
+            for face in self.faces:
+                for crn in face.loops:
+                    luv = crn[uv]
+                    luv.select = state
+                    luv.select_edge = state
 
-    def select_set(self, mode, sync, force=False):
-        if force:
-            return self.__select_force(True, sync)
-        self._select_ex(True, sync, mode)
+    @property
+    def is_full_face_selected(self):
+        if self.umesh.sync:
+            return all(f.select for f in self)
+        uv = self.umesh.uv
+        return all(crn[uv].select for f in self for crn in f.loops)
 
-    def deselect_set(self, mode, sync, force=False):
-        if force:
-            return self.__select_force(False, sync)
-        self._select_ex(False, sync, mode)
+    @property
+    def is_full_face_deselected(self):
+        if self.umesh.sync:
+            return not any(f.select for f in self)
+        uv = self.umesh.uv
+        return not any(crn[uv].select for f in self for crn in f.loops)
+
+    @property
+    def is_full_vert_deselected(self):
+        if self.umesh.sync:
+            return not any(v.select for f in self for v in f.verts)
+        uv = self.umesh.uv
+        return not any(crn[uv].select for f in self for crn in f.loops)
+
+    @property
+    def is_full_edge_deselected(self):
+        if self.umesh.sync:
+            return not any(e.select for f in self for e in f.edges)
+        uv = self.umesh.uv
+        return not any(crn[uv].select_edge for f in self for crn in f.loops)
 
     def __info_vertex_select(self) -> eInfoSelectFaceIsland:
         uv = self.umesh.uv
