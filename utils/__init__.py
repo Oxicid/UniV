@@ -8,13 +8,12 @@ import numpy as np  # noqa
 from math import pi
 
 from .bench import timer, profile
-from . import umath
-from .umath import *
-from .other import *
-from .ubm import *
 from .draw import *
+from .other import *
+from .shapes import *
+from .ubm import *
+from .umath import *
 from .. import types
-
 
 class NoInit:
     def __getattribute__(self, item):

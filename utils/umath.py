@@ -1,9 +1,8 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
 import math
-import numpy as np
+# import numpy as np
 from bl_math import lerp
 from mathutils import Vector
 
@@ -62,16 +61,52 @@ def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
         return l_b
     return l_a + projection * line_vec
 
-def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
-    line_vecs = l_b - l_a
-    pt_vecs = pt - l_a
+# def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
+#     line_vecs = l_b - l_a
+#     pt_vecs = pt - l_a
+#
+#     line_len_squared = np.sum(line_vecs ** 2, axis=1)
+#     projections = np.sum(pt_vecs * line_vecs, axis=1) / line_len_squared
+#
+#     # Restrict projections in the range [0, 1] for those that are inside segments
+#     projections_clipped = np.clip(projections, 0, 1)
+#
+#     closest_pts = l_a + projections_clipped[:, np.newaxis] * line_vecs
+#
+#     return closest_pts
 
-    line_len_squared = np.sum(line_vecs ** 2, axis=1)
-    projections = np.sum(pt_vecs * line_vecs, axis=1) / line_len_squared
-
-    # Restrict projections in the range [0, 1] for those that are inside segments
-    projections_clipped = np.clip(projections, 0, 1)
-
-    closest_pts = l_a + projections_clipped[:, np.newaxis] * line_vecs
-
-    return closest_pts
+# def test(self, event):
+#     from numpy import mean as np_mean
+#     from numpy import array as np_array
+#     from numpy import roll as np_roll
+#     from numpy.linalg import norm as np_distance
+#     from ..utils import closest_pts_to_lines
+#
+#     pt = self.get_mouse_pos(event)
+#     pt_np = np.array([pt], dtype='float32')
+#     u = self.umeshes[0]
+#     uv = u.uv
+#
+#     min_pt = ()
+#     min_dist = float('inf')
+#
+#     for f in u.bm.faces:
+#         l_a = np_array([crn[uv].uv.to_tuple() for crn in f.loops], dtype='float32')
+#         l_b = np_roll(l_a, shift=1, axis=0)
+#
+#         closest_points = closest_pts_to_lines(pt_np, l_a, l_b)
+#         distance = np_distance(pt_np - closest_points, axis=1)
+#
+#         min_index = np.argmin(distance)
+#         if distance[min_index] < min_dist:
+#             min_dist = distance[min_index]
+#             min_pt = closest_points[min_index]
+#
+#         face_center = np_mean(l_a, axis=0)
+#         distance_face_center = np_distance(pt_np - face_center, axis=1)
+#
+#         if distance_face_center < min_dist:
+#             min_dist = distance_face_center
+#             min_pt = face_center
+#
+#     self.points = (min_pt,)

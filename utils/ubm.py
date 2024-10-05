@@ -92,21 +92,33 @@ def calc_non_manifolds(bm: BMesh) -> tuple[set[BMVert], set[BMEdge]]:
 def prev_disc(l: BMLoop) -> BMLoop:
     return l.link_loop_prev.link_loop_radial_prev
 
+
 def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
+    first_vert = first.vert
+    first_co = first[uv].uv
     linked = []
     bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        if first[uv].uv == bm_iter[uv].uv:
-            linked.append(bm_iter)
-    return linked
 
-def linked_crn_uv_b(first: BMLoop, uv: BMLayerItem):
-    first_co = first[uv].uv
-    linked = deque(l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co)
-    linked.rotate(-linked.index(first))
-    linked.popleft()
+    while True:
+        bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # get ccw corner
+        if first_vert != bm_iter.vert:  # Skip boundary or flipped
+            bm_iter = first
+            linked_cw = []
+            while True:
+                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
+                if first_vert != bm_iter.vert:  # Skip boundary or flipped
+                    break
+
+                if bm_iter == first:
+                    break
+                if first_co == bm_iter[uv].uv:
+                    linked_cw.append(bm_iter)
+            linked.extend(linked_cw[::-1])
+            break
+        if bm_iter == first:
+            break
+        if first_co == bm_iter[uv].uv:
+            linked.append(bm_iter)
     return linked
 
 def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
@@ -115,10 +127,9 @@ def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
     linked.remove(first)
     return linked
 
-def linked_crn_uv_included(first: BMLoop, uv: BMLayerItem):
+def linked_crn_uv_unordered_included(first: BMLoop, uv: BMLayerItem):
     first_co = first[uv].uv
     linked = deque(l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co)
-    linked.rotate(-linked.index(first))
     return linked
 
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
@@ -189,6 +200,14 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
             break
         if bm_iter.face.index == face_index and first[uv].uv == bm_iter[uv].uv:
             linked.append(bm_iter)
+    return linked
+
+def linked_crn_uv_by_island_index(crn: BMLoop, uv: BMLayerItem, idx: int):
+    """Linked to arg corner by island index with arg corner"""
+    first_co = crn[uv].uv
+    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co)
+    linked.rotate(-linked.index(crn))
+    # linked.popleft()
     return linked
 
 def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerItem, idx: int):
@@ -388,7 +407,7 @@ def point_inside_face(pt, f, uv):
             return True
     return False
 
-def is_boundary(crn: BMLoop, uv: BMLayerItem):
+def is_boundary_non_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.select)
 
     # We get a clockwise corner, but linked to the end of the current corner
@@ -490,7 +509,7 @@ def calc_uv_faces(umesh: 'types.UMesh', *, selected) -> list[BMFace]:
         return calc_selected_uv_faces(umesh)
     return calc_visible_uv_faces(umesh)
 
-def calc_selected_uv_corners(umesh: 'types.UMesh') -> list[BMLoop]:
+def calc_selected_uv_vert_corners(umesh: 'types.UMesh') -> list[BMLoop]:
     if umesh.is_full_vert_deselected:
         return []
 
@@ -518,6 +537,20 @@ def calc_selected_uv_corners_iter(umesh: 'types.UMesh') -> 'typing.Generator[BML
         return (crn for f in umesh.bm.faces for crn in f.loops if crn[uv].select)
     return (crn for f in umesh.bm.faces if f.select for crn in f.loops if crn[uv].select)
 
+def calc_selected_uv_edge_corners(umesh: 'types.UMesh') -> list[BMLoop]:
+    if umesh.is_full_face_deselected:
+        return []
+
+    if umesh.sync:
+        if umesh.is_full_face_selected:
+            return [crn for f in umesh.bm.faces for crn in f.loops]
+        return [crn for f in umesh.bm.faces for crn in f.loops if crn.edge.select]
+
+    uv = umesh.uv
+    if umesh.is_full_face_selected:
+        return [crn for f in umesh.bm.faces for crn in f.loops if crn[uv].select_edge]
+    return [crn for f in umesh.bm.faces if f.select for crn in f.loops if crn[uv].select_edge]
+
 def calc_visible_uv_corners(umesh: 'types.UMesh') -> list[BMLoop]:
     if umesh.sync:
         return [crn for f in umesh.bm.faces if not f.hide for crn in f.loops]
@@ -530,5 +563,5 @@ def calc_visible_uv_corners(umesh: 'types.UMesh') -> list[BMLoop]:
 
 def calc_uv_corners(umesh: 'types.UMesh', *, selected) -> list[BMLoop]:
     if selected:
-        return calc_selected_uv_corners(umesh)
+        return calc_selected_uv_vert_corners(umesh)
     return calc_visible_uv_corners(umesh)

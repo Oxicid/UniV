@@ -89,7 +89,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
             if not self.mark_seam_inner_island:
-                islands.indexing(force=True)
+                islands.indexing()
 
             for isl in islands:
                 if self.mark_seam_inner_island:
@@ -153,7 +153,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def unwrap_sync_faces(self):
         assert bpy.context.tool_settings.mesh_select_mode[2]
-        from ..utils import linked_crn_uv, shared_is_linked
+        from ..utils import linked_crn_uv_unordered, shared_is_linked
 
         unwrap_data: list = []
         for umesh in reversed(self.umeshes):
@@ -164,10 +164,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             uv = umesh.uv
             islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
-                islands_extended.indexing(force=True)
+                islands_extended.indexing()
 
             selected_islands = types.Islands.calc_selected_with_mark_seam(umesh)
-            selected_islands.indexing(force=True)
+            selected_islands.indexing()
 
             save_transform_islands = []
             for isl in islands_extended:
@@ -185,7 +185,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 # TODO: Comment that
                 for f in selected_islands.faces_iter():
                     for crn in f.loops:
-                        for linked_crn in linked_crn_uv(crn, uv):
+                        for linked_crn in linked_crn_uv_unordered(crn, uv):
                             linked_crn_face = linked_crn.face
 
                             if linked_crn_face.index != -1 or linked_crn_face.hide:
@@ -248,7 +248,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
-                islands.indexing(force=True)
+                islands.indexing()
 
             for isl in islands:
                 if self.mark_seam_inner_island:

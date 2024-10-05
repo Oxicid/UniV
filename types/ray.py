@@ -40,7 +40,7 @@ class KDData:
         if len(self.kdmesh.islands) == 1:
             return self.kdmesh.islands.islands.pop()
 
-        self.kdmesh.islands.indexing(force=True)
+        self.kdmesh.islands.indexing()
         if isinstance(self.elem, BMFace):
             ret_isl = self.kdmesh.islands.islands.pop(self.elem.index)
         else:

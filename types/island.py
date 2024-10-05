@@ -716,7 +716,7 @@ class AdvIsland(FaceIsland):
         return super().scale(scale, pivot)
 
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
-        self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ration for bbox
+        self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ratio for bbox
         return super().rotate(angle, pivot, aspect)
 
     def set_position(self, to: Vector, _from: Vector = None):
@@ -1324,6 +1324,28 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_extended_any_edge_with_markseam(cls, umesh: _umesh.UMesh):
+        """Calc any edges selected islands, with markseam"""
+        if umesh.sync:
+            if utils.get_select_mode_mesh() == 'FACE':
+                if umesh.is_full_face_deselected:
+                    return cls()
+            else:
+                if umesh.is_full_edge_deselected:
+                    return cls()
+        else:
+            if umesh.is_full_face_deselected:
+                return cls()
+
+        cls.tag_filter_visible(umesh)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                       if cls.island_filter_is_any_edge_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_visible_non_manifold(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
@@ -1410,7 +1432,7 @@ class Islands(IslandsBase):
             general_bbox.union(island.calc_bbox())
         return general_bbox
 
-    def indexing(self, force=False):
+    def indexing(self, force=True):
         if force:
             if sum(len(isl) for isl in self.islands) != len(self.umesh.bm.faces):
                 for f in self.umesh.bm.faces:
@@ -1568,7 +1590,7 @@ class AdvIslands(Islands):
 
     def triangulate_islands(self):
         loop_triangles = self.umesh.bm.calc_loop_triangles()
-        self.indexing()
+        self.indexing(force=False)
 
         islands_of_tris: list[list[tuple[BMLoop]]] = [[] for _ in range(len(self.islands))]
         for tris in loop_triangles:

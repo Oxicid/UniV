@@ -161,7 +161,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
     def relax_sync_faces(self):
         assert bpy.context.tool_settings.mesh_select_mode[2]
-        from ..utils import linked_crn_uv, shared_is_linked
+        from ..utils import linked_crn_uv_unordered, shared_is_linked
 
         relax_data: list[RelaxData] = []
         for umesh in reversed(self.umeshes):
@@ -182,7 +182,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 if not f.select:
                     continue
                 for crn in f.loops:
-                    linked_crn = linked_crn_uv(crn, uv)
+                    linked_crn = linked_crn_uv_unordered(crn, uv)
                     linked_crn.append(crn)
                     border = False
                     for _crn in linked_crn:
@@ -253,7 +253,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                     crn[uv].pin_uv = False
 
     def relax_non_sync(self):
-        from ..utils import linked_crn_uv, is_boundary
+        from ..utils import linked_crn_uv_unordered, is_boundary_non_sync
 
         relax_data: list[RelaxData] = []
         for umesh in reversed(self.umeshes):
@@ -275,9 +275,9 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 for crn in f.loops:
                     crn_uv = crn[uv]
                     if crn_uv.select:
-                        if is_boundary(crn, uv):
+                        if is_boundary_non_sync(crn, uv):
                             border_corners.add(crn)
-                            for crn_ in linked_crn_uv(crn, uv):
+                            for crn_ in linked_crn_uv_unordered(crn, uv):
                                 if crn_.face.select:
                                     border_corners.add(crn_)
 

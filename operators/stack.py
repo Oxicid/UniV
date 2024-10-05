@@ -347,7 +347,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             if not selected:
                 self.umeshes.umeshes.remove(umesh)
                 continue
-            selected.indexing(force=True)
+            selected.indexing()
 
             for sel_isl in selected:
                 stack_isl = StackIsland(sel_isl, umesh)
@@ -412,7 +412,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            proxi.indexing(force=True)
+            proxi.indexing()
 
             for sel_isl in selected:
                 stack_isl = StackIsland(sel_isl, umesh)

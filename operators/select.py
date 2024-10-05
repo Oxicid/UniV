@@ -8,7 +8,6 @@ if 'bpy' in locals():
 import bpy
 import gpu
 import math
-import numpy as np
 
 from mathutils import Vector
 from bpy.props import *
@@ -26,7 +25,7 @@ from ..utils import (
     face_centroid_uv,
     select_linked_crn_uv_vert,
     deselect_linked_crn_uv_vert,
-    is_boundary,
+    is_boundary_non_sync,
 )
 
 
@@ -776,7 +775,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             if self.mode == 'SELECT':
                 to_select_corns = []
                 for crn in corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_a = crn[uv]
                         crn_uv_b = crn.link_loop_next[uv]
 
@@ -802,7 +801,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
                 for crn in _corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_a = crn[uv]
                         crn_uv_b = crn.link_loop_next[uv]
 
@@ -824,7 +823,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                     crn_uv_a = crn[uv]
                     if crn_uv_a.select_edge:
                         continue
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_b = crn.link_loop_next[uv]
 
                         vec = crn_uv_a.uv - crn_uv_b.uv
@@ -850,7 +849,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             if self.mode == 'SELECT':
                 to_select_corns = []
                 for crn in corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_a = crn[uv]
                         crn_uv_b = crn.link_loop_next[uv]
 
@@ -874,7 +873,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
                 for crn in _corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_a = crn[uv]
                         crn_uv_b = crn.link_loop_next[uv]
 
@@ -884,11 +883,11 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                         if a <= self.angle or a >= self.negative_ange:
                             self.deselect_crn_uv_edge_for_border(crn, uv)
                             # Removing the notches
-                            if is_boundary(crn.link_loop_next, uv):
+                            if is_boundary_non_sync(crn.link_loop_next, uv):
                                 crn_uv_c = crn.link_loop_next[uv]
                                 crn_uv_c.select = False
                                 crn_uv_c.select_edge = False
-                            if is_boundary(crn.link_loop_prev, uv):
+                            if is_boundary_non_sync(crn.link_loop_prev, uv):
                                 crn_uv_d = crn.link_loop_prev[uv]
                                 crn_uv_d.select = False
                                 crn_uv_d.select_edge = False
@@ -904,7 +903,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
                     crn_uv_a = crn[uv]
                     if crn_uv_a.select_edge:
                         continue
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         crn_uv_b = crn.link_loop_next[uv]
 
                         vec = crn_uv_a.uv - crn_uv_b.uv
@@ -1048,7 +1047,7 @@ class UNIV_OT_Select_Border(Operator):
             if self.mode == 'SELECT':
                 to_select_corns = []
                 for crn in corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         to_select_corns.append(crn)
                     else:
                         crn_uv_a = crn[uv]
@@ -1061,7 +1060,7 @@ class UNIV_OT_Select_Border(Operator):
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
                 for crn in _corners:
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(crn, uv)
                 for crn in _corners:
                     crn_uv = crn[uv]
@@ -1073,7 +1072,7 @@ class UNIV_OT_Select_Border(Operator):
                     crn_uv_a = crn[uv]
                     if crn_uv_a.select_edge:
                         continue
-                    if is_boundary(crn, uv):
+                    if is_boundary_non_sync(crn, uv):
                         select_linked_crn_uv_vert(crn, uv)
                         select_linked_crn_uv_vert(crn.link_loop_next, uv)
                         crn_uv_a.select = True
@@ -1093,7 +1092,7 @@ class UNIV_OT_Select_Border(Operator):
                         _crn_uv.select = False
                         _crn_uv.select_edge = False
 
-                islands.indexing()
+                islands.indexing(force=False)
                 for island in islands:
                     for f in island:
                         for crn in f.loops:
@@ -1109,7 +1108,7 @@ class UNIV_OT_Select_Border(Operator):
             elif self.mode == 'DESELECT':
                 islands = Islands.calc_extended(umesh)
 
-                islands.indexing()
+                islands.indexing(force=False)
                 for island in islands:
                     for f in island:
                         for crn in f.loops:
@@ -1122,14 +1121,14 @@ class UNIV_OT_Select_Border(Operator):
                                 UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(crn, uv)
                                 UNIV_OT_Select_Border_Edge_by_Angle.deselect_crn_uv_edge_for_border(shared_crn, uv)
                                 # Removing the notches
-                                if is_boundary(crn.link_loop_next, uv):
+                                if is_boundary_non_sync(crn.link_loop_next, uv):
                                     crn_uv_c = crn.link_loop_next[uv]
                                     crn_uv_c.select = False
                                     crn_uv_c.select_edge = False
             else:  # 'ADDITION'
                 islands = Islands.calc_extended(umesh)
 
-                islands.indexing()
+                islands.indexing(force=False)
                 for island in islands:
                     for f in island:
                         for crn in f.loops:
@@ -1286,7 +1285,7 @@ class UNIV_OT_Select_Grow(Operator):
 
             uv = umesh.uv
             if islands := Islands.calc_visible_with_mark_seam(umesh):
-                islands.indexing(force=True)
+                islands.indexing()
                 for idx, isl in enumerate(islands):
                     if sync:
                         if self.umeshes.elem_mode == 'FACE':
@@ -1353,7 +1352,7 @@ class UNIV_OT_Select_Grow(Operator):
 
             uv = umesh.uv
             if islands := Islands.calc_visible_with_mark_seam(umesh):
-                islands.indexing(force=True)
+                islands.indexing()
                 for idx, isl in enumerate(islands):
                     if sync:
                         if self.umeshes.elem_mode == 'FACE':
@@ -1472,39 +1471,11 @@ class UNIV_OT_Select_Grow(Operator):
         return False
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
-    @utils.profile
-    def test(self, event):
-        from numpy import mean as np_mean
-        from numpy import array as np_array
-        from numpy import roll as np_roll
-        from numpy.linalg import norm as np_distance
-        from ..utils import closest_pts_to_lines
+    def test_invoke(self, _event):
 
-        pt = self.get_mouse_pos(event)
-        pt_np = np.array([pt], dtype='float32')
-        u = self.umeshes[0]
-        uv = u.uv
+        islands = Islands.calc_extended_any_edge_with_markseam(self.umesh)
+        islands.indexing()
+        crn = utils.calc_selected_uv_vert_corners(self.umesh)[0]
 
-        min_pt = ()
-        min_dist = float('inf')
-
-        for f in u.bm.faces:
-            l_a = np_array([crn[uv].uv.to_tuple() for crn in f.loops], dtype='float32')
-            l_b = np_roll(l_a, shift=1, axis=0)
-
-            closest_points = closest_pts_to_lines(pt_np, l_a, l_b)
-            distance = np_distance(pt_np - closest_points, axis=1)
-
-            min_index = np.argmin(distance)
-            if distance[min_index] < min_dist:
-                min_dist = distance[min_index]
-                min_pt = closest_points[min_index]
-
-            face_center = np_mean(l_a, axis=0)
-            distance_face_center = np_distance(pt_np - face_center, axis=1)
-
-            if distance_face_center < min_dist:
-                min_dist = distance_face_center
-                min_pt = face_center
-
-        self.points = (min_pt,)
+        self.calc_from_corners(utils.linked_crn_uv(crn, self.uv), exact=False)
+        # self.calc_from_corners(crn.vert.link_loops, self.uv)

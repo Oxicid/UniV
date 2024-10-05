@@ -1788,7 +1788,7 @@ class UNIV_OT_Orient(Operator):
                 continue
 
             _islands = Islands.calc_visible(umesh)
-            _islands.indexing()
+            _islands.indexing(force=False)
             for idx, island in enumerate(_islands):
                 luvs = (l for f in island for e in f.edges if e.select for l in e.link_loops if l.face.index == idx and l.face.tag)
 
@@ -2084,7 +2084,7 @@ class UNIV_OT_Weld(Operator):
 
             if islands := Islands.calc_extended_any_edge_non_manifold(umesh):
                 umesh.set_corners_tag(False)
-                islands.indexing(force=True)
+                islands.indexing()
 
                 for idx, isl in enumerate(islands):
                     isl.set_selected_crn_edge_tag(umesh)
@@ -2205,7 +2205,7 @@ class UNIV_OT_Weld(Operator):
             uv = umesh.uv
             local_counter = 0
             if selected:
-                init_corners = utils.calc_selected_uv_corners(umesh)
+                init_corners = utils.calc_selected_uv_vert_corners(umesh)
             else:
                 init_corners = utils.calc_visible_uv_corners(umesh)
             if init_corners:
@@ -2344,7 +2344,7 @@ class UNIV_OT_Stitch(Operator):
                 umesh.update_tag = False
                 continue
 
-            adv_islands.indexing(force=True)
+            adv_islands.indexing()
 
             for f in umesh.bm.faces:
                 for crn in f.loops:
@@ -2423,7 +2423,7 @@ class UNIV_OT_Stitch(Operator):
                 umesh.update_tag = False
                 continue
 
-            _islands.indexing(force=True)
+            _islands.indexing()
 
             for f in umesh.bm.faces:
                 for crn in f.loops:

@@ -197,7 +197,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         mtl_counter = 0
 
         sync = umeshes.sync
-        is_boundary = utils.is_boundary_sync if sync else utils.is_boundary
+        is_boundary = utils.is_boundary_sync if sync else utils.is_boundary_non_sync
 
         for umesh in umeshes:
             local_non_seam_counter = 0
