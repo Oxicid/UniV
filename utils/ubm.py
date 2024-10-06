@@ -14,6 +14,22 @@ from collections import deque
 
 from .. import types
 
+
+def shared_crn(crn: BMLoop) -> BMLoop | None:
+    shared = crn.link_loop_radial_prev
+    if shared != crn:
+        return shared
+
+def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv: BMLayerItem):
+    return crn.link_loop_next[uv].uv == _shared_crn[uv].uv and \
+           crn[uv].uv == _shared_crn.link_loop_next[uv].uv
+
+def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
+    shared = crn.link_loop_radial_prev
+    if shared != crn and crn.face.index == shared.face.index:
+        if crn.link_loop_next[uv].uv == shared[uv].uv and crn[uv].uv == shared.link_loop_next[uv].uv:
+            return shared
+
 def set_faces_tag(faces, tag=True):
     for f in faces:
         f.tag = tag
@@ -202,13 +218,51 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
-def linked_crn_uv_by_island_index(crn: BMLoop, uv: BMLayerItem, idx: int):
+def linked_crn_uv_by_idx(crn: BMLoop, uv: BMLayerItem):
     """Linked to arg corner by island index with arg corner"""
+    first_vert = crn.vert
+    idx = crn.face.index
     first_co = crn[uv].uv
-    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co)
-    linked.rotate(-linked.index(crn))
-    # linked.popleft()
+    linked = []
+    bm_iter = crn
+
+    while True:
+        bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # get ccw corner
+        if first_vert != bm_iter.vert:  # Skip boundary or flipped
+            bm_iter = crn
+            linked_cw = []
+            while True:
+                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
+                if first_vert != bm_iter.vert:  # Skip boundary or flipped
+                    break
+
+                if bm_iter == crn:
+                    break
+                if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
+                    linked_cw.append(bm_iter)
+            linked.extend(linked_cw[::-1])
+            break
+        if bm_iter == crn:
+            break
+        if bm_iter.face.index == idx and first_co == bm_iter[uv].uv:
+            linked.append(bm_iter)
     return linked
+
+def linked_crn_uv_by_idx_unordered(crn: BMLoop, uv: BMLayerItem):
+    """Linked to arg corner by island index without arg corner
+    simular - linked_crn_uv_by_island_index_unordered
+    """
+    first_co = crn[uv].uv
+    idx = crn.face.index
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
+
+def linked_crn_uv_by_idx_unordered_included(crn: BMLoop, uv: BMLayerItem):
+    """Linked to arg corner by island index without arg corner
+    simular - linked_crn_uv_by_island_index_unordered_included
+    """
+    first_co = crn[uv].uv
+    idx = crn.face.index
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
 def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerItem, idx: int):
     """Linked to arg corner by island index with arg corner"""
@@ -256,6 +310,34 @@ def select_crn_uv_edge(crn: BMLoop, uv):
     crn_uv_a.select = True
     crn_uv_a.select_edge = True
     crn_uv_b.select = True
+
+def select_crn_uv_edge_with_shared_by_idx(crn: BMLoop, uv, force=False):
+    idx = crn.face.index
+
+    if (shared := crn.link_loop_radial_prev) != crn and shared.face.index == idx and shared_is_linked(crn, shared, uv):
+        shared[uv].select_edge = True
+
+    if force:
+        crn_uv_a = crn[uv]
+        crn_uv_a.select_edge = True
+        for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
+            crn_a[uv].select = True
+
+        crn_uv_next = crn.link_loop_next
+        for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
+            crn_b[uv].select = True
+    else:
+        crn_uv_a = crn[uv]
+        crn_uv_a.select_edge = True
+        if not crn_uv_a.select:
+            for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
+                crn_a[uv].select = True
+
+        crn_uv_next = crn.link_loop_next
+        if not crn_uv_next[uv].select:
+            for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
+                crn_b[uv].select = True
+
 
 def deselect_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):
     bm_iter = first
@@ -321,13 +403,6 @@ def deselect_crn_uv_force(first: BMLoop, uv: BMLayerItem):
         crn_uv_bm_iter = bm_iter[uv]
         if second[uv].uv == crn_uv_bm_iter.uv:
             crn_uv_bm_iter.select = False
-
-
-def shared_crn(crn: BMLoop) -> BMLoop | None:
-    shared = crn.link_loop_radial_prev
-    if shared != crn:
-        return shared
-
 
 def copy_pos_to_target(crn, uv, idx):
     next_crn_co = crn.link_loop_next[uv].uv
@@ -426,10 +501,6 @@ def is_boundary_sync(crn: BMLoop, uv: BMLayerItem):
         return True
     return not (crn[uv].uv == _shared_crn.link_loop_next[uv].uv and
                 crn.link_loop_next[uv].uv == _shared_crn[uv].uv)
-
-def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv: BMLayerItem):
-    return crn.link_loop_next[uv].uv == _shared_crn[uv].uv and \
-           crn[uv].uv == _shared_crn.link_loop_next[uv].uv
 
 def calc_selected_uv_faces(umesh: 'types.UMesh') -> list[BMFace] | typing.Sequence[BMFace]:
     if umesh.is_full_face_deselected:
