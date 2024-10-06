@@ -1515,13 +1515,15 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
 
         if self.grow:
             self.grow_select()
-            return self.umeshes.update(info='Not found edges for grow select')
+            self.umeshes.update(info='Not found edges for grow select')
+            return {'FINISHED'}
 
         self.shrink_select()
-        return self.umeshes.update(info='Not found edges for shrink select')
+        self.umeshes.update(info='Not found edges for shrink select')
+        return {'FINISHED'}
 
     def grow_select(self):
-        for umesh in self.umeshes:
+        for umesh in reversed(self.umeshes):
             uv = umesh.uv
             update = False
             if islands := Islands.calc_extended_any_edge_with_markseam(umesh):
@@ -1552,7 +1554,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
 
                     update |= bool(grew)
 
-            umesh.update_tag = update
+            if not update:
+                self.umeshes.umeshes.remove(umesh)
 
     def shrink_select(self):
         for umesh in self.umeshes:
@@ -1643,7 +1646,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
             if selected_dir.angle(crn[uv].uv - prev_crn[uv].uv, max_angle) <= max_angle:
                 return prev_crn
         elif len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 \
-                and not crn.edge.is_boundary \
+                and shared \
                 and len(cur_quad_linked_crn_uv := utils.linked_crn_uv_by_idx(crn, uv)) == 3 \
                 and not cur_quad_linked_crn_uv[1].edge.is_boundary:  # noqa # pylint:disable=used-before-assignment
             return cur_quad_linked_crn_uv[1]
@@ -1692,7 +1695,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
             if selected_dir.angle(crn[uv].uv - next_crn[uv].uv, max_angle) <= max_angle:
                 return next_crn
         elif len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 \
-                and not crn.edge.is_boundary \
+                and shared \
                 and len(next_quad_linked_crn_uv := utils.linked_crn_uv_by_idx(next_crn, uv)) == 3 \
                 and not next_quad_linked_crn_uv[1].link_loop_prev.edge.is_boundary:  # noqa # pylint:disable=used-before-assignment
             return next_quad_linked_crn_uv[1].link_loop_prev
