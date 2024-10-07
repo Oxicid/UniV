@@ -1324,6 +1324,31 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
+        """Calc any edges selected islands"""
+        if umesh.sync:
+            if (elem_mode := utils.get_select_mode_mesh()) == 'FACE':  # TODO: Add elem_mode field to UMesh
+                if umesh.is_full_face_deselected:
+                    return cls()
+            elif elem_mode == 'VERTEX':
+                if umesh.is_full_vert_deselected:
+                    return cls()
+            else:
+                if umesh.is_full_edge_deselected:
+                    return cls()
+        else:
+            if umesh.is_full_face_deselected:
+                return cls()
+
+        cls.tag_filter_visible(umesh)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        else:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)
+                       if cls.island_filter_is_any_edge_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_extended_any_edge_with_markseam(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands, with markseam"""
         if umesh.sync:

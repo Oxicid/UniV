@@ -1485,6 +1485,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_label = 'Edge Grow Select'
     bl_options = {'REGISTER', 'UNDO'}
 
+    clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True)
     grow: BoolProperty(name='Select', default=True)
     max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE')
 
@@ -1523,10 +1524,11 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
         return {'FINISHED'}
 
     def grow_select(self):
+        calc_islands = Islands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else Islands.calc_extended_any_edge
         for umesh in reversed(self.umeshes):
             uv = umesh.uv
             update = False
-            if islands := Islands.calc_extended_any_edge_with_markseam(umesh):
+            if islands := calc_islands(umesh):  # noqa
                 islands.indexing()
                 for isl in islands:
                     grew = []
@@ -1534,7 +1536,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                     corners = [crn_ for f in isl for crn_ in f.loops if crn_[uv].select_edge]
                     for crn in corners:
 
-                        with_seam = crn.edge.seam
+                        with_seam = not self.clamp_on_seam or crn.edge.seam
                         selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
 
                         if grow_prev_crn := self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam):
@@ -1648,7 +1650,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
         elif len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 \
                 and shared \
                 and len(cur_quad_linked_crn_uv := utils.linked_crn_uv_by_idx(crn, uv)) == 3 \
-                and not cur_quad_linked_crn_uv[1].edge.is_boundary:  # noqa # pylint:disable=used-before-assignment
+                and utils.shared_linked_crn_by_idx(cur_quad_linked_crn_uv[1], uv):  # noqa # pylint:disable=used-before-assignment
             return cur_quad_linked_crn_uv[1]
         else:
             min_crn = None
@@ -1692,20 +1694,18 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                         return None
 
         if not len(next_linked_corners):
-            if selected_dir.angle(crn[uv].uv - next_crn[uv].uv, max_angle) <= max_angle:
+            if selected_dir.angle(next_crn.link_loop_next[uv].uv - next_crn[uv].uv, max_angle) <= max_angle:
                 return next_crn
+
         elif len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 \
                 and shared \
                 and len(next_quad_linked_crn_uv := utils.linked_crn_uv_by_idx(next_crn, uv)) == 3 \
-                and not next_quad_linked_crn_uv[1].link_loop_prev.edge.is_boundary:  # noqa # pylint:disable=used-before-assignment
+                and utils.shared_linked_crn_by_idx(next_quad_linked_crn_uv[1].link_loop_prev, uv):  # noqa # pylint:disable=used-before-assignment
             return next_quad_linked_crn_uv[1].link_loop_prev
         else:
             min_crn = None
             angle = max_angle * 1.0001
             for crn_ in next_linked_corners:
-                # When Face is flipped, do not clamp.
-                # It is necessary to calculate shared_crn_by_idx in advance, and check whether crn is selected or not,
-                # with seam or without, excluding crn and shared_crn from these checks.
                 angle_ = selected_dir.angle(crn_.link_loop_next[uv].uv - crn_[uv].uv, max_angle)
                 if angle_ < angle:
                     angle = angle_
