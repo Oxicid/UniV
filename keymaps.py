@@ -58,6 +58,7 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Edge Grow (Conflict)
     kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', alt=True)
     kmi.properties.grow = True
     kmi.active = False

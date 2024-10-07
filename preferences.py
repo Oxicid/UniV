@@ -116,7 +116,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             for area in keymaps.keys_areas:
                 km = kc.keymaps[area]
                 for kmi in km.keymap_items:
-                    if '.univ_' in kmi.idname and kmi.idname != 'uv.univ_align':
+                    if '.univ_' in kmi.idname and kmi.idname not in ('uv.univ_align', 'uv.univ_select_edge_grow'):
                         col.context_pointer_set("keymap", km)
                         rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
 
@@ -126,7 +126,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
             km = kc.keymaps['UV Editor']
             for kmi in km.keymap_items:
-                if '.univ_' in kmi.idname and kmi.idname == 'uv.univ_align':
+                if '.univ_' in kmi.idname and kmi.idname in ('uv.univ_align', 'uv.univ_select_edge_grow'):
                     col.context_pointer_set("keymap", km)
                     rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
 

@@ -1484,9 +1484,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_idname = 'uv.univ_select_edge_grow'
     bl_label = 'Edge Grow Select'
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Edge Grow/Shrink Select\n\n" \
+                     f"Default - Grow Select \n" \
+                     f"Alt or Ctrl - Shrink Select\n\n" \
+                     f"Has keymap Alt + Scroll Up/Down, but it conflicts with the Frame Offset operator"
 
-    clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True)
-    grow: BoolProperty(name='Select', default=True)
+    clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
+                                description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
+    grow: BoolProperty(name='Select', default=True, description='Grow/Shrink toggle')
     max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE')
 
     def __init__(self):
