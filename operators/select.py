@@ -1492,7 +1492,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
     grow: BoolProperty(name='Select', default=True, description='Grow/Shrink toggle')
-    max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE')
+    max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
+                             description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
 
     def __init__(self):
         self.umeshes: UMeshes | None = None

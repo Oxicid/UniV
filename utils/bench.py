@@ -10,6 +10,8 @@ import functools
 from dataclasses import dataclass
 
 
+# example for use timeit: print('my_func:',timeit.timeit(lambda: my_func(),number=100))
+
 @dataclass
 class timer:
     text: str = ''

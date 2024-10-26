@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 3, 5),
+    "version": (2, 3, 7),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -36,6 +36,7 @@ from .operators import straight
 from .operators import toggle
 from .operators import transform
 from .operators import unwrap
+from .operators import misc
 from . import ui
 from . import keymaps
 from . import preferences
@@ -95,6 +96,8 @@ try:
         # Stack
         stack.UNIV_OT_Stack,
         stack.UNIV_OT_Stack_VIEW3D,
+        # Misc
+        misc.UNIV_OT_Pin,
     )
 except AttributeError:
     traceback.print_exc()

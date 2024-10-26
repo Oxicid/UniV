@@ -108,6 +108,9 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_stitch', text='Stitch')
 
         split = col_align.split(align=True)
+        split.operator('uv.univ_pin', text='Pin', icon='PINNED')
+
+        split = col_align.split(align=True)
         split.operator('uv.univ_stack', text='Stack')
 
         # Select

@@ -595,13 +595,16 @@ def calc_selected_uv_vert_corners(umesh: 'types.UMesh') -> list[BMLoop]:
     return [crn for f in umesh.bm.faces if f.select for crn in f.loops if crn[uv].select]
 
 def calc_selected_uv_corners_iter(umesh: 'types.UMesh') -> 'typing.Generator[BMLoop] | tuple':
-    if umesh.is_full_vert_deselected:
-        return ()
-
     if umesh.sync:
+        if umesh.is_full_vert_deselected:
+            return ()
+
         if umesh.is_full_vert_selected:
             return (crn for f in umesh.bm.faces for crn in f.loops)
         return (crn for f in umesh.bm.faces for crn in f.loops if crn.vert.select)
+
+    if umesh.is_full_face_deselected:
+        return ()
 
     uv = umesh.uv
     if umesh.is_full_face_selected:
@@ -624,6 +627,8 @@ def calc_selected_uv_edge_corners(umesh: 'types.UMesh') -> list[BMLoop]:
 
 def calc_visible_uv_corners(umesh: 'types.UMesh') -> list[BMLoop]:
     if umesh.sync:
+        if umesh.is_full_face_selected:
+            return [crn for f in umesh.bm.faces for crn in f.loops]
         return [crn for f in umesh.bm.faces if not f.hide for crn in f.loops]
 
     if umesh.is_full_face_deselected:
