@@ -44,6 +44,7 @@ class UNIV_Normal(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = types.UMeshes.calc(self.report)
         if self.is_edit_mode:
+            # TODO: Standardize select and non select
             self.umeshes.filter_selected_faces()
             self.umeshes.set_sync(True)
         else:

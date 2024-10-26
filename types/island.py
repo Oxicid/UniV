@@ -687,12 +687,8 @@ class FaceIsland:
 
 class AdvIslandInfo:
     def __init__(self):
-        self.area_uv: float = -1.0
-        self.area_3d: float = -1.0
-        self.td: float | None = -1.0
         self.edge_length: float | None = -1.0
         self.scale: Vector | None = None
-        self.materials: tuple[str] = tuple()
 
 class AdvIsland(FaceIsland):
     def __init__(self, faces: list[BMFace] | tuple = (), umesh: _umesh.UMesh | None = None):
@@ -703,6 +699,8 @@ class AdvIsland(FaceIsland):
         self._bbox: BBox | None = None
         self.tag = True
         self._select_state = None
+        self.area_3d: float = -1.0
+        self.area_uv: float = -1.0
         self.info: AdvIslandInfo | None = None
 
     def move(self, delta: Vector) -> bool:
@@ -772,14 +770,55 @@ class AdvIsland(FaceIsland):
             self.convex_coords = super().calc_convex_points()
         return self.convex_coords
 
-    def calc_area(self):
+    def calc_area_3d(self, scale=None):
         area = 0.0
-        for i in range(0, len(self.flat_coords), 3):
-            area += area_tri(self.flat_coords[i], self.flat_coords[i + 1], self.flat_coords[i + 2])
+        if scale:
+            if self.tris:
+                for crn_a, crn_b, crn_c in self.tris:
+                    area += area_tri(crn_a.vert.co*scale, crn_b.vert.co*scale, crn_c.vert.co*scale)
+            else:
+                # newell_cross
+                for f in self:
+                    n = Vector()
 
-        if self.info is None:
-            self.info = AdvIslandInfo()
-        self.info.area_uv = area
+                    for crn in f.loops:
+                        v_prev = crn.vert.co * scale
+                        v_curr = crn.link_loop_next.vert.co * scale
+
+                        # inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
+                        v_prev_yzx = v_prev.yzx
+                        v_prev_zxy = v_prev.zxy
+
+                        v_prev_yzx -= v_curr.yzx
+                        v_prev_zxy += v_curr.zxy
+
+                        v_prev_yzx *= v_prev_zxy
+                        n += v_prev_yzx
+
+                    area += n.length * 0.5
+        else:
+            for f in self:
+                area += f.calc_area()
+
+        self.area_3d = area
+        return area
+
+    def calc_area_uv(self):
+        area = 0.0
+        uv = self.umesh.uv
+        if self.flat_coords:
+            for i in range(0, len(self.flat_coords), 3):
+                area += area_tri(self.flat_coords[i], self.flat_coords[i + 1], self.flat_coords[i + 2])
+        elif self.tris:
+            for crn_a, crn_b, crn_c in self.tris:
+                area += area_tri(crn_a[uv].uv, crn_b[uv].uv, crn_c[uv].uv)
+        else:
+            from ..utils import calc_face_area_uv
+            for f in self:
+                area += calc_face_area_uv(f, uv)
+
+        self.area_uv = area
+        return area
 
     def calc_selected_edge_length(self, selected=True):
         uv = self.umesh.uv
@@ -1636,9 +1675,11 @@ class AdvIslands(Islands):
         for island in self.islands:
             island.calc_flat_coords()
 
-    def calc_area(self):
-        for isl in self:
-            isl.calc_area()
+    def calc_area_3d(self, scale=None):
+        return sum(isl.calc_area_3d(scale) for isl in self)
+
+    def calc_area_uv(self):
+        return sum(isl.calc_area_uv() for isl in self)
 
     def calc_materials(self, umesh: _umesh.UMesh):
         for isl in self:

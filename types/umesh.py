@@ -46,13 +46,13 @@ class UMesh:
         if vert:
             self.bm.verts.ensure_lookup_table()
 
-    def check_uniform_scale(self, report=None):
+    def check_uniform_scale(self, report=None, threshold=0.01):
         _, _, scale = self.obj.matrix_world.decompose()
-        if not utils.umath.vec_isclose_to_uniform(scale, 0.01):
+        if not utils.umath.vec_isclose_to_uniform(scale, threshold):
             if report:
-                report({'WARNING'}, f'Object {self.obj.name} has non-uniform scale: {scale}')
-            return False
-        return True
+                report({'WARNING'}, f"The '{self.obj.name}' hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}")
+            return scale
+        return None
 
     @property
     def is_full_face_selected(self):

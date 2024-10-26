@@ -83,6 +83,9 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_distribute', text='Distribute')
 
         split = col_align.split(align=True)
+        split.operator('uv.univ_normalize', text='Normalize')
+
+        split = col_align.split(align=True)
         split.operator('uv.univ_home', text='Home')
 
         split = col_align.split(align=True)
@@ -227,3 +230,5 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         self.layout.label(text='Transform')
         self.layout.operator('mesh.univ_orient_view3d', text='Orient')
+
+        self.layout.operator('mesh.univ_normalize', text='Normalize')

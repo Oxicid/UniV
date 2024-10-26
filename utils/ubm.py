@@ -10,6 +10,7 @@ import typing
 
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
 from mathutils import Vector
+from mathutils.geometry import area_tri
 from collections import deque
 
 from .. import types
@@ -42,10 +43,25 @@ def face_centroid_uv(f: BMFace, uv: BMLayerItem):
     return value / len(loops)
 
 def calc_face_area_uv(f, uv) -> float:
-    area = 0.0
-    for crn in f.loops:
-        area += abs(crn[uv].uv.cross(crn.link_loop_next[uv].uv))
-    return area
+    corners = f.loops
+    if (n := len(corners)) == 4:
+        l1 = corners[0][uv].uv
+        l2 = corners[1][uv].uv
+        l3 = corners[2][uv].uv
+        l4 = corners[3][uv].uv
+
+        return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
+    elif n == 3:
+        crn_a, crn_b, crn_c = corners
+        return area_tri(crn_a[uv].uv, crn_b[uv].uv, crn_c[uv].uv)
+    else:
+        area = 0.0
+        first_crn_co = corners[0][uv].uv
+        for crn in corners:
+            next_crn_co = crn.link_loop_next[uv].uv
+            area += first_crn_co.cross(next_crn_co)
+            first_crn_co = next_crn_co
+        return abs(area) * 0.5
 
 def calc_max_length_uv_crn(corners, uv) -> BMLoop:
     length = -1.0

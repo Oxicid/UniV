@@ -9,6 +9,7 @@ import bpy
 import math
 import random
 import bl_math
+from collections.abc import Callable
 
 import numpy as np
 
@@ -1007,7 +1008,7 @@ class UNIV_OT_Sort(Operator):
                 elif self.subgroup_type == 'AREA':
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
-                    adv_islands.calc_area()
+                    adv_islands.calc_area_uv()
                     _islands.extend(adv_islands)
                 else:
                     _islands.extend(adv_islands)
@@ -1044,8 +1045,8 @@ class UNIV_OT_Sort(Operator):
         islands.sort(reverse=True, key=lambda a: a.info.area_uv)
         splitted = []
         if len(islands) > 1:
-            start = islands[0].info.area_uv
-            end = islands[-1].info.area_uv
+            start = islands[0].area_uv
+            end = islands[-1].area_uv
             segment = (start - end) / self.area_subgroups
             end += 0.00001
 
@@ -1056,7 +1057,7 @@ class UNIV_OT_Sort(Operator):
                     break
 
                 for j in range(len(islands) - 1, -1, -1):
-                    if islands[j].info.area_uv <= end:
+                    if islands[j].area_uv <= end:
                         seg.append(islands.pop())
                     else:
                         break
@@ -1501,7 +1502,7 @@ class UNIV_OT_Random(Operator):
 
         if not self.is_edit_mode:
             self.umeshes.free()
-            utils.update_by_area_type('VIEW_3D')
+            utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
 
     def random_preprocessing(self, extended=True):
@@ -2339,7 +2340,7 @@ class UNIV_OT_Stitch(Operator):
 
             uv = umesh.uv
             adv_islands = AdvIslands.calc_extended_or_visible(umesh, extended=False)
-            print(adv_islands)
+            # print(adv_islands)
             if len(adv_islands) < 2:
                 umesh.update_tag = False
                 continue
@@ -2577,3 +2578,121 @@ class UNIV_OT_Stitch(Operator):
 
         adv_islands.weld_selected(target_isl, source_isl, selected=selected)
         return True
+
+class UNIV_OT_Normalize_VIEW3D(Operator):
+    bl_idname = "mesh.univ_normalize"
+    bl_label = 'Normalize'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Average the size of separate UV islands, based on their area in 3D space\n\n" \
+                     f"Default - Average Islands Scale"
+
+    # f"Shift - Scale U and V independently\n\n" \
+
+    # scale_individual: BoolProperty(name='Individual Axis Scale', default=False, description='Scale U and V independently')
+    # shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        # if event.value == 'PRESS':
+        #     return self.execute(context)
+        # self.scale_individual = event.shift
+        return self.execute(context)
+
+    def __init__(self):
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = types.UMeshes(report=self.report)
+        is_uv_area = context.area.ui_type == 'UV'
+        if not is_uv_area:
+            self.umeshes.set_sync(True)
+
+        has_non_uniform_scale_obj = any([umesh.check_uniform_scale(report=self.report) for umesh in self.umeshes])  # noqa
+
+        tot_area_3d = 0.0
+        tot_area_uv = 0.0
+        # TODO: Exclude zero areas islands
+        # TODO: Add two avg system, and add props in addon settings
+        # TODO: Get max min uv area (for 3d 3d area) size, and implement clamp system (two sliders, by default factor min=0.7, max=1.0)
+        all_islands: list[AdvIsland] = []
+
+        if context.mode == 'EDIT_MESH':
+
+            # TODO: Add method for filter umeshes with selected faces, edges, verts, corner verts, corner edges. with force mode, for exclude loose verts
+            has_selected_faces = any(any(utils.calc_selected_uv_faces_iter(umesh)) for umesh in self.umeshes)
+
+            # TODO: AdvIslands with FLIPPED_3D
+            islands_calc_type: Callable[[types.UMesh], AdvIslands]
+            islands_calc_type = AdvIslands.calc_extended_with_mark_seam if has_selected_faces else AdvIslands.calc_visible_with_mark_seam
+
+            for umesh in reversed(self.umeshes):
+                if adv_islands := islands_calc_type(umesh):
+                    # TODO: Optimize calc area, when object one and scale simular by axis
+                    tot_area_3d += adv_islands.calc_area_3d(umesh.check_uniform_scale())
+                    tot_area_uv += adv_islands.calc_area_uv()
+
+                    all_islands.extend(adv_islands)
+                    umesh.update_tag = False
+                else:
+                    self.umeshes.umeshes.remove(umesh)
+        else:
+            for umesh in reversed(self.umeshes):
+                if len(umesh.bm.faces) == 0:
+                    self.umeshes.umeshes.remove(umesh)
+                    continue
+
+                umesh.ensure(face=True)
+                adv_islands = AdvIslands.calc_with_hidden(umesh)
+
+                tot_area_3d += adv_islands.calc_area_3d(umesh.check_uniform_scale())
+                tot_area_uv += adv_islands.calc_area_uv()
+
+                all_islands.extend(adv_islands)
+                umesh.update_tag = False
+
+        self.normalize(all_islands, tot_area_3d, tot_area_uv)
+
+        self.umeshes.update(info='All islands normalized')
+
+        if context.mode != 'EDIT_MESH':
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
+    def normalize(self, islands: list[AdvIsland], tot_area_3d, tot_area_uv):
+        if len(islands) <= 1:
+            self.umeshes.cancel_with_report({'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
+            return
+        if tot_area_3d == 0.0 or tot_area_uv == 0.0:
+            # Prevent divide by zero.
+            if tot_area_3d == 0.0:
+                self.umeshes.cancel_with_report({'WARNING'}, info=f"Cannot normalize islands, total UV-area is zero")
+            else:
+                self.umeshes.cancel_with_report({'WARNING'}, info=f"Cannot normalize islands, total faces area is zero")
+            return
+
+        tot_fac = tot_area_3d / tot_area_uv
+
+        zero_islands_counter = 0
+        for isl in islands:
+            if isl.area_3d == 0.0 or isl.area_uv == 0.0:
+                zero_islands_counter += 1
+                continue
+
+            fac = isl.area_3d / isl.area_uv
+
+            scale = math.sqrt(fac / tot_fac)
+            if math.isclose(scale, 1.0, abs_tol=0.00001):
+                continue
+            isl.umesh.update_tag |= isl.scale(Vector((scale, scale)), pivot=isl.bbox.center)
+
+        if zero_islands_counter:
+            self.report({'WARNING'}, f"Found {zero_islands_counter} islands with zero area")
+
+class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
+    bl_idname = "uv.univ_normalize"
+    bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a Shift + A keymap"

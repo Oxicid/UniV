@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 3, 7),
+    "version": (2, 4, 7),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -63,6 +63,8 @@ try:
         transform.UNIV_OT_Random,
         transform.UNIV_OT_Weld,
         transform.UNIV_OT_Stitch,
+        transform.UNIV_OT_Normalize,
+        transform.UNIV_OT_Normalize_VIEW3D,
         # Quadrify
         quadrify.UNIV_OT_Quadrify,
         straight.UNIV_OT_Straight,
