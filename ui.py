@@ -164,6 +164,12 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_cut', text='Cut')
 
+        self.layout.label(text='Texture')
+        row = self.layout.row(align=True)
+        row.operator('mesh.univ_checker', text='Checker')
+        row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
+        row.alignment = 'RIGHT'
+
     @staticmethod
     def __draw_align_buttons(where, *, alignment='CENTER', scale_x=1.0):
         def ly_wide_icon_op(layout, *, icon):
@@ -219,16 +225,22 @@ class UNIV_PT_General_VIEW_3D(Panel):
         split.operator('mesh.univ_cut', text='Cut')
         split.operator('mesh.univ_angle', text='Angle')
 
-        self.layout.label(text='Project')
+        layout.label(text='Project')
         row = self.layout.row(align=True)
         row.operator('mesh.univ_normal', text='Normal')
         row.operator('mesh.univ_box_project', text='Box')
 
-        self.layout.label(text='Stack')
+        layout.label(text='Stack')
         row = self.layout.row(align=True)
         row.operator('mesh.univ_stack', text='Stack')
 
-        self.layout.label(text='Transform')
-        self.layout.operator('mesh.univ_orient_view3d', text='Orient')
+        layout.label(text='Transform')
+        layout.operator('mesh.univ_orient_view3d', text='Orient')
 
-        self.layout.operator('mesh.univ_normalize', text='Normalize')
+        layout.operator('mesh.univ_normalize', text='Normalize')
+
+        layout.label(text='Texture')
+        row = self.layout.row(align=True)
+        row.operator('mesh.univ_checker', text='Checker')
+        row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
+        row.alignment = 'RIGHT'

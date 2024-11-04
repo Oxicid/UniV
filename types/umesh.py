@@ -456,6 +456,32 @@ class UMeshes:
         bpy.ops.object.mode_set(mode='EDIT', toggle=False)
         bpy.context.view_layer.objects.active = active
 
+    @staticmethod
+    def loop_for_object_mode_processing(without_selection=True):
+        assert bpy.context.mode == 'EDIT_MESH'
+        active = bpy.context.active_object
+        selected_objects = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
+
+        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+        if without_selection:
+            for obj in selected_objects:
+                yield obj
+        else:
+            for obj in reversed(bpy.context.selected_objects):
+                obj.select_set(False)
+
+            for obj in selected_objects:
+                bpy.context.view_layer.objects.active = obj
+                obj.select_set(True)
+                yield obj
+                obj.select_set(False)
+
+            for obj in selected_objects:
+                obj.select_set(True)
+        if not without_selection:
+            bpy.context.view_layer.objects.active = active
+        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
     def set_sync(self, state=True):
         for umesh in self:
             umesh.sync = state

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 4, 7),
+    "version": (2, 5, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -24,7 +24,9 @@ from .types import bbox    # noqa: F401 # pylint:disable=unused-import
 from .types import btypes  # noqa: F401 # pylint:disable=unused-import
 from .types import island  # noqa: F401 # pylint:disable=unused-import
 from .types import mesh_island  # noqa: F401 # pylint:disable=unused-import
+from .operators import checker
 from .operators import inspect
+from .operators import misc
 from .operators import project
 from .operators import quadrify
 from .operators import quick_snap
@@ -36,7 +38,6 @@ from .operators import straight
 from .operators import toggle
 from .operators import transform
 from .operators import unwrap
-from .operators import misc
 from . import ui
 from . import keymaps
 from . import preferences
@@ -45,6 +46,9 @@ try:
     classes = (
         preferences.UNIV_AddonPreferences,
         keymaps.UNIV_RestoreKeymaps,
+        # Checker System
+        checker.UNIV_OT_Checker,
+        checker.UNIV_OT_CheckerCleanup,
         # Inspect
         inspect.UNIV_OT_Check_Zero,
         inspect.UNIV_OT_Check_Flipped,
