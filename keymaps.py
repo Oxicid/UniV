@@ -274,6 +274,11 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Pack
+    kmi = km.keymap_items.new('uv.univ_pack', 'P', 'PRESS')
+    kmi.active = False
+    keys.append((km, kmi))
+
     # Quadrify
     kmi = km.keymap_items.new('uv.univ_quadrify', 'E', 'PRESS')
     kmi.active = False

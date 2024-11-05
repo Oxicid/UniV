@@ -15,6 +15,9 @@ from .ubm import *
 from .umath import *
 from .. import types
 
+resolutions = (('256', '256', ''), ('512', '512', ''), ('1K', '1024', ''), ('2K', '2048', ''), ('4K', '4096', ''), ('8K', '8192', ''))
+resolutions_name_by_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
+
 class NoInit:
     def __getattribute__(self, item):
         raise AttributeError(f'Object not initialized')

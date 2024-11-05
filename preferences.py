@@ -113,22 +113,24 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
             kc = context.window_manager.keyconfigs.user
 
+            keymaps_with_conflicts = []
             for area in keymaps.keys_areas:
                 km = kc.keymaps[area]
                 for kmi in km.keymap_items:
-                    if '.univ_' in kmi.idname and kmi.idname not in ('uv.univ_align', 'uv.univ_select_edge_grow'):
-                        col.context_pointer_set("keymap", km)
-                        rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+                    if '.univ_' in kmi.idname:
+                        if kmi.idname in {'uv.univ_align', 'uv.univ_select_edge_grow', 'uv.univ_pack'}:
+                            keymaps_with_conflicts.append((km, kmi))
+                        else:
+                            col.context_pointer_set("keymap", km)
+                            rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
 
             col.separator()
             col.label(text='Keymap at the bottom may have conflicts')
             col.separator()
 
-            km = kc.keymaps['UV Editor']
-            for kmi in km.keymap_items:
-                if '.univ_' in kmi.idname and kmi.idname in ('uv.univ_align', 'uv.univ_select_edge_grow'):
-                    col.context_pointer_set("keymap", km)
-                    rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+            for km, kmi in keymaps_with_conflicts:
+                col.context_pointer_set("keymap", km)
+                rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
 
         # elif self.tab == 'INFO':
         else:

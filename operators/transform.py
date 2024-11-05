@@ -2696,3 +2696,109 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
     bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a Shift + A keymap"
+
+
+_udim_source = [
+    ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
+    ('ACTIVE_UDIM', 'Active UDIM', "Pack islands to active UDIM image tile or UDIM grid tile where 2D cursor is located")
+]
+if _is_360_pack := bpy.app.version >= (3, 6, 0):
+    _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
+
+
+class UNIV_OT_Pack(Operator):
+    bl_idname = 'uv.univ_pack'
+    bl_label = 'Pack'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Pack selected islands\n\n" \
+                     f"Has a 'P' keymap, but it conflicts with the 'Pin' operator"
+
+    shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
+                               items=(('CONCAVE', 'Exact', 'Uses exact geometry'), ('AABB', 'Fast', 'Uses bounding boxes'))
+                               )
+    scale: BoolProperty(name='Scale', default=True, description="Scale islands to fill unit square")
+    rotate: BoolProperty(name='Rotate', default=True, description="Rotate islands to improve layout")
+    rotate_method: EnumProperty(name='Rotation Method', default='ANY',
+                             items=(
+                                 ('ANY', 'Any', "Any angle is allowed for rotation"),
+                                 ('AXIS_ALIGNED', 'Axis-Aligned', "Rotated to a minimal rectangle, either vertical or horizontal"),
+                                 ('CARDINAL', 'Cardinal', "Only 90 degree rotations are allowed")
+
+                             ))
+
+    pin: BoolProperty(name='Lock Pinned Islands', default=False, description="Constrain islands containing any pinned UV's")
+    pin_method: EnumProperty(name='Lock Method', default='LOCKED',
+                             items=(
+                                 ('LOCKED', 'All', "Pinned islands are locked in place"),
+                                 ('ROTATION_SCALE', 'Rotation and Scale', "Pinned islands will translate only"),
+                                 ('ROTATION', 'Rotation', "Pinned islands won't rotate"),
+                                 ('SCALE', 'Scale', "Pinned islands won't rescale")))
+
+    merge_overlap: BoolProperty(name='Lock Overlaps', default=False)
+    udim_source: EnumProperty(name='Pack to', default='CLOSEST_UDIM', items=_udim_source)
+
+    texture_size: bpy.props.EnumProperty(name='Size', default='2K', items=utils.resolutions,
+                                         description="Optimal value for UV padding:\n"
+                                                     "256 = 2 px\n"
+                                                     "512 = 4 px\n"
+                                                     "1024 = 8 px\n"
+                                                     "2048 = 16 px\n"
+                                                     "4096 = 32 px\n"
+                                                     "8192 = 64 px\t")
+    padding: IntProperty(name='Padding', default=8, min=0, soft_min=2, soft_max=32, max=64, step=2,
+                         subtype='PIXEL', description="Space between islands in pixels.\n\n"
+                                                      "Formula for converting the current Padding implementation to Margin:\n"
+                                                      "Margin = Padding / 2 / Texture Size")
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+        if not _is_360_pack and False:
+            layout.prop(self, 'rotate', toggle=1)
+        else:
+            row = layout.row(align=True)
+            row.prop(self, 'shape_method', expand=True)
+
+            row = layout.row(align=True)
+            row.prop(self, 'scale', toggle=1)
+            row.prop(self, 'rotate', toggle=1)
+
+            row = layout.row().column()
+            row.scale_x = 1.5
+            row.alignment = 'CENTER'
+            row.prop(self, 'rotate_method', text='Rotation Method')
+
+            if self.pin:
+                row.prop(self, 'pin_method', text='Lock Method       ')
+
+            self.layout.prop(self, 'pin')
+            layout.prop(self, 'merge_overlap')
+        layout.prop(self, 'udim_source')
+
+        layout.separator()
+
+        row = layout.row(align=False)
+        row.prop(self, 'texture_size')
+        row.prop(self, 'padding')
+
+    def execute(self, context):
+        args = {
+            'udim_source': self.udim_source,
+            'rotate': self.rotate,
+            'margin_method': 'FRACTION',
+            'margin': self.padding / 2 / utils.resolutions_name_by_value[self.texture_size]}
+
+        if _is_360_pack:
+            args['scale'] = self.scale
+            args['rotate_method'] = self.rotate_method
+            args['pin'] = self.pin
+            args['merge_overlap'] = self.merge_overlap
+            args['pin_method'] = self.pin_method
+            args['shape_method'] = self.shape_method
+
+        bpy.ops.uv.pack_islands(**args)
+
+        return {'FINISHED'}

@@ -91,6 +91,10 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_random', text='Random')
 
+        split = col_align.split(align=True)
+        split.scale_y = 1.5
+        split.operator('uv.univ_pack', text='Pack')
+
         # Misc
         col_align = col.column(align=True)
 
@@ -114,6 +118,7 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_pin', text='Pin', icon='PINNED')
 
         split = col_align.split(align=True)
+        split.scale_y = 1.5
         split.operator('uv.univ_stack', text='Stack')
 
         # Select
@@ -166,47 +171,11 @@ class UNIV_PT_General(Panel):
 
         self.layout.label(text='Texture')
         row = self.layout.row(align=True)
+        row.scale_y = 1.5
         row.operator('mesh.univ_checker', text='Checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
         row.alignment = 'RIGHT'
 
-    @staticmethod
-    def __draw_align_buttons(where, *, alignment='CENTER', scale_x=1.0):
-        def ly_wide_icon_op(layout, *, icon):
-            row = layout.row(align=True)
-            row.ui_units_x = 3
-            row.scale_x = 2.05
-            row.operator('uv.univ_align', text="", icon=icon)
-
-        def ly_mid_mid_op(layout, *, icon):
-            row = layout.row(align=True)
-            row.operator('uv.univ_align', text="", icon=icon)
-            row.scale_x = 1.5
-
-        colMain = where.column(align=True)
-        colMain.scale_x = scale_x
-        rowTop = colMain.row(align=True)
-        rowTop.alignment = alignment
-        ly_wide_icon_op(rowTop, icon='RESTRICT_SELECT_ON')
-        ly_wide_icon_op(rowTop.row(), icon='SORT_DESC')
-        ly_wide_icon_op(rowTop, icon='CURVE_PATH')
-        ##
-        rowMiddle = colMain.row().row(align=True)
-        rowMiddle.alignment = alignment
-        ly_wide_icon_op(rowMiddle, icon='BACK')
-
-        rowMidMiddle = rowMiddle.row().row(align=True)
-        ly_mid_mid_op(rowMidMiddle, icon='REMOVE')
-        ly_mid_mid_op(rowMidMiddle.row(), icon='ADD')
-        ly_mid_mid_op(rowMidMiddle.row(), icon='THREE_DOTS')
-
-        ly_wide_icon_op(rowMiddle, icon='FORWARD')
-        ##
-        rowBottom = colMain.row(align=True)
-        rowBottom.alignment = alignment
-        ly_wide_icon_op(rowBottom, icon='LINE_DATA')
-        ly_wide_icon_op(rowBottom.row(), icon='SORT_ASC')
-        ly_wide_icon_op(rowBottom, icon='DECORATE_LIBRARY_OVERRIDE')
 
 class UNIV_PT_General_VIEW_3D(Panel):
     bl_label = "UniV"
@@ -241,6 +210,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         layout.label(text='Texture')
         row = self.layout.row(align=True)
+        row.scale_y = 1.5
         row.operator('mesh.univ_checker', text='Checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
         row.alignment = 'RIGHT'

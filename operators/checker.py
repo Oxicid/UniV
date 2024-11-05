@@ -14,10 +14,6 @@ from .. import utils
 # UniV_ColorGrid_2K_
 # UniV_Grid_2Kx512_
 
-
-resolutions = (('256', '256', ''), ('512', '512', ''), ('1K', '1024', ''), ('2K', '2048', ''), ('4K', '4096', ''), ('8K', '8192', ''))
-resolutions_name_by_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
-
 generated_types = (
     ('UV_GRID', 'Grid', ''),
     ('COLOR_GRID', 'Color Grid', ''),
@@ -31,9 +27,9 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     generated_type: bpy.props.EnumProperty(name='Texture', default='UV_GRID', items=generated_types)
     # show_in_2d: bpy.props.BoolProperty(name='Show in 2D View', default=True)
-    size_x: bpy.props.EnumProperty(name='X', default='2K', items=resolutions,
+    size_x: bpy.props.EnumProperty(name='X', default='2K', items=utils.resolutions,
                                    update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
-    size_y: bpy.props.EnumProperty(name='Y', default='2K', items=resolutions,
+    size_y: bpy.props.EnumProperty(name='Y', default='2K', items=utils.resolutions,
                                    update=lambda self, _: setattr(self, 'size_x', self.size_y) if self.lock_size and self.size_x != self.size_y else None)
     lock_size: bpy.props.BoolProperty(name='Lock Size', default=True,
                                       update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
@@ -66,8 +62,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
         self.resolution_name: str = self.resolution_str_values_to_name(self.size_x, self.size_y)
         self.full_pattern_name = f"UniV_{self.pattern_name}_{self.resolution_name}"
 
-        self.int_size_x = resolutions_name_by_value[self.size_x]
-        self.int_size_y = resolutions_name_by_value[self.size_y]
+        self.int_size_x = utils.resolutions_name_by_value[self.size_x]
+        self.int_size_y = utils.resolutions_name_by_value[self.size_y]
 
         mtl = self.get_checker_material()
         node_group = self.get_checker_node_group()
@@ -281,21 +277,21 @@ class UNIV_OT_Checker(bpy.types.Operator):
             xsize, ysize = name.split('x')
         else:
             xsize = ysize = name
-        return resolutions_name_by_value[xsize], resolutions_name_by_value[ysize]
+        return utils.resolutions_name_by_value[xsize], utils.resolutions_name_by_value[ysize]
 
     @staticmethod
     def resolution_values_to_name(xsize: int, ysize: int):
         xsize_name = ysize_name = ''
         if xsize != ysize:
-            for k, v in resolutions_name_by_value.items():
+            for k, v in utils.resolutions_name_by_value.items():
                 if v == xsize:
                     xsize_name = k
                 if v == ysize:
                     ysize_name = k
-            assert (xsize_name and ysize_name), f'Not found resolutions {xsize=} {ysize=} in {resolutions_name_by_value}'
+            assert (xsize_name and ysize_name), f'Not found resolutions {xsize=} {ysize=} in {utils.resolutions_name_by_value}'
             return f'{xsize_name}x{ysize_name}'
         else:
-            for k, v in resolutions_name_by_value.items():
+            for k, v in utils.resolutions_name_by_value.items():
                 if v == xsize:
                     return k
         assert (xsize_name and ysize_name), f'Not found resolutions {xsize=} {xsize_name=}, {ysize=} {ysize_name=}'
