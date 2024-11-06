@@ -74,7 +74,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         row = layout.row()
@@ -99,38 +99,35 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
-            row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
-            # row.operator('wm.univ_keymaps_config', text='Default').mode = 'DEFAULT'
+            row.operator('wm.univ_keymaps_config', text='Default').mode = 'DEFAULT'
             row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
             row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
+            row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
 
             layout.label(
                 text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
                 icon='INFO')
-            box = layout.box()
-            split = box.split()
-            col = split.column()
 
-            kc = context.window_manager.keyconfigs.user
+            # TODO: Add 3D View
+            for area, kc, km, filtered_keymaps in keymaps.ConflictFilter.get_conflict_filtered_keymaps():
+                layout.label(text=area)
+                for config_filtered in filtered_keymaps.values():
+                    box = layout.box()
+                    for univ_kmi in config_filtered.univ_keys:
+                        rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
+                        any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
 
-            keymaps_with_conflicts = []
-            for area in keymaps.keys_areas:
-                km = kc.keymaps[area]
-                for kmi in km.keymap_items:
-                    if '.univ_' in kmi.idname:
-                        if kmi.idname in {'uv.univ_align', 'uv.univ_select_edge_grow', 'uv.univ_pack'}:
-                            keymaps_with_conflicts.append((km, kmi))
-                        else:
-                            col.context_pointer_set("keymap", km)
-                            rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+                        if config_filtered.default_keys:
+                            box.label(text='\t\tDefault',
+                                      icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
+                            for (default_km, default_kmi) in config_filtered.default_keys:
+                                rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
 
-            col.separator()
-            col.label(text='Keymap at the bottom may have conflicts')
-            col.separator()
-
-            for km, kmi in keymaps_with_conflicts:
-                col.context_pointer_set("keymap", km)
-                rna_keymap_ui.draw_kmi([], kc, km, kmi, col, 0)
+                        if config_filtered.user_defined:
+                            box.label(text='\t\tUser',
+                                      icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
+                            for (user_km, user_kmi) in config_filtered.user_defined:
+                                rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
 
         # elif self.tab == 'INFO':
         else:
