@@ -95,6 +95,17 @@ class UMesh:
         return PyBMesh.fields(self.bm).totloop
 
     @property
+    def has_selected_uv_faces(self) -> bool:
+        if self.sync:
+            return bool(self.total_face_sel)
+        if not self.total_face_sel:
+            return False
+        uv = self.uv
+        if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+            return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
+        return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+
+    @property
     def has_any_selected_crn_non_sync(self):
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
@@ -571,6 +582,22 @@ class UMeshes:
                         if all(crn[uv].select for crn in f.loops) and f.select:
                             return True
         return False
+
+    def filter_by_selected_and_unselected_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+        selected = []
+        unselected = []
+        for umesh in self:
+            if umesh.has_selected_uv_faces:
+                selected.append(umesh)
+            else:
+                unselected.append(umesh)
+
+        import copy
+        u1 = copy.copy(self)
+        u2 = copy.copy(self)
+        u1.umeshes = selected
+        u2.umeshes = unselected
+        return u1, u2
 
     def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)

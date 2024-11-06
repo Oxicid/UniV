@@ -234,7 +234,7 @@ class FaceIsland:
     def __init__(self, faces: list[BMFace], umesh: _umesh.UMesh):
         self.faces: list[BMFace] = faces
         self.umesh: _umesh.UMesh = umesh
-        self.value: float | int = -1  # value for different purposes
+        self.value: float | int | Vector = -1  # value for different purposes
 
     def move(self, delta: Vector) -> bool:
         if umath.vec_isclose_to_zero(delta):
@@ -694,7 +694,10 @@ class AdvIsland(FaceIsland):
     def __init__(self, faces: list[BMFace] | tuple = (), umesh: _umesh.UMesh | None = None):
         super().__init__(faces, umesh)
         self.tris: list[tuple[BMLoop]] = []
-        self.flat_coords = []
+        self.flat_coords: list[Vector] | list[tuple[Vector, Vector, Vector]] = []
+        self.flat_3d_coords: list[Vector] | list[tuple[Vector, Vector, Vector]] = []
+        self.weights: list[float] = []
+        # self.custom_value_2: int | float | Vector = -1
         self.convex_coords = []
         self._bbox: BBox | None = None
         self.tag = True
@@ -722,13 +725,26 @@ class AdvIsland(FaceIsland):
             _from = self.bbox.min
         return self.move(to - _from)
 
-    def calc_flat_coords(self):
+    def calc_flat_coords(self, save_triplet=False):
         assert self.tris, 'Calculate tris'
 
         uv = self.umesh.uv
-        flat_coords = self.flat_coords
-        for t in self.tris:
-            flat_coords.extend((t_crn[uv].uv for t_crn in t))
+        if save_triplet:
+            self.flat_coords = [(t[0][uv].uv, t[1][uv].uv, t[2][uv].uv) for t in self.tris]
+        else:
+            extend = self.flat_coords.extend
+            for t in self.tris:
+                extend(t_crn[uv].uv for t_crn in t)
+
+    def calc_flat_3d_coords(self, save_triplet=False):
+        assert self.tris, 'Calculate tris'
+
+        if save_triplet:
+            self.flat_3d_coords = [(t[0].vert.co, t[1].vert.co, t[2].vert.co) for t in self.tris]
+        else:
+            extend = self.flat_3d_coords.extend
+            for t in self.tris:
+                extend((t_crn.vert.co for t_crn in t))
 
     def is_overlap(self, other: 'AdvIsland'):
         assert (self.flat_coords and other.flat_coords), 'Calculate flat coordinates'
@@ -745,7 +761,10 @@ class AdvIsland(FaceIsland):
         if self.convex_coords:
             self._bbox = BBox.calc_bbox(self.convex_coords)
         elif self.flat_coords:
-            self._bbox = BBox.calc_bbox(self.flat_coords)
+            if isinstance(self.flat_coords[0], tuple):
+                self._bbox = BBox.calc_bbox(itertools.chain.from_iterable(self.flat_coords))
+            else:
+                self._bbox = BBox.calc_bbox(self.flat_coords)
         else:
             self._bbox = BBox.calc_bbox_uv(self.faces, self.umesh.uv)
         return self._bbox
@@ -770,12 +789,28 @@ class AdvIsland(FaceIsland):
             self.convex_coords = super().calc_convex_points()
         return self.convex_coords
 
-    def calc_area_3d(self, scale=None):
+    def calc_area_3d(self, scale=None, areas_to_weight=False):
         area = 0.0
-        if scale:
+        # self.weights = []
+
+        weight_append = self.weights.append
+        it = self.flat_3d_coords if self.flat_3d_coords else ((crn_a.vert.co, crn_b.vert.co, crn_c.vert.co) for crn_a, crn_b, crn_c in self.tris)
+        if areas_to_weight:
+            assert self.tris, 'Calculate tris'
+            if scale:
+                for va, vb, vc in it:
+                    ar = area_tri(va * scale, vb * scale, vc * scale)
+                    weight_append(ar)
+                    area += ar
+            else:
+                for va, vb, vc in it:
+                    ar = area_tri(va, vb, vc)
+                    weight_append(ar)
+                    area += ar
+        elif scale:
             if self.tris:
-                for crn_a, crn_b, crn_c in self.tris:
-                    area += area_tri(crn_a.vert.co*scale, crn_b.vert.co*scale, crn_c.vert.co*scale)
+                for va, vb, vc in it:
+                    area += area_tri(va * scale, vb * scale, vc * scale)
             else:
                 # newell_cross
                 for f in self:
@@ -807,8 +842,13 @@ class AdvIsland(FaceIsland):
         area = 0.0
         uv = self.umesh.uv
         if self.flat_coords:
-            for i in range(0, len(self.flat_coords), 3):
-                area += area_tri(self.flat_coords[i], self.flat_coords[i + 1], self.flat_coords[i + 2])
+            flat_coords = self.flat_coords
+            if isinstance(flat_coords[0], tuple):
+                for triplet in flat_coords:
+                    area += area_tri(*triplet)
+            else:
+                for i in range(0, len(flat_coords), 3):
+                    area += area_tri(flat_coords[i], flat_coords[i + 1], flat_coords[i + 2])
         elif self.tris:
             for crn_a, crn_b, crn_c in self.tris:
                 area += area_tri(crn_a[uv].uv, crn_b[uv].uv, crn_c[uv].uv)
@@ -1671,12 +1711,16 @@ class AdvIslands(Islands):
             isl.tris = tria_isl
         return True
 
-    def calc_flat_coords(self):
+    def calc_flat_coords(self, save_triplet=False):
         for island in self.islands:
-            island.calc_flat_coords()
+            island.calc_flat_coords(save_triplet)
 
-    def calc_area_3d(self, scale=None):
-        return sum(isl.calc_area_3d(scale) for isl in self)
+    def calc_flat_3d_coords(self, save_triplet=False):
+        for island in self.islands:
+            island.calc_flat_3d_coords(save_triplet)
+
+    def calc_area_3d(self, scale=None, areas_to_weight=False):
+        return sum(isl.calc_area_3d(scale, areas_to_weight) for isl in self)
 
     def calc_area_uv(self):
         return sum(isl.calc_area_uv() for isl in self)

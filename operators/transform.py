@@ -16,8 +16,8 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
-from math import pi, sin, cos, atan2
-from mathutils import Vector
+from math import pi, sin, cos, atan2, sqrt
+from mathutils import Vector, Matrix
 from collections import defaultdict
 
 from bmesh.types import BMLoop
@@ -2588,8 +2588,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     # f"Shift - Scale U and V independently\n\n" \
 
-    # scale_individual: BoolProperty(name='Individual Axis Scale', default=False, description='Scale U and V independently')
-    # shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
+    shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
+    xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
 
     @classmethod
     def poll(cls, context):
@@ -2600,6 +2600,12 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
         #     return self.execute(context)
         # self.scale_individual = event.shift
         return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.alignment = 'LEFT'
+        layout.prop(self, 'shear')
+        layout.prop(self, 'xy_scale')
 
     def __init__(self):
         self.umeshes: types.UMeshes | None = None
@@ -2620,19 +2626,29 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
         all_islands: list[AdvIsland] = []
 
         if context.mode == 'EDIT_MESH':
-
-            # TODO: Add method for filter umeshes with selected faces, edges, verts, corner verts, corner edges. with force mode, for exclude loose verts
-            has_selected_faces = any(any(utils.calc_selected_uv_faces_iter(umesh)) for umesh in self.umeshes)
+            selected_umeshes, unselected_umeshes = self.umeshes.filter_by_selected_and_unselected_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
 
             # TODO: AdvIslands with FLIPPED_3D
             islands_calc_type: Callable[[types.UMesh], AdvIslands]
-            islands_calc_type = AdvIslands.calc_extended_with_mark_seam if has_selected_faces else AdvIslands.calc_visible_with_mark_seam
+            islands_calc_type = AdvIslands.calc_extended_with_mark_seam if selected_umeshes else AdvIslands.calc_visible_with_mark_seam
 
             for umesh in reversed(self.umeshes):
                 if adv_islands := islands_calc_type(umesh):
                     # TODO: Optimize calc area, when object one and scale simular by axis
-                    tot_area_3d += adv_islands.calc_area_3d(umesh.check_uniform_scale())
+                    obj_scale = umesh.check_uniform_scale()
+                    if self.xy_scale or self.shear:
+                        adv_islands.calc_tris()
+                        adv_islands.calc_flat_coords(save_triplet=True)
+                        adv_islands.calc_flat_3d_coords(save_triplet=True)
+                        adv_islands.calc_area_3d(obj_scale, areas_to_weight=True)
+
+                        for isl in adv_islands:
+                            isl.value = isl.bbox.center
+                            self.individual_scale(isl, obj_scale)
+
                     tot_area_uv += adv_islands.calc_area_uv()
+                    tot_area_3d += adv_islands.calc_area_3d(obj_scale)
 
                     all_islands.extend(adv_islands)
                     umesh.update_tag = False
@@ -2645,13 +2661,26 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                     continue
 
                 umesh.ensure(face=True)
-                adv_islands = AdvIslands.calc_with_hidden(umesh)
+                if adv_islands := AdvIslands.calc_with_hidden(umesh):
+                    # TODO: Deduplicate
+                    obj_scale = umesh.check_uniform_scale()
+                    if self.xy_scale or self.shear:
+                        adv_islands.calc_tris()
+                        adv_islands.calc_flat_coords(save_triplet=True)
+                        adv_islands.calc_flat_3d_coords(save_triplet=True)
+                        adv_islands.calc_area_3d(obj_scale, areas_to_weight=True)
 
-                tot_area_3d += adv_islands.calc_area_3d(umesh.check_uniform_scale())
-                tot_area_uv += adv_islands.calc_area_uv()
+                        for isl in adv_islands:
+                            isl.value = isl.bbox.center
+                            self.individual_scale(isl, obj_scale)
 
-                all_islands.extend(adv_islands)
-                umesh.update_tag = False
+                    tot_area_uv += adv_islands.calc_area_uv()
+                    tot_area_3d += adv_islands.calc_area_3d(obj_scale)
+
+                    all_islands.extend(adv_islands)
+                    umesh.update_tag = False
+                else:
+                    self.umeshes.umeshes.remove(umesh)
 
         self.normalize(all_islands, tot_area_3d, tot_area_uv)
 
@@ -2663,8 +2692,74 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
         return {'FINISHED'}
 
+    def individual_scale(self, isl: AdvIsland, obj_scale):
+        from bl_math import clamp
+        shear = self.shear
+        xy_scale = self.xy_scale
+
+        if obj_scale:
+            vectors_ac_bc = [((va - vc) * obj_scale, (vb - vc) * obj_scale) for va, vb, vc in isl.flat_3d_coords]
+        else:
+            vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
+
+        uv = isl.umesh.uv
+        isl_flat_unique_uv_coords = [crn[uv].uv for f in isl for crn in f.loops]
+        for j in range(15):
+            scale_cou = 0.0
+            scale_cov = 0.0
+            scale_cross = 0.0
+            weight_sum = 0.0
+
+            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in zip(isl.flat_coords, vectors_ac_bc, isl.weights):
+                m = Matrix((uv_a - uv_c, uv_b - uv_c))
+                try:
+                    m.invert()
+                except ValueError:
+                    continue
+
+                cou = m[0][0] * vec_ac + m[0][1] * vec_bc
+                cov = m[1][0] * vec_ac + m[1][1] * vec_bc
+
+                scale_cou += cou.length * weight
+                scale_cov += cov.length * weight
+
+                if shear:
+                    cov.normalize()
+                    cou.normalize()
+                    scale_cross += cou.dot(cov) * weight
+                weight_sum += weight
+
+            if scale_cou * scale_cov < 1e-10:
+                break
+
+            scale_factor_u = sqrt(scale_cou / scale_cov) if xy_scale else 1.0
+
+            tolerance = 1e-6  # Trade accuracy for performance.
+            if shear:
+                t = Matrix.Identity(2)
+                t[0][0] = scale_factor_u
+                t[1][0] = clamp((scale_cross / weight_sum), -0.5, 0.5)
+                t[0][1] = 0
+                t[1][1] = 1.0 / scale_factor_u
+
+                err = abs(t[0][0] - 1.0) + abs(t[1][0]) + abs(t[0][1]) + abs(t[1][1] - 1.0)
+                if err < tolerance:
+                    break
+
+                # Transform
+                for uv_coord in isl_flat_unique_uv_coords:
+                    uv_coord.xy = t @ uv_coord  # TODO: Calc new pivot from old pivot ond save in bbox
+            else:
+                if math.isclose(scale_factor_u - 1.0, 0.0, abs_tol=tolerance):
+                    break
+                scale = Vector((scale_factor_u, 1/scale_factor_u))
+                for uv_coord in isl_flat_unique_uv_coords:
+                    uv_coord *= scale
+
+            isl.umesh.update_tag = True
+
     def normalize(self, islands: list[AdvIsland], tot_area_3d, tot_area_uv):
-        if len(islands) <= 1:
+        if not self.xy_scale and len(islands) <= 1:
             self.umeshes.cancel_with_report({'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
             return
         if tot_area_3d == 0.0 or tot_area_uv == 0.0:
@@ -2684,14 +2779,35 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                 continue
 
             fac = isl.area_3d / isl.area_uv
-
             scale = math.sqrt(fac / tot_fac)
-            if math.isclose(scale, 1.0, abs_tol=0.00001):
-                continue
-            isl.umesh.update_tag |= isl.scale(Vector((scale, scale)), pivot=isl.bbox.center)
+
+            if self.xy_scale or self.shear:
+                old_pivot = isl.value
+                new_pivot = isl.calc_bbox().center
+                new_pivot_with_scale = new_pivot * scale
+
+                if utils.vec_isclose(old_pivot, new_pivot, abs_tol=0.00001):
+                    continue
+
+                diff1 = old_pivot - new_pivot
+                diff = (new_pivot - new_pivot_with_scale) + diff1
+
+                uv = isl.umesh.uv
+                for face in isl.faces:
+                    for crn in face.loops:
+                        crn_co = crn[uv].uv
+                        crn_co *= scale
+                        crn_co += diff
+
+                isl.umesh.update_tag = True
+            else:
+                if math.isclose(scale, 1.0, abs_tol=0.00001):
+                    continue
+                isl.umesh.update_tag |= isl.scale(Vector((scale, scale)), pivot=isl.calc_bbox().center)
 
         if zero_islands_counter:
             self.report({'WARNING'}, f"Found {zero_islands_counter} islands with zero area")
+
 
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
