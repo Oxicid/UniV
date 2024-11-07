@@ -46,7 +46,7 @@ class UMesh:
         if vert:
             self.bm.verts.ensure_lookup_table()
 
-    def check_uniform_scale(self, report=None, threshold=0.01):
+    def check_uniform_scale(self, report=None, threshold=0.01) -> 'Vector | None':
         _, _, scale = self.obj.matrix_world.decompose()
         if not utils.umath.vec_isclose_to_uniform(scale, threshold):
             if report:

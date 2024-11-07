@@ -2588,6 +2588,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     # f"Shift - Scale U and V independently\n\n" \
 
+    __is_uv_ot = True
+
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
 
@@ -2618,12 +2620,12 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
         has_non_uniform_scale_obj = any([umesh.check_uniform_scale(report=self.report) for umesh in self.umeshes])  # noqa
 
-        tot_area_3d = 0.0
-        tot_area_uv = 0.0
+        # tot_area_3d = 0.0
+        # tot_area_uv = 0.0
         # TODO: Exclude zero areas islands
         # TODO: Add two avg system, and add props in addon settings
         # TODO: Get max min uv area (for 3d 3d area) size, and implement clamp system (two sliders, by default factor min=0.7, max=1.0)
-        all_islands: list[AdvIsland] = []
+        all_islands_of_islands: list[tuple[AdvIslands, Vector]] = []
 
         if context.mode == 'EDIT_MESH':
             selected_umeshes, unselected_umeshes = self.umeshes.filter_by_selected_and_unselected_uv_faces()
@@ -2647,10 +2649,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                             isl.value = isl.bbox.center
                             self.individual_scale(isl, obj_scale)
 
-                    tot_area_uv += adv_islands.calc_area_uv()
-                    tot_area_3d += adv_islands.calc_area_3d(obj_scale)
+                    # tot_area_uv += adv_islands.calc_area_uv()
+                    # tot_area_3d += adv_islands.calc_area_3d(obj_scale)
 
-                    all_islands.extend(adv_islands)
+                    all_islands_of_islands.append((adv_islands, obj_scale))
                     umesh.update_tag = False
                 else:
                     self.umeshes.umeshes.remove(umesh)
@@ -2674,15 +2676,22 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                             isl.value = isl.bbox.center
                             self.individual_scale(isl, obj_scale)
 
-                    tot_area_uv += adv_islands.calc_area_uv()
-                    tot_area_3d += adv_islands.calc_area_3d(obj_scale)
+                    # tot_area_uv += adv_islands.calc_area_uv()
+                    # tot_area_3d += adv_islands.calc_area_3d(obj_scale)
 
-                    all_islands.extend(adv_islands)
+                    all_islands_of_islands.append((adv_islands, obj_scale))
                     umesh.update_tag = False
                 else:
                     self.umeshes.umeshes.remove(umesh)
 
-        self.normalize(all_islands, tot_area_3d, tot_area_uv)
+        all_adv_isl = [isl_ for islands_, _ in all_islands_of_islands for isl_ in islands_]
+
+        if not all_adv_isl:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
+
+        tot_area_uv, tot_area_3d = self.avg_by_frequencies(all_islands_of_islands, len(all_adv_isl))
+        self.normalize(all_adv_isl, tot_area_uv, tot_area_3d)
 
         self.umeshes.update(info='All islands normalized')
 
@@ -2758,7 +2767,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
             isl.umesh.update_tag = True
 
-    def normalize(self, islands: list[AdvIsland], tot_area_3d, tot_area_uv):
+    def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
         if not self.xy_scale and len(islands) <= 1:
             self.umeshes.cancel_with_report({'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
             return
@@ -2786,11 +2795,11 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                 new_pivot = isl.calc_bbox().center
                 new_pivot_with_scale = new_pivot * scale
 
-                if utils.vec_isclose(old_pivot, new_pivot, abs_tol=0.00001):
-                    continue
-
                 diff1 = old_pivot - new_pivot
                 diff = (new_pivot - new_pivot_with_scale) + diff1
+
+                if utils.vec_isclose(old_pivot, new_pivot) and math.isclose(scale, 1.0, abs_tol=0.00001):
+                    continue
 
                 uv = isl.umesh.uv
                 for face in isl.faces:
@@ -2808,10 +2817,58 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
         if zero_islands_counter:
             self.report({'WARNING'}, f"Found {zero_islands_counter} islands with zero area")
 
+    def avg_by_frequencies(self, all_islands_of_islands: list[tuple[AdvIslands, Vector]], islands_size):
+        areas_uv = np.empty(islands_size, dtype=float)
+        areas_3d = np.empty(islands_size, dtype=float)
+
+        idx = 0
+        for islands, obj_scale in all_islands_of_islands:
+            for isl in islands:
+                areas_uv[idx] = isl.calc_area_uv()
+                areas_3d[idx] = isl.calc_area_3d(obj_scale)
+                idx += 1
+
+        areas = areas_uv if self.__is_uv_ot else areas_3d
+
+        median: float = np.median(areas)  # noqa
+        min_area = np.amin(areas)
+        max_area = np.amax(areas)
+
+        center = (min_area + max_area) / 2
+        if median > center:
+            diff = median - bl_math.lerp(median, min_area, 0.15)
+        else:
+            diff = bl_math.lerp(median, max_area, 0.15) - median
+
+        min_clamp = median - diff
+        max_clamp = median + diff
+
+        indexes = (areas >= min_clamp) & (areas <= max_clamp)
+
+        total_uv_area = np.sum(areas_uv, where=indexes)
+        total_3d_area = np.sum(areas_3d, where=indexes)
+
+        if total_uv_area and total_3d_area:
+            return total_uv_area, total_3d_area
+        else:
+            idx = self.np_find_nearest(areas, median)
+            total_uv_area = areas_uv[idx]
+            total_3d_area = areas_3d[idx]
+            if total_uv_area and total_3d_area:
+                return total_uv_area, total_3d_area
+            else:
+                return np.sum(areas_uv), np.sum(areas_3d)
+
+    @staticmethod
+    def np_find_nearest(array, value):
+        idx = (np.abs(array - value)).argmin()
+        return idx
+
 
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
     bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a Shift + A keymap"
+    __is_uv_ot = False
 
 
 _udim_source = [
