@@ -106,6 +106,14 @@ class UMesh:
         return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
 
     @property
+    def has_visible_uv_faces(self) -> bool:
+        if self.total_face_sel:
+            return True
+        if self.sync:
+            return any(not f.hide for f in self.bm.faces)
+        return False
+
+    @property
     def has_any_selected_crn_non_sync(self):
         if PyBMesh.is_full_face_deselected(self.bm):
             return False
@@ -499,6 +507,7 @@ class UMeshes:
         self.sync = state
 
     def free(self):
+        """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""
         for umesh in self:
             umesh.free()
 
@@ -570,6 +579,11 @@ class UMeshes:
             if umesh.is_full_face_deselected:
                 self.umeshes.remove(umesh)
 
+    def filter_with_faces(self):
+        for umesh in reversed(self.umeshes):
+            if not umesh.bm.faces:
+                self.umeshes.remove(umesh)
+
     @property
     def has_selected_uv_faces(self):
         if self.sync:
@@ -583,20 +597,24 @@ class UMeshes:
                             return True
         return False
 
-    def filter_by_selected_and_unselected_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
         selected = []
-        unselected = []
+        visible = []
         for umesh in self:
             if umesh.has_selected_uv_faces:
                 selected.append(umesh)
             else:
-                unselected.append(umesh)
+                visible.append(umesh)
+        if not selected:
+            for umesh2 in reversed(visible):
+                if not umesh2.has_visible_uv_faces:
+                    visible.remove(umesh2)
 
         import copy
         u1 = copy.copy(self)
         u2 = copy.copy(self)
         u1.umeshes = selected
-        u2.umeshes = unselected
+        u2.umeshes = visible
         return u1, u2
 
     def __iter__(self) -> typing.Iterator[UMesh]:
