@@ -23,6 +23,7 @@ class UMesh:
         # self.islands_calc_type
         # self.islands_calc_subtype
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
+        self.aspect: float = 1.0
 
     def update(self, force=False):
         if not self.update_tag:

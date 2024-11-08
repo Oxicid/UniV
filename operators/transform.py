@@ -2596,6 +2596,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
     lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
+    use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -2613,6 +2614,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
         layout.prop(self, 'lock_overlap')
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
+        layout.prop(self, 'use_aspect')
 
     def __init__(self):
         self.umeshes: types.UMeshes | None = None
@@ -2646,6 +2648,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
                 umesh.ensure(face=True)
 
         for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
             adv_islands = islands_calc_type(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
             all_islands.extend(adv_islands)
@@ -2682,12 +2685,13 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     def individual_scale(self, isl: AdvIsland):
         from bl_math import clamp
+        aspect = isl.umesh.aspect
         shear = self.shear
         xy_scale = self.xy_scale
 
         vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
         uv_and_3d_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
-        for j in range(15):
+        for j in range(10):
             scale_cou = 0.0
             scale_cov = 0.0
             scale_cross = 0.0
@@ -2713,15 +2717,14 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
             if scale_cou * scale_cov < 1e-10:
                 break
 
-            scale_factor_u = sqrt(scale_cou / scale_cov) if xy_scale else 1.0
-
-            tolerance = 1e-6  # Trade accuracy for performance.
+            scale_factor_u = sqrt(scale_cou / scale_cov / aspect) if xy_scale else 1.0
+            tolerance = 1e-5  # Trade accuracy for performance.
             if shear:
                 t = Matrix.Identity(2)
                 t[0][0] = scale_factor_u
-                t[1][0] = clamp((scale_cross / isl.area_3d), -0.5, 0.5)
+                t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -0.5 * aspect, 0.5 * aspect)
                 t[0][1] = 0
-                t[1][1] = 1.0 / scale_factor_u
+                t[1][1] = 1 / scale_factor_u
 
                 err = abs(t[0][0] - 1.0) + abs(t[1][0]) + abs(t[0][1]) + abs(t[1][1] - 1.0)
                 if err < tolerance:

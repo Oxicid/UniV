@@ -1648,6 +1648,11 @@ class UnionIslandsController:
         for isl in self._islands:
             isl.umesh.update_tag = value
 
+    @property
+    def aspect(self):
+        import numpy
+        return numpy.mean([isl.umesh.aspect for isl in self._islands])
+
 class UnionIslands(Islands):
     def __init__(self, islands):
         super().__init__([])

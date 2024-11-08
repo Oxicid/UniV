@@ -9,6 +9,7 @@ from mathutils import Vector
 
 def get_aspect_ratio(umesh=None):
     """Aspect Y"""
+    # TODO: Get aspect from checker modifier
     # Aspect from material
     if umesh and (mtl := umesh.obj.active_material):
         if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
