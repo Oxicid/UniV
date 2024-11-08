@@ -650,7 +650,13 @@ class UNIV_OT_Align(Operator):
 class UNIV_OT_Flip(Operator):
     bl_idname = 'uv.univ_flip'
     bl_label = 'Flip'
-    bl_description = 'FlipX and FlipY'
+    bl_description = "FlipX and FlipY.\n\n" \
+                     "Default - Flip island.\n" \
+                     "Shift - Individual flip.\n" \
+                     "Ctrl - Flip by cursor.\n" \
+                     "Alt - Flip by Y axis.\n\n" \
+                     "Shift and Ctrl conflict between them"
+
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode', default='DEFAULT', items=(
@@ -673,15 +679,14 @@ class UNIV_OT_Flip(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
+        self.axis = 'Y' if event.alt else 'X'
+        match event.ctrl, event.shift:
+            case False, False:
                 self.mode = 'DEFAULT'
-            case True, False, False:
+            case True, False:
                 self.mode = 'BY_CURSOR'
-            case False, True, False:
+            case False, True:
                 self.mode = 'INDIVIDUAL'
-            case False, False, True:
-                self.mode = 'FLIPPED'
             case _:
                 self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n")
                 return {'CANCELLED'}
