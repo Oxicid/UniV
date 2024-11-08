@@ -109,9 +109,8 @@ class UNIV_OT_SelectLinked(Operator):
 
     def deselect_linked(self, sync):
         umeshes = UMeshes(report=self.report)
-        mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
-        if sync and mode == 'VERTEX':
+        if sync and umeshes.elem_mode == 'VERTEX':
             for umesh in umeshes:
                 if types.PyBMesh.is_full_vert_selected(umesh.bm) or types.PyBMesh.is_full_vert_deselected(umesh.bm):
                     umesh.update_tag = False
@@ -150,7 +149,7 @@ class UNIV_OT_SelectLinked(Operator):
                 umesh.update_tag = is_update
             return umeshes.update(info='No islands for deselect')
 
-        if sync and mode == 'EDGE':
+        if sync and umeshes.elem_mode == 'EDGE':
             for umesh in umeshes:
                 if types.PyBMesh.is_full_edge_selected(umesh.bm) or types.PyBMesh.is_full_edge_deselected(umesh.bm):
                     umesh.update_tag = False
@@ -190,7 +189,7 @@ class UNIV_OT_SelectLinked(Operator):
             return umeshes.update(info='No islands for deselect')
 
         for umesh in umeshes:
-            if sync and mode == 'FACE':
+            if sync and umeshes.elem_mode == 'FACE':
                 if types.PyBMesh.is_full_edge_selected(umesh.bm) or types.PyBMesh.is_full_edge_deselected(umesh.bm):
                     umesh.update_tag = False
                     continue
@@ -198,7 +197,7 @@ class UNIV_OT_SelectLinked(Operator):
             if islands := Islands.calc_visible(umesh):
                 for island in islands:
                     if update_state := (island.info_select(sync) == types.eInfoSelectFaceIsland.HALF_SELECTED):
-                        island.deselect_set(mode=mode, sync=sync)
+                        island.select = False
                     is_update |= update_state
             umesh.update_tag = is_update
 
