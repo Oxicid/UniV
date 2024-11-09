@@ -63,6 +63,15 @@ def calc_face_area_uv(f, uv) -> float:
             first_crn_co = next_crn_co
         return abs(area) * 0.5
 
+        # TODO: Check that optimization
+        # area = 0.0
+        # first_crn_co = corners[-1][uv].uv
+        # for crn in corners:
+        #     next_crn_co = crn[uv].uv
+        #     area += first_crn_co.cross(next_crn_co)
+        #     first_crn_co = next_crn_co
+        # return abs(area) * 0.5
+
 def calc_max_length_uv_crn(corners, uv) -> BMLoop:
     length = -1.0
     crn_ = None

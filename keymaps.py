@@ -126,6 +126,11 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Adjust
+    kmi = km.keymap_items.new('uv.univ_adjust_td', 'A', 'PRESS', alt=True)
+    kmi.active = False
+    keys.append((km, kmi))
+
     # Align operator
     ## Align
     kmi = km.keymap_items.new('uv.univ_align', 'UP_ARROW', 'PRESS')

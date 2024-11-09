@@ -841,11 +841,10 @@ class AdvIsland(FaceIsland):
                 # newell_cross
                 for f in self:
                     n = Vector()
-
-                    for crn in f.loops:
-                        v_prev = crn.vert.co * scale
-                        v_curr = crn.link_loop_next.vert.co * scale
-
+                    corners = f.loops
+                    v_prev = corners[-1].vert.co * scale
+                    for crn in corners:
+                        v_curr = crn.vert.co * scale
                         # inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
                         v_prev_yzx = v_prev.yzx
                         v_prev_zxy = v_prev.zxy
@@ -855,6 +854,8 @@ class AdvIsland(FaceIsland):
 
                         v_prev_yzx *= v_prev_zxy
                         n += v_prev_yzx
+
+                        v_prev = v_curr
 
                     area += n.length * 0.5
         else:
@@ -1281,6 +1282,18 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_extended_with_mark_seam(cls, umesh: _umesh.UMesh):
+        if umesh.is_full_face_deselected:
+            return cls()
+        cls.tag_filter_visible(umesh)
+        if umesh.sync and umesh.is_full_face_deselected:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                       if cls.island_filter_is_any_face_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_selected_quad(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls()
@@ -1313,18 +1326,6 @@ class Islands(IslandsBase):
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh) if cls.island_filter_is_any_face_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_with_mark_seam(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-        cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_deselected:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
-        else:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
-                       if cls.island_filter_is_any_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod

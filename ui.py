@@ -83,7 +83,9 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_distribute', text='Distribute')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_normalize', text='Normalize')
+        row = split.row(align=True)
+        row.operator('uv.univ_adjust_td', text='Adjust')
+        row.operator('uv.univ_normalize', text='Normalize')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_home', text='Home')
