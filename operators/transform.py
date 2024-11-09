@@ -79,9 +79,12 @@ class UNIV_OT_Crop(Operator):
         return self.execute(context)
 
     def execute(self, context):
+        self.mode_preprocessing()
+        return self.crop(self.mode, self.axis, self.padding, proportional=True, report=self.report)
+
+    def mode_preprocessing(self):
         if all((self.to_cursor, self.inplace)):
             self.inplace = False
-
         match self.to_cursor, self.individual, self.inplace:
             case False, False, False:
                 self.mode = 'DEFAULT'
@@ -95,8 +98,6 @@ class UNIV_OT_Crop(Operator):
                 self.mode = 'INPLACE'
             case False, True, True:
                 self.mode = 'INDIVIDUAL_INPLACE'
-
-        return self.crop(self.mode, self.axis, self.padding, proportional=True, report=self.report)
 
     @staticmethod
     def crop(mode, axis, padding, proportional, report=None):
@@ -190,6 +191,7 @@ class UNIV_OT_Crop(Operator):
     def crop_ex(axis, bbox, inplace, islands_of_mesh, offset, padding, proportional):
         scale_x = ((1.0 - padding) / w) if (w := bbox.width) else 1
         scale_y = ((1.0 - padding) / h) if (h := bbox.height) else 1
+
         if proportional:
             if axis == 'XY':
                 scale_x = scale_y = min(scale_x, scale_y)
@@ -233,6 +235,7 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        self.mode_preprocessing()
         return self.crop(self.mode, self.axis, self.padding, proportional=False, report=self.report)
 
     @staticmethod
@@ -2803,23 +2806,22 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
             areas_uv[idx] = isl.calc_area_uv()
             areas_3d[idx] = isl.area_3d
 
-        areas = areas_uv if self.__is_uv_ot else areas_3d
+        areas = areas_uv if not self.__is_uv_ot else areas_3d
 
         median: float = np.median(areas)  # noqa
         min_area = np.amin(areas)
         max_area = np.amax(areas)
 
         center = (min_area + max_area) / 2
-        if median > center:
-            diff = median - bl_math.lerp(median, min_area, 0.15)
+        if center > median:
+            diff = bl_math.lerp(median, max_area, 0.25) - median
         else:
-            diff = bl_math.lerp(median, max_area, 0.15) - median
+            diff = median - bl_math.lerp(median, min_area, 0.25)
 
         min_clamp = median - diff
         max_clamp = median + diff
 
         indexes = (areas >= min_clamp) & (areas <= max_clamp)
-
         total_uv_area = np.sum(areas_uv, where=indexes)
         total_3d_area = np.sum(areas_3d, where=indexes)
 
