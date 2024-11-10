@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 6, 6),
+    "version": (2, 6, 7),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -68,6 +68,7 @@ try:
         transform.UNIV_OT_Weld,
         transform.UNIV_OT_Stitch,
         transform.UNIV_OT_AdjustScale,
+        transform.UNIV_OT_AdjustScale_VIEW3D,
         transform.UNIV_OT_Normalize,
         transform.UNIV_OT_Normalize_VIEW3D,
         transform.UNIV_OT_Pack,

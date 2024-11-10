@@ -208,7 +208,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
         layout.label(text='Transform')
         layout.operator('mesh.univ_orient_view3d', text='Orient')
 
-        layout.operator('mesh.univ_normalize', text='Normalize')
+        row = layout.row(align=True)
+        row.operator('mesh.univ_adjust_td', text='Adjust')
+        row.operator('mesh.univ_normalize', text='Normalize')
 
         layout.label(text='Texture')
         row = self.layout.row(align=True)

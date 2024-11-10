@@ -2863,6 +2863,8 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         assert self.is_edit_mode
         self.umeshes = types.UMeshes(report=self.report)
         self.umeshes.filter_with_faces()
+        if not self.bl_idname.startswith('UV'):
+            self.umeshes.set_sync()
 
         is_uv_area = context.area.ui_type == 'UV'
         if not is_uv_area:

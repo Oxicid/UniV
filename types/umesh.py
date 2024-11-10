@@ -530,7 +530,7 @@ class UMeshes:
             for data, obj in data_and_objects.items():
                 bm = bmesh.new()
                 bm.from_mesh(data)
-                bmeshes.append(UMesh(bm, obj, False))
+                bmeshes.append(UMesh(bm, obj[0], False))
 
         return cls(bmeshes)
 
@@ -553,6 +553,36 @@ class UMeshes:
                 bm.from_mesh(data)
                 bmeshes.append(UMesh(bm, objs[0], False))
         self.umeshes = bmeshes
+
+    @classmethod
+    def visible_ob_with_uv(cls):
+        if bpy.context.area.type == 'VIEW_3D':
+            spaces = (bpy.context.area.spaces.active, )
+        else:
+            spaces = (area.spaces.active for area in utils.get_areas_by_type('VIEW_3D'))
+
+        visible_objects = []
+        for obj in bpy.context.view_layer.objects:
+            if not obj.select_get() and obj.visible_get() and \
+                    obj.type == 'MESH' and obj.data.polygons and obj.data.uv_layers:
+                if spaces:
+                    if any(obj.visible_in_viewport_get(space) for space in spaces):
+                        visible_objects.append(obj)
+                else:
+                    visible_objects.append(obj)
+
+        data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+
+        for obj in visible_objects:
+            data_and_objects[obj.data].append(obj)
+
+        bmeshes = []
+        for data, obj in data_and_objects.items():
+            bm = bmesh.new()
+            bm.from_mesh(data)
+            obj.sort(key=lambda a: a.name)
+            bmeshes.append(UMesh(bm, obj[0], False))
+        return cls(bmeshes)
 
     @classmethod
     def calc(cls, report=None):
