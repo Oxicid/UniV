@@ -4,6 +4,7 @@
 import bpy
 import rna_keymap_ui
 
+from . import utils
 from . import keymaps
 from bpy.props import *
 
@@ -22,6 +23,51 @@ def stable():
 def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
+
+_udim_source = [
+    ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
+    ('ACTIVE_UDIM', 'Active UDIM', "Pack islands to active UDIM image tile or UDIM grid tile where 2D cursor is located")
+]
+if _is_360_pack := bpy.app.version >= (3, 6, 0):
+    _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
+
+class UNIV_Settings(bpy.types.PropertyGroup):
+    shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
+                               items=(('CONCAVE', 'Exact', 'Uses exact geometry'), ('AABB', 'Fast', 'Uses bounding boxes'))
+                               )
+    scale: BoolProperty(name='Scale', default=True, description="Scale islands to fill unit square")
+    rotate: BoolProperty(name='Rotate', default=True, description="Rotate islands to improve layout")
+    rotate_method: EnumProperty(name='Rotation Method', default='CARDINAL',
+                                items=(
+                                    ('ANY', 'Any', "Any angle is allowed for rotation"),
+                                    ('AXIS_ALIGNED', 'Orient', "Rotated to a minimal rectangle, either vertical or horizontal"),
+                                    ('CARDINAL', 'Step 90', "Only 90 degree rotations are allowed")
+
+                                ))
+
+    pin: BoolProperty(name='Lock Pinned Islands', default=False, description="Constrain islands containing any pinned UV's")
+    pin_method: EnumProperty(name='Lock Method', default='LOCKED',
+                             items=(
+                                 ('LOCKED', 'All', "Pinned islands are locked in place"),
+                                 ('ROTATION_SCALE', 'Rotation and Scale', "Pinned islands will translate only"),
+                                 ('ROTATION', 'Rotation', "Pinned islands won't rotate"),
+                                 ('SCALE', 'Scale', "Pinned islands won't rescale")))
+
+    merge_overlap: BoolProperty(name='Lock Overlaps', default=False)
+    udim_source: EnumProperty(name='Pack to', default='CLOSEST_UDIM', items=_udim_source)
+
+    texture_size: bpy.props.EnumProperty(name='Size', default='2K', items=utils.resolutions,
+                                         description="Optimal value for UV padding:\n"
+                                                     "256 = 2 px\n"
+                                                     "512 = 4 px\n"
+                                                     "1024 = 8 px\n"
+                                                     "2048 = 16 px\n"
+                                                     "4096 = 32 px\n"
+                                                     "8192 = 64 px\t")
+    padding: IntProperty(name='Padding', default=8, min=0, soft_min=2, soft_max=32, max=64, step=2,
+                         subtype='PIXEL', description="Space between islands in pixels.\n\n"
+                                                      "Formula for converting the current Padding implementation to Margin:\n"
+                                                      "Margin = Padding / 2 / Texture Size")
 
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__

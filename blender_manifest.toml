@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 id = "univ"
 name = "UniV"
-version = "2.6.7"
+version = "2.6.8"
 tagline = "UV Toolkit"
 maintainer = "Oxicid <oxicid2019@gmail.com>"
 type = "add-on"

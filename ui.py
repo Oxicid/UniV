@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import bpy
 from bpy.types import Panel
 
 class UNIV_PT_General(Panel):
@@ -9,6 +10,7 @@ class UNIV_PT_General(Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "UniV"
+    bl_options = {'HIDE_HEADER'}
 
     @staticmethod
     def draw_align_buttons(where, *, alignment='EXPAND', scale_x=1.0):
@@ -93,9 +95,14 @@ class UNIV_PT_General(Panel):
         split = col_align.split(align=True)
         split.operator('uv.univ_random', text='Random')
 
+        # Pack
+        col_align = col.column(align=True)
         split = col_align.split(align=True)
-        split.scale_y = 1.5
-        split.operator('uv.univ_pack', text='Pack')
+        row = split.row(align=True)
+        row.scale_y = 1.5
+        # row.scale_x = 2
+        row.operator('uv.univ_pack', text='Pack')
+        row.popover(panel='UNIV_PT_PackSettings', text="", icon='SETTINGS')
 
         # Misc
         col_align = col.column(align=True)
@@ -176,7 +183,7 @@ class UNIV_PT_General(Panel):
         row.scale_y = 1.5
         row.operator('mesh.univ_checker', text='Checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
-        row.alignment = 'RIGHT'
+        # row.alignment = 'RIGHT'
 
 
 class UNIV_PT_General_VIEW_3D(Panel):
@@ -218,3 +225,45 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row.operator('mesh.univ_checker', text='Checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
         row.alignment = 'RIGHT'
+
+class UNIV_PT_PackSettings(Panel):
+    bl_idname = 'UNIV_PT_PackSettings'
+    bl_label = 'Pack Settings'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
+
+    def draw(self, context):
+        settings = context.scene.univ_settings  # noqa
+
+        layout = self.layout
+        if not bpy.app.version >= (3, 6, 0):
+            layout.prop(settings, 'rotate', toggle=1)
+        else:
+            row = layout.row(align=True)
+            row.prop(settings, 'shape_method', expand=True)
+
+            row = layout.row(align=True)
+            row.prop(settings, 'scale', toggle=1)
+            row.prop(settings, 'rotate', toggle=1)
+
+            if settings.rotate:
+                row = layout.row().column()
+                row.scale_x = 1.5
+                row.alignment = 'CENTER'
+                row.prop(settings, 'rotate_method', text='Rotation Method')
+
+            if settings.pin:
+                row.prop(settings, 'pin_method', text='Lock Method       ')
+
+            self.layout.prop(settings, 'pin')
+            layout.prop(settings, 'merge_overlap')
+        layout.prop(settings, 'udim_source')
+
+        layout.separator()
+
+        row = layout.row(align=True)
+        row.alignment = 'LEFT'
+        row.prop(settings, 'texture_size')
+        row.prop(settings, 'padding', slider=True)

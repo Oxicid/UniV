@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 6, 7),
+    "version": (2, 6, 8),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -45,6 +45,7 @@ from . import preferences
 try:
     classes = (
         preferences.UNIV_AddonPreferences,
+        preferences.UNIV_Settings,
         keymaps.UNIV_RestoreKeymaps,
         # Checker System
         checker.UNIV_OT_Checker,
@@ -95,6 +96,7 @@ try:
         # UI
         ui.UNIV_PT_General,
         ui.UNIV_PT_General_VIEW_3D,
+        ui.UNIV_PT_PackSettings,
         # Seam
         seam.UNIV_OT_Cut_VIEW2D,
         seam.UNIV_OT_Cut_VIEW3D,
@@ -129,6 +131,7 @@ def register():
         except Exception:  # noqa
             traceback.print_exc()
 
+    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=preferences.UNIV_Settings)
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
@@ -153,6 +156,10 @@ def unregister():
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
+
+    for scene in bpy.data.scenes:
+        if "univ_settings" in scene:
+            del scene["univ_settings"]
 
 
 if __name__ == "__main__":
