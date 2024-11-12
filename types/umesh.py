@@ -96,6 +96,29 @@ class UMesh:
         return PyBMesh.fields(self.bm).totloop
 
     @property
+    def has_full_selected_uv_faces(self) -> bool:
+        if self.sync:
+            if self.is_full_face_selected:
+                return True
+            elif self.is_full_face_deselected:
+                return False
+            else:
+                return all(f for f in self.bm.faces if not f.hide)
+
+        if not self.total_face_sel:
+            return False
+
+        uv = self.uv
+        if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+            if self.is_full_face_selected:
+                return all(all(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
+            return all(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
+        else:
+            if self.is_full_face_selected:
+                return all(all(crn[uv].select for crn in f.loops) for f in self.bm.faces)
+            return all(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+
+    @property
     def has_selected_uv_faces(self) -> bool:
         if self.sync:
             return bool(self.total_face_sel)
@@ -420,6 +443,7 @@ class UMeshes:
         self.sync: bool = utils.sync()
         self.elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
             utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+        self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
 
     def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
         if self.report_obj is None:
@@ -538,14 +562,14 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH' and obj.data.uv_layers:
+                if obj.type == 'MESH' and obj.data.uv_layers and obj.data.polygons:
                     bm = bmesh.from_edit_mesh(obj.data)
                     bmeshes.append(UMesh(bm, obj))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH' and obj.data.uv_layers:
+                if obj.type == 'MESH' and obj.data.uv_layers and obj.data.polygons:
                     data_and_objects[obj.data].append(obj)
 
             for data, objs in data_and_objects.items():
@@ -555,7 +579,7 @@ class UMeshes:
         self.umeshes = bmeshes
 
     @classmethod
-    def visible_ob_with_uv(cls):
+    def unselected_with_uv(cls):
         if bpy.context.area.type == 'VIEW_3D':
             spaces = (bpy.context.area.spaces.active, )
         else:
@@ -633,6 +657,26 @@ class UMeshes:
         visible = []
         for umesh in self:
             if umesh.has_selected_uv_faces:
+                selected.append(umesh)
+            else:
+                visible.append(umesh)
+        if not selected:
+            for umesh2 in reversed(visible):
+                if not umesh2.has_visible_uv_faces:
+                    visible.remove(umesh2)
+
+        import copy
+        u1 = copy.copy(self)
+        u2 = copy.copy(self)
+        u1.umeshes = selected
+        u2.umeshes = visible
+        return u1, u2
+
+    def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+        selected = []
+        visible = []
+        for umesh in self:
+            if umesh.has_full_selected_uv_faces:
                 selected.append(umesh)
             else:
                 visible.append(umesh)

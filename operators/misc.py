@@ -19,7 +19,7 @@ class UNIV_OT_Pin(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n\n" \
                      f"Default - Set Pin \n" \
-                     f"Alt or Ctrl - Clear Pin\n\n" \
+                     f"Ctrl or Alt- Clear Pin\n\n" \
                      f"This button is used to free the 'P' button for the Pack operator."
 
     clear: BoolProperty(name='Clear', default=False)

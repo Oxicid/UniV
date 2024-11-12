@@ -1485,7 +1485,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Edge Grow/Shrink Select\n\n" \
                      f"Default - Grow Select \n" \
-                     f"Alt or Ctrl - Shrink Select\n\n" \
+                     f"Ctrl or Alt - Shrink Select\n\n" \
                      f"Has a Alt + Scroll Up/Down keymap, but it conflicts with the Frame Offset operator"
 
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,

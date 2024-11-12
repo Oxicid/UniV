@@ -1539,6 +1539,12 @@ class Islands(IslandsBase):
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
+    @classmethod
+    def calc_with_hidden_with_mark_seam(cls, umesh: _umesh.UMesh):
+        cls.tag_filter_all(umesh)
+        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
     def move(self, delta: Vector) -> bool:
         return bool(sum(island.move(delta) for island in self.islands))
 
