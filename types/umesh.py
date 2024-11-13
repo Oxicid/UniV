@@ -610,22 +610,24 @@ class UMeshes:
 
     @classmethod
     def calc(cls, report=None):
+        # Get umeshes without uv
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH':
+                if obj.type == 'MESH' and obj.data.polygons:
                     bm = bmesh.from_edit_mesh(obj.data)
                     bmeshes.append(UMesh(bm, obj))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH':
+                if obj.type == 'MESH' and obj.data.polygons:
                     data_and_objects[obj.data].append(obj)
 
             for data, objs in data_and_objects.items():
                 bm = bmesh.new()
                 bm.from_mesh(data)
+                objs.sort(key=lambda a: a.name)
                 bmeshes.append(UMesh(bm, objs[0], False))
         return cls(bmeshes, report=report)
 
@@ -673,6 +675,7 @@ class UMeshes:
         return u1, u2
 
     def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+        """Filter full selected and visible with not full selected"""
         selected = []
         visible = []
         for umesh in self:

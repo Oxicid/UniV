@@ -80,7 +80,7 @@ def add_draw_rect(data):
 
 class UNIV_OT_SelectLinked(Operator):
     bl_idname = 'uv.univ_select_linked'
-    bl_label = 'Select Linked'
+    bl_label = 'Linked'
     bl_options = {'REGISTER', 'UNDO'}
 
     deselect: bpy.props.BoolProperty(name='Deselect', default=False)
@@ -209,7 +209,7 @@ class UNIV_OT_SelectLinked(Operator):
 
 class UNIV_OT_Select_By_Cursor(Operator):
     bl_idname = "uv.univ_select_by_cursor"
-    bl_label = "Select by Cursor"
+    bl_label = "Cursor"
     bl_description = "Select by Cursor"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -426,7 +426,8 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
 class UNIV_OT_Select_Square_Island(Operator):
     bl_idname = 'uv.univ_select_square_island'
-    bl_label = 'Select Square Island'
+    bl_label = 'Square'
+    bl_description = 'Select Square Island'
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode', default='SELECT', items=(
@@ -559,7 +560,8 @@ class UNIV_OT_Select_Square_Island(Operator):
 
 class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
     bl_idname = 'uv.univ_select_border_edge_by_angle'
-    bl_label = 'Select Border Edge by Angle'
+    bl_label = 'Border by Angle'
+    bl_description = 'Select Border Edge by Angle'
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Select Mode', default='SELECT', items=(
@@ -1253,7 +1255,7 @@ class UNIV_OT_Select_Pick(Operator):
 
 class UNIV_OT_Select_Grow(Operator):
     bl_idname = 'uv.univ_select_grow'
-    bl_label = 'Grow Select'
+    bl_label = 'Grow'
     bl_options = {'REGISTER', 'UNDO'}
 
     grow: BoolProperty(name='Select', default=True)
@@ -1481,7 +1483,7 @@ class UNIV_OT_Select_Grow(Operator):
 
 class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_idname = 'uv.univ_select_edge_grow'
-    bl_label = 'Edge Grow Select'
+    bl_label = 'Edge Grow'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Edge Grow/Shrink Select\n\n" \
                      f"Default - Grow Select \n" \

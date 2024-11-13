@@ -73,7 +73,7 @@ class SaveTransform:
     def calc_static_corners(island, uv) -> tuple[list[BMLoop], list[BMLoop]]:
         corners = []
         pinned_corners = []
-        if utils.sync():
+        if island.umesh.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
                 for f in island:
                     if f.select:
@@ -615,14 +615,14 @@ class FaceIsland:
 
     def mark_seam(self, additional=False):
         uv = self.umesh.uv
-        if utils.sync():
+        if self.umesh.sync:
             for f in self.faces:
                 for crn in f.loops:
-                    shared_crn = crn.link_loop_radial_prev
-                    if crn == shared_crn and shared_crn.face.select:  # TODO: Test without shared_crn.face.select
+                    pair = crn.link_loop_radial_prev
+                    if crn == pair or pair.face.hide:
                         crn.edge.seam = True
                         continue
-                    seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
+                    seam = not (crn[uv].uv == pair.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == pair[uv].uv)
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -630,11 +630,11 @@ class FaceIsland:
         else:
             for f in self.faces:
                 for crn in f.loops:
-                    shared_crn = crn.link_loop_radial_prev
-                    if crn == shared_crn and all(_crn[uv].select_edge for _crn in shared_crn.face.loops):  # TODO: Test without second compare
+                    pair = crn.link_loop_radial_prev
+                    if crn == pair or not pair.face.select:
                         crn.edge.seam = True
                         continue
-                    seam = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
+                    seam = not (crn[uv].uv == pair.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == pair[uv].uv)
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -892,7 +892,7 @@ class AdvIsland(FaceIsland):
         total_length = 0.0
         corners = (_crn for _f in self for _crn in _f.loops)
         if selected:
-            if not utils.sync():
+            if not self.umesh.sync:
                 for crn in corners:
                     uv_crn = crn[uv]
                     if uv_crn.select_edge:

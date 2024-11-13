@@ -16,14 +16,15 @@ from mathutils import Vector, Euler, Matrix
 
 class UNIV_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
-    bl_label = "Project by Normal"
+    bl_label = "Normal"
     bl_description = "Projection by faces normal.\n\nShift - Individual"
     bl_options = {'REGISTER', 'UNDO'}
 
     crop: bpy.props.BoolProperty(name='Crop', default=True,
                                  description='Packs the islands into a base tile, for performance purposes, does so with uncritical inaccuracy')
-    orient: bpy.props.BoolProperty(name='Orient', default=True)
+    orient: bpy.props.BoolProperty(name='Orient 2D', default=True)
     individual: bpy.props.BoolProperty(name='Individual', default=False, description='Individual by Island Meshes')
+    mark_seam: bpy.props.BoolProperty(name='Mark Seam', default=True)
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
                                                description='Gets Aspect Correct from the active image from the shader node editor')
 
@@ -38,29 +39,41 @@ class UNIV_Normal(bpy.types.Operator):
         return self.execute(context)
 
     def __init__(self):
-        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
+        self.info = 'No found faces for manipulate'
+        self.has_selected: bool = True
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         self.umeshes = types.UMeshes.calc(self.report)
-        if self.is_edit_mode:
-            # TODO: Standardize select and non select
-            self.umeshes.filter_selected_faces()
-            self.umeshes.set_sync(True)
+        self.umeshes.set_sync()
+        if self.umeshes.is_edit_mode:
+            selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                self.umeshes = selected
+                self.has_selected = True
+            elif unselected:
+                self.umeshes = unselected
+                self.has_selected = False
+            else:
+                return selected.update(info=self.info)
         else:
             self.umeshes.ensure(face=True)
+
+        if self.use_correct_aspect:
+            for umesh in self.umeshes:
+                umesh.aspect = utils.get_aspect_ratio(umesh)
 
         if self.individual:
             self.xyz_to_uv_individual()
         else:
             self.xyz_to_uv()
 
-        if not self.is_edit_mode:
-            self.umeshes.update('No found faces for manipulate')
+        if not self.umeshes.is_edit_mode:
+            ret = self.umeshes.update(info=self.info)
             self.umeshes.free()
             bpy.context.area.tag_redraw()
-            return {'FINISHED'}
-        return self.umeshes.update(info='Not selected face')
+            return ret
+        return self.umeshes.update(info=self.info)
 
     def xyz_to_uv(self):
         vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces()
@@ -72,7 +85,7 @@ class UNIV_Normal(bpy.types.Operator):
         for mesh_islands in islands_of_mesh:
             adv_island = mesh_islands[0].to_adv_island()
             adv_islands_of_mesh.append(adv_island)
-            self.project_orient_and_calc_crop_data(mesh_islands.umesh, adv_island, global_bbox, rot_mtx_from_normal)
+            self.project_orient_and_calc_crop_data(adv_island, global_bbox, rot_mtx_from_normal)
 
         self.crop_islands(adv_islands_of_mesh, global_bbox)
 
@@ -84,18 +97,19 @@ class UNIV_Normal(bpy.types.Operator):
             adv_island = mesh_islands.to_adv_island()
             adv_islands_of_mesh.append(adv_island)
             rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
-            self.project_orient_and_calc_crop_data(mesh_islands.umesh, adv_island, global_bbox, rot_mtx_from_normal)
+            self.project_orient_and_calc_crop_data(adv_island, global_bbox, rot_mtx_from_normal)
 
         self.crop_islands(adv_islands_of_mesh, global_bbox)
 
-    def project_orient_and_calc_crop_data(self, umesh, adv_island, global_bbox, rot_mtx_from_normal):
-        uv = umesh.uv
+    def project_orient_and_calc_crop_data(self, adv_island, global_bbox, rot_mtx_from_normal):
+        aspect = adv_island.umesh.aspect
+        uv = adv_island.umesh.uv
 
-        if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
+        if aspect >= 1.0:
             aspect_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
         else:
             aspect_mtx = Matrix.Diagonal((1, aspect))
-        mtx = aspect_mtx.to_4x4() @ rot_mtx_from_normal @ umesh.obj.matrix_world
+        mtx = aspect_mtx.to_4x4() @ rot_mtx_from_normal @ adv_island.umesh.obj.matrix_world
 
         points = []
         points_append = points.append
@@ -112,8 +126,6 @@ class UNIV_Normal(bpy.types.Operator):
                     crn[uv].uv = (mtx @ crn.vert.co).to_2d()
             return
 
-        adv_island.value = aspect
-
         convex_coords = utils.calc_convex_points(points)
         bbox = BBox.calc_bbox(convex_coords)
 
@@ -128,25 +140,31 @@ class UNIV_Normal(bpy.types.Operator):
         if not self.crop or not adv_islands_of_mesh:
             return
 
-        # if self.mark_seam:  # TODO: Implement Mark Seam after island struct refactoring (umesh)
-        #     for isl in uv_islands_of_mesh:
-        #         isl.mark_seam()
+        if self.mark_seam:
+            for isl in adv_islands_of_mesh:
+                isl.mark_seam()
 
         pivot = bbox.left_bottom
         for island in adv_islands_of_mesh:
-            if island.value != 1.0:
-                if island.value < 1:
+            if island.umesh.aspect != 1.0:
+                if island.umesh.aspect < 1:
                     bbox_ = bbox.copy()
-                    bbox_.scale(Vector((1, island.value)), pivot=pivot)
+                    bbox_.scale(Vector((1, island.umesh.aspect)), pivot=pivot)
                 else:
                     bbox_ = bbox.copy()
-                    bbox_.scale(Vector((1/island.value, 1)), pivot=pivot)
+                    bbox_.scale(Vector((1/island.umesh.aspect, 1)), pivot=pivot)
             else:
                 bbox_ = bbox
             transform.UNIV_OT_Crop.crop_ex('XY', bbox_, inplace=False, islands_of_mesh=[island], offset=Vector((0, 0)), padding=0.001, proportional=True)
 
     def avg_normal_and_calc_faces_individual(self):
-        calc_mesh_isl_obj = MeshIslands.calc_selected if self.is_edit_mode else MeshIslands.calc_all
+        if self.umeshes.is_edit_mode:
+            if self.has_selected:
+                calc_mesh_isl_obj = MeshIslands.calc_selected
+            else:
+                calc_mesh_isl_obj = MeshIslands.calc_visible
+        else:
+            calc_mesh_isl_obj = MeshIslands.calc_all
 
         for umesh in self.umeshes:
             _, r, s = umesh.obj.matrix_world.decompose()
@@ -163,10 +181,13 @@ class UNIV_Normal(bpy.types.Operator):
         islands_of_mesh: list[MeshIslands] = []
         for umesh in self.umeshes:
             weight = Vector()
-            if not self.is_edit_mode:
+            if not self.umeshes.is_edit_mode:
                 faces = umesh.bm.faces
             else:
-                faces = utils.calc_selected_uv_faces(umesh)
+                if self.has_selected:
+                    faces = utils.calc_selected_uv_faces(umesh)
+                else:
+                    faces = utils.calc_visible_uv_faces(umesh)
 
             for f in faces:
                 weight += f.normal * f.calc_area()
@@ -204,8 +225,8 @@ class UNIV_Normal(bpy.types.Operator):
 
 class UNIV_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
-    bl_label = "Project by Box"
-    bl_description = "Box Projection by faces normal"
+    bl_label = "Box"
+    bl_description = "Box Projection"
     bl_options = {'REGISTER', 'UNDO'}
 
     scale: bpy.props.FloatProperty(name='Scale', default=1, soft_min=0.5, soft_max=2)

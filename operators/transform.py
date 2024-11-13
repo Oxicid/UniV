@@ -2847,7 +2847,7 @@ class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
 
 class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "mesh.univ_adjust_td"
-    bl_label = 'Adjust TD'
+    bl_label = 'Adjust'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Average the size of separate UV islands from unselected islands or objects, based on their area in 3D space\n\n" \
                      "Default - Average Islands Scale\n" \

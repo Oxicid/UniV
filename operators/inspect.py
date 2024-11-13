@@ -283,7 +283,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 
 class UNIV_OT_Check_Overlap(Operator):
     bl_idname = 'uv.univ_check_overlap'
-    bl_label = 'Select Overlap'
+    bl_label = 'Overlap'
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
