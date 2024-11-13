@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 7, 0),
+    "version": (2, 7, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -102,6 +102,7 @@ try:
         seam.UNIV_OT_Cut_VIEW2D,
         seam.UNIV_OT_Cut_VIEW3D,
         seam.UNIV_OT_Angle,
+        seam.UNIV_OT_SeamBorder,
         # Project
         project.UNIV_Normal,
         project.UNIV_BoxProject,

@@ -25,6 +25,10 @@ def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv: BMLayerItem):
     return crn.link_loop_next[uv].uv == _shared_crn[uv].uv and \
            crn[uv].uv == _shared_crn.link_loop_next[uv].uv
 
+def is_pair(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
+    return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
+           crn[uv].uv == _rad_prev.link_loop_next[uv].uv
+
 def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn and crn.face.index == shared.face.index:

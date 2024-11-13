@@ -980,7 +980,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
 
 class UNIV_OT_Select_Border(Operator):
     bl_idname = 'uv.univ_select_border'
-    bl_label = 'Select Border'
+    bl_label = 'Border'
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Select Mode', default='SELECT', items=(

@@ -19,7 +19,7 @@ from .. import types
 
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
-    bl_label = "Select Degenerate"
+    bl_label = "Zero"
     bl_description = "Select degenerate UVs (zero area UV triangles)"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -84,7 +84,7 @@ class UNIV_OT_Check_Zero(Operator):
 
 class UNIV_OT_Check_Flipped(Operator):
     bl_idname = "uv.univ_check_flipped"
-    bl_label = "Select Flipped"
+    bl_label = "Flipped"
     bl_description = "Select flipped UV faces"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -147,7 +147,7 @@ class UNIV_OT_Check_Flipped(Operator):
 
 class UNIV_OT_Check_Non_Splitted(Operator):
     bl_idname = 'uv.univ_check_non_splitted'
-    bl_label = 'Select Non-Splitted'
+    bl_label = 'Non-Splitted'
     bl_options = {'REGISTER', 'UNDO'}
 
     check_non_seam: bpy.props.BoolProperty(name='Check Non-Seam', default=True)

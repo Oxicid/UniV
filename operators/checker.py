@@ -21,7 +21,7 @@ generated_types = (
 
 class UNIV_OT_Checker(bpy.types.Operator):
     bl_idname = "mesh.univ_checker"
-    bl_label = "Checker Map"
+    bl_label = "Checker"
     bl_description = "Used as a texture for testing UV maps"
     bl_options = {'REGISTER', 'UNDO'}
 

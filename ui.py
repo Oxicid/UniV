@@ -145,7 +145,7 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_by_cursor', text='Cursor')
 
         row = col.split().row(align=True)
-        row.operator('uv.univ_select_border', text='Border')
+        row.operator('uv.univ_select_border')
 
         split = col.split(factor=0.65, align=True)
         split.operator('uv.univ_select_border_edge_by_angle', text='Border by Angle').edge_dir = 'BOTH'
@@ -164,12 +164,12 @@ class UNIV_PT_General(Panel):
         col_align.label(text='Inspect')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_check_zero', text='Zero')
-        split.operator('uv.univ_check_flipped', text='Flipped')
+        split.operator('uv.univ_check_zero')
+        split.operator('uv.univ_check_flipped')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_check_non_splitted', text='Non-Splitted')
-        split.operator('uv.univ_check_overlap', text='Overlap')
+        split.operator('uv.univ_check_non_splitted')
+        split.operator('uv.univ_check_overlap')
 
         # Seam
         col_align = col.column(align=True)
@@ -177,12 +177,13 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_cut', text='Cut')
+        split.operator('uv.univ_cut')
+        split.operator('mesh.univ_seam_border')
 
         self.layout.label(text='Texture')
         row = self.layout.row(align=True)
         row.scale_y = 1.5
-        row.operator('mesh.univ_checker', text='Checker')
+        row.operator('mesh.univ_checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
         # row.alignment = 'RIGHT'
 
@@ -201,8 +202,11 @@ class UNIV_PT_General_VIEW_3D(Panel):
         col_align = col.column(align=True)
         col_align.label(text='Seam')
         split = col_align.split(align=True)
-        split.operator('mesh.univ_cut', text='Cut')
-        split.operator('mesh.univ_angle', text='Angle')
+        split.operator('mesh.univ_cut')
+        split.operator('mesh.univ_seam_border')
+
+        split = col_align.split(align=True)
+        split.operator('mesh.univ_angle')
 
         layout.label(text='Project')
         row = self.layout.row(align=True)

@@ -9,23 +9,25 @@ import bpy
 import math
 import bl_math
 
+from bpy.types import Operator
+from bpy.props import *
 from .. import utils
 from .. import types
 from ..types import Islands
 
-class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
+class UNIV_OT_Cut_VIEW2D(Operator):
     bl_idname = "uv.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
     bl_options = {'REGISTER', 'UNDO'}
 
-    addition: bpy.props.BoolProperty(name='Addition', default=True)
-    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED',
-                                   items=(
-                                          ('NONE', 'None', ''),
-                                          ('ANGLE_BASED', 'Angle Based', ''),
-                                          ('CONFORMAL', 'Conformal', '')
-                                      ))
+    addition: BoolProperty(name='Addition', default=True)
+    unwrap: EnumProperty(name='Unwrap', default='ANGLE_BASED',
+                         items=(
+                                ('NONE', 'None', ''),
+                                ('ANGLE_BASED', 'Angle Based', ''),
+                                ('CONFORMAL', 'Conformal', '')
+                            ))
 
     @classmethod
     def poll(cls, context):
@@ -83,7 +85,7 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
                             continue
                         elif (_shared_crn := crn.link_loop_radial_prev) == crn:
                             crn.edge.seam = True
-                        elif not (_shared_crn.face.select and crn.face.select):
+                        elif not (_shared_crn.face.select and f.select):
                             crn.edge.seam = True
                         elif not shared_is_linked(crn, _shared_crn, uv):
                             crn.edge.seam = True
@@ -106,7 +108,7 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
                         continue
                     elif (_shared_crn := crn.link_loop_radial_prev) == crn:
                         crn.edge.seam = True
-                    elif not (_shared_crn.face.tag and crn.face.tag):
+                    elif not (_shared_crn.face.tag and f.tag):
                         crn.edge.seam = True
                     elif not utils.shared_is_linked(crn, _shared_crn, uv):
                         crn.edge.seam = True
@@ -130,13 +132,13 @@ class UNIV_OT_Cut_VIEW2D(bpy.types.Operator):
                 isl.inplace()
 
 
-class UNIV_OT_Cut_VIEW3D(bpy.types.Operator):
+class UNIV_OT_Cut_VIEW3D(Operator):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
     bl_options = {'REGISTER', 'UNDO'}
 
-    addition: bpy.props.BoolProperty(name='Addition', default=True)
+    addition: BoolProperty(name='Addition', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -183,21 +185,21 @@ class UNIV_OT_Cut_VIEW3D(bpy.types.Operator):
                 elif not self.addition:
                     e.seam = False
 
-class UNIV_OT_Angle(bpy.types.Operator):
+class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"
     bl_label = "Angle"
     bl_description = "Seams by angle, sharps, materials, borders"
     bl_options = {'REGISTER', 'UNDO'}
 
-    selected: bpy.props.BoolProperty(name='Selected', default=False)
-    addition: bpy.props.BoolProperty(name='Addition', default=True)
-    borders: bpy.props.BoolProperty(name='Borders', default=False)
-    mtl: bpy.props.BoolProperty(name='Mtl', default=True)
-    by_weight: bpy.props.BoolProperty(name='By Weight', default=True)
-    by_sharps: bpy.props.BoolProperty(name='By Sharps', default=True)
-    seams_to_sharps: bpy.props.BoolProperty(name='Seams to Sharps', default=True)
-    obj_smooth: bpy.props.BoolProperty(name='Auto Smooth', default=True)
-    angle: bpy.props.FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
+    selected: BoolProperty(name='Selected', default=False)
+    addition: BoolProperty(name='Addition', default=True)
+    borders: BoolProperty(name='Borders', default=False)
+    mtl: BoolProperty(name='Mtl', default=True)
+    by_weight: BoolProperty(name='By Weight', default=True)
+    by_sharps: BoolProperty(name='By Sharps', default=True)
+    seams_to_sharps: BoolProperty(name='Seams to Sharps', default=True)
+    obj_smooth: BoolProperty(name='Auto Smooth', default=True)
+    angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     @classmethod
     def poll(cls, context):
@@ -272,12 +274,127 @@ class UNIV_OT_Angle(bpy.types.Operator):
                         crn_edge.seam = True
                     elif self.by_sharps and not crn_edge.smooth:
                         crn_edge.seam = True
-                    elif self.mtl and crn.face.material_index != crn.link_loop_radial_prev.face.material_index:
+                    elif self.mtl and f.material_index != crn.link_loop_radial_prev.face.material_index:
                         crn_edge.seam = True
                     elif check_weights and crn_edge[bevel_weight_key]:
                         crn_edge.seam = True
                     elif not self.addition:
                         crn_edge.seam = False
+
+        self.umeshes.update()
+        return {'FINISHED'}
+
+class UNIV_OT_SeamBorder(Operator):
+    bl_idname = "mesh.univ_seam_border"
+    bl_label = "Border"
+    bl_description = "Seams by borders\n\n" \
+                     "Default - Seams by borders\n" \
+                     "Shift - Additional\n" \
+                     "Alt - All Channels"
+
+    bl_options = {'REGISTER', 'UNDO'}
+
+    all_channels: BoolProperty(name='All Channels', default=False)
+    addition: BoolProperty(name='Addition', default=False)
+    selected: BoolProperty(name='Selected', default=False)
+    mtl: BoolProperty(name='Mtl', default=True)
+    by_sharps: BoolProperty(name='By Sharps', default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, 'all_channels')
+        layout.prop(self, 'addition')
+        layout.prop(self, 'selected')
+        layout.prop(self, 'mtl')
+        layout.prop(self, 'by_sharps')
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.addition = event.shift
+        self.all_channels = event.alt
+        return self.execute(context)
+
+    def __init__(self):
+        self.sync = utils.sync()
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context) -> set[str]:
+        self.umeshes = types.UMeshes(report=self.report)
+        sync = self.umeshes.sync
+
+        for umesh in reversed(self.umeshes):
+            if self.selected:
+                faces = utils.calc_selected_uv_faces(umesh)
+            else:
+                faces = utils.calc_visible_uv_faces(umesh)
+
+            if not faces:
+                self.umeshes.umeshes.remove(umesh)
+
+            uv = umesh.uv
+            is_pair = utils.is_pair
+            uv_layers = umesh.obj.data.uv_layers
+            if _all_channels := self.all_channels and len(uv_layers) > 1:
+                prev_index = uv_layers.active_index
+                indexes = list(range(len(uv_layers)))
+                del indexes[prev_index]
+                indexes.append(prev_index)
+                seams = [False] * umesh.total_corners
+
+                corners = [crn for f in faces for crn in f.loops]
+                for first_loop_check, active_index in enumerate(indexes):
+                    uv_layers.active_index = active_index
+
+                    if first_loop_check == 0:
+                        for idx, crn in enumerate(corners):
+                            crn_edge = crn.edge
+                            pair = crn.link_loop_radial_prev
+                            if crn == pair:
+                                seams[idx] = True
+                            elif not is_pair(crn, pair, uv):
+                                seams[idx] = True
+                            elif (pair_face := pair.face).hide if sync else not (pair_face := pair.face).select:  # if hidden
+                                seams[idx] = True
+                            elif self.by_sharps and not crn_edge.smooth:
+                                seams[idx] = True
+                            elif self.mtl and crn.face.material_index != pair_face.material_index:
+                                seams[idx] = True
+                            elif crn_edge.seam and self.addition:
+                                seams[idx] = True
+                    else:
+                        for idx, crn in enumerate(corners):
+                            if seams[idx]:
+                                continue
+                            elif not is_pair(crn, crn.link_loop_radial_prev, uv):
+                                seams[idx] = True
+
+                for idx, crn in enumerate(corners):
+                    crn.edge.seam = seams[idx]
+
+                uv_layers.active_index = prev_index
+
+            else:
+                for f in faces:
+                    for crn in f.loops:
+                        crn_edge = crn.edge
+                        pair = crn.link_loop_radial_prev
+                        if crn == pair:
+                            crn_edge.seam = True
+                        elif not is_pair(crn, pair, uv):
+                            crn_edge.seam = True
+                        elif (pair_face := pair.face).hide if sync else not (pair_face := pair.face).select:  # if hidden
+                            crn_edge.seam = True
+                        elif self.by_sharps and not crn_edge.smooth:
+                            crn_edge.seam = True
+                        elif self.mtl and f.material_index != pair_face.material_index:
+                            crn_edge.seam = True
+                        elif not self.addition:
+                            crn_edge.seam = False
 
         self.umeshes.update()
         return {'FINISHED'}
