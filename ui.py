@@ -168,7 +168,8 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_check_flipped', text='Flipped')
 
         split = col_align.split(align=True)
-        split.row(align=True).operator('uv.univ_check_non_splitted', text='Non-Splitted')
+        split.operator('uv.univ_check_non_splitted', text='Non-Splitted')
+        split.operator('uv.univ_check_overlap', text='Overlap')
 
         # Seam
         col_align = col.column(align=True)

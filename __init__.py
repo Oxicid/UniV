@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 6, 9),
+    "version": (2, 7, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -54,6 +54,7 @@ try:
         inspect.UNIV_OT_Check_Zero,
         inspect.UNIV_OT_Check_Flipped,
         inspect.UNIV_OT_Check_Non_Splitted,
+        inspect.UNIV_OT_Check_Overlap,
         # Transforms
         transform.UNIV_OT_Orient,
         transform.UNIV_OT_Orient_VIEW3D,

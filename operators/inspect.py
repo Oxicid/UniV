@@ -280,3 +280,33 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         if r_text:
             r_text = f'Found: {sum(counters)} non splitted edges. {r_text}'
         return r_text
+
+class UNIV_OT_Check_Overlap(Operator):
+    bl_idname = 'uv.univ_check_overlap'
+    bl_label = 'Select Overlap'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.ops.uv.select_overlap()
+        count = 0
+        for umesh in types.UMeshes():
+            if umesh.sync:
+                count += umesh.total_edge_sel
+            else:
+                if umesh.is_full_face_deselected:
+                    continue
+                uv = umesh.uv
+                if umesh.is_full_face_selected:
+                    for f in umesh.bm.faces:
+                        for crn in f.loops:
+                            count += crn[uv].select_edge
+                else:
+                    for f in umesh.bm.faces:
+                        if f.select:
+                            for crn in f.loops:
+                                count += crn[uv].select_edge
+        if count:
+            self.report({'WARNING'}, f"Found about {count} edges with overlap")
+        else:
+            self.report({'INFO'}, f"Edges with overlap not found")
+        return {'FINISHED'}

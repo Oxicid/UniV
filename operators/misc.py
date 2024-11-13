@@ -46,7 +46,7 @@ class UNIV_OT_Pin(Operator):
             if self.umeshes.sync:
                 has_selected = any(u.total_vert_sel for u in self.umeshes)
             else:
-                has_selected = any(any(utils.calc_selected_uv_corners_iter(u)) for u in self.umeshes)
+                has_selected = any(any(utils.calc_selected_uv_vert_corners_iter(u)) for u in self.umeshes)
 
             if has_selected:
                 bpy.ops.uv.pin(clear=self.clear)
