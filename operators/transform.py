@@ -1738,9 +1738,18 @@ class UNIV_OT_Orient(Operator):
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         self.umeshes = types.UMeshes(report=self.report)
         # Island Orient
-        if self.mode == 'ISLAND':
+        if self.mode == 'ISLAND':  # TODO: Remove island mode (make union). Both island and edge mode must be calculated at the same time
             self.orient_island(extended=True)
             if self.skip_count == len(self.umeshes):
+                if self.umeshes.elem_mode in ('VERTEX', 'EDGE') and any(umesh.has_selected_edges for umesh in self.umeshes):
+                    # Edge Orient
+                    if self.sync:
+                        self.orient_edge_sync()
+                    else:
+                        self.orient_edge()
+                    if any(umesh.update_tag for umesh in self.umeshes):
+                        return self.umeshes.update()
+
                 self.orient_island(extended=False)
                 if self.skip_count == len(self.umeshes):
                     return self.umeshes.update(info="No uv for manipulate")
@@ -1770,23 +1779,25 @@ class UNIV_OT_Orient(Operator):
             for island in Islands.calc_visible(umesh):
                 corners = (crn for f in island for crn in f.loops if crn[uv].select_edge)
 
-                for crn_ in corners:
-                    diff: Vector = (v1 := crn_[uv].uv) - (v2 := crn_.link_loop_next[uv].uv)
-                    if not any(diff):
-                        continue
-                    if self.edge_dir == 'BOTH':
-                        current_angle = atan2(*diff)
-                        angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
-                    elif self.edge_dir == 'HORIZONTAL':
-                        vec = diff.normalized()
-                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
-                    else:
-                        vec = diff.normalized()
-                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+                if not (max_length_crn := max(corners, key=lambda c: (c[uv].uv - c.link_loop_next[uv].uv).length, default=None)):
+                    continue
 
-                    pivot: Vector = (v1 + v2) / 2
-                    umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
-                    break
+                diff: Vector = (v1 := max_length_crn[uv].uv) - (v2 := max_length_crn.link_loop_next[uv].uv)
+                if not any(diff):
+                    continue
+
+                if self.edge_dir == 'BOTH':
+                    current_angle = atan2(*diff)
+                    angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
+                elif self.edge_dir == 'HORIZONTAL':
+                    vec = diff.normalized()
+                    angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
+                else:
+                    vec = diff.normalized()
+                    angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+
+                pivot: Vector = (v1 + v2) / 2
+                umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
 
     def orient_edge_sync(self):
         self.skip_count = 0

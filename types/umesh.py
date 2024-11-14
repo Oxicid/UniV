@@ -125,9 +125,26 @@ class UMesh:
         if not self.total_face_sel:
             return False
         uv = self.uv
-        if bpy.context.tool_settings.uv_select_mode == 'EDGE':
-            return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
-        return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+        if self.is_full_face_selected:
+            if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+                return any(all(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
+            return any(all(crn[uv].select for crn in f.loops) for f in self.bm.faces)
+        else:
+            if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+                return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
+            return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+
+    @property
+    def has_selected_edges(self) -> bool:
+        """Warning: Edges might be without corners in sync mode"""
+        if self.sync:
+            return bool(self.total_edge_sel)
+        if not self.total_face_sel:
+            return False
+        uv = self.uv
+        if self.is_full_face_selected:
+            return any(any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
+        return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
 
     @property
     def has_visible_uv_faces(self) -> bool:
