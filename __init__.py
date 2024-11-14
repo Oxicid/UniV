@@ -125,6 +125,7 @@ def register():
         reload.reload(globals())
         if not classes:
             raise AttributeError('Failed to load operators, try re-enabling or restarting Blender')
+
     is_enabled = True
 
     for c in classes:
@@ -133,7 +134,11 @@ def register():
         except Exception:  # noqa
             traceback.print_exc()
 
-    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=preferences.UNIV_Settings)
+    # WARNING: When modules are reloaded, classes are overwritten and have no registration.
+    # To avoid this, it is necessary to use initially registered classes.
+    # Perhaps it does not allow to reload operators in a normal way.
+    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[1])
+
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
@@ -147,6 +152,10 @@ def register():
 def unregister():
     keymaps.remove_keymaps()
 
+    for scene in bpy.data.scenes:
+        if "univ_settings" in scene:
+            del scene["univ_settings"]
+
     for c in reversed(classes):
         try:
             bpy.utils.unregister_class(c)
@@ -158,10 +167,6 @@ def unregister():
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
-
-    for scene in bpy.data.scenes:
-        if "univ_settings" in scene:
-            del scene["univ_settings"]
 
 
 if __name__ == "__main__":
