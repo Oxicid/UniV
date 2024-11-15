@@ -7,6 +7,7 @@ if 'bpy' in locals():
 
 import bpy
 
+from . import unwrap
 from .. import types
 
 from ..types import Islands
@@ -20,13 +21,14 @@ class RelaxData:
         self.border_corners = _border_corners
         self.save_transform_islands = _save_transform_islands
 
-
-class UNIV_OT_Relax(bpy.types.Operator):
+class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     bl_idname = "uv.univ_relax"
     bl_label = "Relax"
+    bl_description = "Warning: Incorrect behavior with flipped islands"
     bl_options = {'REGISTER', 'UNDO'}
 
-    iterations: bpy.props.IntProperty(name='Iterations', default=50, min=5, max=600, soft_min=50, soft_max=200)
+    iterations: bpy.props.IntProperty(name='Iterations', default=20, min=5, max=150, soft_max=50)
+    legacy: bpy.props.BoolProperty(name='Legacy Behavior', default=False)
     border_blend: bpy.props.FloatProperty(name='Border Blend', default=0.1, min=0, soft_min=0, soft_max=1)
 
     @classmethod
@@ -34,28 +36,46 @@ class UNIV_OT_Relax(bpy.types.Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
+        if self.slim_support and not self.legacy and unwrap.MULTIPLAYER != 1:
+            self.layout.label(text=f'Multiplayer: x{unwrap.MULTIPLAYER}')
         self.layout.prop(self, 'iterations', slider=True)
-        self.layout.prop(self, 'border_blend', slider=True)
+        if not self.slim_support or self.legacy:
+            self.layout.prop(self, 'border_blend', slider=True)
+        if self.slim_support:
+            self.layout.prop(self, 'legacy')
 
     def invoke(self, context, event):
         return self.execute(context)
 
     def __init__(self):
-        self.sync: bool = utils.sync()
-        self.umeshes: types.UMeshes | None = None
+        super().__init__()
+        self.slim_support: bool = bpy.app.version >= (4, 3, 0)
+        if self.slim_support:
+            self.unwrap = 'MINIMUM_STRETCH'
 
     def execute(self, context):
-        self.umeshes = types.UMeshes()
-        if self.sync:
-            if bpy.context.tool_settings.mesh_select_mode[2]:
-                self.relax_sync_faces()
-            else:
-                self.relax_sync_verts_edges()
-        else:
-            self.relax_non_sync()
 
-        for umesh in self.umeshes:
-            umesh.bm.select_flush_mode()
+        self.umeshes = types.UMeshes()
+        if not self.slim_support or self.legacy:
+            if self.umeshes.sync:
+                if bpy.context.tool_settings.mesh_select_mode[2]:
+                    self.relax_sync_faces()
+                else:
+                    self.relax_sync_verts_edges()
+            else:
+                self.relax_non_sync()
+
+            for umesh in self.umeshes:
+                umesh.bm.select_flush_mode()
+        else:
+            if self.umeshes.sync:
+                if bpy.context.tool_settings.mesh_select_mode[2]:
+                    self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)
+                else:
+                    self.unwrap_sync_verts_edges(no_flip=True, iterations=self.iterations)
+            else:
+                self.unwrap_non_sync(no_flip=True, iterations=self.iterations)
+
         return self.umeshes.update()
 
     def relax_sync_verts_edges(self):
@@ -133,7 +153,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
     def relax_a(self, relax_data: list[RelaxData]):
         # Relax
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations)
+        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
@@ -142,7 +162,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv_co = crn[uv].uv
                     crn_uv_co[:] = co.lerp(crn_uv_co, self.border_blend)
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations)
+        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
 
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Weld half selected islands
@@ -227,7 +247,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
 
     def relax_b(self, relax_data: list[RelaxData]):
         # Relax
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations)
+        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
@@ -236,7 +256,7 @@ class UNIV_OT_Relax(bpy.types.Operator):
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv = crn[uv]
                     crn_uv.uv = co.lerp(crn_uv.uv, self.border_blend)
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations)
+        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
 
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Weld half selected islands

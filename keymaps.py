@@ -282,6 +282,11 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Relax
+    kmi = km.keymap_items.new('uv.univ_relax', 'R', 'PRESS', alt=True)
+    kmi.active = False
+    keys.append((km, kmi))
+
     # Pack
     kmi = km.keymap_items.new('uv.univ_pack', 'P', 'PRESS')
     kmi.active = False

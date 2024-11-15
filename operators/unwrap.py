@@ -7,7 +7,6 @@ if 'bpy' in locals():
 
 import bpy
 from .. import types
-from .. import utils
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
@@ -16,12 +15,23 @@ class UnwrapData:
         self.islands = island
         self.temp_selected = selected
 
+
+items = [('ANGLE_BASED', 'Hard Surface', ''), ('CONFORMAL', 'Conformal', '')]
+_bl_description = 'Inplace unwrap the mesh of object being edited'
+if bpy.app.version >= (4, 3, 0):
+    items.append(('MINIMUM_STRETCH', 'Organic', ''))
+    _bl_description += "\n\nOrganic Mode has incorrect behavior with pinned and flipped islands"
+
+MULTIPLAYER = 1
+UNIQUE_NUMBER_FOR_MULTIPLY = -1
+
 class UNIV_OT_Unwrap(bpy.types.Operator):
     bl_idname = "uv.univ_unwrap"
     bl_label = "Unwrap"
+    bl_description = _bl_description
     bl_options = {'REGISTER', 'UNDO'}
 
-    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=(('ANGLE_BASED', 'Angle Based', ''), ('CONFORMAL', 'Conformal', '')))
+    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=items)
     unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
                 description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
@@ -49,16 +59,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return self.execute(context)
 
     def __init__(self):
-        self.sync: bool = utils.sync()
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         if context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
-            self.sync = True
 
         self.umeshes = types.UMeshes()
-        if self.sync:
+        if self.umeshes.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:
                 self.unwrap_sync_faces()
             else:
@@ -70,7 +78,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             umesh.bm.select_flush_mode()
         return self.umeshes.update()
 
-    def unwrap_sync_verts_edges(self):
+    def unwrap_sync_verts_edges(self, **unwrap_kwargs):
+        unique_number_for_multiply = 0
         pin_and_inplace = []
         unwrap_data: list[UnwrapData] = []
         for umesh in reversed(self.umeshes):
@@ -92,6 +101,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 islands.indexing()
 
             for isl in islands:
+                if unwrap_kwargs:
+                    unique_number_for_multiply += hash(isl[0])  # multiplayer
                 if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
@@ -136,7 +147,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             pin_and_inplace.append((unpin_uvs, save_transform_islands))
             unwrap_data.append(UnwrapData(umesh, unpin_uvs, save_transform_islands, verts_to_select))
 
-        bpy.ops.uv.unwrap(method=self.unwrap)
+        self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
 
         for ud in unwrap_data:
             for pin in ud.pins:
@@ -151,9 +163,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 for e in ud.umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
-    def unwrap_sync_faces(self):
+    def unwrap_sync_faces(self, **unwrap_kwargs):
         assert bpy.context.tool_settings.mesh_select_mode[2]
         from ..utils import linked_crn_uv_unordered, shared_is_linked
+        unique_number_for_multiply = 0
 
         unwrap_data: list = []
         for umesh in reversed(self.umeshes):
@@ -171,6 +184,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             save_transform_islands = []
             for isl in islands_extended:
+                if unwrap_kwargs:
+                    unique_number_for_multiply += hash(isl[0])  # multiplayer
+
                 if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
@@ -227,7 +243,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     f.select = True
             unwrap_data.append((pinned, to_select, save_transform_islands))
 
-        bpy.ops.uv.unwrap(method=self.unwrap)
+        self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
 
         for pinned, faces, islands in unwrap_data:
             for pin in pinned:
@@ -238,8 +255,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 isl.inplace(self.unwrap_along)
                 isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
 
-    def unwrap_non_sync(self):
+    def unwrap_non_sync(self, **unwrap_kwargs):
         save_transform_islands = []
+        unique_number_for_multiply = 0
         for umesh in reversed(self.umeshes):
             uv = umesh.uv
             if umesh.is_full_face_deselected or not any(crn[uv].select for f in umesh.bm.faces if f.select for crn in f.loops):
@@ -251,6 +269,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 islands.indexing()
 
             for isl in islands:
+                if unwrap_kwargs:
+                    unique_number_for_multiply += hash(isl[0])  # multiplayer
+
                 if self.mark_seam_inner_island:
                     isl.mark_seam(additional=True)
                 else:
@@ -261,11 +282,25 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
 
-        bpy.ops.uv.unwrap(method=self.unwrap)
+        self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+
+        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
 
         for isl in save_transform_islands:
             isl.inplace(self.unwrap_along)
             isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+
+    @staticmethod
+    def multiply_relax(unique_number_for_multiply, unwrap_kwargs):
+        if unwrap_kwargs:
+            global MULTIPLAYER
+            global UNIQUE_NUMBER_FOR_MULTIPLY
+            if UNIQUE_NUMBER_FOR_MULTIPLY == unique_number_for_multiply:
+                MULTIPLAYER += 1
+                unwrap_kwargs['iterations'] *= MULTIPLAYER
+            else:
+                MULTIPLAYER = 1
+                UNIQUE_NUMBER_FOR_MULTIPLY = unique_number_for_multiply
 
 # class UNIV_OT_Unwrap_VIEW3D(UNIV_OT_Unwrap):
 #     bl_idname = "mesh.univ_unwrap"
