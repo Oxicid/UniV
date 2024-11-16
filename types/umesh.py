@@ -103,7 +103,7 @@ class UMesh:
             elif self.is_full_face_deselected:
                 return False
             else:
-                return all(f for f in self.bm.faces if not f.hide)
+                return all(f.select for f in self.bm.faces)
 
         if not self.total_face_sel:
             return False
@@ -700,11 +700,8 @@ class UMeshes:
             if umesh.has_full_selected_uv_faces:
                 selected.append(umesh)
             else:
-                visible.append(umesh)
-        if not selected:
-            for umesh2 in reversed(visible):
-                if not umesh2.has_visible_uv_faces:
-                    visible.remove(umesh2)
+                if umesh.has_visible_uv_faces:
+                    visible.append(umesh)
 
         import copy
         u1 = copy.copy(self)
@@ -712,6 +709,10 @@ class UMeshes:
         u1.umeshes = selected
         u2.umeshes = visible
         return u1, u2
+
+    @property
+    def has_update_mesh(self):
+        return any(umesh.update_tag for umesh in self)
 
     def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)
@@ -724,3 +725,6 @@ class UMeshes:
 
     def __bool__(self):
         return bool(self.umeshes)
+
+    def __str__(self):
+        return f"UMeshes Count = {len(self.umeshes)}"

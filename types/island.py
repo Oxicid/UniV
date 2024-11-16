@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+import collections
 
 if 'bpy' in locals():
     from .. import reload
@@ -12,6 +13,7 @@ import mathutils
 import typing
 import enum
 import itertools
+import numpy as np
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
@@ -22,7 +24,7 @@ from bmesh.types import BMFace, BMLoop
 from .. import utils
 from ..utils import umath
 from . import umesh as _umesh
-from. import BBox
+from . import BBox
 
 
 class eInfoSelectFaceIsland(enum.IntEnum):
@@ -1745,29 +1747,133 @@ class UnionIslands(Islands):
             return self.convex_coords
 
     @staticmethod
-    def calc_overlapped_island_groups(adv_islands: list[AdvIsland]) -> list['UnionIslands']:
+    def calc_overlapped_island_groups(adv_islands: list[AdvIsland], threshold=None) -> list['UnionIslands', AdvIsland]:
+        """Warning: Tags should be the default. Optimal Threshold = 0.0005"""
         islands_group = []
         union_islands = []
-        for island_first in adv_islands:
-            if not island_first.tag:
-                continue
-            island_first.tag = False
+        single_islands = []
+        if threshold is not None:
+            if threshold == 0:
+                threshold_to_precision = 20
+            else:
+                threshold_to_precision = max(0, int(-math.log10(threshold)))
 
-            union_islands.append(island_first)
-            compare_index = 0
-            while True:
-                if compare_index > len(union_islands) - 1:
-                    islands_group.append(UnionIslands(union_islands))
-                    union_islands = []
-                    break
+            class ExactOverlap:
+                def __init__(self, island):
+                    self.island = island
+                    self.coords: np.array = np.array
 
-                for isl in adv_islands:
-                    if not isl.tag:
+                def calc_coords(self):
+                    uv = self.island.umesh.uv
+                    self.coords = np.array([crn[uv].uv for f in self.island for crn in f.loops], dtype='float32')
+
+                def compare(self, other, threshold_):
+                    distances = np.linalg.norm(self.coords[:, None] - other.coords, axis=2)
+                    a_matches = np.any(distances < threshold_, axis=1)
+                    b_matches = np.any(distances < threshold_, axis=0)
+                    return np.all(a_matches) and np.all(b_matches)
+
+            # reduce islands by len
+            islands_by_len: collections.defaultdict[int | list[AdvIsland]] = collections.defaultdict(list)
+            for isl in adv_islands:
+                islands_by_len[len(isl)].append(isl)
+
+            islands_by_len_ = islands_by_len.copy()
+            for size, list_of_isl in islands_by_len.items():
+                if len(list_of_isl) == 1:
+                    single_island = islands_by_len_.pop(size)[0]
+                    single_islands.append(single_island)
+
+            # reduce by area_uv
+            islands_by_ngons: collections.defaultdict[typing.Any | list[AdvIsland]] = collections.defaultdict(list)
+            if adv_islands[0].area_uv != -1.0:
+                for list_of_isl in islands_by_len_.values():
+                    islands_by_area_uv: collections.defaultdict[float | list[AdvIsland]] = collections.defaultdict(list)
+                    for isl in list_of_isl:
+                        islands_by_area_uv[round(isl.area_uv, threshold_to_precision)].append(isl)
+
+                    islands_by_area_uv_ = islands_by_area_uv.copy()
+                    for area, list_of_isl_by_area in islands_by_area_uv_.items():
+                        if len(list_of_isl_by_area) == 1:
+                            single_island = islands_by_area_uv_.pop(area)[0]
+                            single_islands.append(single_island)
+                        else:
+                            # reduce by ngons
+                            for isl__ in list_of_isl_by_area:
+                                ngons_sizes = collections.Counter(len(f.loops) for f in isl__)
+                                ngons_sizes = list(ngons_sizes.items())
+                                ngons_sizes.sort(key=lambda a: a[0])
+                                ngons_sizes.append(area)
+                                islands_by_ngons[tuple(ngons_sizes)].append(isl__)
+            else:
+                # reduce by ngons
+                for size, list_of_isl_by_size in islands_by_len_.items():
+                    for isl__ in list_of_isl_by_size:
+                        ngons_sizes = collections.Counter(len(f.loops) for f in isl__)
+                        ngons_sizes = list(ngons_sizes.items())
+                        ngons_sizes.sort(key=lambda a: a[0])
+                        ngons_sizes.append(size)
+                        islands_by_ngons[tuple(ngons_sizes)].append(isl__)
+
+            islands_by_ngons_ = islands_by_ngons.copy()
+            for key, list_of_isl in islands_by_ngons.items():
+                if len(list_of_isl) == 1:
+                    single_island = islands_by_ngons_.pop(key)[0]
+                    single_islands.append(single_island)
+
+            for finished_reduced_islands in islands_by_ngons_.values():
+                exact_islands = []
+                for fin_isl in finished_reduced_islands:
+                    exact_isl = ExactOverlap(fin_isl)
+                    exact_isl.calc_coords()
+                    exact_islands.append(exact_isl)
+
+                for island_first in exact_islands:
+                    if not island_first.island.tag:
                         continue
-                    if union_islands[compare_index].is_overlap(isl):
-                        isl.tag = False
-                        union_islands.append(isl)
-                compare_index += 1
+                    island_first.island.tag = False
+
+                    union_islands.append(island_first)
+                    compare_index = 0
+                    while True:
+                        if compare_index > len(union_islands) - 1:
+                            if len(union_islands) == 1:
+                                single_islands.append(union_islands[0].island)
+                            else:
+                                islands_group.append(UnionIslands([exact_.island for exact_ in union_islands]))
+                            union_islands = []
+                            break
+
+                        for isl in exact_islands:
+                            if not isl.island.tag:
+                                continue
+                            if union_islands[compare_index].compare(isl, threshold):
+                                isl.island.tag = False
+                                union_islands.append(isl)
+                        compare_index += 1
+
+        else:
+            for island_first in adv_islands:
+                if not island_first.tag:
+                    continue
+                island_first.tag = False
+
+                union_islands.append(island_first)
+                compare_index = 0
+                while True:
+                    if compare_index > len(union_islands) - 1:
+                        islands_group.append(UnionIslands(union_islands))
+                        union_islands = []
+                        break
+
+                    for isl in adv_islands:
+                        if not isl.tag:
+                            continue
+                        if union_islands[compare_index].is_overlap(isl):
+                            isl.tag = False
+                            union_islands.append(isl)
+                    compare_index += 1
+        islands_group.extend(single_islands)
         return islands_group
 
     def append(self, island):

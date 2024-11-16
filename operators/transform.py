@@ -2610,7 +2610,9 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
+    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
     lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
+    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -2626,9 +2628,16 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
     def draw(self, context):
         layout = self.layout
         layout.alignment = 'LEFT'
+        if self.lock_overlap:
+            if self.lock_overlap_mode == 'EXACT':
+                layout.prop(self, 'threshold', slider=True)
+            layout.row().prop(self, 'lock_overlap_mode', expand=True)
+
         layout.prop(self, 'lock_overlap')
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
+        if hasattr(self, 'invert'):
+            layout.prop(self, 'invert')
         layout.prop(self, 'use_aspect')
 
     def __init__(self):
@@ -2677,7 +2686,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
             return {'CANCELLED'}
 
         if self.lock_overlap:
-            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands)
+            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
 
         if self.xy_scale or self.shear:
             for isl in all_islands:
@@ -2895,9 +2905,10 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
         if self.invert:
-            unselected_umeshes, selected_umeshes = self.umeshes.filtered_by_full_selected_and_visible_uv_faces()  # swap
+            full_selected, not_full_selected = self.umeshes.filtered_by_full_selected_and_visible_uv_faces()
+            unselected_umeshes = full_selected
+            selected_umeshes = not_full_selected
             self.umeshes = selected_umeshes
-
             if not self.umeshes:
                 self.report({'WARNING'}, 'Islands not found')
                 return {'CANCELLED'}
@@ -2941,7 +2952,8 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             tot_area_3d += adv_islands.calc_area_3d(scale=umesh.value)
 
         if self.lock_overlap:
-            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands)
+            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
 
         if self.xy_scale or self.shear:
             for isl in all_islands:
@@ -3009,34 +3021,43 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.free()
 
         if self.lock_overlap:
-            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands)
+            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
 
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
                 self.individual_scale(isl)
 
-        info_ = 'All target islands were adjusted'
-        if isinstance(tot_area_uv, int):
-            sel = 'selected'
-            unsel = 'unselected'
-            if self.invert:
-                sel, unsel = unsel, sel
+        sel = 'selected'
+        unsel = 'unselected'
+        if self.invert:
+            sel, unsel = unsel, sel
 
-            if (ret := self.umeshes.update(info=info_)) == {'FINISHED'}:
+        self.umeshes.report_obj = None
+        if isinstance(tot_area_uv, int):
+            if (ret := self.umeshes.update()) == {'FINISHED'}:
                 for isl in all_islands:
                     isl.set_position(isl.value, isl.calc_bbox().center)
-                self.report({'INFO'}, f'Islands in {unsel} objects not found, but {sel} was adjusted')
+                self.report({'INFO'}, f'{unsel.capitalize()} objects not found, but {sel} was adjusted')
             else:
-                self.report({'WARNING'}, f"{unsel.capitalize()} islands not found")
+                self.report({'WARNING'}, f"{unsel.capitalize()} objects not found")
 
             self.umeshes.free()
             utils.update_area_by_type('VIEW_3D')
             return ret
 
         self.normalize(all_islands, tot_area_uv, tot_area_3d)
+        self.umeshes.report_obj = self.report
 
-        self.umeshes.update(info=info_)
+        if self.umeshes.has_update_mesh:
+            if not unselected_umeshes:
+                self.umeshes.update(info=f'{unsel.capitalize()} objects not found, but {sel} was adjusted')
+            else:
+                self.umeshes.update(info='All target islands were adjusted')
+        else:
+            self.report({'WARNING'}, f'{unsel.capitalize()} objects not found.')
+
         self.umeshes.free()
         utils.update_area_by_type('VIEW_3D')
 
