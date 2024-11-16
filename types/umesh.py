@@ -597,20 +597,21 @@ class UMeshes:
 
     @classmethod
     def unselected_with_uv(cls):
-        if bpy.context.area.type == 'VIEW_3D':
-            spaces = (bpy.context.area.spaces.active, )
-        else:
-            spaces = (area.spaces.active for area in utils.get_areas_by_type('VIEW_3D'))
-
         visible_objects = []
-        for obj in bpy.context.view_layer.objects:
-            if not obj.select_get() and obj.visible_get() and \
-                    obj.type == 'MESH' and obj.data.polygons and obj.data.uv_layers:
-                if spaces:
-                    if any(obj.visible_in_viewport_get(space) for space in spaces):
-                        visible_objects.append(obj)
-                else:
+        if (area := bpy.context.area).type == 'VIEW_3D' and not area.spaces.active.local_view:
+            for obj in bpy.context.view_layer.objects:
+                if (not obj.select_get()) and obj.visible_get() and (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
                     visible_objects.append(obj)
+        else:
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            spaces = (area.spaces.active for area in utils.get_areas_by_type('VIEW_3D'))
+            for obj in bpy.context.view_layer.objects:
+                if (not obj.select_get()) and (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
+                    if spaces:
+                        if any(obj.evaluated_get(depsgraph).visible_in_viewport_get(space) for space in spaces):
+                            visible_objects.append(obj)
+                    else:
+                        visible_objects.append(obj)
 
         data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
