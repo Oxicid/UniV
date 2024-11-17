@@ -1166,13 +1166,13 @@ class UNIV_OT_Select_Pick(Operator):
         return self.pick_select()
 
     def pick_select(self):
-        min_dist = float('inf')
-        min_isl = None
         sync = self.umeshes.sync
         is_sync_face_mode = self.umeshes.elem_mode == 'FACE'  # TODO: Test with: and sync
 
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
             if self.select:
+                # TODO: Use has_non_full_sel (implement)
                 if (sync and umesh.is_full_face_selected) or (not sync and umesh.is_full_face_deselected):
                     continue
             else:
@@ -1189,39 +1189,36 @@ class UNIV_OT_Select_Pick(Operator):
                     if (is_sync_face_mode and isl.is_full_face_deselected) or \
                             (not is_sync_face_mode and isl.is_full_vert_deselected):
                         continue
+                hit.find_nearest_island(isl)
 
-                if not (res := self.find_nearest_island(self.mouse_pos, min_dist, isl)) is None:
-                    min_dist = res
-                    min_isl = isl
-
-        if not min_isl or (self.max_distance < min_dist):
+        if not hit or (self.max_distance < hit.min_dist):
             return {'CANCELLED'}
 
-        umesh = min_isl.umesh
+        umesh = hit.island.umesh
 
         if sync:
             if self.select:
-                min_isl.select = True
+                hit.island.select = True
             else:
                 if self.umeshes.elem_mode == 'FACE':
-                    min_isl.select = False
+                    hit.island.select = False
                 else:
-                    if any(f.select for f in min_isl):
-                        min_isl.select_all_elem = False
+                    if any(f.select for f in hit.island):
+                        hit.island.select_all_elem = False
                         for f in utils.calc_selected_uv_faces_iter(umesh):
                             for v in f.verts:
                                 v.select = True
                             for e in f.edges:
                                 e.select = True
                     else:
-                        for f in min_isl:
+                        for f in hit.island:
                             for v in f.verts:
                                 v.select = False
                             for e in f.edges:
                                 e.select = False
                         umesh.bm.select_flush_mode()
         else:
-            min_isl.select = self.select
+            hit.island.select = self.select
 
         umesh.update()
 

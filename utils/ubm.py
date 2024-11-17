@@ -10,7 +10,7 @@ import typing
 
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
 from mathutils import Vector
-from mathutils.geometry import area_tri
+from mathutils.geometry import area_tri, intersect_point_tri_2d
 from collections import deque
 
 from .. import types
@@ -503,13 +503,26 @@ def is_flipped_uv(f, uv) -> bool:
     return area < 0
 
 def point_inside_face(pt, f, uv):
-    from mathutils.geometry import intersect_point_tri_2d
     corners = f.loops
-    p1 = corners[0][uv].uv
-    for i in range(1, len(corners)-1):
-        if intersect_point_tri_2d(pt, p1, corners[i][uv].uv, corners[i+1][uv].uv):
-            return True
-    return False
+    if (n := len(corners)) == 4:
+        p1 = corners[0][uv].uv
+        p2 = corners[1][uv].uv
+        p3 = corners[2][uv].uv
+        p4 = corners[3][uv].uv
+        return intersect_point_tri_2d(pt, p1, p2, p3) or intersect_point_tri_2d(pt, p3, p4, p1)
+    elif n == 3:
+        crn_a, crn_b, crn_c = corners
+        return intersect_point_tri_2d(pt, crn_a[uv].uv, crn_b[uv].uv, crn_c[uv].uv)
+    else:
+        p1 = corners[0][uv].uv
+        p2 = corners[1][uv].uv
+        for i in range(2, len(corners)):
+            p3 = corners[i][uv].uv
+            if intersect_point_tri_2d(pt, p1, p2, p3):
+                return True
+            p2 = p3
+        return False
+
 
 def is_boundary_non_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.select)
