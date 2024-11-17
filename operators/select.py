@@ -81,6 +81,7 @@ def add_draw_rect(data):
 class UNIV_OT_SelectLinked(Operator):
     bl_idname = 'uv.univ_select_linked'
     bl_label = 'Linked'
+    bl_description = "Select all UV vertices linked to the active UV map"
     bl_options = {'REGISTER', 'UNDO'}
 
     deselect: bpy.props.BoolProperty(name='Deselect', default=False)
@@ -561,7 +562,7 @@ class UNIV_OT_Select_Square_Island(Operator):
 class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
     bl_idname = 'uv.univ_select_border_edge_by_angle'
     bl_label = 'Border by Angle'
-    bl_description = 'Select Border Edge by Angle'
+    bl_description = 'Select border edges by angle'
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Select Mode', default='SELECT', items=(
@@ -983,6 +984,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
 class UNIV_OT_Select_Border(Operator):
     bl_idname = 'uv.univ_select_border'
     bl_label = 'Border'
+    bl_description = 'Select border edges'
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Select Mode', default='SELECT', items=(
@@ -1045,7 +1047,7 @@ class UNIV_OT_Select_Border(Operator):
 
             uv = umesh.uv
             corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
-            if self.mode == 'SELECT':
+            if self.mode == 'SELECT':  # TODO: Add behavior, border by select (not All)
                 to_select_corns = []
                 for crn in corners:
                     if is_boundary_non_sync(crn, uv):
@@ -1253,6 +1255,10 @@ class UNIV_OT_Select_Pick(Operator):
 class UNIV_OT_Select_Grow(Operator):
     bl_idname = 'uv.univ_select_grow'
     bl_label = 'Grow'
+    bl_description = "Select more UV vertices connected to initial selection\n\n" \
+                     "Default - Grow\n" \
+                     "Ctrl or Alt - Shrink\n\n" \
+                     "Has a [Ctrl + Scroll Up/Down] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     grow: BoolProperty(name='Select', default=True)
@@ -1485,7 +1491,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_description = f"Edge Grow/Shrink Select\n\n" \
                      f"Default - Grow Select \n" \
                      f"Ctrl or Alt - Shrink Select\n\n" \
-                     f"Has a Alt + Scroll Up/Down keymap, but it conflicts with the Frame Offset operator"
+                     f"Has a [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
 
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")

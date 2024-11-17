@@ -148,6 +148,7 @@ class UNIV_OT_Check_Flipped(Operator):
 class UNIV_OT_Check_Non_Splitted(Operator):
     bl_idname = 'uv.univ_check_non_splitted'
     bl_label = 'Non-Splitted'
+    bl_description = "Selects the edges where seams should be marked and unwrapped without connection"
     bl_options = {'REGISTER', 'UNDO'}
 
     check_non_seam: bpy.props.BoolProperty(name='Check Non-Seam', default=True)
@@ -284,6 +285,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 class UNIV_OT_Check_Overlap(Operator):
     bl_idname = 'uv.univ_check_overlap'
     bl_label = 'Overlap'
+    bl_description = "Select all UV faces which overlap each other.\n" \
+                     "Unlike the default operator, this one informs about the number of faces with conflicts"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):

@@ -17,10 +17,11 @@ class UNIV_OT_Pin(Operator):
     bl_idname = 'uv.univ_pin'
     bl_label = 'Pin'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n\n" \
+    bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n" \
+                     f"With sync mode disabled, Edge mode switches to Vertex since the pins are not visible in edge mode\n\n" \
                      f"Default - Set Pin \n" \
                      f"Ctrl or Alt- Clear Pin\n\n" \
-                     f"This button is used to free the 'P' button for the Pack operator."
+                     f"This button is used to free the 'P' button for the Pack operator"
 
     clear: BoolProperty(name='Clear', default=False)
 
@@ -46,6 +47,7 @@ class UNIV_OT_Pin(Operator):
             if self.umeshes.sync:
                 has_selected = any(u.total_vert_sel for u in self.umeshes)
             else:
+                utils.set_select_mode_uv('VERTEX')
                 has_selected = any(any(utils.calc_selected_uv_vert_corners_iter(u)) for u in self.umeshes)
 
             if has_selected:

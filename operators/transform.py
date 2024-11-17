@@ -790,7 +790,13 @@ class UNIV_OT_Flip(Operator):
 class UNIV_OT_Rotate(Operator):
     bl_idname = 'uv.univ_rotate'
     bl_label = 'Rotate'
-    bl_description = 'Rotate CW and Rotate CCW'
+    bl_description = "Rotate CW and Rotate CCW\n\n" \
+                     "Context keymaps on button:\n" \
+                     "\t\tDefault - Rotate\n" \
+                     "\t\tCtrl - By Cursor\n" \
+                     "\t\tShift - Individual\n" \
+                     "\t\tAlt - CCW" \
+                     "Has a [5] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode',
@@ -1110,7 +1116,12 @@ class UNIV_OT_Sort(Operator):
 class UNIV_OT_Distribute(Operator):
     bl_idname = 'uv.univ_distribute'
     bl_label = 'Distribute'
-    bl_description = 'Distribute'
+    bl_description = "Distribute\n\n" \
+                     "Context keymaps on button:\n" \
+                     "\t\tDefault - Distribute\n" \
+                     "\t\tCtrl - To Cursor\n" \
+                     "\t\tShift - Overlapped\n" \
+                     "\t\tAlt - Break"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
@@ -2011,7 +2022,15 @@ class UNIV_OT_Orient_VIEW3D(Operator):
 class UNIV_OT_Weld(Operator):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
-    bl_description = "Weld"
+    bl_description = "Weld selected UV vertices\n\n" \
+                     "If there are paired and unpaired selections with no connections \nat the same time in the off sync mode, \n" \
+                     "the paired connection is given priority, but when you press again, \nthe unpaired selections are also connected.\n" \
+                     "This prevents unwanted connections.\n" \
+                     "Works like Stitch if everything is welded in the island.\n\n" \
+                     "Context keymaps on button:\n" \
+                     "Default - Weld\n" \
+                     "Alt - Weld by Distance\n\n" \
+                     "Has a [W] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     use_by_distance: BoolProperty(name='By Distance', default=False)
@@ -2315,7 +2334,12 @@ class UNIV_OT_Weld(Operator):
 class UNIV_OT_Stitch(Operator):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
-    bl_description = 'Stitch'
+    bl_description = "Stitch selected UV vertices by proximity\n\n" \
+                     "Default - Stitch\n" \
+                     "Alt - Stitch Between\n\n" \
+                     "Has a [Shift + W] keymap. \n" \
+                     "In sync mode when calling stitch via keymap, the stitch priority is done by mouse cursor.\n" \
+                     "In other cases of pairwise selection, prioritization occurs by island size"
     bl_options = {'REGISTER', 'UNDO'}
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
@@ -2864,7 +2888,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
-    bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a Shift + A keymap"
+    bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a [Shift + A] keymap"
 
 class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "mesh.univ_adjust_td"
@@ -3064,7 +3088,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         return {'FINISHED'}
 class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
     bl_idname = "uv.univ_adjust_td"
-    bl_description = UNIV_OT_AdjustScale_VIEW3D.bl_description + "\n\nHas a Alt + A keymap"
+    bl_description = UNIV_OT_AdjustScale_VIEW3D.bl_description + "\n\nHas a [Alt + A] keymap, but it conflicts with the 'Deselect All' operator"
 
 
 class UNIV_OT_Pack(Operator):
@@ -3072,7 +3096,7 @@ class UNIV_OT_Pack(Operator):
     bl_label = 'Pack'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Pack selected islands\n\n" \
-                     f"Has a 'P' keymap, but it conflicts with the 'Pin' operator"
+                     f"Has a [P] keymap, but it conflicts with the 'Pin' operator"
 
     def invoke(self, context, event):
         return self.execute(context)

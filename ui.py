@@ -144,16 +144,16 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_linked')
         row.operator('uv.univ_select_by_cursor')
 
-        row = col.split().row(align=True)
+        row = col_align.split(align=True)#.row(align=True)
         row.operator('uv.univ_select_border')
 
-        split = col.split(factor=0.65, align=True)
+        split = col_align.split(factor=0.65, align=True)
         split.operator('uv.univ_select_border_edge_by_angle').edge_dir = 'BOTH'
         row = split.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', text='H').edge_dir = 'HORIZONTAL'
         row.operator('uv.univ_select_border_edge_by_angle', text='V').edge_dir = 'VERTICAL'
 
-        split = col.split(factor=0.65, align=True)
+        split = col_align.split(factor=0.65, align=True)
         split.operator('uv.univ_select_square_island').shape = 'SQUARE'
         row = split.row(align=True)
         row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
@@ -208,24 +208,24 @@ class UNIV_PT_General_VIEW_3D(Panel):
         split = col_align.split(align=True)
         split.operator('mesh.univ_angle')
 
-        layout.label(text='Project')
-        row = self.layout.row(align=True)
+        col_align.label(text='Project')
+        row = col_align.row(align=True)
         row.operator('mesh.univ_normal')
         row.operator('mesh.univ_box_project')
 
-        layout.label(text='Stack')
-        row = self.layout.row(align=True)
+        col_align.label(text='Stack')
+        row = col_align.row(align=True)
         row.operator('mesh.univ_stack', text='Stack')
 
-        layout.label(text='Transform')
-        layout.operator('mesh.univ_orient_view3d')
+        col_align.label(text='Transform')
+        col_align.operator('mesh.univ_orient_view3d')
 
-        row = layout.row(align=True)
+        row = col_align.row(align=True)
         row.operator('mesh.univ_adjust_td')
         row.operator('mesh.univ_normalize')
 
-        layout.label(text='Texture')
-        row = self.layout.row(align=True)
+        col_align.label(text='Texture')
+        row = col_align.row(align=True)
         row.scale_y = 1.5
         row.operator('mesh.univ_checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')

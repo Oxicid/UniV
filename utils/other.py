@@ -69,7 +69,7 @@ def set_select_mode_mesh(mode: str):
 def get_select_mode_uv() -> typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']:
     return bpy.context.scene.tool_settings.uv_select_mode
 
-def set_select_mode_uv(mode: str):
+def set_select_mode_uv(mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']):
     if get_select_mode_uv() == mode:
         return
     bpy.context.scene.tool_settings.uv_select_mode = mode
