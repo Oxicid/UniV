@@ -3110,8 +3110,9 @@ class UNIV_OT_Pack(Operator):
         args = {
             'udim_source': settings.udim_source,
             'rotate': settings.rotate,
-            'margin_method': 'FRACTION',
             'margin': settings.padding / 2 / utils.resolutions_name_by_value[settings.texture_size]}
+        if bpy.app.version >= (3, 5, 0):
+            args['margin_method'] = 'FRACTION'
         is_360v = bpy.app.version >= (3, 6, 0)
         if is_360v:
             args['scale'] = settings.scale
