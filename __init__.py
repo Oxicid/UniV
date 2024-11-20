@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 8, 0),
+    "version": (2, 8, 4),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -74,6 +74,7 @@ try:
         transform.UNIV_OT_Normalize,
         transform.UNIV_OT_Normalize_VIEW3D,
         transform.UNIV_OT_Pack,
+        transform.UNIV_OT_Shift,
         # Quadrify
         quadrify.UNIV_OT_Quadrify,
         straight.UNIV_OT_Straight,

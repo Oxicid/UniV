@@ -497,9 +497,12 @@ def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv: BMLayerItem):
 
 def is_flipped_uv(f, uv) -> bool:
     area = 0.0
-    uvs = [l[uv].uv for l in f.loops]
-    for i in range(len(uvs)):
-        area += uvs[i - 1].cross(uvs[i])
+    corners = f.loops
+    prev = corners[-1][uv].uv
+    for crn in corners:
+        curr = crn[uv].uv
+        area += prev.cross(curr)
+        prev = curr
     return area < 0
 
 def point_inside_face(pt, f, uv):

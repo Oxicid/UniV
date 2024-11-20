@@ -8,6 +8,7 @@ if 'bpy' in locals():
 import bpy
 import math
 import random
+import typing
 import bl_math
 from collections.abc import Callable
 
@@ -16,7 +17,7 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
-from math import pi, sin, cos, atan2, sqrt
+from math import pi, sin, cos, atan2, sqrt, isclose
 from mathutils import Vector, Matrix
 from collections import defaultdict
 
@@ -1056,7 +1057,7 @@ class UNIV_OT_Sort(Operator):
                     self.sort_islands(is_horizontal, margin, islands)
 
     def calc_area_subgroups(self, islands: list[AdvIsland]):
-        islands.sort(reverse=True, key=lambda a: a.info.area_uv)
+        islands.sort(reverse=True, key=lambda a: a.area_uv)
         splitted = []
         if len(islands) > 1:
             start = islands[0].area_uv
@@ -3138,3 +3139,97 @@ class UNIV_OT_Pack(Operator):
         KEYUP = 0x0002  # Release
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
+
+class UNIV_OT_Shift(Operator):
+    bl_idname = "uv.univ_shift"
+    bl_label = 'Shift'
+    bl_description = "Moving overlapped islands to an adjacent tile, to avoid artifacts when baking"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
+    shift_smaller: BoolProperty(name='Shift Smaller', default=False, description="Sets a higher priority for shifting, for small islands")
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+        if self.lock_overlap_mode == 'EXACT':
+            layout.prop(self, 'threshold', slider=True)
+        else:
+            layout.prop(self, 'shift_smaller')
+        layout.row().prop(self, 'lock_overlap_mode', expand=True)
+
+    def __init__(self):
+        self.has_selected = True
+        self.islands_calc_type: typing.Callable = typing.Callable
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        umeshes = types.UMeshes(report=self.report)
+        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+        if selected_umeshes:
+            self.has_selected = True
+            self.umeshes = selected_umeshes
+            self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+        elif unselected_umeshes:
+            self.has_selected = False
+            self.umeshes = unselected_umeshes
+            self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
+        else:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
+
+        all_islands = []
+
+        for umesh in self.umeshes:
+            umesh.update_tag = False
+            adv_islands = self.islands_calc_type(umesh)  # noqa
+            for isl in reversed(adv_islands):
+                if isl.has_flip_with_noflip():
+                    adv_islands.remove(isl)
+                    noflip, flipped = isl.calc_islands_by_flip_with_mark_seam()
+                    adv_islands.islands.extend(noflip)
+                    adv_islands.islands.extend(flipped)  # TODO: Add info about flip and no flip
+
+            if self.lock_overlap_mode == 'ANY':
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_uv_coords(save_triplet=True)
+            all_islands.extend(adv_islands)
+
+        counter = 0
+        threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
+        # TODO: Add calc Union by bbox for exact (speedup)
+        overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+        for over_isl in reversed(overlapped_islands):
+            if isinstance(over_isl, AdvIsland) or len(over_isl) == 1:
+                overlapped_islands.remove(over_isl)
+                continue
+
+            if self.shift_smaller and self.lock_overlap_mode == 'ANY':
+                for sub_isl in over_isl:
+                    sub_isl.calc_area_uv()
+                f_island = over_isl.islands[0]
+                index_for_bigger = 0
+                for idx_, sub_isl in enumerate(over_isl):
+                    if isclose(f_island.area_uv, sub_isl.area_uv, abs_tol=1e-04):
+                        continue
+                    if sub_isl.area_uv > f_island.area_uv:
+                        f_island = sub_isl
+                        index_for_bigger = idx_
+                if index_for_bigger:
+                    over_isl[0], over_isl[index_for_bigger] = over_isl[index_for_bigger], over_isl[0]
+
+            for idx, isl in enumerate(over_isl):
+                if idx:
+                    counter += 1
+
+                    isl.umesh.update_tag = True
+                    isl.move(Vector((1.0, 0.0)))
+
+        if counter:
+            self.report({'INFO'}, f'Shifted {counter} overlapped islands')
+        self.umeshes.update()
+        return {'FINISHED'}

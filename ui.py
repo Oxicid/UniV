@@ -90,7 +90,9 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_normalize')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_home')
+        row = split.row(align=True)
+        row.operator('uv.univ_home')
+        row.operator('uv.univ_shift')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_random')
@@ -144,7 +146,7 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_linked')
         row.operator('uv.univ_select_by_cursor')
 
-        row = col_align.split(align=True)#.row(align=True)
+        row = col_align.split(align=True)
         row.operator('uv.univ_select_border')
 
         split = col_align.split(factor=0.65, align=True)

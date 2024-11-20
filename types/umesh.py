@@ -12,9 +12,13 @@ from math import pi
 from .. import utils
 from ..types import PyBMesh
 
+class FakeBMesh:
+    def __init__(self, isl):
+        self.faces = isl
+
 class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True):
-        self.bm: bmesh.types.BMesh = bm
+        self.bm: bmesh.types.BMesh | FakeBMesh = bm
         self.obj: bpy.types.Object = obj
         self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
         self.is_edit_bm: bool = is_edit_bm
@@ -33,6 +37,16 @@ class UMesh:
         else:
             self.bm.to_mesh(self.obj.data)
         return True
+
+    def fake_umesh(self, isl):
+        """Need for calculate sub islands"""
+        fake = UMesh(self.bm, self.obj, self.is_edit_bm)
+        fake.update_tag = self.update_tag
+        fake.sync = self.sync
+        fake.value = self.value
+        fake.aspect = self.aspect
+        fake.bm = FakeBMesh(isl)
+        return fake
 
     def free(self):
         self.bm.free()

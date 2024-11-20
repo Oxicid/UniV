@@ -793,6 +793,40 @@ class AdvIsland(FaceIsland):
             self._bbox = BBox.calc_bbox_uv(self.faces, self.umesh.uv)
         return self._bbox
 
+    def has_flip_with_noflip(self):
+        from ..utils import is_flipped_uv
+        uv = self.umesh.uv
+        flip_state = is_flipped_uv(self[-1], uv)
+        for f in self:
+            if flip_state != is_flipped_uv(f, uv):
+                return True
+        return False
+
+    def calc_islands_by_flip_with_mark_seam(self) -> 'tuple[AdvIslands, AdvIslands]':
+        """Warning: All 'bm.faces' must be untagged"""
+        from ..utils import is_flipped_uv
+        uv = self.umesh.uv
+        no_flipped_faces = []
+        flipped_faces = []
+        for f in self:
+            if is_flipped_uv(f, uv):
+                flipped_faces.append(f)
+            else:
+                f.tag = True
+                no_flipped_faces.append(f)
+
+        assert no_flipped_faces and flipped_faces
+
+        fake_umesh = self.umesh.fake_umesh(no_flipped_faces)
+        no_flipped_islands = AdvIslands([AdvIsland(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
+
+        fake_umesh.bm.faces = flipped_faces
+        for flipped_f in flipped_faces:
+            flipped_f.tag = True
+        flipped_islands = AdvIslands([AdvIsland(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
+
+        return no_flipped_islands, flipped_islands
+
     @property
     def bbox(self) -> BBox:
         if self._bbox is None:
@@ -1747,7 +1781,7 @@ class UnionIslands(Islands):
             return self.convex_coords
 
     @staticmethod
-    def calc_overlapped_island_groups(adv_islands: list[AdvIsland], threshold=None) -> list['UnionIslands', AdvIsland]:
+    def calc_overlapped_island_groups(adv_islands: list[AdvIsland], threshold=None) -> list['UnionIslands | AdvIsland']:
         """Warning: Tags should be the default. Optimal Threshold = 0.0005"""
         islands_group = []
         union_islands = []
