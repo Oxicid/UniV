@@ -8,7 +8,6 @@ if 'bpy' in locals():
 import bpy
 import math
 import random
-import typing
 import bl_math
 from collections.abc import Callable
 
@@ -3164,7 +3163,7 @@ class UNIV_OT_Shift(Operator):
 
     def __init__(self):
         self.has_selected = True
-        self.islands_calc_type: typing.Callable = typing.Callable
+        self.islands_calc_type: Callable = Callable
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
@@ -3189,7 +3188,7 @@ class UNIV_OT_Shift(Operator):
             adv_islands = self.islands_calc_type(umesh)  # noqa
             for isl in reversed(adv_islands):
                 if isl.has_flip_with_noflip():
-                    adv_islands.remove(isl)
+                    adv_islands.islands.remove(isl)
                     noflip, flipped = isl.calc_islands_by_flip_with_mark_seam()
                     adv_islands.islands.extend(noflip)
                     adv_islands.islands.extend(flipped)  # TODO: Add info about flip and no flip
