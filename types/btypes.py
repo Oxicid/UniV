@@ -27,12 +27,15 @@ from ctypes import (
     c_float,
     c_short,
     c_int,
+    c_uint,
     c_long,
     c_int64,
     c_char,
     # cast,
     c_void_p,
     sizeof,
+    c_size_t,
+    c_bool,
     # addressof
 )
 
@@ -420,6 +423,112 @@ class ARegion(StructBase):
         category_history[0].idname = name
         return True
 
+# source/blender/makesdna/DNA_ID.h | rev 362
+class ID_Runtime_Remap(StructBase):
+    status:                 c_int
+    skipped_refcounted:     c_int
+    skipped_direct:         c_int
+    skipped_indirect:       c_int
+
+
+# source/blender/makesdna/DNA_ID.h | rev 362
+class ID_Runtime(StructBase):
+    remap:                  ID_Runtime_Remap
+
+class ID(StructBase):
+    next:                   c_void_p
+    prev:                   c_void_p
+
+    newid:                  lambda: POINTER(ID)
+    lib:                    c_void_p  # Library
+    asset_data:             c_void_p  # AssetMetaData
+
+    name:                   c_char * 66  # MAX_ID_NAME
+    flag:                   c_short
+    tag:                    c_int
+    us:                     c_int
+    icon_id:                c_int
+    recalc:                 c_uint
+    recalc_up_to_undo_push: c_uint
+    recalc_after_undo_push: c_uint
+
+    session_uuid:           c_uint
+
+    properties:             c_void_p  # IDProperty
+    override_library:       c_void_p  # IDOverrideLibrary
+    orig_id:                lambda: POINTER(ID)
+    py_instance:            c_void_p
+    library_weak_reference: c_void_p
+    _pad1:                  c_void_p
+    runtime:                ID_Runtime
+
+
+# source/blender/makesdna/DNA_windowmanager_types.h | rev 362
+class ReportList(StructBase):
+    list:           ListBase  # Report
+    printlevel:     c_int
+    storelevel:     c_int
+    flag:           c_int
+    _pad4:          c_char * 4
+    reporttimer:    c_void_p  # wmTimer
+
+
+class UndoStep(StructBase):
+    next: lambda: POINTER(UndoStep)
+    prev: lambda: POINTER(UndoStep)
+    name: c_char * 64
+    type: c_void_p
+
+    data_size:          c_size_t
+    skip:               c_bool
+    use_memfile_step:   c_bool
+    use_old_bmain_data: c_bool
+    is_applied:         c_bool
+
+class UndoStack(StructBase):
+    steps: ListBase(ListBase)
+    step_active: POINTER(UndoStep)
+    step_active_memfile: POINTER(UndoStep)
+    step_init: POINTER(UndoStep)
+    group_level: c_int
+
+# source/blender/makesdna/DNA_windowmanager_types.h | rev 362
+class wmWindowManager(StructBase):
+    ID:                         lambda: ID
+
+    windrawable:                c_void_p
+    winactive:                  c_void_p
+    windows:                    ListBase
+
+    initialized:                c_short
+    file_saved:                 c_short
+    op_undo_depth:              c_short
+
+    outliner_sync_select_dirty: c_short
+
+    operators:                  ListBase  # Operator undo history
+
+    notifier_queue:             ListBase
+
+    if version > (3, 2, 2):
+        notifier_queue_set:     c_void_p  # GSet
+
+    reports:                    ReportList
+    jobs:                       ListBase
+    paintcursors:               ListBase
+    drags:                      ListBase
+    keyconfigs:                 ListBase
+
+    defaultconf:                c_void_p  # wmKeyConfig
+    addonconf:                  c_void_p  # wmKeyConfig
+    userconf:                   c_void_p  # wmKeyConfig
+
+    timers:                     ListBase
+    autosavetimer:              c_void_p  # wmTimer
+    undo_stack:                 c_void_p  # UndoStack
+    is_interface_locked:        c_char
+    _pad7:                      c_char * 7
+    message_bus:                c_void_p  # wmMsgBus
 
 class CBMesh(StructBase):
     totvert: c_int

@@ -51,10 +51,10 @@ def round_threshold(a, min_clip):
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     line_vec = l_b - l_a
     pt_vec = pt - l_a
-    line_len_squared = line_vec.dot(line_vec)
+    if not (line_len_squared := line_vec.dot(line_vec)):
+        return l_a
 
     projection = pt_vec.dot(line_vec) / line_len_squared
-
     if projection < 0:
         return l_a
     elif projection > 1:
