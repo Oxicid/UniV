@@ -23,7 +23,7 @@ class UNIV_OT_Check_Zero(Operator):
     bl_description = "Select degenerate UVs (zero area UV triangles)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    precision: FloatProperty(name='Precision', default=0.0001, min=0, soft_max=0.001, step=0.0001, precision=7)  # noqa
+    precision: FloatProperty(name='Precision', default=1e-6, min=0, soft_max=0.001, step=0.0001, precision=7)  # noqa
 
     def draw(self, context):
         self.layout.prop(self, 'precision', slider=True)

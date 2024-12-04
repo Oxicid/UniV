@@ -2800,7 +2800,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
         zero_area_islands = []
         for isl in islands:
-            if math.isclose(isl.area_3d, 0.0, abs_tol=0.00001) or math.isclose(isl.area_uv, 0.0, abs_tol=0.00001):
+            if isclose(isl.area_3d, 0.0, abs_tol=1e-6) or isclose(isl.area_uv, 0.0, abs_tol=1e-6):
                 zero_area_islands.append(isl)
                 continue
 
