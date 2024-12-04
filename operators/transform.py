@@ -2410,9 +2410,8 @@ class UNIV_OT_Stitch(Operator):
                     for _ff in __island:
                         for crn_ in _ff.loops:
                             if crn_.edge.select:
-                                min_dist = min((min_dist,
-                                                (mouse_position - crn_[uv].uv).length_squared,
-                                                (mouse_position - crn_.link_loop_next[uv].uv).length_squared))
+                                closest_pt = utils.closest_pt_to_line(mouse_position, crn_[uv].uv, crn_.link_loop_next[uv].uv)
+                                min_dist = min(min_dist, (closest_pt-mouse_position).length_squared)
                     return min_dist
 
                 mouse_position = self.mouse_position
