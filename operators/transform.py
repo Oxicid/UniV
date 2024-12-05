@@ -1718,153 +1718,150 @@ class UNIV_OT_Orient(Operator):
         ('HORIZONTAL', 'Horizontal', ''),
         ('VERTICAL', 'Vertical', ''),
     ))
-
-    mode: EnumProperty(name='Mode', default='ISLAND', items=(
-        ('ISLAND', 'Island', ''),
-        ('EDGE', 'Edge', ''),
-    ))
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     def draw(self, context):
-        self.layout.row().prop(self, 'mode', expand=True)
         self.layout.row().prop(self, 'edge_dir', expand=True)
         self.layout.prop(self, 'use_correct_aspect', toggle=1)
 
     def invoke(self, context, event):
-        if not (event.value == 'PRESS'):
-            self.mode = 'EDGE' if event.alt else 'ISLAND'
+        # if event.value == 'PRESS':
         return self.execute(context)
+        # self.mode = 'EDGE' if event.alt else 'ISLAND'
+        # return self.execute(context)
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def __init__(self):
-        self.skip_count: int = 0
         self.aspect: float = 1.0
-        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         self.umeshes = types.UMeshes(report=self.report)
-        # Island Orient
-        if self.mode == 'ISLAND':  # TODO: Remove island mode (make union). Both island and edge mode must be calculated at the same time
-            self.orient_island(extended=True)
-            if self.skip_count == len(self.umeshes):
-                if self.umeshes.elem_mode in ('VERTEX', 'EDGE') and any(umesh.has_selected_edges for umesh in self.umeshes):
-                    # Edge Orient
-                    if self.sync:
-                        self.orient_edge_sync()
+        islands_of_mesh = []
+
+        has_any_selected_elements = False
+        for umesh in self.umeshes:
+            umesh.update_tag = False
+            uv = umesh.uv
+            if islands := Islands.calc_visible(umesh):
+                islands_of_mesh.append(islands)
+                if self.umeshes.sync and umesh.is_full_edge_deselected:
+                    continue
+                for island in islands:
+                    has_selected_edge = False
+                    has_selected_faces = False
+
+                    if self.umeshes.sync:
+                        if any(f.select for f in island):  # orient island
+                            has_selected_faces = True
+                        elif any(e.select for f in island for e in f.edges):  # orient by edges
+                            has_selected_edge = True
                     else:
-                        self.orient_edge()
-                    if any(umesh.update_tag for umesh in self.umeshes):
-                        return self.umeshes.update()
+                        for f in island:
+                            if has_selected_faces:
+                                break
+                            corners = f.loops
+                            counter = 0
+                            for crn in corners:
+                                select_state = crn[uv].select_edge
+                                counter += select_state
+                                has_selected_edge |= select_state
+                            has_selected_faces = len(corners) == counter  # optimized, instead any
+                    has_any_selected_elements |= has_selected_edge or has_selected_faces
 
-                self.orient_island(extended=False)
-                if self.skip_count == len(self.umeshes):
-                    return self.umeshes.update(info="No uv for manipulate")
-            return self.umeshes.update(info="All islands oriented")
+                    if has_selected_faces:
+                        self.orient_island(island)
+                    elif has_selected_edge:
+                        self.orient_edge(island)
 
-        # Edge Orient
-        if self.sync:
-            self.orient_edge_sync()
+        if not has_any_selected_elements and islands_of_mesh:
+            for islands in islands_of_mesh:
+                for isl in islands:
+                    self.orient_island(isl)
+        elif not has_any_selected_elements and not islands_of_mesh:
+            self.report({'WARNING'}, "Islands not found")
+            return {"CANCELLED"}
+
+        return self.umeshes.update(info="All islands oriented")
+
+    def orient_edge(self, island):
+        uv = island.umesh.uv
+        if island.umesh.sync:
+            corners = (crn for f in island for crn in f.loops if crn.edge.select)
         else:
-            self.orient_edge()
+            corners = (crn for f in island for crn in f.loops if crn[uv].select_edge)
 
-        if self.skip_count == len(self.umeshes):
-            return self.umeshes.update(info="No selected edges")
-        return self.umeshes.update(info="All islands aligned")
+        if not (max_length_crn := max(corners, key=lambda c: (c[uv].uv - c.link_loop_next[uv].uv).length, default=None)):
+            return
 
-    def orient_edge(self):
-        self.skip_count = 0
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            umesh.update_tag = False
+        vec_aspect = Vector((self.aspect, 1.0))
+        v1 = max_length_crn[uv].uv
+        v2 = max_length_crn.link_loop_next[uv].uv
+        diff: Vector = (v2 - v1) * vec_aspect
 
-            if umesh.is_full_face_deselected or \
-                    not any(crn[uv].select_edge for f in umesh.bm.faces for crn in f.loops):
-                self.skip_count += 1
+        if not any(diff):  # TODO: Use inspect (Zero)
+            return
+        diff.normalize()
+        if self.edge_dir == 'BOTH':
+            current_angle = atan2(*diff)
+            angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
+        elif self.edge_dir == 'HORIZONTAL':
+            vec = diff.normalized()
+            angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
+        else:
+            vec = diff.normalized()
+            angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+
+        pivot: Vector = (v1 + v2) / 2
+        island.umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
+
+    def orient_island(self, island):
+        from collections import Counter
+        uv = island.umesh.uv
+
+        angles: Counter[float | float] = Counter()
+        boundary_coords = []
+
+        is_boundary = utils.is_boundary_sync if island.umesh.sync else utils.is_boundary_non_sync
+        boundary_corners = (crn for f in island for crn in f.loops if is_boundary(crn, uv))
+
+        vec_aspect = Vector((self.aspect, 1.0))
+        for crn in boundary_corners:
+            v1 = crn[uv].uv
+            v2 = crn.link_loop_next[uv].uv
+            boundary_coords.append(v1)
+
+            diff: Vector = (v2 - v1) * vec_aspect
+
+            if not any(diff):
                 continue
 
-            for island in Islands.calc_visible(umesh):
-                corners = (crn for f in island for crn in f.loops if crn[uv].select_edge)
+            current_angle = atan2(*diff)
+            angle_to_rotate = -utils.find_min_rotate_angle(round(current_angle, 4))
+            angles[round(angle_to_rotate, 4)] += diff.length
 
-                if not (max_length_crn := max(corners, key=lambda c: (c[uv].uv - c.link_loop_next[uv].uv).length, default=None)):
-                    continue
+        if not angles:
+            return
 
-                diff: Vector = (v1 := max_length_crn[uv].uv) - (v2 := max_length_crn.link_loop_next[uv].uv)
-                if not any(diff):
-                    continue
+        angle = max(angles, key=angles.get)
 
-                if self.edge_dir == 'BOTH':
-                    current_angle = atan2(*diff)
-                    angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
-                elif self.edge_dir == 'HORIZONTAL':
-                    vec = diff.normalized()
-                    angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
-                else:
-                    vec = diff.normalized()
-                    angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
+        bbox = types.BBox.calc_bbox(boundary_coords)
+        island.umesh.update_tag |= island.rotate(angle, bbox.center, self.aspect)
 
-                pivot: Vector = (v1 + v2) / 2
-                umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
+        bbox = types.BBox.calc_bbox(boundary_coords)
+        if self.edge_dir == 'HORIZONTAL':
+            if bbox.width*self.aspect < bbox.height:
+                final_angle = pi/2 if angle < 0 else -pi/2
+                island.umesh.update_tag |= island.rotate(final_angle, bbox.center, self.aspect)
 
-    def orient_edge_sync(self):
-        self.skip_count = 0
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            umesh.update_tag = False
-
-            if umesh.is_full_edge_deselected:
-                self.skip_count += 1
-                continue
-
-            _islands = Islands.calc_visible(umesh)
-            _islands.indexing(force=False)
-            for idx, island in enumerate(_islands):
-                luvs = (l for f in island for e in f.edges if e.select for l in e.link_loops if l.face.index == idx and l.face.tag)
-
-                for l in luvs:
-                    diff: Vector = (v1 := l[uv].uv) - (v2 := l.link_loop_next[uv].uv)
-                    if not any(diff):
-                        continue
-                    if self.edge_dir == 'BOTH':
-                        current_angle = atan2(*diff)
-                        angle_to_rotate = -utils.find_min_rotate_angle(current_angle)
-                    elif self.edge_dir == 'HORIZONTAL':
-                        vec = diff.normalized()
-                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((-1, 0)))) < abs(b := vec.angle_signed(Vector((1, 0)))) else b
-                    else:
-                        vec = diff.normalized()
-                        angle_to_rotate = a if abs(a := vec.angle_signed(Vector((0, -1)))) < abs(b := vec.angle_signed(Vector((0, 1)))) else b
-
-                    pivot: Vector = (v1 + v2) / 2
-                    umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
-                    break
-
-    def orient_island(self, extended):
-        self.skip_count = 0
-        for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
-                for island in adv_islands:
-                    points = island.calc_convex_points()
-
-                    angle = -utils.calc_min_align_angle(points, self.aspect)
-                    umesh.update_tag |= island.rotate(angle, island.bbox.center, self.aspect)
-                    island._bbox = None
-
-                    if self.edge_dir == 'HORIZONTAL':
-                        if island.bbox.width*self.aspect < island.bbox.height:
-                            end_angle = pi/2 if angle < 0 else -pi/2
-                            umesh.update_tag |= island.rotate(end_angle, island.bbox.center, self.aspect)
-
-                    elif self.edge_dir == 'VERTICAL':
-                        if island.bbox.width*self.aspect > island.bbox.height:
-                            end_angle = pi / 2 if angle < 0 else -pi / 2
-                            umesh.update_tag |= island.rotate(end_angle, island.bbox.center, self.aspect)
-            else:
-                self.skip_count += 1
+        elif self.edge_dir == 'VERTICAL':
+            if bbox.width*self.aspect > bbox.height:
+                final_angle = pi/2 if angle < 0 else -pi/2
+                island.umesh.update_tag |= island.rotate(final_angle, bbox.center, self.aspect)
 
 
 # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
