@@ -116,7 +116,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='AREA')
 
-    max_pick_distance: IntProperty(name='Max Pick Distance', default=40, min=15, soft_max=100, subtype='PIXEL',
+    max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
 

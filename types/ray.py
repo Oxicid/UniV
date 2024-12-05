@@ -302,6 +302,7 @@ class IslandHit:
         self.island = None
         self.point = pt
         self.min_dist = min_dist
+        self.crn = None
 
     def find_nearest_island(self, isl: AdvIsland):
         from math import isclose
@@ -324,6 +325,7 @@ class IslandHit:
                 if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
                     if point_inside_face(pt, f, uv):
                         min_dist = dist
+                        # This is necessary for the inequality check to be successful
                         self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
                 elif dist < min_dist:
                     min_dist = dist
@@ -335,6 +337,39 @@ class IslandHit:
         if self.min_dist != min_dist:
             self.min_dist = min_dist
             self.island = isl
+            return True
+        return False
+
+    def find_nearest_island_by_crn(self, isl: AdvIsland):
+        from math import isclose
+        from ..utils import closest_pt_to_line, point_inside_face
+        pt = self.point
+        min_dist = self.min_dist
+        min_crn = None
+
+        uv = isl.umesh.uv
+        for f in isl:
+            corners = f.loops
+            v_prev = corners[-1][uv].uv
+            for crn in corners:
+                v_curr = crn[uv].uv
+
+                close_pt = closest_pt_to_line(pt, v_prev, v_curr)
+
+                if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                    if point_inside_face(pt, f, uv):
+                        min_dist = dist
+                        min_crn = crn
+                        self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                elif dist < min_dist:
+                    min_dist = dist
+                    min_crn = crn
+                v_prev = v_curr
+
+        if self.min_dist != min_dist:
+            self.min_dist = min_dist
+            self.island = isl
+            self.crn = min_crn.link_loop_prev
             return True
         return False
 

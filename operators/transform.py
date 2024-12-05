@@ -34,6 +34,7 @@ from ..types import (
     UnionIslands,
     LoopGroup
 )
+from ..preferences import prefs
 
 
 class UNIV_OT_Crop(Operator):
@@ -1725,10 +1726,9 @@ class UNIV_OT_Orient(Operator):
         self.layout.prop(self, 'use_correct_aspect', toggle=1)
 
     def invoke(self, context, event):
-        # if event.value == 'PRESS':
+        self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+        self.mouse_pos = utils.get_mouse_pos(context, event) if (event.value == 'PRESS' and context.area.ui_type == 'UV') else None
         return self.execute(context)
-        # self.mode = 'EDGE' if event.alt else 'ISLAND'
-        # return self.execute(context)
 
     @classmethod
     def poll(cls, context):
@@ -1736,16 +1736,23 @@ class UNIV_OT_Orient(Operator):
 
     def __init__(self):
         self.aspect: float = 1.0
+        self.mouse_pos: Vector | None = None
+        self.max_distance: float | None = None
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         self.umeshes = types.UMeshes(report=self.report)
-        islands_of_mesh = []
 
-        has_any_selected_elements = False
         for umesh in self.umeshes:
             umesh.update_tag = False
+
+        islands_of_mesh = []
+
+        selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+
+        has_any_selected_elements = False
+        for umesh in selected:
             uv = umesh.uv
             if islands := Islands.calc_visible(umesh):
                 islands_of_mesh.append(islands)
@@ -1778,11 +1785,37 @@ class UNIV_OT_Orient(Operator):
                     elif has_selected_edge:
                         self.orient_edge(island)
 
-        if not has_any_selected_elements and islands_of_mesh:
+        if not has_any_selected_elements:
+            for umesh in visible:
+                if islands := Islands.calc_visible(umesh):
+                    islands_of_mesh.append(islands)
+
+            hit = types.IslandHit(self.mouse_pos, self.max_distance)
             for islands in islands_of_mesh:
                 for isl in islands:
-                    self.orient_island(isl)
-        elif not has_any_selected_elements and not islands_of_mesh:
+                    if self.mouse_pos:
+                        hit.find_nearest_island_by_crn(isl)
+                    else:
+                        self.orient_island(isl)
+
+            if self.mouse_pos:
+                if hit:
+                    self.orient_edge_ex(hit.island, hit.crn)
+                    uv = hit.island.umesh.uv
+                    length = (hit.crn[uv].uv - hit.crn.link_loop_next[uv].uv).length
+                    if length:
+                        return self.umeshes.update(info="Island oriented")
+                    else:
+                        hit.crn[uv].select = True
+                        hit.crn[uv].select_edge = True
+                        hit.crn.link_loop_next[uv].select = True
+                        hit.crn.face.select = True
+                        hit.island.umesh.update_tag = True
+                        self.report({'WARNING'}, "Island has zero length edge")
+                        return self.umeshes.update()
+                return self.umeshes.update(info_type={'WARNING'}, info="Island not found")
+
+        if not islands_of_mesh:
             self.report({'WARNING'}, "Islands not found")
             return {"CANCELLED"}
 
@@ -1797,11 +1830,12 @@ class UNIV_OT_Orient(Operator):
 
         if not (max_length_crn := max(corners, key=lambda c: (c[uv].uv - c.link_loop_next[uv].uv).length, default=None)):
             return
+        self.orient_edge_ex(island, max_length_crn)
 
-        vec_aspect = Vector((self.aspect, 1.0))
-        v1 = max_length_crn[uv].uv
-        v2 = max_length_crn.link_loop_next[uv].uv
-        diff: Vector = (v2 - v1) * vec_aspect
+    def orient_edge_ex(self, island, tar_crn):
+        v1 = tar_crn[island.umesh.uv].uv
+        v2 = tar_crn.link_loop_next[island.umesh.uv].uv
+        diff: Vector = (v2 - v1) * Vector((self.aspect, 1.0))
 
         if not any(diff):  # TODO: Use inspect (Zero)
             return

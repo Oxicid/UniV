@@ -77,6 +77,9 @@ def get_cursor_location() -> Vector:
             if area.ui_type == 'UV':
                 return area.spaces.active.cursor_location.copy()
 
+def get_mouse_pos(context, event):
+    return Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+
 def get_tile_from_cursor() -> Vector:
     if cursor := get_cursor_location():
         return Vector((math.floor(val) for val in cursor))

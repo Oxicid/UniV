@@ -339,6 +339,12 @@ def add_keymaps():
     kmi.active = False
     keys.append((km, kmi))
 
+    # Orient
+    kmi = km.keymap_items.new('uv.univ_orient', 'O', 'PRESS')
+    kmi.active = False
+    kmi.properties.edge_dir = 'BOTH'
+    keys.append((km, kmi))
+
 def remove_keymaps():
     global keys
     import traceback

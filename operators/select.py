@@ -1164,7 +1164,7 @@ class UNIV_OT_Select_Pick(Operator):
     def invoke(self, context, event):
         self.umeshes = UMeshes()
         self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-        self.mouse_pos = self.get_mouse_pos(event, context.region.view2d)
+        self.mouse_pos = utils.get_mouse_pos(context, event)
         return self.pick_select()
 
     def pick_select(self):
@@ -1225,31 +1225,6 @@ class UNIV_OT_Select_Pick(Operator):
         umesh.update()
 
         return {'FINISHED'}
-
-    @staticmethod
-    def find_nearest_island(pt, min_dist, isl):
-        from ..utils import closest_pt_to_line
-        first_dist = min_dist
-        uv = isl.umesh.uv
-        for f in isl:
-            face_center = Vector((0.0, 0.0))
-            for crn in f.loops:
-                close_pt = closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
-
-                face_center += close_pt
-                if (dist := (close_pt-pt).length) < min_dist:
-                    min_dist = dist
-                # TODO: Check Point inside face, if crn.edge == other_crn.edge
-
-            if (dist := (face_center / len(f.loops) - pt).length) < min_dist:
-                min_dist = dist
-
-        if first_dist != min_dist:
-            return min_dist
-
-    @staticmethod
-    def get_mouse_pos(event, view):
-        return Vector(view.region_to_view(event.mouse_region_x, event.mouse_region_y))
 
 
 class UNIV_OT_Select_Grow(Operator):

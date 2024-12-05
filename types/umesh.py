@@ -149,7 +149,15 @@ class UMesh:
             return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
 
     @property
-    def has_selected_edges(self) -> bool:
+    def has_visible_uv_faces(self) -> bool:
+        if self.total_face_sel:
+            return True
+        if self.sync:
+            return any(not f.hide for f in self.bm.faces)
+        return False
+
+    @property
+    def has_selected_uv_edges(self) -> bool:
         """Warning: Edges might be without corners in sync mode"""
         if self.sync:
             return bool(self.total_edge_sel)
@@ -159,14 +167,6 @@ class UMesh:
         if self.is_full_face_selected:
             return any(any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
         return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
-
-    @property
-    def has_visible_uv_faces(self) -> bool:
-        if self.total_face_sel:
-            return True
-        if self.sync:
-            return any(not f.hide for f in self.bm.faces)
-        return False
 
     @property
     def has_any_selected_crn_non_sync(self):
@@ -691,6 +691,26 @@ class UMeshes:
         visible = []
         for umesh in self:
             if umesh.has_selected_uv_faces:
+                selected.append(umesh)
+            else:
+                visible.append(umesh)
+        if not selected:
+            for umesh2 in reversed(visible):
+                if not umesh2.has_visible_uv_faces:
+                    visible.remove(umesh2)
+
+        import copy
+        u1 = copy.copy(self)
+        u2 = copy.copy(self)
+        u1.umeshes = selected
+        u2.umeshes = visible
+        return u1, u2
+
+    def filtered_by_selected_and_visible_uv_edges(self) -> tuple['UMeshes', 'UMeshes']:
+        selected = []
+        visible = []
+        for umesh in self:
+            if umesh.has_selected_uv_edges:
                 selected.append(umesh)
             else:
                 visible.append(umesh)
