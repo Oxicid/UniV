@@ -26,10 +26,9 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     generated_type: bpy.props.EnumProperty(name='Texture', default='UV_GRID', items=generated_types)
-    # show_in_2d: bpy.props.BoolProperty(name='Show in 2D View', default=True)
-    size_x: bpy.props.EnumProperty(name='X', default='2K', items=utils.resolutions,
+    size_x: bpy.props.EnumProperty(name='X', default='2048', items=utils.resolutions,
                                    update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
-    size_y: bpy.props.EnumProperty(name='Y', default='2K', items=utils.resolutions,
+    size_y: bpy.props.EnumProperty(name='Y', default='2048', items=utils.resolutions,
                                    update=lambda self, _: setattr(self, 'size_x', self.size_y) if self.lock_size and self.size_x != self.size_y else None)
     lock_size: bpy.props.BoolProperty(name='Lock Size', default=True,
                                       update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
@@ -39,16 +38,15 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
-        self.layout.row().prop(self, 'generated_type', expand=True)
-        self.layout.prop(self, 'lock_size')
+        layout = self.layout
+        row = layout.row(align=True, heading='Texture Type')
+        row.scale_x = 0.92
+        row.prop(self, 'generated_type', expand=True)
 
-        row = self.layout.row(align=True, heading='Size')
+        row = layout.row(align=True, heading='Size')
         row.prop(self, 'size_x', text='')
+        row.prop(self, 'lock_size', text='', icon='LOCKED' if self.lock_size else 'UNLOCKED')
         row.prop(self, 'size_y', text='')
-
-    # def invoke(self, context, event):
-    #     wm = context.window_manager
-    #     return wm.invoke_props_dialog(self)
 
     def __init__(self):
         self.pattern_name: str = ''
@@ -58,14 +56,23 @@ class UNIV_OT_Checker(bpy.types.Operator):
         self.int_size_y: int = -1
 
     def execute(self, context):
-        self.pattern_name = self.get_name_from_idname(self.generated_type)
-        self.resolution_name: str = self.resolution_str_values_to_name(self.size_x, self.size_y)
+        self.int_size_x = int(self.size_x)
+        self.int_size_y = int(self.size_y)
+
+        self.pattern_name = self.get_name_from_gen_type_idname(self.generated_type)
+        self.resolution_name: str = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
         self.full_pattern_name = f"UniV_{self.pattern_name}_{self.resolution_name}"
 
-        self.int_size_x = utils.resolutions_name_by_value[self.size_x]
-        self.int_size_y = utils.resolutions_name_by_value[self.size_y]
-
         mtl = self.get_checker_material()
+
+        if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+            for node in mtl.node_tree.nodes:
+                if node.bl_idname == 'ShaderNodeTexImage':
+                    assert node.image.name.startswith(self.full_pattern_name)
+                    space_data = area.spaces.active
+                    space_data.image = node.image
+                    break
+
         node_group = self.get_checker_node_group()
         self.checker_modifier_sanitize()
         self.create_gn_checker_modifier(node_group, mtl)
@@ -272,50 +279,20 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     m['Input_1'] = mtl
 
     @staticmethod
-    def resolution_name_to_values(name: str):
-        if 'x' in name:
-            xsize, ysize = name.split('x')
-        else:
-            xsize = ysize = name
-        return utils.resolutions_name_by_value[xsize], utils.resolutions_name_by_value[ysize]
-
-    @staticmethod
     def resolution_values_to_name(xsize: int, ysize: int):
-        xsize_name = ysize_name = ''
-        if xsize != ysize:
-            for k, v in utils.resolutions_name_by_value.items():
-                if v == xsize:
-                    xsize_name = k
-                if v == ysize:
-                    ysize_name = k
-            assert (xsize_name and ysize_name), f'Not found resolutions {xsize=} {ysize=} in {utils.resolutions_name_by_value}'
-            return f'{xsize_name}x{ysize_name}'
-        else:
-            for k, v in utils.resolutions_name_by_value.items():
-                if v == xsize:
-                    return k
-        assert (xsize_name and ysize_name), f'Not found resolutions {xsize=} {xsize_name=}, {ysize=} {ysize_name=}'
+        x_size_name = utils.resolution_value_to_name[xsize]
+        y_size_name = utils.resolution_value_to_name[ysize]
+        return f'{x_size_name}x{y_size_name}' if xsize != ysize else x_size_name
 
     @staticmethod
-    def resolution_str_values_to_name(xsize: str, ysize: str):
-        return f'{xsize}x{ysize}' if xsize != ysize else xsize
-
-    @staticmethod
-    def get_id_name_from_name(name):
-        for gt in generated_types:
-            if gt[1] == name:
-                return gt[0]
-        raise NotImplementedError(f'Texture {name} not implement')
-
-    @staticmethod
-    def get_name_from_idname(name):
+    def get_name_from_gen_type_idname(name):
         for gt in generated_types:
             if gt[0] == name:
                 return gt[1]
         raise NotImplementedError(f'Texture {name} not implement')
 
     def _generate_checker_texture(self):
-        full_image_name = f"UniV_{self.get_name_from_idname(self.generated_type)}_{self.resolution_str_values_to_name(self.size_x, self.size_y)}"
+        full_image_name = f"UniV_{self.get_name_from_gen_type_idname(self.generated_type)}_{self.resolution_values_to_name(self.int_size_x, self.int_size_y)}"
 
         if self.generated_type in ('UV_GRID', 'COLOR_GRID'):
             before = set(bpy.data.images)
@@ -348,6 +325,11 @@ class UNIV_OT_CheckerCleanup(bpy.types.Operator):
         self.remove_modifiers()
         self.remove_node_group()
         self.remove_materials()
+        # TODO: Close img from selected meshes
+        for a in utils.get_areas_by_type('IMAGE_EDITOR'):
+            space = a.spaces.active
+            if (img := space.image) and img.name.startswith('UniV_'):
+                space.image = None
         self.remove_images()
         return {'FINISHED'}
 

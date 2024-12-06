@@ -56,7 +56,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     merge_overlap: BoolProperty(name='Lock Overlaps', default=False)
     udim_source: EnumProperty(name='Pack to', default='CLOSEST_UDIM', items=_udim_source)
 
-    texture_size: bpy.props.EnumProperty(name='Size', default='2K', items=utils.resolutions,
+    texture_size: bpy.props.EnumProperty(name='Size', default='2048', items=utils.resolutions,
                                          description="Optimal value for UV padding:\n"
                                                      "256 = 2 px\n"
                                                      "512 = 4 px\n"

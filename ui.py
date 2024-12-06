@@ -13,18 +13,13 @@ class UNIV_PT_General(Panel):
     bl_options = {'HIDE_HEADER'}
 
     @staticmethod
-    def draw_align_buttons(where, *, alignment='EXPAND', scale_x=1.0):
+    def draw_align_buttons(where):
         def ly_wide_text_op(layout, direction, *, text):
             row = layout.row(align=True)
             row.operator('uv.univ_align', text=text).direction = direction
 
-        def ly_mid_mid_text_op(layout, direction, *, text, opt='uv.univ_align'):
-            row = layout.row(align=True)
-            row.operator(opt, text=text).direction = direction
-
-        where.alignment = alignment
+        where.alignment = 'EXPAND'
         colMain = where.column(align=True)
-        colMain.scale_x = scale_x
         rowTop = colMain.row(align=True)
 
         ly_wide_text_op(rowTop, 'LEFT_UPPER', text='↖')
@@ -32,12 +27,13 @@ class UNIV_PT_General(Panel):
         ly_wide_text_op(rowTop, 'RIGHT_UPPER', text='↗')
         ##
         rowMiddle = colMain.row().row(align=True)
-        ly_mid_mid_text_op(rowMiddle, 'LEFT', text='← ')
+        ly_wide_text_op(rowMiddle, 'LEFT', text='← ')
         rowMidMiddle = rowMiddle.row().row(align=True)
-        ly_mid_mid_text_op(rowMidMiddle, 'HORIZONTAL', text='—')
-        ly_mid_mid_text_op(rowMidMiddle, 'CENTER', text='+')
-        ly_mid_mid_text_op(rowMidMiddle, 'VERTICAL', text='|')
-        ly_mid_mid_text_op(rowMiddle, 'RIGHT', text=' →')
+
+        ly_wide_text_op(rowMidMiddle, 'HORIZONTAL', text='—')
+        ly_wide_text_op(rowMidMiddle, 'CENTER', text='+')
+        ly_wide_text_op(rowMidMiddle, 'VERTICAL', text='|')
+        ly_wide_text_op(rowMiddle, 'RIGHT', text=' →')
         ##
         rowBottom = colMain.row(align=True)
         ly_wide_text_op(rowBottom, 'LEFT_BOTTOM', text='↙')
