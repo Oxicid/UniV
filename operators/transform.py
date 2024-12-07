@@ -1720,14 +1720,31 @@ class UNIV_OT_Orient(Operator):
         ('VERTICAL', 'Vertical', ''),
     ))
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+    lock_overlap: BoolProperty(name='Lock Overlaps', default=False,
+                               description="Islands are not overlapped if one island has only a selected face and the other only a selected edge")
+    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
 
     def draw(self, context):
-        self.layout.row().prop(self, 'edge_dir', expand=True)
-        self.layout.prop(self, 'use_correct_aspect', toggle=1)
+        layout = self.layout
+        layout.row().prop(self, 'edge_dir', expand=True)
+        layout.prop(self, 'use_correct_aspect', toggle=1)
+
+        if self.lock_overlap:
+            if self.lock_overlap_mode == 'EXACT':
+                layout.prop(self, 'threshold', slider=True)
+            layout.row().prop(self, 'lock_overlap_mode', expand=True)
+        layout.prop(self, 'lock_overlap', toggle=1)
 
     def invoke(self, context, event):
         self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-        self.mouse_pos = utils.get_mouse_pos(context, event) if (event.value == 'PRESS' and context.area.ui_type == 'UV') else None
+        self.mouse_pos = None
+        if event.value == 'PRESS':
+            if context.area.ui_type == 'UV':
+                self.mouse_pos = utils.get_mouse_pos(context, event)
+            return self.execute(context)
+
+        self.lock_overlap = event.shift
         return self.execute(context)
 
     @classmethod
@@ -1736,6 +1753,7 @@ class UNIV_OT_Orient(Operator):
 
     def __init__(self):
         self.aspect: float = 1.0
+        # WARNING: Possible potential error when calling via bpy.ops.uv.univ_orient('DEFAULT') when an old value is used
         self.mouse_pos: Vector | None = None
         self.max_distance: float | None = None
         self.umeshes: types.UMeshes | None = None
@@ -1747,47 +1765,33 @@ class UNIV_OT_Orient(Operator):
         for umesh in self.umeshes:
             umesh.update_tag = False
 
-        islands_of_mesh = []
+        if self.lock_overlap:
+            return self.orient_lock_overlap_processing()
+        else:
+            return self.orient_processing()
 
+    def orient_processing(self):
+        islands_of_mesh = []
+        has_any_selected_elements = False  # This check is necessary because the selected edge can be without faces
         selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_edges()
 
-        has_any_selected_elements = False
         for umesh in selected:
-            uv = umesh.uv
-            if islands := Islands.calc_visible(umesh):
+            if islands := Islands.calc_visible_with_mark_seam(umesh):
                 islands_of_mesh.append(islands)
                 if self.umeshes.sync and umesh.is_full_edge_deselected:
                     continue
                 for island in islands:
-                    has_selected_edge = False
-                    has_selected_faces = False
-
-                    if self.umeshes.sync:
-                        if any(f.select for f in island):  # orient island
-                            has_selected_faces = True
-                        elif any(e.select for f in island for e in f.edges):  # orient by edges
-                            has_selected_edge = True
-                    else:
-                        for f in island:
-                            if has_selected_faces:
-                                break
-                            corners = f.loops
-                            counter = 0
-                            for crn in corners:
-                                select_state = crn[uv].select_edge
-                                counter += select_state
-                                has_selected_edge |= select_state
-                            has_selected_faces = len(corners) == counter  # optimized, instead any
-                    has_any_selected_elements |= has_selected_edge or has_selected_faces
+                    has_selected_edges, has_selected_faces = self.has_selected_edges_or_faces(island)
 
                     if has_selected_faces:
                         self.orient_island(island)
-                    elif has_selected_edge:
+                    elif has_selected_edges:
                         self.orient_edge(island)
+                    has_any_selected_elements |= has_selected_edges or has_selected_faces
 
         if not has_any_selected_elements:
             for umesh in visible:
-                if islands := Islands.calc_visible(umesh):
+                if islands := Islands.calc_visible_with_mark_seam(umesh):
                     islands_of_mesh.append(islands)
 
             hit = types.IslandHit(self.mouse_pos, self.max_distance)
@@ -1800,9 +1804,12 @@ class UNIV_OT_Orient(Operator):
 
             if self.mouse_pos:
                 if hit:
-                    self.orient_edge_ex(hit.island, hit.crn)
                     uv = hit.island.umesh.uv
-                    length = (hit.crn[uv].uv - hit.crn.link_loop_next[uv].uv).length
+                    v1 = hit.crn[uv].uv
+                    v2 = hit.crn.link_loop_next[uv].uv
+                    self.orient_edge_ex(hit.island, v1, v2)
+
+                    length = (v1 - v2).length
                     if length:
                         return self.umeshes.update(info="Island oriented")
                     else:
@@ -1821,20 +1828,93 @@ class UNIV_OT_Orient(Operator):
 
         return self.umeshes.update(info="All islands oriented")
 
-    def orient_edge(self, island):
-        uv = island.umesh.uv
+    def orient_lock_overlap_processing(self):
+        islands_with_selected_edges = []
+        islands_with_selected_faces = []
+        unselected_islands = []
+
+        for umesh in self.umeshes:
+            if islands := AdvIslands.calc_visible_with_mark_seam(umesh):
+                islands.calc_tris()
+                islands.calc_flat_coords(save_triplet=True)
+                for island in islands:
+                    has_selected_edges, has_selected_faces = self.has_selected_edges_or_faces(island)
+
+                    if has_selected_edges:
+                        islands_with_selected_edges.append(island)
+                    elif has_selected_faces:
+                        islands_with_selected_faces.append(island)
+                    else:
+                        unselected_islands.append(island)
+
+        if not any((islands_with_selected_faces, islands_with_selected_edges, unselected_islands)):
+            self.report({'WARNING'}, "Islands not found")
+            return {"CANCELLED"}
+
+        threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+        if islands_with_selected_edges:
+            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(islands_with_selected_edges, threshold):
+                self.orient_edge(overlapped_isl)
+
+        if islands_with_selected_faces:
+            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(islands_with_selected_faces, threshold):
+                self.orient_island(overlapped_isl)
+
+        if not any((islands_with_selected_edges, islands_with_selected_faces)):
+            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(unselected_islands, threshold):
+                self.orient_island(overlapped_isl)
+
+        return self.umeshes.update(info="All islands oriented")
+
+    @staticmethod
+    def has_selected_edges_or_faces(island):
+        has_selected_edges = False
+        has_selected_faces = False
+
         if island.umesh.sync:
-            corners = (crn for f in island for crn in f.loops if crn.edge.select)
+            if island.umesh.total_face_sel and any(f.select for f in island):  # orient island
+                has_selected_faces = True
+            elif island.umesh.total_edge_sel and any(e.select for f in island for e in f.edges):  # orient by edges
+                has_selected_edges = True
         else:
-            corners = (crn for f in island for crn in f.loops if crn[uv].select_edge)
+            if island.umesh.total_face_sel:
+                uv = island.umesh.uv
+                for f in island:
+                    if has_selected_faces:
+                        break
+                    corners = f.loops
+                    counter = 0
+                    for crn in corners:
+                        select_state = crn[uv].select_edge
+                        counter += select_state
+                        has_selected_edges |= select_state
+                    has_selected_faces = len(corners) == counter  # optimized, instead any
+        return has_selected_edges, has_selected_faces
 
-        if not (max_length_crn := max(corners, key=lambda c: (c[uv].uv - c.link_loop_next[uv].uv).length, default=None)):
+    def orient_edge(self, island):
+        iter_isl = island if isinstance(island, types.UnionIslands) else (island,)
+        max_length = -1.0
+        v1 = Vector()
+        v2 = Vector()
+        for isl_ in iter_isl:
+            uv = isl_.umesh.uv
+            if isl_.umesh.sync:
+                corners = (crn for f in isl_ for crn in f.loops if crn.edge.select)
+            else:
+                corners = (crn for f in isl_ for crn in f.loops if crn[uv].select_edge)
+            for crn_ in corners:
+                v1_ = crn_[uv].uv
+                v2_ = crn_.link_loop_next[uv].uv
+                if (new_length := (v1_ - v2_).length) > max_length:
+                    v1 = v1_
+                    v2 = v2_
+                    max_length = new_length
+
+        if max_length == 1.0:
             return
-        self.orient_edge_ex(island, max_length_crn)
+        self.orient_edge_ex(island, v1, v2)
 
-    def orient_edge_ex(self, island, tar_crn):
-        v1 = tar_crn[island.umesh.uv].uv
-        v2 = tar_crn.link_loop_next[island.umesh.uv].uv
+    def orient_edge_ex(self, island, v1: Vector, v2: Vector):
         diff: Vector = (v2 - v1) * Vector((self.aspect, 1.0))
 
         if not any(diff):  # TODO: Use inspect (Zero)
@@ -1853,34 +1933,36 @@ class UNIV_OT_Orient(Operator):
         pivot: Vector = (v1 + v2) / 2
         island.umesh.update_tag |= island.rotate(angle_to_rotate, pivot, self.aspect)
 
-    def orient_island(self, island):
+    def orient_island(self, island: AdvIsland | types.UnionIslands):
         from collections import Counter
-        uv = island.umesh.uv
-
         angles: Counter[float | float] = Counter()
         boundary_coords = []
-
         is_boundary = utils.is_boundary_sync if island.umesh.sync else utils.is_boundary_non_sync
-        boundary_corners = (crn for f in island for crn in f.loops if is_boundary(crn, uv))
 
-        vec_aspect = Vector((self.aspect, 1.0))
-        for crn in boundary_corners:
-            v1 = crn[uv].uv
-            v2 = crn.link_loop_next[uv].uv
-            boundary_coords.append(v1)
+        iter_isl = island if isinstance(island, types.UnionIslands) else (island, )
+        for isl_ in iter_isl:
+            uv = isl_.umesh.uv
+            boundary_corners = (crn for f in isl_ for crn in f.loops if crn.edge.seam or is_boundary(crn, uv))
 
-            diff: Vector = (v2 - v1) * vec_aspect
+            vec_aspect = Vector((self.aspect, 1.0))
+            for crn in boundary_corners:
+                v1 = crn[uv].uv
+                v2 = crn.link_loop_next[uv].uv
+                boundary_coords.append(v1)
 
-            if not any(diff):
-                continue
+                diff: Vector = (v2 - v1) * vec_aspect
 
-            current_angle = atan2(*diff)
-            angle_to_rotate = -utils.find_min_rotate_angle(round(current_angle, 4))
-            angles[round(angle_to_rotate, 4)] += diff.length
+                if not any(diff):
+                    continue
+
+                current_angle = atan2(*diff)
+                angle_to_rotate = -utils.find_min_rotate_angle(round(current_angle, 4))
+                angles[round(angle_to_rotate, 4)] += diff.length
 
         if not angles:
             return
 
+        # TODO: Calculate by convex if the angles are many and have ~ simular distances
         angle = max(angles, key=angles.get)
 
         bbox = types.BBox.calc_bbox(boundary_coords)

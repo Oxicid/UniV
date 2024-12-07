@@ -1684,7 +1684,7 @@ class UnionIslandsController:
 
     @property
     def update_tag(self):
-        raise
+        return any(isl.umesh.update_tag for isl in self._islands)
 
     @update_tag.setter
     def update_tag(self, value):
@@ -1695,6 +1695,10 @@ class UnionIslandsController:
     def aspect(self):
         import numpy
         return numpy.mean([isl.umesh.aspect for isl in self._islands])
+
+    @property
+    def sync(self):
+        return self._islands[0].umesh.sync
 
 class UnionIslands(Islands):
     def __init__(self, islands):
