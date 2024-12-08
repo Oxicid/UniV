@@ -1233,7 +1233,7 @@ class UNIV_OT_Select_Grow(Operator):
     bl_description = "Select more UV vertices connected to initial selection\n\n" \
                      "Default - Grow\n" \
                      "Ctrl or Alt - Shrink\n\n" \
-                     "Has a [Ctrl + Scroll Up/Down] keymap"
+                     "Has [Ctrl + Scroll Up/Down] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     grow: BoolProperty(name='Select', default=True)
@@ -1466,7 +1466,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     bl_description = f"Edge Grow/Shrink Select\n\n" \
                      f"Default - Grow Select \n" \
                      f"Ctrl or Alt - Shrink Select\n\n" \
-                     f"Has a [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
+                     f"Has [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
 
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")

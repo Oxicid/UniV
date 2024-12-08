@@ -57,7 +57,7 @@ try:
         inspect.UNIV_OT_Check_Overlap,
         # Transforms
         transform.UNIV_OT_Orient,
-        transform.UNIV_OT_Orient_VIEW3D,
+        transform.UNIV_OT_Gravity,
         transform.UNIV_OT_Align,
         transform.UNIV_OT_Fill,
         transform.UNIV_OT_Crop,

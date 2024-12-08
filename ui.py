@@ -216,7 +216,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row.operator('mesh.univ_stack', text='Stack')
 
         col_align.label(text='Transform')
-        col_align.operator('mesh.univ_orient_view3d')
+        col_align.operator('mesh.univ_gravity')
 
         row = col_align.row(align=True)
         row.operator('mesh.univ_adjust_td')

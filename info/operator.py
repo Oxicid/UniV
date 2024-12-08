@@ -8,7 +8,7 @@ align_event_info_ex = \
         "Ctrl+Shift+Alt - Align to cursor union\n" \
         "Alt - Align to faces/verts\n" \
         "Ctrl+Alt - Cursor to Tile. Mnemonic - Current(Ctrl) tile cursor Align(Alt)\n\n" \
-        "Has a [Ctrl | Shift | Alt + Arrows] keymaps, but it conflicts with the \'Frame Jump\' operator"
+        "Has [Ctrl | Shift | Alt + Arrows] keymaps, but it conflicts with the \'Frame Jump\' operator"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 align_info = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
 

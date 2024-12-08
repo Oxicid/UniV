@@ -797,7 +797,7 @@ class UNIV_OT_Rotate(Operator):
                      "\t\tCtrl - By Cursor\n" \
                      "\t\tShift - Individual\n" \
                      "\t\tAlt - CCW" \
-                     "Has a [5] keymap"
+                     "Has [5] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode',
@@ -1711,7 +1711,8 @@ class UNIV_OT_Orient(Operator):
     bl_label = 'Orient'
     bl_description = "Rotated to a minimal rectangle, either vertical or horizontal\n\n" \
                      "Default - Fit by Islands\n" \
-                     "Alt - Orient by Edge"
+                     "Alt - Orient by Edge\n" \
+                     "Has [O] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     edge_dir: EnumProperty(name='Direction', default='HORIZONTAL', items=(
@@ -1981,17 +1982,17 @@ class UNIV_OT_Orient(Operator):
 
 
 # The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
-class UNIV_OT_Orient_VIEW3D(Operator):
-    bl_idname = 'mesh.univ_orient_view3d'
-    bl_label = 'Orient'
+class UNIV_OT_Gravity(Operator):
+    bl_idname = 'mesh.univ_gravity'
+    bl_label = 'Gravity'
     bl_description = "Align selected UV islands or faces to world / gravity directions"
     bl_options = {'REGISTER', 'UNDO'}
 
-    axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
-                                    ('AUTO', 'Auto', 'Detect World axis to align to.'),
-                                    ('U', 'X', 'Align to the X axis of the World.'),
-                                    ('V', 'Y', 'Align to the Y axis of the World.'),
-                                    ('W', 'Z', 'Align to the Z axis of the World.')))
+    # axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
+    #                                 ('AUTO', 'Auto', 'Detect World axis to align to.'),
+    #                                 ('U', 'X', 'Align to the X axis of the World.'),
+    #                                 ('V', 'Y', 'Align to the Y axis of the World.'),
+    #                                 ('W', 'Z', 'Align to the Z axis of the World.')))
     additional_angle: FloatProperty(name='Additional Angle', default=0.0, soft_min=-pi/2, soft_max=pi, subtype='ANGLE')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True, description='Gets Aspect Correct from the active image from the shader node editor')
 
@@ -2005,6 +2006,7 @@ class UNIV_OT_Orient_VIEW3D(Operator):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def __init__(self):
+        self.axis = 'AUTO'
         self.skip_count: int = 0
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: types.UMeshes | None = None
@@ -2143,7 +2145,7 @@ class UNIV_OT_Weld(Operator):
                      "Context keymaps on button:\n" \
                      "Default - Weld\n" \
                      "Alt - Weld by Distance\n\n" \
-                     "Has a [W] keymap"
+                     "Has [W] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     use_by_distance: BoolProperty(name='By Distance', default=False)
@@ -2450,7 +2452,7 @@ class UNIV_OT_Stitch(Operator):
     bl_description = "Stitch selected UV vertices by proximity\n\n" \
                      "Default - Stitch\n" \
                      "Alt - Stitch Between\n\n" \
-                     "Has a [Shift + W] keymap. \n" \
+                     "Has [Shift + W] keymap. \n" \
                      "In sync mode when calling stitch via keymap, the stitch priority is done by mouse cursor.\n" \
                      "In other cases of pairwise selection, prioritization occurs by island size"
     bl_options = {'REGISTER', 'UNDO'}
@@ -3000,7 +3002,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
-    bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas a [Shift + A] keymap"
+    bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas [Shift + A] keymap"
 
 class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "mesh.univ_adjust_td"
@@ -3200,7 +3202,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         return {'FINISHED'}
 class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
     bl_idname = "uv.univ_adjust_td"
-    bl_description = UNIV_OT_AdjustScale_VIEW3D.bl_description + "\n\nHas a [Alt + A] keymap, but it conflicts with the 'Deselect All' operator"
+    bl_description = UNIV_OT_AdjustScale_VIEW3D.bl_description + "\n\nHas [Alt + A] keymap, but it conflicts with the 'Deselect All' operator"
 
 
 class UNIV_OT_Pack(Operator):
@@ -3208,7 +3210,7 @@ class UNIV_OT_Pack(Operator):
     bl_label = 'Pack'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Pack selected islands\n\n" \
-                     f"Has a [P] keymap, but it conflicts with the 'Pin' operator"
+                     f"Has [P] keymap, but it conflicts with the 'Pin' operator"
 
     def invoke(self, context, event):
         return self.execute(context)
