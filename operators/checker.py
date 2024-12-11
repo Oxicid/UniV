@@ -3,7 +3,6 @@ import bpy
 
 from .. import types
 from .. import utils
-
 # Patterns for future
 # _ARS-10.5  # Arrow Scale
 # _C(1,2,3)-FFFFFF_  # Color
@@ -19,6 +18,19 @@ generated_types = (
     ('COLOR_GRID', 'Color Grid', ''),
 )
 
+def _update_size_x(self, _context):
+    if self.lock_size:
+        self.size_y = self.size_x
+
+def _update_size_y(self, _context):
+    if self.lock_size:
+        self.size_x = self.size_y
+
+def _update_lock_size(self, _context):
+    if self.lock_size and self.size_y != self.size_x:
+        self.size_y = self.size_x
+
+
 class UNIV_OT_Checker(bpy.types.Operator):
     bl_idname = "mesh.univ_checker"
     bl_label = "Checker"
@@ -26,12 +38,9 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     generated_type: bpy.props.EnumProperty(name='Texture', default='UV_GRID', items=generated_types)
-    size_x: bpy.props.EnumProperty(name='X', default='2048', items=utils.resolutions,
-                                   update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
-    size_y: bpy.props.EnumProperty(name='Y', default='2048', items=utils.resolutions,
-                                   update=lambda self, _: setattr(self, 'size_x', self.size_y) if self.lock_size and self.size_x != self.size_y else None)
-    lock_size: bpy.props.BoolProperty(name='Lock Size', default=True,
-                                      update=lambda self, _: setattr(self, 'size_y', self.size_x) if self.lock_size and self.size_x != self.size_y else None)
+    size_x: bpy.props.EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
+    size_y: bpy.props.EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
+    lock_size: bpy.props.BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
     @classmethod
     def poll(cls, context):
@@ -74,7 +83,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     break
 
         node_group = self.get_checker_node_group()
-        self.checker_modifier_sanitize()
+        for obj in bpy.context.selected_objects:
+            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker')
         self.create_gn_checker_modifier(node_group, mtl)
         self.update_views()
         return {'FINISHED'}
@@ -158,7 +168,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return True
 
     def get_checker_node_group(self):
-        """Get exist checker material"""
+        """Get exist checker node group"""
         for ng in reversed(bpy.data.node_groups):
             if ng.name.startswith('UniV Checker'):
                 if self.checker_node_group_is_changed(ng):
@@ -197,55 +207,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
         node_group.links.new(input_node.outputs['Checker Material'], mtl_socket)
 
         return node_group
-
-    @staticmethod
-    def checker_modifier_sanitize():
-        def remove_not_needed(obj_):
-            if obj_.type == 'MESH':
-                checker_modifiers_ = []
-                for m_ in obj_.modifiers:
-                    if isinstance(m_, bpy.types.NodesModifier):
-                        if m_.name.startswith('UniV Checker'):
-                            if not m_.show_in_editmode:
-                                m_.show_in_editmode = True
-                            if not m_.show_viewport:
-                                m_.show_viewport = True
-                            checker_modifiers_.append(m_)
-                if len(checker_modifiers_) <= 1:
-                    return
-
-                for m_ in checker_modifiers_[:-1]:  # TODO: Save when == pattern
-                    obj_.modifiers.remove(m_)
-
-                # Move to bottom
-                for idx, m_ in enumerate(obj_.modifiers):
-                    if checker_modifiers_[-1] == m_:
-                        if len(obj_.modifiers)-1 != idx:
-                            obj_.modifiers.move(idx, len(obj_.modifiers))
-                        return
-
-        if bpy.context.mode == 'EDIT_MESH':
-            for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH' and obj.modifiers:
-                    checker_modifiers = []
-                    for m in obj.modifiers:
-                        if isinstance(m, bpy.types.NodesModifier):
-                            if m.name.startswith('UniV Checker'):
-                                if not m.show_in_editmode:
-                                    m.show_in_editmode = True
-                                if not m.show_viewport:
-                                    m.show_viewport = True
-                                checker_modifiers.append(m)
-                    if len(checker_modifiers) > 1:
-                        break
-            else:
-                return
-            for obj in types.UMeshes.loop_for_object_mode_processing(without_selection=True):
-                remove_not_needed(obj)
-
-        else:
-            for obj in bpy.context.selected_objects:
-                remove_not_needed(obj)
 
     @staticmethod
     def create_gn_checker_modifier(node_group, mtl):
@@ -328,7 +289,7 @@ class UNIV_OT_CheckerCleanup(bpy.types.Operator):
         # TODO: Close img from selected meshes
         for a in utils.get_areas_by_type('IMAGE_EDITOR'):
             space = a.spaces.active
-            if (img := space.image) and img.name.startswith('UniV_'):
+            if (img := space.image) and img.name.startswith('UniV_'):  # noqa
                 space.image = None
         self.remove_images()
         return {'FINISHED'}

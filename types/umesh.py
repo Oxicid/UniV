@@ -51,6 +51,11 @@ class UMesh:
     def free(self):
         self.bm.free()
 
+    def mesh_to_bmesh(self):
+        bm = bmesh.from_edit_mesh(self.obj.data)
+        self.bm = bm
+        self.uv = bm.loops.layers.uv.verify()
+
     def ensure(self, face=True, edge=False, vert=False, force=False):
         if self.is_edit_bm or not force:
             return
@@ -496,6 +501,15 @@ class UMeshes:
             self.report(info_type, info)
         return {'CANCELLED'}
 
+    @property
+    def tag_update(self):
+        return any(umesh.update_tag for umesh in self)
+
+    @tag_update.setter
+    def tag_update(self, value):
+        for umesh in self:
+            umesh.update_tag = value
+
     def silent_update(self):
         for umesh in self:
             umesh.update()
@@ -638,6 +652,20 @@ class UMeshes:
             bm.from_mesh(data)
             obj.sort(key=lambda a: a.name)
             bmeshes.append(UMesh(bm, obj[0], False))
+        return cls(bmeshes)
+
+    @classmethod
+    def calc_all_objects(cls):
+        bmeshes = []
+        for obj in bpy.data.objects:
+            if obj.type == 'MESH':
+                if obj.mode == 'EDIT':
+                    bm = bmesh.from_edit_mesh(obj.data)
+                    bmeshes.append(UMesh(bm, obj))
+                else:
+                    bm = bmesh.new()
+                    bm.from_mesh(obj.data)
+                    bmeshes.append(UMesh(bm, obj, False))
         return cls(bmeshes)
 
     @classmethod

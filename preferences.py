@@ -11,6 +11,9 @@ from bpy.props import *
 def prefs():
     return bpy.context.preferences.addons[__package__].preferences
 
+def settings():
+    return bpy.context.scene.univ_settings  # noqa
+
 def force_debug():
     return prefs().debug == 'FORCE'
 

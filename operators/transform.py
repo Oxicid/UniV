@@ -1356,13 +1356,14 @@ class UNIV_OT_Distribute(Operator):
 class UNIV_OT_Home(Operator):
     bl_idname = 'uv.univ_home'
     bl_label = 'Home'
-    bl_description = info.operator.home_info
+    bl_description = "Move island to base tile without changes in the textured object\n\n" \
+                     "Default - Move island to base tile\n" \
+                     "Ctrl - Move island to cursor.\n\n" \
+                     "Removes attributes and modifiers from Shift operator, " \
+                     "resets uv offset of Array, Mirror, UVWarp modifiers"
     bl_options = {'REGISTER', 'UNDO'}
 
-    mode: EnumProperty(name='Mode', default='DEFAULT', items=(
-        ('DEFAULT', 'Default', ''),
-        ('TO_CURSOR', 'To Cursor', ''),
-    ))
+    to_cursor: BoolProperty(name='To Cursor', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -1371,54 +1372,480 @@ class UNIV_OT_Home(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.mode = 'DEFAULT'
-            case True, False, False:
-                self.mode = 'TO_CURSOR'
-            # case False, True, False:
-            #     self.mode = 'OVERLAPPED'
-            case _:
-                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement.\n\n"
-                                      f"See all variations: {info.operator.home_event_info_ex}\n\n")
-                return {'CANCELLED'}
+        self.to_cursor = event.ctrl
         return self.execute(context)
 
+    def __init__(self):
+        self.has_selected = True
+        self.gn_mod_counter = 0
+        self.shift_attrs_counter = 0
+        self.islands_calc_type: Callable = Callable
+        self.umeshes: types.UMeshes | None = None
+        self.no_change_info = "Not found islands for move and modifiers for reset uv offsets"
+
     def execute(self, context):
-        return UNIV_OT_Home.home(self.mode, report=self.report)
+        self.gn_mod_counter = 0
+        self.shift_attrs_counter = 0
+
+        cursor_loc = Vector((0, 0))
+        if self.to_cursor and not (cursor_loc := utils.get_tile_from_cursor()):
+            self.report({'WARNING'}, "Cursor not found")
+            return {'CANCELLED'}
+
+        self.umeshes = types.UMeshes()
+        self.umeshes.tag_update = False
+
+        mod_counter, attr_counter = self.remove_shift_md()  # remove_shift_md changes update tag
+        changed_modifiers_count = self.uv_shift_reset_array_and_mirror_and_warp()
+        changed_modifiers_count += mod_counter
+
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        if selected_umeshes:
+            self.umeshes = selected_umeshes
+            self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+        elif unselected_umeshes:
+            self.umeshes = unselected_umeshes
+            self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
+        else:
+            if changed_modifiers_count or attr_counter:
+                counter_info = ''
+                if changed_modifiers_count:
+                    counter_info += f"Changed {changed_modifiers_count} modifiers."
+                if attr_counter:
+                    counter_info += f"Deleted {attr_counter} shift attributes."
+                self.report({'INFO'}, counter_info)
+                return
+            else:
+                self.report({'WARNING'}, self.no_change_info)
+                return {'CANCELLED'}
+
+        counter = 0
+        for umesh in self.umeshes:
+            for island in self.islands_calc_type(umesh):  # noqa
+                counter += self.home(island, cursor_loc)
+
+        report_info = ''
+        if counter:
+            report_info += f'Moved {counter} islands. '
+        if changed_modifiers_count:
+            report_info += f"Changed {changed_modifiers_count} modifiers."
+        if attr_counter:
+            report_info += f"Deleted {attr_counter} shift attributes."
+
+        if report_info:
+            self.report({'INFO'}, report_info)
+        else:
+            self.report({'WARNING'}, self.no_change_info)
+        self.umeshes.silent_update()
+        return {'FINISHED'}
 
     @staticmethod
-    def home(mode, report):
-        umeshes = types.UMeshes(report=report)
-        match mode:
-            case 'DEFAULT':
-                UNIV_OT_Home.home_ex(umeshes, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Home.home_ex(umeshes, extended=False)
+    def home(island, cursor):
+        center = island.calc_bbox().center
+        delta = Vector(round(-i + 0.5) for i in center) + cursor
+        tag = island.move(delta)
+        island.umesh.update_tag |= tag
+        return tag
 
-            case 'TO_CURSOR':
-                if not (cursor_loc := utils.get_tile_from_cursor()):
-                    umeshes.report({'WARNING'}, "Cursor not found")
-                    return {'CANCELLED'}
-                UNIV_OT_Home.home_ex(umeshes, extended=True, cursor=cursor_loc)
-                if not umeshes.final():
-                    UNIV_OT_Home.home_ex(umeshes, extended=False, cursor=cursor_loc)
+    def remove_shift_md(self):
+        all_object = set(types.UMeshes.calc_all_objects()) - set(self.umeshes)
+        mod_counter = 0
+        attr_counter = 0
+        for umesh in self.umeshes:
+            for mod in reversed(umesh.obj.modifiers):
+                if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
+                    umesh.obj.modifiers.remove(mod)
+                    mod_counter += 1
 
-            case _:
-                raise NotImplementedError(mode)
+            # safe attr for instances if not zero
+            if not any(all_umesh.obj.data == umesh.obj.data for all_umesh in all_object):
+                for attr in reversed(umesh.bm.faces.layers.int.values()):
+                    if attr.name.startswith('univ_shift'):
+                        umesh.bm.faces.layers.int.remove(attr)
+                        umesh.update_tag = True
+                        attr_counter += 1
 
-        return umeshes.update()
+            for attr in reversed(umesh.bm.faces.layers.int.values()):
+                if attr.name.startswith('univ_shift'):
+                    if not any(f[attr] for f in umesh.bm.faces):
+                        umesh.bm.faces.layers.int.remove(attr)
+                        umesh.update_tag = True
+                        attr_counter += 1
+
+        for other_umesh in all_object:
+            if any(other_umesh.obj.data == umesh.obj.data for umesh in self.umeshes):
+                if not any(attr.name.startswith('univ_shift') for attr in other_umesh.bm.faces.layers.int.values()):
+                    for mod in reversed(other_umesh.obj.modifiers):
+                        if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
+                            other_umesh.obj.modifiers.remove(mod)
+                            mod_counter += 1
+
+        return mod_counter, attr_counter
+
+    def uv_shift_reset_array_and_mirror_and_warp(self):
+        counter = 0
+        for umesh in self.umeshes:
+            for mod in umesh.obj.modifiers:
+                if isinstance(mod, bpy.types.ArrayModifier):
+                    if any((mod.offset_u, mod.offset_v)):
+                        mod.offset_u = 0.0
+                        mod.offset_v = 0.0
+                        counter += 1
+                elif isinstance(mod, bpy.types.MirrorModifier):
+                    if any((mod.offset_u, mod.offset_v)):
+                        mod.offset_u = 0.0
+                        mod.offset_v = 0.0
+                        counter += 1
+                elif isinstance(mod, bpy.types.UVWarpModifier):
+                    if any(mod.offset):
+                        mod.offset[0] = 0.0
+                        mod.offset[1] = 0.0
+                        counter += 1
+        return counter
+
+class UNIV_OT_Shift(Operator):
+    bl_idname = "uv.univ_shift"
+    bl_label = 'Shift'
+    bl_description = "Moving overlapped islands to an adjacent tile, to avoid artifacts when baking"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
+    shift_smaller: BoolProperty(name='Shift Smaller', default=False, description="Sets a higher priority for shifting, for small islands")
+
+    with_modifier: BoolProperty(name='Use Modifiers', default=False,
+                                description="Non-destructively through a modifier shifts islands. To remove a modifier, use the Home operator.")
+    gn_shift: BoolProperty(name='GN Shift', default=True, description="Add Shift Geometry Node Modifier.")
+    array_shift: BoolProperty(name='Array', default=True, description='U Offset')
+    mirror_shift: BoolProperty(name='Mirror', default=True, description='U Offset')
+    warp_shift: BoolProperty(name='Warp', default=True, description='U Offset')
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.with_modifier = event.alt
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        if self.lock_overlap_mode == 'EXACT':
+            layout.prop(self, 'threshold', slider=True)
+        else:
+            layout.prop(self, 'shift_smaller')
+        layout.row().prop(self, 'lock_overlap_mode', expand=True)
+        if self.with_modifier:
+            row = layout.row(align=True)
+            row.prop(self, 'gn_shift', toggle=1)
+            row.prop(self, 'array_shift', toggle=1)
+            row.prop(self, 'mirror_shift', toggle=1)
+            row.prop(self, 'warp_shift', toggle=1)
+        layout.prop(self, 'with_modifier', toggle=1)
+
+    def __init__(self):
+        self.has_selected = True
+        self.islands_calc_type: Callable = Callable
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = types.UMeshes(report=self.report)
+        changed_modifiers = self.shift_array_and_mirror_and_warp()
+
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        if selected_umeshes:
+            self.has_selected = True
+            self.umeshes = selected_umeshes
+
+            self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+        elif unselected_umeshes:
+            self.has_selected = False
+            self.umeshes = unselected_umeshes
+            self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
+        else:
+            if changed_modifiers:
+                self.report({'INFO'}, f"Changed {changed_modifiers} modifiers")
+                return
+            else:
+                self.report({'WARNING'}, 'Islands not found')
+                return {'CANCELLED'}
+
+        umeshes_without_attributes = []
+        if self.with_modifier and self.gn_shift:
+            for umesh in self.umeshes:
+                if 'univ_shift' not in umesh.obj.data.attributes:
+                    umesh.obj.data.attributes.new('univ_shift', 'INT', 'FACE')
+                    umesh.mesh_to_bmesh()
+                    umeshes_without_attributes.append(umesh)
+
+        all_islands = []
+        self.umeshes.tag_update = False
+
+        for umesh in self.umeshes:
+            adv_islands = self.islands_calc_type(umesh)  # noqa
+            for isl in reversed(adv_islands):
+                if isl.has_flip_with_noflip():
+                    adv_islands.islands.remove(isl)
+                    noflip, flipped = isl.calc_islands_by_flip_with_mark_seam()
+                    adv_islands.islands.extend(noflip)
+                    adv_islands.islands.extend(flipped)  # TODO: Add info about flip and no flip
+
+            if self.lock_overlap_mode == 'ANY':
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_uv_coords(save_triplet=True)
+            all_islands.extend(adv_islands)
+
+        counter = 0
+        deleted_attr_counter = 0
+        threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
+        # TODO: Add calc Union by bbox for exact (speedup)
+        overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+        for over_isl in reversed(overlapped_islands):
+            if isinstance(over_isl, AdvIsland) or len(over_isl) == 1:
+                overlapped_islands.remove(over_isl)
+                continue
+
+            if self.shift_smaller and self.lock_overlap_mode == 'ANY':
+                for sub_isl in over_isl:
+                    sub_isl.calc_area_uv()
+                f_island = over_isl.islands[0]
+                index_for_bigger = 0
+                for idx_, sub_isl in enumerate(over_isl):
+                    if isclose(f_island.area_uv, sub_isl.area_uv, abs_tol=1e-04):
+                        continue
+                    if sub_isl.area_uv > f_island.area_uv:
+                        f_island = sub_isl
+                        index_for_bigger = idx_
+                if index_for_bigger:
+                    over_isl[0], over_isl[index_for_bigger] = over_isl[index_for_bigger], over_isl[0]
+
+            for idx, isl in enumerate(over_isl):
+                if self.with_modifier and self.gn_shift:
+                    if idx:
+                        shift_attr = isl.umesh.bm.faces.layers.int.get('univ_shift')
+                        if not all(f[shift_attr] for f in isl):
+                            for f in isl:
+                                f[shift_attr] = 1
+
+                            isl.umesh.update_tag = True
+                            counter += 1
+                    else:
+                        if 'univ_shift' in isl.umesh.obj.data.attributes:
+                            shift_attr = isl.umesh.bm.faces.layers.int.get('univ_shift')
+                            if any(f[shift_attr] for f in isl):
+                                for f in isl:
+                                    f[shift_attr] = 0
+                                isl.umesh.update_tag = True
+                else:
+                    if idx:
+                        counter += 1
+                        isl.umesh.update_tag = True
+                        isl.move(Vector((1.0, 0.0)))
+
+        if self.with_modifier and self.gn_shift:
+            node_group = self.get_shift_node_group()
+            for umesh in self.umeshes:
+                if umesh.update_tag:
+                    utils.remove_univ_duplicate_modifiers(umesh.obj, 'UniV Shift')
+                    self.create_gn_shift_modifier(umesh, node_group)
+
+        # Sanitize
+        for umesh in self.umeshes:
+            for attr in reversed(umesh.bm.faces.layers.int.values()):
+                if attr.name.startswith('univ_shift'):
+                    if not any(f[attr] for f in umesh.bm.faces):
+                        umesh.bm.faces.layers.int.remove(attr)
+                        umesh.update_tag = True
+                        if umesh not in umeshes_without_attributes:
+                            deleted_attr_counter += 1
+            if not any(attr.name.startswith('univ_shift') for attr in umesh.bm.faces.layers.int.values()):
+                for mod in reversed(umesh.obj.modifiers):
+                    if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
+                        umesh.obj.modifiers.remove(mod)
+                        changed_modifiers += 1
+
+        report_info = ''
+        if counter:
+            report_info += f'Shifted {counter} overlapped islands. '
+        if changed_modifiers:
+            report_info += f"Changed {changed_modifiers} modifiers."
+        if deleted_attr_counter:
+            report_info += f"Deleted {deleted_attr_counter} unused attributes."
+        if report_info:
+            self.report({'INFO'}, report_info)
+        else:
+            self.report({'WARNING'}, 'Not found islands and modifiers for shift')
+        self.umeshes.silent_update()
+        return {'FINISHED'}
+
+    def shift_array_and_mirror_and_warp(self):
+        if not self.with_modifier:
+            return 0
+        counter = 0
+        for umesh in self.umeshes:
+            for mod in umesh.obj.modifiers:
+                if self.array_shift and isinstance(mod, bpy.types.ArrayModifier):
+                    if mod.offset_u != 1.0:
+                        mod.offset_u = 1.0
+                        counter += 1
+                elif self.mirror_shift and isinstance(mod, bpy.types.MirrorModifier):
+                    if mod.offset_u != 1.0:
+                        mod.offset_u = 1.0
+                        counter += 1
+                elif self.warp_shift and isinstance(mod, bpy.types.UVWarpModifier):
+                    if mod.offset[0] != 1.0:
+                        mod.offset[0] = 1.0
+                        counter += 1
+        return counter
 
     @staticmethod
-    def home_ex(umeshes, extended, cursor=Vector((0, 0))):
-        for umesh in umeshes:
-            changed = False
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
-                for island in islands:
-                    center = island.calc_bbox().center
-                    delta = Vector(round(-i + 0.5) for i in center) + cursor
-                    changed |= island.move(delta)
-            umesh.update_tag = changed
+    def shift_node_group_is_changed(node_group):
+        if len(nodes := node_group.nodes) != 7:
+            return True
+
+        if not (output_node := [n for n in nodes if n.bl_idname == 'NodeGroupOutput']) or \
+                not output_node[0].inputs or not (output_links := output_node[0].inputs[0].links):
+            return True
+
+        if (store_attr_node := output_links[0].from_node).bl_idname != 'GeometryNodeStoreNamedAttribute' or \
+                store_attr_node.data_type != 'FLOAT2' and store_attr_node.domain != 'CORNER':
+            return True
+
+        if not (store_attr_node_geometry_links := store_attr_node.inputs[0].links) or \
+                (store_attr_node_geometry_links[0].from_node.bl_idname != 'NodeGroupInput'):
+            return True
+
+        if not (store_attr_node_name_links := store_attr_node.inputs['Name'].links) or \
+                store_attr_node_name_links[0].from_node.bl_idname != 'NodeGroupInput':
+            return True
+
+        if not (store_attr_node_value_links := store_attr_node.inputs['Value'].links) or \
+                (vector_node := store_attr_node_value_links[0].from_node).bl_idname != 'ShaderNodeVectorMath':
+            return True
+
+        if vector_node.operation != 'ADD':
+            return True
+
+        if not (vector_node_a_links := vector_node.inputs[0].links) or not (vector_node_b_links := vector_node.inputs[1].links):
+            return True
+
+        if (uvmap_node := vector_node_a_links[0].from_node).bl_idname != 'GeometryNodeInputNamedAttribute' or \
+                not (uvmap_name_links := uvmap_node.inputs['Name'].links) or \
+                uvmap_name_links[0].from_node.bl_idname != 'NodeGroupInput' or uvmap_node.data_type != 'FLOAT_VECTOR':  # noqa
+            return True
+
+        if (combine_xyz_node := vector_node_b_links[0].from_node).bl_idname != 'ShaderNodeCombineXYZ' or \
+                not (x_links := combine_xyz_node.inputs['X'].links) or \
+                (shift_node := x_links[0].from_node).bl_idname != 'GeometryNodeInputNamedAttribute':  # noqa
+            return True
+
+        if shift_node.data_type != 'BOOLEAN' or shift_node.inputs['Name'].default_value != 'univ_shift':
+            return True
+
+        return False
+
+    @staticmethod
+    def create_shift_node_group():
+        node_group = bpy.data.node_groups.new(name='UniV Shift', type='GeometryNodeTree')
+
+        create_node = node_group.nodes.new
+        input_node = create_node(type="NodeGroupInput")
+        input_node.location = (-800, -80)
+
+        output_node = create_node(type="NodeGroupOutput")
+        output_node.location = (200, 0)
+
+        store_attr_node = create_node(type="GeometryNodeStoreNamedAttribute")
+        store_attr_node.location = (0, 0)
+        store_attr_node.data_type = 'FLOAT2'
+        store_attr_node.domain = 'CORNER'
+
+        shift_node = create_node(type="GeometryNodeInputNamedAttribute")
+        shift_node.location = (-600, -330)
+        shift_node.data_type = 'BOOLEAN'
+        shift_node.inputs['Name'].default_value = 'univ_shift'
+
+        uvmap_node = create_node(type="GeometryNodeInputNamedAttribute")
+        uvmap_node.location = (-600, -180)
+        uvmap_node.data_type = 'FLOAT_VECTOR'
+
+        combine_xyz_node = create_node(type="ShaderNodeCombineXYZ")
+        combine_xyz_node.location = (-380, -330)
+
+        vector_add_node = create_node(type="ShaderNodeVectorMath")
+        vector_add_node.location = (-180, -180)
+
+        if iface := getattr(node_group, 'interface', None):
+            iface.new_socket('Input', description="", in_out='INPUT', socket_type='NodeSocketGeometry')
+            iface.new_socket('UVMap', description="", in_out='INPUT', socket_type='NodeSocketString')
+            iface.new_socket('Output', description="", in_out='OUTPUT', socket_type='NodeSocketGeometry')
+        else:
+            node_group.inputs.new('NodeSocketGeometry', 'Input')
+            node_group.inputs.new('NodeSocketString', 'UVMap')
+            node_group.outputs.new('NodeSocketGeometry', 'Output')
+
+        link = node_group.links.new
+
+        link(input_node.outputs['Input'], store_attr_node.inputs['Geometry'])
+        link(store_attr_node.outputs['Geometry'], output_node.inputs['Output'])
+        link(input_node.outputs['UVMap'], store_attr_node.inputs['Name'])
+        link(input_node.outputs['UVMap'], uvmap_node.inputs['Name'])
+
+        for attr_output in shift_node.outputs:
+            if attr_output.name == 'Attribute' and not attr_output.is_unavailable:
+                link(attr_output, combine_xyz_node.inputs[0])
+                break
+        link(combine_xyz_node.outputs['Vector'], vector_add_node.inputs[1])
+
+        for attr_output in uvmap_node.outputs:
+            if attr_output.name == 'Attribute' and not attr_output.is_unavailable:
+                link(attr_output, vector_add_node.inputs[0])
+                break
+        link(vector_add_node.outputs['Vector'], store_attr_node.inputs['Value'])
+
+        return node_group
+
+    @staticmethod
+    def create_gn_shift_modifier(umesh, node_group):
+        has_checker_modifier = False
+        uv_name = umesh.uv.name
+        for m in umesh.obj.modifiers:
+            if not isinstance(m, bpy.types.NodesModifier):
+                continue
+            if m.name.startswith('UniV Shift'):
+                has_checker_modifier = True
+                if m.node_group != node_group:
+                    m.node_group = node_group
+                if 'Socket_1' in m:
+                    if m['Socket_1'] != uv_name:
+                        m['Socket_1'] = uv_name
+                else:
+                    # old version support (version???)
+                    if m['Input_1'] != uv_name:
+                        m['Input_1'] = uv_name
+                umesh.update_tag = True
+                break
+        if not has_checker_modifier:
+            m = umesh.obj.modifiers.new(name='UniV Shift', type='NODES')
+            m.node_group = node_group
+            if 'Socket_1' in m:
+                m['Socket_1'] = uv_name
+            else:
+                m['Input_1'] = uv_name
+            umesh.update_tag = True
+
+    def get_shift_node_group(self):
+        """Get exist checker material"""
+        for ng in reversed(bpy.data.node_groups):
+            if ng.name.startswith('UniV Shift'):
+                if self.shift_node_group_is_changed(ng):
+                    if ng.users == 0:
+                        bpy.data.node_groups.remove(ng)
+                else:
+                    return ng
+        return self.create_shift_node_group()
 
 
 class UNIV_OT_Random(Operator):
@@ -3252,97 +3679,3 @@ class UNIV_OT_Pack(Operator):
         KEYUP = 0x0002  # Release
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
-
-class UNIV_OT_Shift(Operator):
-    bl_idname = "uv.univ_shift"
-    bl_label = 'Shift'
-    bl_description = "Moving overlapped islands to an adjacent tile, to avoid artifacts when baking"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
-    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
-    shift_smaller: BoolProperty(name='Shift Smaller', default=False, description="Sets a higher priority for shifting, for small islands")
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
-
-    def draw(self, context):
-        layout = self.layout
-        if self.lock_overlap_mode == 'EXACT':
-            layout.prop(self, 'threshold', slider=True)
-        else:
-            layout.prop(self, 'shift_smaller')
-        layout.row().prop(self, 'lock_overlap_mode', expand=True)
-
-    def __init__(self):
-        self.has_selected = True
-        self.islands_calc_type: Callable = Callable
-        self.umeshes: types.UMeshes | None = None
-
-    def execute(self, context):
-        umeshes = types.UMeshes(report=self.report)
-        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
-        if selected_umeshes:
-            self.has_selected = True
-            self.umeshes = selected_umeshes
-            self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
-        elif unselected_umeshes:
-            self.has_selected = False
-            self.umeshes = unselected_umeshes
-            self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
-        else:
-            self.report({'WARNING'}, 'Islands not found')
-            return {'CANCELLED'}
-
-        all_islands = []
-
-        for umesh in self.umeshes:
-            umesh.update_tag = False
-            adv_islands = self.islands_calc_type(umesh)  # noqa
-            for isl in reversed(adv_islands):
-                if isl.has_flip_with_noflip():
-                    adv_islands.islands.remove(isl)
-                    noflip, flipped = isl.calc_islands_by_flip_with_mark_seam()
-                    adv_islands.islands.extend(noflip)
-                    adv_islands.islands.extend(flipped)  # TODO: Add info about flip and no flip
-
-            if self.lock_overlap_mode == 'ANY':
-                adv_islands.calc_tris()
-                adv_islands.calc_flat_uv_coords(save_triplet=True)
-            all_islands.extend(adv_islands)
-
-        counter = 0
-        threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
-        # TODO: Add calc Union by bbox for exact (speedup)
-        overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
-        for over_isl in reversed(overlapped_islands):
-            if isinstance(over_isl, AdvIsland) or len(over_isl) == 1:
-                overlapped_islands.remove(over_isl)
-                continue
-
-            if self.shift_smaller and self.lock_overlap_mode == 'ANY':
-                for sub_isl in over_isl:
-                    sub_isl.calc_area_uv()
-                f_island = over_isl.islands[0]
-                index_for_bigger = 0
-                for idx_, sub_isl in enumerate(over_isl):
-                    if isclose(f_island.area_uv, sub_isl.area_uv, abs_tol=1e-04):
-                        continue
-                    if sub_isl.area_uv > f_island.area_uv:
-                        f_island = sub_isl
-                        index_for_bigger = idx_
-                if index_for_bigger:
-                    over_isl[0], over_isl[index_for_bigger] = over_isl[index_for_bigger], over_isl[0]
-
-            for idx, isl in enumerate(over_isl):
-                if idx:
-                    counter += 1
-
-                    isl.umesh.update_tag = True
-                    isl.move(Vector((1.0, 0.0)))
-
-        if counter:
-            self.report({'INFO'}, f'Shifted {counter} overlapped islands')
-        self.umeshes.update()
-        return {'FINISHED'}

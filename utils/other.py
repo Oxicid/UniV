@@ -44,6 +44,32 @@ def get_aspect_ratio(umesh=None):
                     return image_width / image_height
     return 1.0
 
+
+def remove_univ_duplicate_modifiers(obj_, modifier_name):
+    if obj_.type != 'MESH':
+        return
+    checker_modifiers_ = []
+    for m_ in obj_.modifiers:
+        if isinstance(m_, bpy.types.NodesModifier):
+            if m_.name.startswith(modifier_name):
+                if not m_.show_in_editmode:
+                    m_.show_in_editmode = True
+                if not m_.show_viewport:
+                    m_.show_viewport = True
+                checker_modifiers_.append(m_)
+    if len(checker_modifiers_) <= 1:
+        return
+
+    for m_ in checker_modifiers_[:-1]:  # TODO: Save when == pattern
+        obj_.modifiers.remove(m_)
+
+    # Move to bottom
+    for idx, m_ in enumerate(obj_.modifiers):
+        if checker_modifiers_[-1] == m_:
+            if len(obj_.modifiers) - 1 != idx:
+                obj_.modifiers.move(idx, len(obj_.modifiers))
+            return
+
 def is_island_mode():
     scene = bpy.context.scene
     if scene.tool_settings.use_uv_select_sync:

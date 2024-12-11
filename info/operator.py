@@ -30,13 +30,7 @@ fill_event_info_ex = \
         "Shift+Alt - Individual Inplace Fill"
 fill_info = "Fill islands\n\n" + fill_event_info_ex
 
-home_event_info_ex = \
-        "Default - Move island to base tile\n" \
-        "Ctrl - Move island to cursor.\n"
-home_info = "Move island to base tile without changes in the textured object\n\n" + home_event_info_ex
-
 distribution_event_info_ex = \
         "Default - Move island to base tile\n" \
         "Ctrl - Move island to cursor.\n"
-distribution_info = "Move island to base tile without changes in the textured object\n\n" + home_event_info_ex
-
+distribution_info = "Move island to base tile without changes in the textured object\n\n" + distribution_event_info_ex
