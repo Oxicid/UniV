@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 4),
+    "version": (2, 9, 10),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -66,6 +66,7 @@ try:
         transform.UNIV_OT_Sort,
         transform.UNIV_OT_Distribute,
         transform.UNIV_OT_Home,
+        transform.UNIV_OT_Shift,
         transform.UNIV_OT_Random,
         transform.UNIV_OT_Weld,
         transform.UNIV_OT_Stitch,
@@ -73,8 +74,11 @@ try:
         transform.UNIV_OT_AdjustScale_VIEW3D,
         transform.UNIV_OT_Normalize,
         transform.UNIV_OT_Normalize_VIEW3D,
+        transform.UNIV_OT_TexelDensitySet,
+        transform.UNIV_OT_TexelDensitySet_VIEW3D,
+        transform.UNIV_OT_TexelDensityGet,
+        transform.UNIV_OT_TexelDensityGet_VIEW3D,
         transform.UNIV_OT_Pack,
-        transform.UNIV_OT_Shift,
         # Quadrify
         quadrify.UNIV_OT_Quadrify,
         straight.UNIV_OT_Straight,
@@ -96,8 +100,9 @@ try:
         # QuickSnap
         quick_snap.UNIV_OT_QuickSnap,
         # UI
-        ui.UNIV_PT_General,
         ui.UNIV_PT_General_VIEW_3D,
+        ui.UNIV_PT_General,
+        ui.UNIV_PT_GlobalSettings,
         ui.UNIV_PT_PackSettings,
         # Seam
         seam.UNIV_OT_Cut_VIEW2D,

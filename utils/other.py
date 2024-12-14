@@ -60,7 +60,7 @@ def remove_univ_duplicate_modifiers(obj_, modifier_name):
     if len(checker_modifiers_) <= 1:
         return
 
-    for m_ in checker_modifiers_[:-1]:  # TODO: Save when == pattern
+    for m_ in checker_modifiers_[:-1]:
         obj_.modifiers.remove(m_)
 
     # Move to bottom

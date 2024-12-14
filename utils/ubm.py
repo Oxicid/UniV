@@ -75,6 +75,41 @@ def calc_face_area_uv(f, uv) -> float:
         #     area += first_crn_co.cross(next_crn_co)
         #     first_crn_co = next_crn_co
         # return abs(area) * 0.5
+def calc_total_area_uv(faces, uv):
+    return sum(calc_face_area_uv(f, uv) for f in faces)
+
+def calc_total_area_3d(faces, scale):
+    if scale:
+        # TODO: Test uniform scale
+        # if uniform_scale:
+        #     s = (sum(scale) / 3) ** 2
+        #     return sum(f.calc_area() for f in faces) * s
+        # newell_cross
+        area = 0.0
+        for f in faces:
+            n = Vector()
+            corners = f.loops
+            v_prev = corners[-1].vert.co * scale
+            for crn in corners:
+                v_curr = crn.vert.co * scale
+                # inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
+                v_prev_yzx = v_prev.yzx
+                v_prev_zxy = v_prev.zxy
+
+                v_prev_yzx -= v_curr.yzx
+                v_prev_zxy += v_curr.zxy
+
+                v_prev_yzx *= v_prev_zxy
+                n += v_prev_yzx
+
+                v_prev = v_curr
+
+            area += n.length
+        return area * 0.5
+
+    else:
+        return sum(f.calc_area() for f in faces)
+
 
 def calc_max_length_uv_crn(corners, uv) -> BMLoop:
     length = -1.0

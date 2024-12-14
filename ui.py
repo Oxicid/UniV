@@ -3,14 +3,13 @@
 
 import bpy
 from bpy.types import Panel
-
+from .preferences import settings
 class UNIV_PT_General(Panel):
-    bl_label = "UniV"
+    bl_label = ''
     bl_idname = 'UNIV_PT_General'
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
     bl_category = "UniV"
-    bl_options = {'HIDE_HEADER'}
 
     @staticmethod
     def draw_align_buttons(where):
@@ -39,6 +38,21 @@ class UNIV_PT_General(Panel):
         ly_wide_text_op(rowBottom, 'LEFT_BOTTOM', text='↙')
         ly_wide_text_op(rowBottom.row(), 'BOTTOM', text='↓')
         ly_wide_text_op(rowBottom, 'RIGHT_BOTTOM', text='↘')
+
+    @staticmethod
+    def draw_texel_density(layer, prefix):
+        # layer.separator(factor=0.18)
+        split = layer.split(align=True)
+        row = split.row(align=True)
+        row.operator(prefix + '.univ_texel_density_set')
+        row.operator(prefix + '.univ_texel_density_get')
+        row.prop(settings(), 'texel_density', text='')
+
+    def draw_header(self, context):
+        layout = self.layout
+        row = layout.split(factor=.35)
+        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon='PREFERENCES')
+        row.label(text='UniV')
 
     def draw(self, context):
         layout = self.layout
@@ -82,16 +96,18 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_adjust_td')
-        row.operator('uv.univ_normalize')
-
-        split = col_align.split(align=True)
-        row = split.row(align=True)
         row.operator('uv.univ_home')
         row.operator('uv.univ_shift')
 
         split = col_align.split(align=True)
         split.operator('uv.univ_random')
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_adjust_td')
+        row.operator('uv.univ_normalize')
+
+        self.draw_texel_density(col_align, 'uv')
 
         # Pack
         col_align = col.column(align=True)
@@ -186,11 +202,9 @@ class UNIV_PT_General(Panel):
         # row.alignment = 'RIGHT'
 
 
-class UNIV_PT_General_VIEW_3D(Panel):
-    bl_label = "UniV"
+class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
+    bl_idname = 'UNIV_PT_General_VIEW3D'
     bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "UniV"
 
     def draw(self, context):
         layout = self.layout
@@ -222,12 +236,38 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row.operator('mesh.univ_adjust_td')
         row.operator('mesh.univ_normalize')
 
+        self.draw_texel_density(col_align, 'mesh')
+
         col_align.label(text='Texture')
         row = col_align.row(align=True)
         row.scale_y = 1.5
         row.operator('mesh.univ_checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
-        row.alignment = 'RIGHT'
+
+
+class UNIV_PT_GlobalSettings(Panel):
+    bl_idname = 'UNIV_PT_GlobalSettings'
+    bl_label = 'Global Settings'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
+
+    def draw(self, context):
+        self.draw_global_settings(self.layout)
+
+    @staticmethod
+    def draw_global_settings(layout):
+        settings = bpy.context.scene.univ_settings  # noqa
+
+        row = layout.row(align=True, heading='Size')
+        row.prop(settings, 'size_x', text='')
+        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
+        row.prop(settings, 'size_y', text='')
+
+        layout.prop(settings, 'padding', slider=True)
+        layout.separator()
+
 
 class UNIV_PT_PackSettings(Panel):
     bl_idname = 'UNIV_PT_PackSettings'
@@ -238,9 +278,11 @@ class UNIV_PT_PackSettings(Panel):
     bl_category = "UniV"
 
     def draw(self, context):
+        layout = self.layout
         settings = context.scene.univ_settings  # noqa
 
-        layout = self.layout
+        UNIV_PT_GlobalSettings.draw_global_settings(layout)
+
         if not bpy.app.version >= (3, 6, 0):
             layout.prop(settings, 'rotate', toggle=1)
         else:
@@ -263,10 +305,3 @@ class UNIV_PT_PackSettings(Panel):
             self.layout.prop(settings, 'pin')
             layout.prop(settings, 'merge_overlap')
         layout.prop(settings, 'udim_source')
-
-        layout.separator()
-
-        row = layout.row(align=True)
-        row.alignment = 'LEFT'
-        row.prop(settings, 'texture_size')
-        row.prop(settings, 'padding', slider=True)

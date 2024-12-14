@@ -26,6 +26,18 @@ def stable():
 def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
+def _update_size_x(self, _context):
+    if settings().lock_size:
+        settings().size_y = settings().size_x
+
+def _update_size_y(self, _context):
+    if settings().lock_size:
+        settings().size_x = settings().size_y
+
+def _update_lock_size(self, _context):
+    if settings().lock_size and settings().size_y != settings().size_x:
+        settings().size_y = settings().size_x
+
 
 _udim_source = [
     ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
@@ -35,6 +47,15 @@ if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
 class UNIV_Settings(bpy.types.PropertyGroup):
+    # Global Settings
+    size_x: EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
+    size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
+    lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
+
+    texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=0,
+                                 description="The number of texture pixels (texels) per unit surface area in 3D space.")
+
+    # Pack Settings
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
                                items=(('CONCAVE', 'Exact', 'Uses exact geometry'), ('AABB', 'Fast', 'Uses bounding boxes'))
                                )
@@ -59,18 +80,17 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     merge_overlap: BoolProperty(name='Lock Overlaps', default=False)
     udim_source: EnumProperty(name='Pack to', default='CLOSEST_UDIM', items=_udim_source)
 
-    texture_size: bpy.props.EnumProperty(name='Size', default='2048', items=utils.resolutions,
-                                         description="Optimal value for UV padding:\n"
-                                                     "256 = 2 px\n"
-                                                     "512 = 4 px\n"
-                                                     "1024 = 8 px\n"
-                                                     "2048 = 16 px\n"
-                                                     "4096 = 32 px\n"
-                                                     "8192 = 64 px\t")
     padding: IntProperty(name='Padding', default=8, min=0, soft_min=2, soft_max=32, max=64, step=2,
                          subtype='PIXEL', description="Space between islands in pixels.\n\n"
                                                       "Formula for converting the current Padding implementation to Margin:\n"
-                                                      "Margin = Padding / 2 / Texture Size")
+                                                      "Margin = Padding / 2 / Texture Size\n\n"
+                                                      "Optimal value for UV padding:\n"
+                                                      "256 = 2 px\n"
+                                                      "512 = 4 px\n"
+                                                      "1024 = 8 px\n"
+                                                      "2048 = 16 px\n"
+                                                      "4096 = 32 px\n"
+                                                      "8192 = 64 px\t")
 
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__

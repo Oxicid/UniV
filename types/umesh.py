@@ -48,8 +48,9 @@ class UMesh:
         fake.bm = FakeBMesh(isl)
         return fake
 
-    def free(self):
-        self.bm.free()
+    def free(self, force=False):
+        if force or not self.is_edit_bm:
+            self.bm.free()
 
     def mesh_to_bmesh(self):
         bm = bmesh.from_edit_mesh(self.obj.data)
@@ -576,10 +577,10 @@ class UMeshes:
             umesh.sync = state
         self.sync = state
 
-    def free(self):
+    def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""
         for umesh in self:
-            umesh.free()
+            umesh.free(force)
 
     @classmethod
     def sel_ob_with_uv(cls):
@@ -715,6 +716,7 @@ class UMeshes:
         return False
 
     def filtered_by_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+        """Warning: if bmesh has selected faces, non-selected might be without visible faces"""
         selected = []
         visible = []
         for umesh in self:

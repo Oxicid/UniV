@@ -720,6 +720,16 @@ class AdvIsland(FaceIsland):
             self._bbox.scale(scale, pivot)
         return super().scale(scale, pivot)
 
+    def set_texel(self, texel: float, texture_size: float | int):
+        """Warning: Need calc uv and 3d area"""
+        assert self.area_3d != 1.0 and self.area_uv != 1.0, "Need calculate uv and 3d area"
+        area_3d = math.sqrt(self.area_3d)
+        area_uv = math.sqrt(self.area_uv) * texture_size
+        if math.isclose(area_3d, 0.0, abs_tol=1e-6) or math.isclose(area_uv, 0.0, abs_tol=1e-6):
+            return None
+        scale = (texel / (area_uv / area_3d))
+        return self.scale(Vector((scale, scale)), self.bbox.center)
+
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         self._bbox = None  # TODO: Implement Rotate 90 degrees and aspect ratio for bbox
         return super().rotate(angle, pivot, aspect)
@@ -869,7 +879,6 @@ class AdvIsland(FaceIsland):
                     weight_append(ar)
                     area += ar
         elif scale:
-            # TODO: Need variant without scale?
             if self.tris:
                 for va, vb, vc in it:
                     area += area_tri(va * scale, vb * scale, vc * scale)
@@ -893,7 +902,8 @@ class AdvIsland(FaceIsland):
 
                         v_prev = v_curr
 
-                    area += n.length * 0.5
+                    area += n.length
+                area *= 0.5
         else:
             for f in self:
                 area += f.calc_area()
@@ -1733,6 +1743,16 @@ class UnionIslands(Islands):
     def area_uv(self) -> float:
         return sum(isl.area_uv for isl in self)
 
+    def set_texel(self, texel: float, texture_size: float | int):
+        """Warning: Need calc uv and 3d area"""
+        assert self.islands[0].area_3d != 1.0 and self.islands[0].area_uv != 1.0, "Need calculate uv and 3d area"
+        area_3d = math.sqrt(self.area_3d)
+        area_uv = math.sqrt(self.area_uv) * texture_size
+        if math.isclose(area_3d, 0.0, abs_tol=1e-6) or math.isclose(area_uv, 0.0, abs_tol=1e-6):
+            return None
+        scale = (texel / (area_uv / area_3d))
+        return self.scale(Vector((scale, scale)), self.bbox.center)
+
     @property
     def flat_3d_coords(self):
         return itertools.chain.from_iterable(isl.flat_3d_coords for isl in self)
@@ -1787,6 +1807,8 @@ class UnionIslands(Islands):
     @staticmethod
     def calc_overlapped_island_groups(adv_islands: list[AdvIsland], threshold=None) -> list['UnionIslands | AdvIsland']:
         """Warning: Tags should be the default. Optimal Threshold = 0.0005"""
+        if not adv_islands:
+            return []
         islands_group = []
         union_islands = []
         single_islands = []
@@ -1821,6 +1843,22 @@ class UnionIslands(Islands):
                 if len(list_of_isl) == 1:
                     single_island = islands_by_len_.pop(size)[0]
                     single_islands.append(single_island)
+
+            # # reduce islands by bbox
+            # islands_by_bbox: collections.defaultdict[tuple[float | int] | list[AdvIsland]] = collections.defaultdict(list)
+            # for size, list_of_isl in islands_by_len_.items():
+            #     for isl in list_of_isl:
+            #         bbox = isl.bbox
+            #         bbox_key: list[float | int] = list((round(minmax, threshold_to_precision) for minmax in (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax)))
+            #         bbox_key.append(size)
+            #         islands_by_bbox[tuple(bbox_key)].append(isl)
+            #
+            # islands_by_bbox_ = islands_by_bbox.copy()
+            # for size, list_of_isl in islands_by_bbox.items():
+            #     if len(list_of_isl) == 1:
+            #         single_island = islands_by_bbox_.pop(size)[0]
+            #         single_islands.append(single_island)
+            # islands_by_len_ = islands_by_bbox_
 
             # reduce by area_uv
             islands_by_ngons: collections.defaultdict[typing.Any | list[AdvIsland]] = collections.defaultdict(list)

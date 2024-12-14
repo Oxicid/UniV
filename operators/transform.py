@@ -34,7 +34,7 @@ from ..types import (
     UnionIslands,
     LoopGroup
 )
-from ..preferences import prefs
+from ..preferences import prefs, settings
 
 
 class UNIV_OT_Crop(Operator):
@@ -3651,7 +3651,7 @@ class UNIV_OT_Pack(Operator):
         args = {
             'udim_source': settings.udim_source,
             'rotate': settings.rotate,
-            'margin': settings.padding / 2 / int(settings.texture_size)}
+            'margin': settings.padding / 2 / min(int(settings.size_x), int(settings.size_y))}
         if bpy.app.version >= (3, 5, 0):
             args['margin_method'] = 'FRACTION'
         is_360v = bpy.app.version >= (3, 6, 0)
@@ -3679,3 +3679,204 @@ class UNIV_OT_Pack(Operator):
         KEYUP = 0x0002  # Release
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
+
+class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
+    bl_idname = "mesh.univ_texel_density_set"
+    bl_label = 'Set TD'
+    bl_description = "Set Texel Density"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
+    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    threshold: FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.lock_overlap = event.shift
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        # layout.alignment = 'LEFT'
+        if self.lock_overlap:
+            if self.lock_overlap_mode == 'EXACT':
+                layout.prop(self, 'threshold', slider=True)
+            layout.row().prop(self, 'lock_overlap_mode', expand=True)
+        layout.prop(self, 'lock_overlap')
+
+    def __init__(self):
+        self.texel: float = 1.0
+        self.texture_size: float = 2048.0
+        self.has_selected = True
+        self.islands_calc_type: Callable = Callable
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        self.texel = settings().texel_density
+        self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        self.umeshes = types.UMeshes(report=self.report)
+
+        if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
+            self.umeshes.set_sync()
+
+        cancel = False
+        if not self.umeshes.is_edit_mode:
+            if not self.umeshes:
+                cancel = True
+            else:
+                self.has_selected = False
+                self.islands_calc_type = AdvIslands.calc_with_hidden_with_mark_seam
+                self.umeshes.ensure(True)
+        else:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                self.has_selected = True
+                self.umeshes = selected_umeshes
+                self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+            elif unselected_umeshes:
+                self.has_selected = False
+                self.umeshes = unselected_umeshes
+                self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
+            else:
+                cancel = True
+
+        if cancel:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
+
+        all_islands = []
+        selected_islands_of_mesh = []
+        zero_area_islands = []
+        self.umeshes.tag_update = False
+
+        for umesh in self.umeshes:
+            if adv_islands := self.islands_calc_type(umesh):  # noqa
+                umesh.value = umesh.check_uniform_scale(report=self.report)
+
+                if self.lock_overlap:
+                    adv_islands.calc_tris()
+                    adv_islands.calc_flat_uv_coords(save_triplet=True)
+                    all_islands.extend(adv_islands)
+
+                adv_islands.calc_area_uv()
+                adv_islands.calc_area_3d(scale=umesh.value)
+
+                if not self.lock_overlap:
+                    for isl in adv_islands:
+                        if (status := isl.set_texel(self.texel, self.texture_size)) is None:
+                            zero_area_islands.append(isl)
+                            continue
+                        isl.umesh.update_tag |= status
+
+                if self.has_selected:
+                    selected_islands_of_mesh.append(adv_islands)
+
+        if self.lock_overlap:
+            threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
+            overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+
+            for isl in overlapped_islands:
+                if (status := isl.set_texel(self.texel, self.texture_size)) is None:
+                    zero_area_islands.append(isl)
+                    continue
+                isl.umesh.update_tag |= status
+
+        if zero_area_islands:
+            self.report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
+            if self.umeshes.is_edit_mode:
+                for islands in selected_islands_of_mesh:
+                    for isl in islands:
+                        isl.select = False
+                for isl in zero_area_islands:
+                    isl.select = True
+
+            self.umeshes.silent_update()
+            if not self.umeshes.is_edit_mode:
+                self.umeshes.free()
+                utils.update_area_by_type('VIEW_3D')
+            return {'FINISHED'}
+
+        if not self.umeshes.is_edit_mode:
+            res = self.umeshes.update(info='All islands adjusted')
+            self.umeshes.free()
+            if self.umeshes.tag_update:
+                utils.update_area_by_type('VIEW_3D')
+            return res
+        return self.umeshes.update(info='All islands adjusted')
+
+
+class UNIV_OT_TexelDensitySet(UNIV_OT_TexelDensitySet_VIEW3D):
+    bl_idname = "uv.univ_texel_density_set"
+
+class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
+    bl_idname = "mesh.univ_texel_density_get"
+    bl_label = 'Get TD'
+    bl_description = "Get Texel Density"
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def __init__(self):
+        self.texel: float = 1.0
+        self.texture_size: float = 2048.0
+        self.has_selected = True
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        self.texel = settings().texel_density
+        self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        self.umeshes = types.UMeshes(report=self.report)
+
+        if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
+            self.umeshes.set_sync()
+
+        cancel = False
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                self.has_selected = True
+                self.umeshes = selected_umeshes
+            elif unselected_umeshes:
+                self.has_selected = False
+                self.umeshes = unselected_umeshes
+            else:
+                cancel = True
+        else:
+            if not self.umeshes:
+                cancel = True
+            else:
+                self.has_selected = False
+
+        if cancel:
+            self.report({'WARNING'}, 'Faces not found')
+            return {'CANCELLED'}
+
+        total_3d_area = 0.0
+        total_uv_area = 0.0
+
+        for umesh in self.umeshes:
+            if self.umeshes.is_edit_mode:
+                faces = utils.calc_uv_faces(umesh, selected=self.has_selected)
+            else:
+                faces = umesh.bm.faces
+            scale = umesh.check_uniform_scale(self.report)
+            total_3d_area += utils.calc_total_area_3d(faces, scale)
+            total_uv_area += utils.calc_total_area_uv(faces, umesh.uv)
+
+        area_3d = sqrt(total_3d_area)
+        area_uv = sqrt(total_uv_area) * self.texture_size
+        if isclose(area_3d, 0.0, abs_tol=1e-6) or isclose(area_uv, 0.0, abs_tol=1e-6):
+            self.report({'WARNING'}, f"All faces has zero area")
+            return {'CANCELLED'}
+        texel = area_uv / area_3d
+        settings().texel_density = bl_math.clamp(texel, 1.0, 10_000.0)
+        return {'FINISHED'}
+
+class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):
+    bl_idname = "uv.univ_texel_density_get"
