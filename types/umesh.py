@@ -154,7 +154,6 @@ class UMesh:
                 return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
             return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
 
-    @property
     def has_visible_uv_faces(self) -> bool:
         if self.total_face_sel:
             return True
@@ -162,7 +161,6 @@ class UMesh:
             return any(not f.hide for f in self.bm.faces)
         return False
 
-    @property
     def has_selected_uv_edges(self) -> bool:
         """Warning: Edges might be without corners in sync mode"""
         if self.sync:
@@ -173,6 +171,17 @@ class UMesh:
         if self.is_full_face_selected:
             return any(any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
         return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
+
+    def has_selected_uv_verts(self) -> bool:
+        """Warning: Edges might be without corners in sync mode"""
+        if self.sync:
+            return bool(self.total_vert_sel)
+        if not self.total_face_sel:
+            return False
+        uv = self.uv
+        if self.is_full_face_selected:
+            return any(any(crn[uv].select for crn in f.loops) for f in self.bm.faces)
+        return any(f.select and any(crn[uv].select for crn in f.loops) for f in self.bm.faces)
 
     @property
     def has_any_selected_crn_non_sync(self):
@@ -503,11 +512,11 @@ class UMeshes:
         return {'CANCELLED'}
 
     @property
-    def tag_update(self):
+    def update_tag(self):
         return any(umesh.update_tag for umesh in self)
 
-    @tag_update.setter
-    def tag_update(self, value):
+    @update_tag.setter
+    def update_tag(self, value):
         for umesh in self:
             umesh.update_tag = value
 
@@ -726,7 +735,7 @@ class UMeshes:
                 visible.append(umesh)
         if not selected:
             for umesh2 in reversed(visible):
-                if not umesh2.has_visible_uv_faces:
+                if not umesh2.has_visible_uv_faces():
                     visible.remove(umesh2)
 
         import copy
@@ -740,13 +749,13 @@ class UMeshes:
         selected = []
         visible = []
         for umesh in self:
-            if umesh.has_selected_uv_edges:
+            if umesh.has_selected_uv_edges():
                 selected.append(umesh)
             else:
                 visible.append(umesh)
         if not selected:
             for umesh2 in reversed(visible):
-                if not umesh2.has_visible_uv_faces:
+                if not umesh2.has_visible_uv_faces():
                     visible.remove(umesh2)
 
         import copy
@@ -764,7 +773,7 @@ class UMeshes:
             if umesh.has_full_selected_uv_faces:
                 selected.append(umesh)
             else:
-                if umesh.has_visible_uv_faces:
+                if umesh.has_visible_uv_faces():
                     visible.append(umesh)
 
         import copy

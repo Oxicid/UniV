@@ -46,6 +46,7 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         row.operator(prefix + '.univ_texel_density_set')
         row.operator(prefix + '.univ_texel_density_get')
+        row.operator(prefix + '.univ_select_texel_density', text='', icon='RESTRICT_SELECT_OFF')
         row.prop(settings(), 'texel_density', text='')
 
     def draw_header(self, context):

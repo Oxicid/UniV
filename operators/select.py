@@ -9,6 +9,7 @@ import bpy
 import gpu
 import math
 
+from math import sqrt, isclose
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
@@ -18,7 +19,7 @@ from time import perf_counter as time
 
 from .. import utils
 from .. import types
-from ..preferences import prefs
+from ..preferences import prefs, settings
 from ..types import Islands, AdvIslands, AdvIsland,  BBox, UMeshes
 
 from ..utils import (
@@ -981,6 +982,7 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
         crn_uv_a.select_edge = False
         crn_uv_b.select = False
 
+
 class UNIV_OT_Select_Border(Operator):
     bl_idname = 'uv.univ_select_border'
     bl_label = 'Border'
@@ -1144,6 +1146,7 @@ class UNIV_OT_Select_Border(Operator):
                                 UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(crn, uv)
                                 UNIV_OT_Select_Border_Edge_by_Angle.select_crn_uv_edge(shared_crn, uv)
                 umesh.update_tag = bool(islands)
+
 
 class UNIV_OT_Select_Pick(Operator):
     bl_idname = 'uv.univ_select_pick'
@@ -1703,6 +1706,129 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                         min_crn = crn_.link_loop_prev
             return min_crn
         return False
+
+
+class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
+    bl_idname = "mesh.univ_select_texel_density"
+    bl_label = 'Select by TD'
+    bl_description = "Select by Texel Density"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+    island_mode: EnumProperty(name='Mode', default='ISLAND', items=(('ISLAND', 'Island', ''), ('FACE', 'Face', '')))
+
+    target_texel: FloatProperty(name='Texel', default=512, min=1, soft_min=32, soft_max=2048, max=10_000)
+    threshold: FloatProperty(name='Texel', default=0.01, min=0, soft_max=50, max=10_000)
+
+    def draw(self, context):
+        layout = self.layout
+        row = self.layout.row(align=True)
+        row.prop(self, 'mode', expand=True)
+        row = self.layout.row(align=True)
+        row.prop(self, 'island_mode', expand=True)
+        layout.prop(self, 'target_texel', slider=True)
+        layout.prop(self, 'threshold', slider=True)
+
+    def invoke(self, context, event):
+        self.target_texel = settings().texel_density
+
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        self.island_mode = 'FACE' if event.alt else 'ISLAND'
+        return self.execute(context)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def execute(self, context):
+        texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        umeshes = types.UMeshes()
+        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+
+        if not self.bl_idname.startswith('UV'):
+            umeshes.set_sync()
+
+        has_elem = False
+        counter = 0
+        counter_skipped = 0
+        for umesh in umeshes:
+            has_selected = umesh.has_selected_uv_verts()
+            if self.island_mode == 'ISLAND':
+                islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            else:
+                islands = [AdvIsland([f], umesh) for f in utils.calc_visible_uv_faces(umesh)]
+            if islands:
+                has_elem = True
+                scale = umesh.check_uniform_scale(self.report)
+                for isl in islands:
+                    isl.calc_area_3d(scale)
+                    isl.calc_area_uv()
+
+                    area_3d = sqrt(isl.area_3d)
+                    area_uv = sqrt(isl.area_uv) * texture_size
+
+                    texel = area_uv / area_3d if area_3d else 0
+
+                    if self.mode == 'SELECT':
+                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                            if has_selected and isl.is_full_face_selected:
+                                counter_skipped += 1
+                                continue
+                            counter += 1
+                            isl.select = True
+                            umesh.update_tag = True
+                        elif has_selected:
+                            if isl.is_full_face_deselected:
+                                continue
+                            isl.select = False
+                            umesh.update_tag = True
+                    elif self.mode == 'ADDITION':
+                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                            if has_selected and isl.is_full_face_selected:
+                                counter_skipped += 1
+                                continue
+                            counter += 1
+                            isl.select = True
+                            umesh.update_tag = True
+                    else:  # self.mode == 'DESELECT':
+                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                            if isl.is_full_face_deselected:
+                                counter_skipped += 1
+                                continue
+                            counter += 1
+                            isl.select = False
+                            umesh.update_tag = True
+
+        if not has_elem:
+            self.report({'WARNING'}, f'{self.island_mode.capitalize() + "s"} not found')
+        else:
+            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
+            if counter:
+                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} {self.island_mode + "s"}')
+            else:
+                if counter_skipped:
+                    self.report({'INFO'}, f'{self.island_mode.capitalize() + "s"} already {sel_or_deselect}')
+                else:
+                    self.report({'WARNING'}, f'No found {self.island_mode.capitalize() + "s"} in the specified texel')
+        umeshes.silent_update()
+        return {'FINISHED'}
+
+
+class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
+    bl_idname = "uv.univ_select_texel_density"
 
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):

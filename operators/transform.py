@@ -1393,7 +1393,7 @@ class UNIV_OT_Home(Operator):
             return {'CANCELLED'}
 
         self.umeshes = types.UMeshes()
-        self.umeshes.tag_update = False
+        self.umeshes.update_tag = False
 
         mod_counter, attr_counter = self.remove_shift_md()  # remove_shift_md changes update tag
         changed_modifiers_count = self.uv_shift_reset_array_and_mirror_and_warp()
@@ -1581,7 +1581,7 @@ class UNIV_OT_Shift(Operator):
                     umeshes_without_attributes.append(umesh)
 
         all_islands = []
-        self.umeshes.tag_update = False
+        self.umeshes.update_tag = False
 
         for umesh in self.umeshes:
             adv_islands = self.islands_calc_type(umesh)  # noqa
@@ -3753,7 +3753,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         all_islands = []
         selected_islands_of_mesh = []
         zero_area_islands = []
-        self.umeshes.tag_update = False
+        self.umeshes.update_tag = False
 
         for umesh in self.umeshes:
             if adv_islands := self.islands_calc_type(umesh):  # noqa
@@ -3805,7 +3805,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         if not self.umeshes.is_edit_mode:
             res = self.umeshes.update(info='All islands adjusted')
             self.umeshes.free()
-            if self.umeshes.tag_update:
+            if self.umeshes.update_tag:
                 utils.update_area_by_type('VIEW_3D')
             return res
         return self.umeshes.update(info='All islands adjusted')

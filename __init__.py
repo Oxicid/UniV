@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 10),
+    "version": (2, 9, 11),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -96,6 +96,8 @@ try:
         select.UNIV_OT_Select_Pick,
         select.UNIV_OT_Select_Grow,
         select.UNIV_OT_Select_Edge_Grow_VIEW2D,
+        select.UNIV_OT_SelectTexelDensity,
+        select.UNIV_OT_SelectTexelDensity_VIEW3D,
         select.UNIV_OT_Tests,
         # QuickSnap
         quick_snap.UNIV_OT_QuickSnap,
