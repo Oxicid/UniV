@@ -1844,21 +1844,21 @@ class UnionIslands(Islands):
                     single_island = islands_by_len_.pop(size)[0]
                     single_islands.append(single_island)
 
-            # # reduce islands by bbox
-            # islands_by_bbox: collections.defaultdict[tuple[float | int] | list[AdvIsland]] = collections.defaultdict(list)
-            # for size, list_of_isl in islands_by_len_.items():
-            #     for isl in list_of_isl:
-            #         bbox = isl.bbox
-            #         bbox_key: list[float | int] = list((round(minmax, threshold_to_precision) for minmax in (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax)))
-            #         bbox_key.append(size)
-            #         islands_by_bbox[tuple(bbox_key)].append(isl)
-            #
-            # islands_by_bbox_ = islands_by_bbox.copy()
-            # for size, list_of_isl in islands_by_bbox.items():
-            #     if len(list_of_isl) == 1:
-            #         single_island = islands_by_bbox_.pop(size)[0]
-            #         single_islands.append(single_island)
-            # islands_by_len_ = islands_by_bbox_
+            # reduce islands by bbox
+            islands_by_bbox: collections.defaultdict[tuple[float | int] | list[AdvIsland]] = collections.defaultdict(list)
+            for size, list_of_isl in islands_by_len_.items():
+                for isl in list_of_isl:
+                    bbox = isl.bbox
+                    bbox_key: list[float | int] = list((round(minmax, threshold_to_precision) for minmax in (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax)))
+                    bbox_key.append(size)
+                    islands_by_bbox[tuple(bbox_key)].append(isl)
+
+            islands_by_bbox_ = islands_by_bbox.copy()
+            for size, list_of_isl in islands_by_bbox.items():
+                if len(list_of_isl) == 1:
+                    single_island = islands_by_bbox_.pop(size)[0]
+                    single_islands.append(single_island)
+            islands_by_len_ = islands_by_bbox_
 
             # reduce by area_uv
             islands_by_ngons: collections.defaultdict[typing.Any | list[AdvIsland]] = collections.defaultdict(list)

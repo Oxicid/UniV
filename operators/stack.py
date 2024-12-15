@@ -106,7 +106,7 @@ class StackIsland:  # TODO: Split for source and target islands
 
         for crn in face_start_pattern_crn:
             linked_crn_face_size = []
-            for crn_ in linked_crn_to_vert_by_face_index(crn):
+            for crn_ in linked_crn_to_vert_by_face_index(crn):  # TODO: Check with true linked
                 linked_crn_face_size.append(len(crn_.face.loops))
 
             shared_face_size = 0

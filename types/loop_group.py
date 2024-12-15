@@ -8,8 +8,9 @@ if 'bpy' in locals():
 import typing
 from mathutils import Vector
 from collections import defaultdict
+from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import prev_disc, linked_crn_uv_by_tag, vec_isclose_to_zero
+from ..utils import prev_disc, linked_crn_uv_by_tag_unordered_included, vec_isclose_to_zero
 from . import umesh as _umesh
 from . import bbox
 from .. import utils
@@ -255,9 +256,9 @@ class LoopGroup:
             while True:
                 temp = []
                 for sel in temp_group:
-                    it = linked_crn_uv_by_tag(sel, uv)
-                    it.extend(linked_crn_uv_by_tag(sel.link_loop_next, uv))
-                    for l in it:
+                    it1 = linked_crn_uv_by_tag_unordered_included(sel, uv)
+                    it2 = linked_crn_uv_by_tag_unordered_included(sel.link_loop_next, uv)
+                    for l in chain(it1, it2):
                         if l.tag:
                             l.tag = False
                             temp.append(l)
@@ -291,12 +292,12 @@ class LoopGroup:
             move_corners = []
             uv = self.umesh.uv
             for crn in self:
-                linked_corners = utils.linked_crn_uv_by_tag_c(crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
+                linked_corners = utils.linked_crn_uv_by_tag_unordered_included(crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
                 move_corners.extend(linked_corners)
                 for crn_ in linked_corners:
                     crn_.tag = False
 
-                linked_corners = utils.linked_crn_uv_by_tag_c(crn.link_loop_next, uv)
+                linked_corners = utils.linked_crn_uv_by_tag_unordered_included(crn.link_loop_next, uv)
                 move_corners.extend(linked_corners)
                 for crn_ in linked_corners:
                     crn_.tag = False

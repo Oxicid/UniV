@@ -9,6 +9,7 @@ import bpy
 import typing
 
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
+from math import isclose
 from mathutils import Vector
 from mathutils.geometry import area_tri, intersect_point_tri_2d
 from collections import deque
@@ -60,30 +61,21 @@ def calc_face_area_uv(f, uv) -> float:
         return area_tri(crn_a[uv].uv, crn_b[uv].uv, crn_c[uv].uv)
     else:
         area = 0.0
-        first_crn_co = corners[0][uv].uv
+        first_crn_co = corners[-1][uv].uv
         for crn in corners:
-            next_crn_co = crn.link_loop_next[uv].uv
+            next_crn_co = crn[uv].uv
             area += first_crn_co.cross(next_crn_co)
             first_crn_co = next_crn_co
         return abs(area) * 0.5
 
-        # TODO: Check that optimization
-        # area = 0.0
-        # first_crn_co = corners[-1][uv].uv
-        # for crn in corners:
-        #     next_crn_co = crn[uv].uv
-        #     area += first_crn_co.cross(next_crn_co)
-        #     first_crn_co = next_crn_co
-        # return abs(area) * 0.5
 def calc_total_area_uv(faces, uv):
     return sum(calc_face_area_uv(f, uv) for f in faces)
 
 def calc_total_area_3d(faces, scale):
     if scale:
-        # TODO: Test uniform scale
-        # if uniform_scale:
-        #     s = (sum(scale) / 3) ** 2
-        #     return sum(f.calc_area() for f in faces) * s
+        avg_scale = (sum(abs(s_) for s_ in scale) / 3)
+        if all(isclose(abs(s_), avg_scale, abs_tol=0.01) for s_ in scale):
+            return sum(f.calc_area() for f in faces) * avg_scale ** 2
         # newell_cross
         area = 0.0
         for f in faces:
@@ -114,11 +106,14 @@ def calc_total_area_3d(faces, scale):
 def calc_max_length_uv_crn(corners, uv) -> BMLoop:
     length = -1.0
     crn_ = None
+    prev_co = corners[-1][uv].uv
     for crn in corners:
-        if length < (length_ := (crn[uv].uv - crn.link_loop_next[uv].uv).length_squared):
+        curr_co = crn[uv].uv
+        if length < (length_ := (prev_co - curr_co).length_squared):
             crn_ = crn
             length = length_
-    return crn_
+        prev_co = curr_co
+    return crn_.link_loop_prev
 
 # Need implement disc_next disc_prev
 # def calc_non_manifolds_uv(bm, uv):
@@ -207,39 +202,38 @@ def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
     linked.remove(first)
     return linked
 
-def linked_crn_uv_unordered_included(first: BMLoop, uv: BMLayerItem):
-    first_co = first[uv].uv
-    linked = deque(l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co)
-    return linked
-
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
     linked = []
     bm_iter = first
+    first_co = first[uv].uv
     while True:
         if (bm_iter := prev_disc(bm_iter)) == first:
             break
         if not bm_iter.tag:
             continue
-        if first[uv].uv == bm_iter[uv].uv:
+        if first_co == bm_iter[uv].uv:
             linked.append(bm_iter)
     return linked
 
 
+# TODO: Replace with linked unordered (change logic in extend_from_linked)
 def linked_crn_vert_uv_for_transform(first, uv):
     # Need tagging. tag == False - not append
     # assert utils.sync()
     linked = []
     bm_iter = first
+    first_co = first[uv].uv
     while True:
         if (bm_iter := prev_disc(bm_iter)) == first:
             break
         if not bm_iter.tag:
             continue
-        if first[uv].uv == bm_iter[uv].uv:
+        if first_co == bm_iter[uv].uv:
             bm_iter.tag = False
             linked.append(bm_iter)
 
     next_crn = first.link_loop_next
+    next_crn_co = next_crn[uv].uv
     if next_crn.tag:
         next_crn.tag = False
         linked.append(next_crn)
@@ -250,24 +244,13 @@ def linked_crn_vert_uv_for_transform(first, uv):
                 break
             if not bm_iter.tag:
                 continue
-            if next_crn[uv].uv == bm_iter[uv].uv:
+            if next_crn_co == bm_iter[uv].uv:
                 bm_iter.tag = False
                 linked.append(bm_iter)
     return linked
 
-def linked_crn_uv_by_tag(first, uv):
-    linked = [first]
-    bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        if not (bm_iter.tag or bm_iter.link_loop_prev.tag):
-            continue
-        if first[uv].uv == bm_iter[uv].uv:  # TODO: Optimize and test
-            linked.append(bm_iter)
-    return linked
-
-def linked_crn_uv_by_tag_c(crn: BMLoop, uv: BMLayerItem):
+def linked_crn_uv_by_tag_unordered_included(crn, uv):
+    """Linked to arg corner by tag with arg corner and unordered"""
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.tag and l_crn[uv].uv == first_co]
 
@@ -336,23 +319,15 @@ def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerIte
 def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: int):
     """Linked to arg corner by island index without arg corner"""
     first_co = crn[uv].uv
-    linked = [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
-    linked.remove(crn)
-    return linked
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
+# TODO: Check
 def linked_crn_to_vert_by_face_index(crn):
     """Linked to vertex by face index without arg corner"""
     idx = crn.face.index
     linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
     linked.rotate(-linked.index(crn))
     linked.popleft()
-    return linked
-
-def linked_crn_to_vert_by_face_index_including(crn):
-    """Linked to vertex by face index with arg corner"""
-    idx = crn.face.index
-    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
-    linked.rotate(-linked.index(crn))
     return linked
 
 def select_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):

@@ -3130,6 +3130,7 @@ class UNIV_OT_Stitch(Operator):
     def stitch_ex(self, tar: LoopGroup, source: LoopGroup, adv_islands: AdvIslands, selected=True):
         uv = tar.umesh.uv
         # Equal indices occur after merging on non-stitch edges
+        # TODO: Disable?
         if tar[0].face.index == source[0].face.index:
             for target_crn in tar:
                 UNIV_OT_Stitch.copy_pos(target_crn, uv)
