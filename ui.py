@@ -184,6 +184,12 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
         row.operator('uv.univ_select_square_island', text='V').shape = 'VERTICAL'
 
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_select_by_area', text='Small').size_mode = 'SMALL'
+        row.operator('uv.univ_select_by_area', text='Medium').size_mode = 'MEDIUM'
+        row.operator('uv.univ_select_by_area', text='Large').size_mode = 'LARGE'
+
         # Inspect
         col_align = col.column(align=True)
         col_align.label(text='Inspect')

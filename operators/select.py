@@ -10,6 +10,7 @@ import gpu
 import math
 
 from math import sqrt, isclose
+from bl_math import lerp
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
@@ -1765,6 +1766,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         counter = 0
         counter_skipped = 0
         for umesh in umeshes:
+            umesh.update_tag = False
             has_selected = umesh.has_selected_uv_verts()
             if self.island_mode == 'ISLAND':
                 islands = AdvIslands.calc_visible_with_mark_seam(umesh)
@@ -1820,7 +1822,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                 self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} {self.island_mode + "s"}')
             else:
                 if counter_skipped:
-                    self.report({'INFO'}, f'{self.island_mode.capitalize() + "s"} already {sel_or_deselect}')
+                    self.report({'INFO'}, f'The {self.island_mode.capitalize() + "s"} were already {sel_or_deselect}')
                 else:
                     self.report({'WARNING'}, f'No found {self.island_mode.capitalize() + "s"} in the specified texel')
         umeshes.silent_update()
@@ -1874,3 +1876,157 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     #                 update |= bool(grew)
     #
     #         umesh.update_tag = update
+
+
+class UNIV_OT_SelectByArea(Operator):
+    bl_idname = "uv.univ_select_by_area"
+    bl_label = 'Select by Area'
+    bl_description = "Select by Area"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+
+    size_mode: EnumProperty(name='Size Mode', default='SMALL', items=(
+        ('SMALL', 'Small', ''),
+        ('MEDIUM', 'Medium', ''),
+        ('LARGE', 'Large', ''),
+    ))
+    size_type: EnumProperty(name='Size Mode', default='AREA', items=(
+        ('AREA', 'Area', ''),
+        ('X', 'Size X', ''),
+        ('Y', 'Size Y', ''),
+    ))
+
+    threshold: FloatProperty(name='Threshold', default=0.01, min=0, soft_min=0.01, soft_max=0.1, max=0.5, subtype='FACTOR')
+    lower_slider: FloatProperty(name='Low', default=0.2, min=0, max=0.9, subtype='PERCENTAGE',
+        update=lambda self, _: setattr(self, 'higher_slider', self.lower_slider+0.05) if self.higher_slider-0.05 < self.lower_slider else None)
+    higher_slider: FloatProperty(name='High', default=0.8, min=0.1, max=1, subtype='PERCENTAGE',
+        update=lambda self, _: setattr(self, 'lower_slider', self.higher_slider-0.05) if self.higher_slider-0.05 < self.lower_slider else None)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.row(align=True).prop(self, 'mode', expand=True)
+        layout.row(align=True).prop(self, 'size_type', expand=True)
+        layout.row(align=True).prop(self, 'size_mode', expand=True)
+        layout.label(text=f'Small: {self.lower_slider*100:.2f}% \t\t\t'
+                          f'Medium{((self.higher_slider-self.lower_slider)*100):.2f}% \t\t\t'
+                          f'Large {(1-self.higher_slider)*100:.2f}%')
+        row = layout.row(align=True)
+        row.prop(self, 'lower_slider', slider=True)
+        row.prop(self, 'higher_slider', slider=True)
+        layout.prop(self, 'threshold', slider=True)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def execute(self, context):
+        umeshes = types.UMeshes()
+        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+
+        min_value = float('inf')
+        max_value = float('-inf')
+        islands_of_mesh = []
+        counter = 0
+        counter_skipped = 0
+        for umesh in reversed(umeshes):
+            umesh.update_tag = False
+            if islands := AdvIslands.calc_visible_with_mark_seam(umesh):
+                islands_of_mesh.append(islands)
+                islands.value = umesh.has_selected_uv_verts()
+
+                if self.size_type == 'AREA':
+                    for isl in islands:
+                        area = isl.calc_area_uv()
+                        isl.value = area
+                        min_value = min(area, min_value)
+                        max_value = max(area, max_value)
+                else:
+                    for isl in islands:
+                        bbox = isl.calc_bbox()
+                        if self.size_type == 'X':
+                            size = bbox.width
+                        else:
+                            size = bbox.height
+                        isl.value = size
+                        min_value = min(size, min_value)
+                        max_value = max(size, max_value)
+            else:
+                umeshes.umeshes.remove(umesh)
+
+        if self.size_mode == 'SMALL':
+            lower = min_value
+            higher = lerp(min_value, max_value, self.lower_slider)
+        elif self.size_mode == 'MEDIUM':
+            lower = lerp(min_value, max_value, self.lower_slider)
+            higher = lerp(min_value, max_value, self.higher_slider)
+        else:  # self.size_mode == 'LARGE':
+            lower = lerp(min_value, max_value, self.higher_slider)
+            higher = max_value
+        lower -= self.threshold
+        higher += self.threshold
+
+        for islands in islands_of_mesh:
+            umesh = islands.umesh
+            has_selected = islands.value
+            for isl in islands:
+                if self.mode == 'SELECT':
+                    if lower <= isl.value <= higher:
+                        if has_selected and isl.is_full_face_selected:
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        isl.select = True
+                        umesh.update_tag = True
+                    elif has_selected:
+                        if isl.is_full_face_deselected:
+                            continue
+                        isl.select = False
+                        umesh.update_tag = True
+                elif self.mode == 'ADDITION':
+                    if lower <= isl.value <= higher:
+                        if has_selected and isl.is_full_face_selected:
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        isl.select = True
+                        umesh.update_tag = True
+                else:  # self.mode == 'DESELECT':
+                    if lower <= isl.value <= higher:
+                        if isl.is_full_face_deselected:
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        isl.select = False
+                        umesh.update_tag = True
+
+        if not islands_of_mesh:
+            self.report({'WARNING'}, f'Islands not found')
+        else:
+            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
+            if counter:
+                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} islands')
+            else:
+                if counter_skipped:
+                    self.report({'INFO'}, f'The islands were already{sel_or_deselect}')
+                else:
+                    self.report({'WARNING'}, f'No found in the specified size')
+        umeshes.silent_update()
+        return {'FINISHED'}
