@@ -3448,16 +3448,71 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
+        if self.bl_idname.startswith('UV'):
+            self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+            self.mouse_pos = utils.get_mouse_pos(context, event)
         if event.value == 'PRESS':
             return self.execute(context)
         self.lock_overlap = event.shift
         self.invert = event.ctrl or event.alt
         return self.execute(context)
 
+    def __init__(self):
+        super().__init__()
+        self.mouse_pos = Vector((0, 0))
+        self.max_distance: float | None = None
+
     def execute(self, context):
         if context.mode == 'EDIT_MESH':
             return self.adjust_edit()
         return self.adjust_object()
+
+    def pick_adjust_edit(self):
+        all_islands = []
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+            adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
+
+            adv_islands.calc_tris()
+            adv_islands.calc_flat_uv_coords(save_triplet=True)
+            adv_islands.calc_flat_unique_uv_coords()
+            adv_islands.calc_flat_3d_coords(save_triplet=True, scale=umesh.value)
+            adv_islands.calc_area_uv()
+            adv_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
+            all_islands.extend(adv_islands)
+
+        if self.lock_overlap:
+            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+
+        for isl in all_islands:
+            hit.find_nearest_island(isl)
+
+        if not hit or (self.max_distance < hit.min_dist):
+            self.report({'INFO'}, 'Island not found within a given radius')
+            return {'CANCELLED'}
+
+        all_islands.remove(hit.island)
+
+        tot_area_uv = tot_area_3d = 0
+        if self.invert:
+            tot_area_uv += hit.island.area_uv
+            tot_area_3d += hit.island.area_3d
+        else:
+            for isl in all_islands:
+                tot_area_uv += isl.area_uv
+                tot_area_3d += isl.area_3d
+            all_islands = [hit.island]
+
+        if self.xy_scale or self.shear:
+            for isl in all_islands:
+                isl.value = isl.bbox.center  # isl.value == pivot
+                self.individual_scale(isl)
+
+        self.show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
+        return {'FINISHED'}
 
     def adjust_edit(self):
         all_islands: list[AdvIsland | UnionIslands] = []
@@ -3472,6 +3527,11 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         if self.invert:
             full_selected, not_full_selected = self.umeshes.filtered_by_full_selected_and_visible_uv_faces()
+            if self.max_distance and not full_selected:
+                if not_full_selected and all(not u.has_selected_uv_faces() for u in not_full_selected):
+                    self.umeshes = not_full_selected
+                    return self.pick_adjust_edit()
+
             unselected_umeshes = full_selected
             selected_umeshes = not_full_selected
             self.umeshes = selected_umeshes
@@ -3480,6 +3540,10 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                 return {'CANCELLED'}
         else:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if self.max_distance and not selected_umeshes and unselected_umeshes:
+                self.umeshes = unselected_umeshes
+                return self.pick_adjust_edit()
+
             self.umeshes = selected_umeshes
 
             if not self.umeshes:
@@ -3489,7 +3553,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
-            adv_islands = AdvIslands.calc_with_hidden(umesh)
+            adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
             adv_islands.calc_tris()
@@ -3526,10 +3590,12 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                 isl.value = isl.bbox.center  # isl.value == pivot
                 self.individual_scale(isl)
 
+        self.show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv)
+        return {'FINISHED'}
+
+    def show_adjust_result_info_edit(self, all_islands, tot_area_3d, tot_area_uv, sel='selected', unsel='unselected'):
         info_ = 'All target islands were normalized'
         if isinstance(tot_area_uv, int):
-            sel = 'selected'
-            unsel = 'unselected'
             if self.invert:
                 sel, unsel = unsel, sel
 
@@ -3544,7 +3610,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         self.normalize(all_islands, tot_area_uv, tot_area_3d)
         self.umeshes.update(info=info_)
-        return {'FINISHED'}
 
     def adjust_object(self):
         all_islands: list[AdvIsland | UnionIslands] = []
@@ -3568,7 +3633,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         for umesh in self.umeshes:
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0  # TODO: Report heterogeneous aspects
             umesh.ensure()
-            adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            adv_islands = AdvIslands.calc_with_hidden(umesh)
 
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 

@@ -138,7 +138,6 @@ class UMesh:
                 return all(all(crn[uv].select for crn in f.loops) for f in self.bm.faces)
             return all(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
 
-    @property
     def has_selected_uv_faces(self) -> bool:
         if self.sync:
             return bool(self.total_face_sel)
@@ -729,7 +728,7 @@ class UMeshes:
         selected = []
         visible = []
         for umesh in self:
-            if umesh.has_selected_uv_faces:
+            if umesh.has_selected_uv_faces():
                 selected.append(umesh)
             else:
                 visible.append(umesh)
