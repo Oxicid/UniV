@@ -886,7 +886,7 @@ class UNIV_OT_Rotate(Operator):
             umesh.update_tag = bool(islands)
 
 
-class UNIV_OT_Sort(Operator):
+class UNIV_OT_Sort(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_sort'
     bl_label = 'Sort'
     bl_description = 'Sort'
@@ -899,7 +899,6 @@ class UNIV_OT_Sort(Operator):
     reverse: BoolProperty(name='Reverse', default=True)
     to_cursor: BoolProperty(name='To Cursor', default=False)
     align: BoolProperty(name='Orient', default=False)  # TODO: Rename align to orient
-    overlapped: BoolProperty(name='Overlapped', default=False)
     subgroup_type: EnumProperty(name='Subgroup Type', default='NONE', items=(
         ('NONE', 'None', ''),
         ('AREA', 'Area', ''),
@@ -914,7 +913,7 @@ class UNIV_OT_Sort(Operator):
         layout.prop(self, 'to_cursor')
         layout.prop(self, 'align')
         if self.subgroup_type == 'NONE':
-            layout.prop(self, 'overlapped')
+            self.draw_overlap()
         layout.prop(self, 'padding', slider=True)
         if self.subgroup_type != 'NONE':
             layout.prop(self, 'sub_padding', slider=True)
@@ -931,7 +930,7 @@ class UNIV_OT_Sort(Operator):
         if event.value == 'PRESS':
             return self.execute(context)
         self.to_cursor = event.ctrl
-        self.overlapped = event.shift
+        self.lock_overlap = event.shift
         self.align = event.alt
         return self.execute(context)
 
@@ -953,9 +952,9 @@ class UNIV_OT_Sort(Operator):
             self.cursor_loc = None
 
         if self.subgroup_type != 'NONE':
-            self.overlapped = False
+            self.lock_overlap = False
 
-        if not self.overlapped:
+        if not self.lock_overlap:
             self.sort_individual_preprocessing(extended=True)
             if not self.umeshes.final():
                 self.sort_individual_preprocessing(extended=False)
@@ -965,7 +964,7 @@ class UNIV_OT_Sort(Operator):
                 self.sort_overlapped_preprocessing(extended=False)
 
         if not self.update_tag:
-            return self.umeshes.cancel_with_report(info='Islands is sorted')
+            return self.umeshes.cancel_with_report(info='Islands is sorted')  # TODO: Add info when islands not found
         return self.umeshes.update()
 
     def sort_overlapped_preprocessing(self, extended=True):
@@ -981,7 +980,7 @@ class UNIV_OT_Sort(Operator):
             return
 
         general_bbox = BBox()
-        union_islands_groups = UnionIslands.calc_overlapped_island_groups(_islands)
+        union_islands_groups = self.calc_overlapped_island_groups(_islands)
         for union_island in union_islands_groups:
             if self.align:
                 isl_coords = union_island.calc_convex_points()
@@ -995,7 +994,7 @@ class UNIV_OT_Sort(Operator):
                 bb = union_island.bbox
                 general_bbox.union(bb)
 
-        is_horizontal = self.is_horizontal(general_bbox)
+        is_horizontal = self.is_horizontal(general_bbox, union_islands_groups)
         margin = general_bbox.min if (self.cursor_loc is None) else self.cursor_loc
         self.sort_islands(is_horizontal, margin, union_islands_groups)
 
@@ -1033,7 +1032,7 @@ class UNIV_OT_Sort(Operator):
         if not _islands:
             return
 
-        is_horizontal = self.is_horizontal(general_bbox)
+        is_horizontal = self.is_horizontal(general_bbox, _islands)
         margin = general_bbox.min if (self.cursor_loc is None) else self.cursor_loc
 
         if self.subgroup_type == 'NONE':
@@ -1107,14 +1106,26 @@ class UNIV_OT_Sort(Operator):
                 margin.y += self.padding + height
             margin.y += self.sub_padding
 
-    def is_horizontal(self, bbox):
+    def is_horizontal(self, bbox, islands):
         if self.axis == 'AUTO':
-            return bbox.width * 2 > bbox.height
+            if bbox.width * 1.5 > bbox.height:
+                return True
+            else:
+                total_width = 0
+                total_height = 0
+                if type(islands[0]) == AdvIslands:
+                    islands = (isl_ for _islands in islands for isl_ in _islands)
+
+                for isl in islands:
+                    bbox_ = isl.bbox
+                    total_width += bbox_.width
+                    total_height += bbox_.height
+                return total_width < total_height
         else:
             return self.axis == 'X'
 
 
-class UNIV_OT_Distribute(Operator):
+class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_distribute'
     bl_label = 'Distribute'
     bl_description = "Distribute\n\n" \
@@ -1130,7 +1141,6 @@ class UNIV_OT_Distribute(Operator):
                         description='Distribution of islands at equal distances')
     padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     to_cursor: BoolProperty(name='To Cursor', default=False)
-    overlapped: BoolProperty(name='Overlapped', default=False)
     break_: BoolProperty(name='Break', default=False)
     angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
@@ -1139,7 +1149,7 @@ class UNIV_OT_Distribute(Operator):
             layout = self.layout.row()
             layout.prop(self, 'space', expand=True)
             layout = self.layout
-            layout.prop(self, 'overlapped')
+            self.draw_overlap()
             layout.prop(self, 'to_cursor')
             layout.prop(self, 'break_')
         else:
@@ -1160,7 +1170,7 @@ class UNIV_OT_Distribute(Operator):
         if event.value == 'PRESS':
             return self.execute(context)
         self.to_cursor = event.ctrl
-        self.overlapped = event.shift
+        self.lock_overlap = event.shift
         self.break_ = event.alt
         return self.execute(context)
 
@@ -1223,7 +1233,7 @@ class UNIV_OT_Distribute(Operator):
             return
 
         cursor_offset = 0
-        if self.is_horizontal(general_bbox):
+        if self.is_horizontal(general_bbox, _islands):
             _islands.sort(key=lambda a: a.bbox.xmin)
             if self.cursor_loc is None:
                 margin = general_bbox.min.x
@@ -1250,7 +1260,7 @@ class UNIV_OT_Distribute(Operator):
 
     def distribute(self, extended=True):
         self.update_tag = False
-        if self.overlapped:
+        if self.lock_overlap:
             func = self.distribute_preprocessing_overlap
         else:
             func = self.distribute_preprocessing
@@ -1260,7 +1270,7 @@ class UNIV_OT_Distribute(Operator):
             self.umeshes.cancel_with_report(info='Islands is Distributed')
 
     def distribute_space(self, extended=True):
-        if self.overlapped:
+        if self.lock_overlap:
             func = self.distribute_preprocessing_overlap
         else:
             func = self.distribute_preprocessing
@@ -1273,7 +1283,7 @@ class UNIV_OT_Distribute(Operator):
 
         update_tag = False
         cursor_offset = 0
-        if self.is_horizontal(general_bbox):
+        if self.is_horizontal(general_bbox, _islands):
             _islands.sort(key=lambda a: a.bbox.xmin)
 
             general_bbox.xmax += self.padding * (len(_islands) - 1)
@@ -1338,17 +1348,26 @@ class UNIV_OT_Distribute(Operator):
             umesh.update_tag = bool(adv_islands)
 
         general_bbox = BBox()
-        union_islands_groups = UnionIslands.calc_overlapped_island_groups(_islands)
+        union_islands_groups = self.calc_overlapped_island_groups(_islands)
         for union_island in union_islands_groups:
             general_bbox.union(union_island.bbox)
         return union_islands_groups, general_bbox
 
-    def is_horizontal(self, bbox):
+    def is_horizontal(self, bbox, islands):
         if self.axis == 'AUTO':
             if self.break_:
                 return bbox.width > bbox.height
             else:
-                return bbox.width * 2 > bbox.height
+                total_width = 0
+                total_height = 0
+                if type(islands[0]) == AdvIslands:
+                    islands = (isl_ for _islands in islands for isl_ in _islands)
+
+                for isl in islands:
+                    bbox_ = isl.bbox
+                    total_width += bbox_.width
+                    total_height += bbox_.height
+                return total_width < total_height
         else:
             return self.axis == 'X'
 
@@ -1848,13 +1867,12 @@ class UNIV_OT_Shift(Operator):
         return self.create_shift_node_group()
 
 
-class UNIV_OT_Random(Operator):
+class UNIV_OT_Random(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_random"
     bl_label = "Random"
     bl_description = "Randomize selected UV islands or faces"
     bl_options = {'REGISTER', 'UNDO'}
 
-    overlapped: BoolProperty(name='Overlapped', default=False)
     between: BoolProperty(name='Between', default=False)
     bound_between: EnumProperty(name='Bound Between', default='OFF', items=(('OFF', 'Off', ''), ('CROP', 'Crop', ''), ('CLAMP', 'Clamp', '')))
     round_mode: EnumProperty(name='Round Mode', default='OFF', items=(('OFF', 'Off', ''), ('INT', 'Int', ''), ('STEPS', 'Steps', '')))
@@ -1906,13 +1924,13 @@ class UNIV_OT_Random(Operator):
         if self.between:
             layout.prop(self, 'bound_between', expand=True)
         layout = self.layout.row()
-        layout.prop(self, 'overlapped', toggle=1)
+        self.draw_overlap()
         layout.prop(self, 'between', toggle=1)
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.overlapped = event.shift
+        self.lock_overlap = event.shift
         self.between = event.alt
         self.bound_between = 'CROP' if event.ctrl else 'OFF'
         return self.execute(context)
@@ -1963,7 +1981,7 @@ class UNIV_OT_Random(Operator):
             else:
                 islands = AdvIslands.calc_with_hidden(umesh)
             if islands:
-                if self.overlapped:
+                if self.lock_overlap:
                     islands.calc_tris()
                     islands.calc_flat_coords()
                     _islands.extend(islands)
@@ -1971,8 +1989,8 @@ class UNIV_OT_Random(Operator):
                     self.all_islands.extend(islands)
             umesh.update_tag = bool(islands)
 
-        if self.overlapped:
-            self.all_islands = UnionIslands.calc_overlapped_island_groups(_islands)
+        if self.lock_overlap:
+            self.all_islands = self.calc_overlapped_island_groups(_islands)
 
     def random(self):
         bb_general = BBox()
@@ -2103,7 +2121,7 @@ class UNIV_OT_Random(Operator):
             if self.bound_between == 'OFF':
                 continue
 
-            if self.overlapped:
+            if self.lock_overlap:
                 bb = island.calc_bbox(force=True)
             else:
                 bb = island.calc_bbox()
@@ -2133,7 +2151,7 @@ class UNIV_OT_Random(Operator):
     def round_threshold(a, min_clip):
         return round(float(a) / min_clip) * min_clip
 
-class UNIV_OT_Orient(Operator):
+class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_orient'
     bl_label = 'Orient'
     bl_description = "Rotated to a minimal rectangle, either vertical or horizontal\n\n" \
@@ -2148,21 +2166,12 @@ class UNIV_OT_Orient(Operator):
         ('VERTICAL', 'Vertical', ''),
     ))
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
-    lock_overlap: BoolProperty(name='Lock Overlaps', default=False,
-                               description="Islands are not overlapped if one island has only a selected face and the other only a selected edge")
-    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
-    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
 
     def draw(self, context):
         layout = self.layout
         layout.row().prop(self, 'edge_dir', expand=True)
-        layout.prop(self, 'use_correct_aspect', toggle=1)
-
-        if self.lock_overlap:
-            if self.lock_overlap_mode == 'EXACT':
-                layout.prop(self, 'threshold', slider=True)
-            layout.row().prop(self, 'lock_overlap_mode', expand=True)
-        layout.prop(self, 'lock_overlap', toggle=1)
+        layout.prop(self, 'use_correct_aspect')
+        self.draw_overlap()
 
     def invoke(self, context, event):
         self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
@@ -2279,17 +2288,16 @@ class UNIV_OT_Orient(Operator):
             self.report({'WARNING'}, "Islands not found")
             return {"CANCELLED"}
 
-        threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
         if islands_with_selected_edges:
-            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(islands_with_selected_edges, threshold):
+            for overlapped_isl in self.calc_overlapped_island_groups(islands_with_selected_edges):
                 self.orient_edge(overlapped_isl)
 
         if islands_with_selected_faces:
-            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(islands_with_selected_faces, threshold):
+            for overlapped_isl in self.calc_overlapped_island_groups(islands_with_selected_faces):
                 self.orient_island(overlapped_isl)
 
         if not any((islands_with_selected_edges, islands_with_selected_faces)):
-            for overlapped_isl in UnionIslands.calc_overlapped_island_groups(unselected_islands, threshold):
+            for overlapped_isl in self.calc_overlapped_island_groups(unselected_islands):
                 self.orient_island(overlapped_isl)
 
         return self.umeshes.update(info="All islands oriented")
@@ -3166,7 +3174,7 @@ class UNIV_OT_Stitch(Operator):
         adv_islands.weld_selected(target_isl, source_isl, selected=selected)
         return True
 
-class UNIV_OT_Normalize_VIEW3D(Operator):
+class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_normalize"
     bl_label = 'Normalize'
     bl_options = {'REGISTER', 'UNDO'}
@@ -3176,9 +3184,6 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
-    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
-    lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
-    threshold: FloatProperty(name='Distance', default=0.001, min=0, soft_min=0.00005, soft_max=0.00999)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -3193,13 +3198,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.alignment = 'LEFT'
-        if self.lock_overlap:
-            if self.lock_overlap_mode == 'EXACT':
-                layout.prop(self, 'threshold', slider=True)
-            layout.row().prop(self, 'lock_overlap_mode', expand=True)
-
-        layout.prop(self, 'lock_overlap')
+        self.draw_overlap()
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
         if hasattr(self, 'invert'):
@@ -3252,8 +3251,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator):
             return {'CANCELLED'}
 
         if self.lock_overlap:
-            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
-            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+            all_islands = self.calc_overlapped_island_groups(all_islands)
 
         if self.xy_scale or self.shear:
             for isl in all_islands:
@@ -3746,15 +3744,12 @@ class UNIV_OT_Pack(Operator):
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
 
-class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
+class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_texel_density_set"
     bl_label = 'Set TD'
     bl_description = "Set Texel Density"
     bl_options = {'REGISTER', 'UNDO'}
 
-    lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
-    lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
-    threshold: FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
     custom_texel: FloatProperty(name='Custom Texel', default=-1, options={'HIDDEN'})
 
     @classmethod
@@ -3768,13 +3763,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         return self.execute(context)
 
     def draw(self, context):
-        layout = self.layout
-        # layout.alignment = 'LEFT'
-        if self.lock_overlap:
-            if self.lock_overlap_mode == 'EXACT':
-                layout.prop(self, 'threshold', slider=True)
-            layout.row().prop(self, 'lock_overlap_mode', expand=True)
-        layout.prop(self, 'lock_overlap')
+        self.draw_overlap()
 
     def __init__(self):
         self.texel: float = 1.0
@@ -3785,7 +3774,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
 
     def execute(self, context):
         self.texel = settings().texel_density
-        if self.custom_texel != 1.0:
+        if self.custom_texel != -1.0:
             self.texel = bl_math.clamp(self.custom_texel, 1, 10_000)
 
         self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
@@ -3847,8 +3836,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
                     selected_islands_of_mesh.append(adv_islands)
 
         if self.lock_overlap:
-            threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
-            overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+            overlapped_islands = self.calc_overlapped_island_groups(all_islands)
 
             for isl in overlapped_islands:
                 if (status := isl.set_texel(self.texel, self.texture_size)) is None:
