@@ -26,15 +26,15 @@ def stable():
 def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
-def _update_size_x(self, _context):
+def _update_size_x(_self, _context):
     if settings().lock_size:
         settings().size_y = settings().size_x
 
-def _update_size_y(self, _context):
+def _update_size_y(_self, _context):
     if settings().lock_size:
         settings().size_x = settings().size_y
 
-def _update_lock_size(self, _context):
+def _update_lock_size(_self, _context):
     if settings().lock_size and settings().size_y != settings().size_x:
         settings().size_y = settings().size_x
 
@@ -46,6 +46,9 @@ _udim_source = [
 if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
+class UNIV_TexelPreset(bpy.types.PropertyGroup):
+    texel: FloatProperty(name='Texel', default=512, min=1, max=10_000)
+
 class UNIV_Settings(bpy.types.PropertyGroup):
     # Global Settings
     size_x: EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
@@ -54,6 +57,8 @@ class UNIV_Settings(bpy.types.PropertyGroup):
 
     texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=0,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
+    active_td_index: IntProperty(min=-1, max=8)
+    texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
 
     # Pack Settings
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',

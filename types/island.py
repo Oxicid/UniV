@@ -722,7 +722,7 @@ class AdvIsland(FaceIsland):
 
     def set_texel(self, texel: float, texture_size: float | int):
         """Warning: Need calc uv and 3d area"""
-        assert self.area_3d != 1.0 and self.area_uv != 1.0, "Need calculate uv and 3d area"
+        assert self.area_3d != -1.0 and self.area_uv != -1.0, "Need calculate uv and 3d area"
         area_3d = math.sqrt(self.area_3d)
         area_uv = math.sqrt(self.area_uv) * texture_size
         if math.isclose(area_3d, 0.0, abs_tol=1e-6) or math.isclose(area_uv, 0.0, abs_tol=1e-6):
@@ -1745,7 +1745,7 @@ class UnionIslands(Islands):
 
     def set_texel(self, texel: float, texture_size: float | int):
         """Warning: Need calc uv and 3d area"""
-        assert self.islands[0].area_3d != 1.0 and self.islands[0].area_uv != 1.0, "Need calculate uv and 3d area"
+        assert self.islands[0].area_3d != -1.0 and self.islands[0].area_uv != -1.0, "Need calculate uv and 3d area"
         area_3d = math.sqrt(self.area_3d)
         area_uv = math.sqrt(self.area_uv) * texture_size
         if math.isclose(area_3d, 0.0, abs_tol=1e-6) or math.isclose(area_uv, 0.0, abs_tol=1e-6):

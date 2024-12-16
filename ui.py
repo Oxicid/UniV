@@ -41,13 +41,23 @@ class UNIV_PT_General(Panel):
 
     @staticmethod
     def draw_texel_density(layer, prefix):
-        # layer.separator(factor=0.18)
+        univ_settings = settings()
         split = layer.split(align=True)
         row = split.row(align=True)
-        row.operator(prefix + '.univ_texel_density_set')
+        set_idname = prefix + '.univ_texel_density_set'
+        row.operator(set_idname).custom_texel = -1.0
         row.operator(prefix + '.univ_texel_density_get')
+        row.prop(univ_settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon='RESTRICT_SELECT_OFF')
-        row.prop(settings(), 'texel_density', text='')
+        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon='SETTINGS')
+
+        split = layer.split(align=False)
+        row = split.row(align=True)
+        for idx, preset in enumerate(univ_settings.texels_presets):
+            if idx and (idx+1) % 4 == 1:
+                split = layer.split(align=False)
+                row = split.row(align=True)
+            row.operator(set_idname, text=preset.name).custom_texel = preset.texel
 
     def draw_header(self, context):
         layout = self.layout
@@ -306,3 +316,55 @@ class UNIV_PT_PackSettings(Panel):
             self.layout.prop(settings, 'pin')
             layout.prop(settings, 'merge_overlap')
         layout.prop(settings, 'udim_source')
+
+
+class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+        if (index+1) % 4 == 1:
+            icon = 'RIGHTARROW'
+        else:
+            icon = 'BLANK1'
+        row = layout.row(align=0)
+        row.prop(item, 'name', text=str(index+1), emboss=True)
+        row.prop(item, 'texel', text='TD', emboss=False)
+
+    def invoke(self, context, event):
+        pass
+
+
+class UNIV_PT_TD_PresetsManager(Panel):
+    bl_label = 'Texel Density Presets Manager'
+    bl_idname = 'UNIV_PT_td_presets_manager'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_options = {'INSTANCED'}
+    bl_region_type = 'UI'
+    bl_category = 'UniV'
+
+    def draw(self, context):
+        univ_settings = bpy.context.scene.univ_settings  # noqa
+
+        layout = self.layout
+        layout.label(text=f"Texel Density: {round(univ_settings.texel_density, 4)}")
+        row = layout.row(align=True, heading='Size')
+        row.prop(univ_settings, 'size_x', text='')
+        row.prop(univ_settings, 'lock_size', text='', icon='LOCKED' if univ_settings.lock_size else 'UNLOCKED')
+        row.prop(univ_settings, 'size_y', text='')
+
+        row = layout.row()
+        col = row.column()
+        col.scale_x = 0.5
+        col.template_list(
+            listtype_name="UNIV_UL_TD_PresetsManager",
+            list_id="",
+            dataptr=univ_settings,
+            propname="texels_presets",
+            active_dataptr=univ_settings,
+            active_propname="active_td_index",
+            maxrows=9
+        )
+
+        col = row.column(align=True)
+        col.operator('scene.univ_td_presets_processing', icon='ADD', text="").operation_type = 'ADD'
+        col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
+        col.separator()
+        col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'

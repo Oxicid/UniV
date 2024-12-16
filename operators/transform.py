@@ -3690,6 +3690,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     lock_overlap: BoolProperty(name='Lock Overlaps', default=False)
     lock_overlap_mode: EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
     threshold: FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+    custom_texel: FloatProperty(name='Custom Texel', default=-1, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
@@ -3719,6 +3720,9 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
 
     def execute(self, context):
         self.texel = settings().texel_density
+        if self.custom_texel != 1.0:
+            self.texel = bl_math.clamp(self.custom_texel, 1, 10_000)
+
         self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
         self.umeshes = types.UMeshes(report=self.report)
 

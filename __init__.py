@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 11),
+    "version": (2, 9, 12),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -45,6 +45,7 @@ from . import preferences
 try:
     classes = (
         preferences.UNIV_AddonPreferences,
+        preferences.UNIV_TexelPreset,
         preferences.UNIV_Settings,
         keymaps.UNIV_RestoreKeymaps,
         # Checker System
@@ -102,6 +103,8 @@ try:
         # QuickSnap
         quick_snap.UNIV_OT_QuickSnap,
         # UI
+        ui.UNIV_UL_TD_PresetsManager,
+        ui.UNIV_PT_TD_PresetsManager,
         ui.UNIV_PT_General_VIEW_3D,
         ui.UNIV_PT_General,
         ui.UNIV_PT_GlobalSettings,
@@ -119,6 +122,7 @@ try:
         stack.UNIV_OT_Stack_VIEW3D,
         # Misc
         misc.UNIV_OT_Pin,
+        misc.UNIV_OT_TD_PresetsProcessing,
     )
 except AttributeError:
     traceback.print_exc()
@@ -145,7 +149,7 @@ def register():
     # WARNING: When modules are reloaded, classes are overwritten and have no registration.
     # To avoid this, it is necessary to use initially registered classes.
     # Perhaps it does not allow to reload operators in a normal way.
-    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[1])
+    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[2])
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -160,9 +164,10 @@ def register():
 def unregister():
     keymaps.remove_keymaps()
 
-    for scene in bpy.data.scenes:
-        if "univ_settings" in scene:
-            del scene["univ_settings"]
+    del bpy.types.Scene.univ_settings  # noqa
+    # for scene in bpy.data.scenes:
+    #     if "univ_settings" in scene:
+    #         del scene["univ_settings"]
 
     for c in reversed(classes):
         try:
