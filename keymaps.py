@@ -5,7 +5,7 @@ import bpy
 from collections import defaultdict
 
 keys = []
-keys_areas = ['UV Editor', 'Window']
+keys_areas = ['UV Editor', 'Window', 'Object Mode']
 other_conflict_areas = ['Frames']
 
 
@@ -17,6 +17,11 @@ def add_keymaps():
         if debug():
             print('Failed to add keymaps. Result = ', kc)
         return
+
+    km = kc.keymaps.new(name='Object Mode')
+    kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
+    kmi.active = False
+    keys.append((km, kmi))
 
     km = kc.keymaps.new(name='Window')
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)

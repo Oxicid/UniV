@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 15),
+    "version": (2, 9, 16),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -124,6 +124,7 @@ try:
         # Misc
         misc.UNIV_OT_Pin,
         misc.UNIV_OT_TD_PresetsProcessing,
+        misc.UNIV_OT_Join,
     )
 except AttributeError:
     traceback.print_exc()

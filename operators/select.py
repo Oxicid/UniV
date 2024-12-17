@@ -1912,9 +1912,12 @@ class UNIV_OT_SelectByArea(Operator):
         layout.row(align=True).prop(self, 'mode', expand=True)
         layout.row(align=True).prop(self, 'size_type', expand=True)
         layout.row(align=True).prop(self, 'size_mode', expand=True)
-        layout.label(text=f'Small: {self.lower_slider*100:.2f}% \t\t\t'
-                          f'Medium{((self.higher_slider-self.lower_slider)*100):.2f}% \t\t\t'
-                          f'Large {(1-self.higher_slider)*100:.2f}%')
+
+        row = layout.row(align=True)
+        row.label(text=f'   Small: {self.lower_slider*100:.2f}%')
+        row.label(text=f'  Medium{((self.higher_slider-self.lower_slider)*100):.2f}%')
+        row.label(text=f'   Large {(1-self.higher_slider)*100:.2f}%')
+
         row = layout.row(align=True)
         row.prop(self, 'lower_slider', slider=True)
         row.prop(self, 'higher_slider', slider=True)

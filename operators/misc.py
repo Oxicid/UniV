@@ -9,6 +9,7 @@ import bpy
 
 from bpy.types import Operator
 from bpy.props import *
+from collections import Counter
 from .. import utils
 from ..types import UMeshes
 from ..preferences import settings
@@ -136,3 +137,138 @@ class UNIV_OT_TD_PresetsProcessing(Operator):
             active_td_index = len(td_presets) - 1
         settings().active_td_index = active_td_index
         return active_td_index
+
+
+class UNIV_OT_Join(Operator):
+    bl_idname = "object.univ_join"
+    bl_label = "Join"
+    bl_description = "Join with preserve uv channels"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object  # TODO: Without selected
+
+    def execute(self, context):
+        active_obj_type = context.active_object.type
+        if active_obj_type == 'EMPTY':
+            self.report({'WARNING'}, f"Empty object cannot be joined")
+            return {'CANCELLED'}
+        counter_obj_for_join = 0
+        for obj in context.selected_objects:
+            if obj.type == active_obj_type:
+                counter_obj_for_join += 1
+                if counter_obj_for_join > 1:
+                    break
+        else:
+            self.report({'WARNING'}, f"There must be more than one {active_obj_type.capitalize()} type object")
+            return {'CANCELLED'}
+
+        if active_obj_type == 'MESH':
+            conflict_attr_name = '_CONFLICT_WITH_UV'
+
+            meshes = {obj.data for obj in context.selected_objects if obj != context.active_object and obj.type == 'MESH'}
+            removed_extra_channels_counter = 0
+            for m in meshes:
+                removed_extra_channels_counter += self.sanitize_uv(m)
+            removed_extra_channels_counter += self.sanitize_uv(context.active_object.data)
+
+            uv_names_counter = [Counter() for _ in range(8)]
+            active_uv_size = len(context.active_object.data.uv_layers)
+
+            for mesh in meshes:
+                for idx, uv in enumerate(mesh.uv_layers):
+                    uv_names_counter[idx][uv.name] += 1
+
+            uv_names = [uv.name for uv in context.active_object.data.uv_layers]
+            max_index = active_uv_size
+
+            for idx, counter in enumerate(uv_names_counter[active_uv_size:]):
+                max_key = max(counter, key=counter.get, default=None)
+                if max_key is None:
+                    break
+                uv_names.append(max_key)
+                max_index = max(idx+1, max_index)
+
+            for idx, uv_name in enumerate(uv_names):
+                if conflict_attr_name in uv_name:
+                    uv_names[idx] = uv_name.replace(conflict_attr_name, str(idx))
+
+            for idx, uv in enumerate(context.active_object.data.uv_layers):
+                if uv.name in uv_names_counter[idx]:
+                    del uv_names_counter[idx][uv.name]
+
+            conflicts_counter = sum(len(c) for c in uv_names_counter)
+            meshes.add(context.active_object.data)
+
+            for mesh in meshes:
+                for attr in mesh.attributes:
+                    if any((uv.name == attr.name) for uv in mesh.uv_layers):
+                        continue
+
+                    if attr.name in uv_names:
+                        conflicts_counter += 1
+                        attr.name += conflict_attr_name
+
+            added_uvs_counter = 0
+            for mesh in meshes:
+                added_uvs_counter += self.add_missed_uvs(max_index, mesh, uv_names)
+                self.rename_uvs(uv_names, mesh)
+
+            info = ''
+            if conflicts_counter:
+                info += f"Resolver {conflicts_counter} names conflicts. "
+            if removed_extra_channels_counter:
+                info += f"Removed {removed_extra_channels_counter} extra channels in total."
+            if added_uvs_counter:
+                info += f"Added {added_uvs_counter} channels in total."
+
+            if info:
+                self.report({'WARNING'}, info)
+
+        return bpy.ops.object.join()
+
+    @staticmethod
+    def add_missed_uvs(max_index, mesh, names):
+        mesh_uv_size = len(mesh.uv_layers)
+        if max_index == 0 or mesh_uv_size == max_index:
+            return 0
+        assert max_index <= 8
+        assert mesh_uv_size < max_index
+
+        import numpy as np
+        do_init = len(mesh.uv_layers) == 0
+        if not do_init:
+            uv_coords = np.empty(len(mesh.loops) * 2, dtype='float32')
+            uv = mesh.uv_layers[-1]
+            uv.data.foreach_get("uv", uv_coords)
+
+        counter = 0
+        while (mesh_uv_size := len(mesh.uv_layers)) != max_index:
+            uv = mesh.uv_layers.new(name=names[mesh_uv_size], do_init=do_init)
+            counter += 1
+            if not do_init:
+                uv.data.foreach_set("uv", uv_coords)  # noqa
+        return counter
+
+    def rename_uvs(self, names, mesh):
+        assert len(mesh.uv_layers) == len(names)
+        for _ in range(10):
+            renamed = True
+            for uv, new_name in zip(mesh.uv_layers, names):
+                if uv.name != new_name:
+                    uv.name = new_name
+                    renamed = False
+            if renamed:
+                return True
+        return False
+        self.report({'WARNING'}, f'Mesh {mesh.name} do not rename uv layers')
+
+    def sanitize_uv(self, mesh):
+        counter = 0
+        if len(mesh.uv_layers) > 8:
+            for uv in reversed(mesh.uv_layers[8:]):
+                mesh.uv_layers.remove(uv)
+                counter += 1
+            self.report({'WARNING'}, f'Mesh {mesh.name} delete {counter} extra channels')
+        return counter
