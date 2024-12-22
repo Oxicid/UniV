@@ -8,10 +8,12 @@ from . import utils
 from . import keymaps
 from bpy.props import *
 
+UV_LAYERS_ENABLE = True
+
 def prefs():
     return bpy.context.preferences.addons[__package__].preferences
 
-def settings():
+def univ_settings() -> 'UNIV_Settings':
     return bpy.context.scene.univ_settings  # noqa
 
 def force_debug():
@@ -27,16 +29,55 @@ def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
 def _update_size_x(_self, _context):
-    if settings().lock_size:
-        settings().size_y = settings().size_x
+    if univ_settings().lock_size:
+        univ_settings().size_y = univ_settings().size_x
 
 def _update_size_y(_self, _context):
-    if settings().lock_size:
-        settings().size_x = settings().size_y
+    if univ_settings().lock_size:
+        univ_settings().size_x = univ_settings().size_y
 
 def _update_lock_size(_self, _context):
-    if settings().lock_size and settings().size_y != settings().size_x:
-        settings().size_y = settings().size_x
+    if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
+        univ_settings().size_y = univ_settings().size_x
+
+def _update_uv_layers_show(_self, _context):
+    from .operators.misc import UNIV_OT_UV_Layers_Manager
+    if _self.uv_layers_show:
+        if not any(handler is UNIV_OT_UV_Layers_Manager.univ_uv_layers_update for handler in bpy.app.handlers.depsgraph_update_post):
+            bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
+        from . import ui
+        ui.REDRAW_UV_LAYERS = True
+    else:
+        for handler in reversed(bpy.app.handlers.depsgraph_update_post):
+            if handler is UNIV_OT_UV_Layers_Manager.univ_uv_layers_update:
+                bpy.app.handlers.depsgraph_update_post.remove(handler)
+
+def _update_uv_layers_name(_self, context):
+    if UV_LAYERS_ENABLE:
+        settings = univ_settings()
+        idx = settings.uv_layers_active_idx
+        uv_name = settings.uv_layers_presets[idx].name
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                uvs = obj.data.uv_layers
+                if len(obj.data.uv_layers) >= idx+1:
+                    if uvs[idx].name != uv_name:
+                        uvs[idx].name = uv_name
+        from .operators.misc import UNIV_OT_UV_Layers_Manager
+        UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
+
+def _update_uv_layers_active_idx(self, context):
+    if UV_LAYERS_ENABLE:
+        bpy.ops.uv.univ_layers_manager('INVOKE_DEFAULT')  # noqa
+        idx = self.uv_layers_active_idx
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                uvs = obj.data.uv_layers
+                if len(obj.data.uv_layers) >= idx+1:
+                    if not uvs[idx].active:
+                        uvs[idx].active = True
+        from .operators.misc import UNIV_OT_UV_Layers_Manager
+        UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
 
 _udim_source = [
@@ -49,16 +90,29 @@ if _is_360_pack := bpy.app.version >= (3, 6, 0):
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=10_000)
 
+class UNIV_UV_Layers(bpy.types.PropertyGroup):
+    name: StringProperty(name='UVMap', update=_update_uv_layers_name)
+    flag: IntProperty(name='Flag', default=0, min=0, max=3)
+
 class UNIV_Settings(bpy.types.PropertyGroup):
     # Global Settings
     size_x: EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
     size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
+    # Texel Settings
     texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
-    active_td_index: IntProperty(min=-1, max=8)
+    active_td_index: IntProperty(min=0, max=8)
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
+
+    # UV Layer
+    uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)
+
+    uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0)
+    uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0, update=_update_uv_layers_active_idx)
+    uv_layers_active_render_idx: IntProperty(name='Active uv render index', min=-1, max=7, default=-1)
+    uv_layers_presets: CollectionProperty(name="UV Layers", type=UNIV_UV_Layers, options={'SKIP_SAVE'})
 
     # Pack Settings
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
@@ -135,6 +189,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         description='Default Snap Points for QuickSnap')
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
+    # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
 
     show_stretch: BoolProperty(name='Show Stretch', default=False)
     display_stretch_type: EnumProperty(name='Stretch Type',

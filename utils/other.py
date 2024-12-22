@@ -119,12 +119,23 @@ def blf_size(font_id, font_size):
 def get_max_distance_from_px(px_size: int, view: bpy.types.View2D):
     return (Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))).length
 
-def get_areas_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR']):
+def get_areas_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
     return (area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
 
-def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR']):
+def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
     for a in get_areas_by_type(area_type):
         return a
+
+def update_univ_panels():
+    import itertools
+    for image in itertools.chain(get_areas_by_type('VIEW_3D'), get_areas_by_type()):
+        for reg in image.regions:
+            if reg.type == 'UI':
+                if hasattr(reg, 'active_panel_category'):
+                    if reg.active_panel_category == 'UniV':
+                        reg.tag_redraw()
+                else:
+                    reg.tag_redraw()
 
 def event_to_string(event, text=''):
     if event.ctrl:

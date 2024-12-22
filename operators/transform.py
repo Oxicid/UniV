@@ -34,7 +34,7 @@ from ..types import (
     UnionIslands,
     LoopGroup
 )
-from ..preferences import prefs, settings
+from ..preferences import prefs, univ_settings
 
 
 class UNIV_OT_Crop(Operator):
@@ -3773,11 +3773,11 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.texel = settings().texel_density
+        self.texel = univ_settings().texel_density
         if self.custom_texel != -1.0:
             self.texel = bl_math.clamp(self.custom_texel, 1, 10_000)
 
-        self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
         self.umeshes = types.UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
@@ -3887,8 +3887,8 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.texel = settings().texel_density
-        self.texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        self.texel = univ_settings().texel_density
+        self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
         self.umeshes = types.UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
@@ -3933,7 +3933,7 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
             self.report({'WARNING'}, f"All faces has zero area")
             return {'CANCELLED'}
         texel = area_uv / area_3d
-        settings().texel_density = bl_math.clamp(texel, 1.0, 10_000.0)
+        univ_settings().texel_density = bl_math.clamp(texel, 1.0, 10_000.0)
         return {'FINISHED'}
 
 class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):

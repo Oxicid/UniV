@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 16),
+    "version": (2, 9, 17),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -45,6 +45,7 @@ from . import preferences
 try:
     classes = (
         preferences.UNIV_AddonPreferences,
+        preferences.UNIV_UV_Layers,
         preferences.UNIV_TexelPreset,
         preferences.UNIV_Settings,
         keymaps.UNIV_RestoreKeymaps,
@@ -106,6 +107,7 @@ try:
         # UI
         ui.UNIV_UL_TD_PresetsManager,
         ui.UNIV_PT_TD_PresetsManager,
+        ui.UNIV_UL_UV_LayersManager,
         ui.UNIV_PT_General_VIEW_3D,
         ui.UNIV_PT_General,
         ui.UNIV_PT_GlobalSettings,
@@ -125,6 +127,12 @@ try:
         misc.UNIV_OT_Pin,
         misc.UNIV_OT_TD_PresetsProcessing,
         misc.UNIV_OT_Join,
+        misc.UNIV_OT_Add,
+        misc.UNIV_OT_Remove,
+        misc.UNIV_OT_MoveUp,
+        misc.UNIV_OT_MoveDown,
+        misc.UNIV_OT_SetActiveRender,
+        misc.UNIV_OT_UV_Layers_Manager,
     )
 except AttributeError:
     traceback.print_exc()
@@ -151,7 +159,9 @@ def register():
     # WARNING: When modules are reloaded, classes are overwritten and have no registration.
     # To avoid this, it is necessary to use initially registered classes.
     # Perhaps it does not allow to reload operators in a normal way.
-    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[2])
+    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
+
+    bpy.app.timers.register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -165,6 +175,10 @@ def register():
 
 def unregister():
     keymaps.remove_keymaps()
+    for handle in reversed(bpy.app.handlers.depsgraph_update_post):
+        if handle.__name__.startswith('univ_'):
+            bpy.app.handlers.depsgraph_update_post.remove(handle)
+
 
     del bpy.types.Scene.univ_settings  # noqa
     # for scene in bpy.data.scenes:

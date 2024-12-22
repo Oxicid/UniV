@@ -3,7 +3,10 @@
 
 import bpy
 from bpy.types import Panel
-from .preferences import settings
+from .preferences import univ_settings
+
+REDRAW_UV_LAYERS = True
+
 class UNIV_PT_General(Panel):
     bl_label = ''
     bl_idname = 'UNIV_PT_General'
@@ -41,23 +44,58 @@ class UNIV_PT_General(Panel):
 
     @staticmethod
     def draw_texel_density(layer, prefix):
-        univ_settings = settings()
+        settings = univ_settings()
         split = layer.split(align=True)
         row = split.row(align=True)
         set_idname = prefix + '.univ_texel_density_set'
         row.operator(set_idname).custom_texel = -1.0
         row.operator(prefix + '.univ_texel_density_get')
-        row.prop(univ_settings, 'texel_density', text='')
+        row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon='RESTRICT_SELECT_OFF')
         row.popover(panel='UNIV_PT_td_presets_manager', text='', icon='SETTINGS')
 
         split = layer.split(align=False)
         row = split.row(align=True)
-        for idx, preset in enumerate(univ_settings.texels_presets):
+        for idx, preset in enumerate(settings.texels_presets):
             if idx and (idx+1) % 4 == 1:
                 split = layer.split(align=False)
                 row = split.row(align=True)
             row.operator(set_idname, text=preset.name).custom_texel = preset.texel
+
+    @staticmethod
+    def draw_uv_layers(layout):
+        settings = univ_settings()
+        if not settings.uv_layers_show:
+            return
+        global REDRAW_UV_LAYERS
+        # print(f'{REDRAW_UV_LAYERS=}')
+        if REDRAW_UV_LAYERS:
+            from .operators.misc import UNIV_OT_UV_Layers_Manager
+            bpy.app.timers.register(UNIV_OT_UV_Layers_Manager.update_uv_layers_props, first_interval=0.1)
+            REDRAW_UV_LAYERS = False
+
+        layout.label(text='UV Maps')
+        row = layout.row()
+        col = row.column()
+        col.template_list(
+            listtype_name="UNIV_UL_UV_LayersManager",
+            list_id="",
+            dataptr=settings,
+            propname="uv_layers_presets",
+            active_dataptr=settings,
+            active_propname="uv_layers_active_idx",
+            rows=4,
+            maxrows=4,
+            columns=4,
+            # type='GRID'
+        )
+
+        col = row.column(align=True)
+        col.operator('mesh.univ_add', icon='ADD', text='')
+        col.operator('mesh.univ_remove', icon='REMOVE', text='')
+        col.separator()
+        col.operator('mesh.univ_move_up', icon='TRIA_UP', text='')
+        col.operator('mesh.univ_move_down', icon='TRIA_DOWN', text='')
 
     def draw_header(self, context):
         layout = self.layout
@@ -211,12 +249,13 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_cut')
         split.operator('mesh.univ_seam_border')
 
-        self.layout.label(text='Texture')
-        row = self.layout.row(align=True)
+        layout.label(text='Texture')
+        row = layout.row(align=True)
         row.scale_y = 1.5
         row.operator('mesh.univ_checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
-        # row.alignment = 'RIGHT'
+
+        self.draw_uv_layers(self.layout)
 
 
 class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
@@ -261,6 +300,8 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_checker')
         row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
 
+        self.draw_uv_layers(layout)
+
 
 class UNIV_PT_GlobalSettings(Panel):
     bl_idname = 'UNIV_PT_GlobalSettings'
@@ -275,7 +316,7 @@ class UNIV_PT_GlobalSettings(Panel):
 
     @staticmethod
     def draw_global_settings(layout):
-        settings = bpy.context.scene.univ_settings  # noqa
+        settings = univ_settings()
 
         row = layout.row(align=True, heading='Size')
         row.prop(settings, 'size_x', text='')
@@ -284,6 +325,7 @@ class UNIV_PT_GlobalSettings(Panel):
 
         layout.prop(settings, 'padding', slider=True)
         layout.separator()
+        layout.prop(settings, 'uv_layers_show')
 
 
 class UNIV_PT_PackSettings(Panel):
@@ -296,7 +338,7 @@ class UNIV_PT_PackSettings(Panel):
 
     def draw(self, context):
         layout = self.layout
-        settings = context.scene.univ_settings  # noqa
+        settings = univ_settings()
 
         UNIV_PT_GlobalSettings.draw_global_settings(layout)
 
@@ -326,16 +368,25 @@ class UNIV_PT_PackSettings(Panel):
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
-        if (index+1) % 4 == 1:
-            icon = 'RIGHTARROW'
-        else:
-            icon = 'BLANK1'
         row = layout.row(align=0)
         row.prop(item, 'name', text=str(index+1), emboss=True)
         row.prop(item, 'texel', text='TD', emboss=False)
 
-    def invoke(self, context, event):
-        pass
+
+class UNIV_UL_UV_LayersManager(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+        settings = univ_settings()
+        if index >= settings.uv_layers_size:
+            return
+        row = layout.row(align=0)
+        if flag := item.flag:  # noqa
+            if flag == 2:
+                row.alert = True
+            else:
+                row.active = False
+        row.prop(item, 'name', text='', emboss=False, icon='GROUP_UVS')  # noqa
+        icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
+        row.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
 
 
 class UNIV_PT_TD_PresetsManager(Panel):
@@ -347,14 +398,14 @@ class UNIV_PT_TD_PresetsManager(Panel):
     bl_category = 'UniV'
 
     def draw(self, context):
-        univ_settings = bpy.context.scene.univ_settings  # noqa
+        settings = univ_settings()
 
         layout = self.layout
-        layout.label(text=f"Texel Density: {round(univ_settings.texel_density, 4)}")
+        layout.label(text=f"Texel Density: {round(settings.texel_density, 4)}")
         row = layout.row(align=True, heading='Size')
-        row.prop(univ_settings, 'size_x', text='')
-        row.prop(univ_settings, 'lock_size', text='', icon='LOCKED' if univ_settings.lock_size else 'UNLOCKED')
-        row.prop(univ_settings, 'size_y', text='')
+        row.prop(settings, 'size_x', text='')
+        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
+        row.prop(settings, 'size_y', text='')
 
         row = layout.row()
         col = row.column()
@@ -362,9 +413,9 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.template_list(
             listtype_name="UNIV_UL_TD_PresetsManager",
             list_id="",
-            dataptr=univ_settings,
+            dataptr=settings,  # noqa
             propname="texels_presets",
-            active_dataptr=univ_settings,
+            active_dataptr=settings,  # noqa
             active_propname="active_td_index",
             maxrows=9
         )

@@ -119,3 +119,23 @@ def update_area_by_type(area_type: str):
         for area in screen.areas:
             if area.type == area_type:
                 area.tag_redraw()
+
+def calc_any_unique_obj() -> list[bpy.types.Object]:
+    # Get unique umeshes without uv
+    objects = []
+    if bpy.context.mode == 'EDIT_MESH':
+        for obj in bpy.context.objects_in_mode_unique_data:
+            if obj.type == 'MESH':
+                objects.append(obj)
+    else:
+        from collections import defaultdict
+        data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+
+        for obj in bpy.context.selected_objects:
+            if obj.type == 'MESH':
+                data_and_objects[obj.data].append(obj)
+
+        for data, objs in data_and_objects.items():
+            objs.sort(key=lambda a: a.name)
+            objects.append(objs[0])
+    return objects

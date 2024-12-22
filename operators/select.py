@@ -20,7 +20,7 @@ from time import perf_counter as time
 
 from .. import utils
 from .. import types
-from ..preferences import prefs, settings
+from ..preferences import prefs, univ_settings
 from ..types import Islands, AdvIslands, AdvIsland,  BBox, UMeshes
 
 from ..utils import (
@@ -1735,7 +1735,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         layout.prop(self, 'threshold', slider=True)
 
     def invoke(self, context, event):
-        self.target_texel = settings().texel_density
+        self.target_texel = univ_settings().texel_density
 
         if event.value == 'PRESS':
             return self.execute(context)
@@ -1754,7 +1754,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        texture_size = (int(settings().size_x) + int(settings().size_y)) / 2
+        texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
         umeshes = types.UMeshes()
         if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
             utils.set_select_mode_mesh('FACE')

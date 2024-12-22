@@ -700,6 +700,29 @@ class UMeshes:
                 bmeshes.append(UMesh(bm, objs[0], False))
         return cls(bmeshes, report=report)
 
+    @classmethod
+    def calc_any_unique(cls, report=None):
+        # Get unique umeshes without uv
+        umeshes = []
+        if bpy.context.mode == 'EDIT_MESH':
+            for obj in bpy.context.objects_in_mode_unique_data:
+                if obj.type == 'MESH':
+                    bm = bmesh.from_edit_mesh(obj.data)
+                    umeshes.append(UMesh(bm, obj))
+        else:
+            data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+
+            for obj in bpy.context.selected_objects:
+                if obj.type == 'MESH':
+                    data_and_objects[obj.data].append(obj)
+
+            for data, objs in data_and_objects.items():
+                bm = bmesh.new()
+                bm.from_mesh(data)
+                objs.sort(key=lambda a: a.name)
+                umeshes.append(UMesh(bm, objs[0], False))
+        return cls(umeshes, report=report)
+
     def filter_selected_faces(self):
         for umesh in reversed(self.umeshes):
             if umesh.is_full_face_deselected:
