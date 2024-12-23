@@ -117,6 +117,7 @@ try:
         seam.UNIV_OT_Cut_VIEW3D,
         seam.UNIV_OT_Angle,
         seam.UNIV_OT_SeamBorder,
+        seam.UNIV_OT_SeamBorder_VIEW3D,
         # Project
         project.UNIV_Normal,
         project.UNIV_BoxProject,
