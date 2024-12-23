@@ -247,7 +247,7 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.operator('uv.univ_cut')
-        split.operator('mesh.univ_seam_border')
+        split.operator('uv.univ_seam_border')
 
         layout.label(text='Texture')
         row = layout.row(align=True)

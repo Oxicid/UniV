@@ -284,7 +284,7 @@ class UNIV_OT_Angle(Operator):
         self.umeshes.update()
         return {'FINISHED'}
 
-class UNIV_OT_SeamBorder(Operator):
+class UNIV_OT_SeamBorder_VIEW3D(Operator):
     bl_idname = "mesh.univ_seam_border"
     bl_label = "Border"
     bl_description = "Seams by borders\n\n" \
@@ -319,22 +319,21 @@ class UNIV_OT_SeamBorder(Operator):
         self.all_channels = event.alt
         return self.execute(context)
 
-    def __init__(self):
-        self.sync = utils.sync()
-        self.umeshes: types.UMeshes | None = None
-
     def execute(self, context) -> set[str]:
-        self.umeshes = types.UMeshes(report=self.report)
-        sync = self.umeshes.sync
+        umeshes = types.UMeshes(report=self.report)
 
-        for umesh in reversed(self.umeshes):
+        if not self.bl_idname.startswith('UV'):
+            umeshes.set_sync()
+
+        sync = umeshes.sync
+        for umesh in reversed(umeshes):
             if self.selected:
                 faces = utils.calc_selected_uv_faces(umesh)
             else:
                 faces = utils.calc_visible_uv_faces(umesh)
 
             if not faces:
-                self.umeshes.umeshes.remove(umesh)
+                umeshes.umeshes.remove(umesh)
 
             uv = umesh.uv
             is_pair = utils.is_pair
@@ -396,5 +395,8 @@ class UNIV_OT_SeamBorder(Operator):
                         elif not self.addition:
                             crn_edge.seam = False
 
-        self.umeshes.update()
+        umeshes.update()
         return {'FINISHED'}
+
+class UNIV_OT_SeamBorder(UNIV_OT_SeamBorder_VIEW3D):
+    bl_idname = "uv.univ_seam_border"
