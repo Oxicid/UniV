@@ -4,6 +4,7 @@
 import bpy
 from bpy.types import Panel
 
+from .icons import icons
 from .preferences import univ_settings, prefs
 
 REDRAW_UV_LAYERS = True
@@ -17,31 +18,38 @@ class UNIV_PT_General(Panel):
 
     @staticmethod
     def draw_align_buttons(where):
-        def ly_wide_text_op(layout, direction, *, text):
-            row = layout.row(align=True)
-            row.operator('uv.univ_align', text=text).direction = direction
+        def LyWideIconOp(layer, direct, icon):
+            row = layer.row(align=True)
+            row.ui_units_x = 3
+            row.scale_x = 2.05
+            row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
 
-        where.alignment = 'EXPAND'
+        def LyMidMidOp(layer, direct, icon):
+            row = layer.row(align=True)
+            row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
+            row.scale_x = 2
+
         colMain = where.column(align=True)
         rowTop = colMain.row(align=True)
 
-        ly_wide_text_op(rowTop, 'LEFT_UPPER', text='↖')
-        ly_wide_text_op(rowTop.row(), 'UPPER', text='↑')
-        ly_wide_text_op(rowTop, 'RIGHT_UPPER', text='↗')
-        ##
+        LyWideIconOp(rowTop, 'LEFT_UPPER', icons.arrow_top_left)
+        LyWideIconOp(rowTop.row(), 'UPPER', icons.arrow_top)
+        LyWideIconOp(rowTop, 'RIGHT_UPPER', icons.arrow_top_right)
+
         rowMiddle = colMain.row().row(align=True)
-        ly_wide_text_op(rowMiddle, 'LEFT', text='← ')
+        LyWideIconOp(rowMiddle, 'LEFT', icons.arrow_left)
+
         rowMidMiddle = rowMiddle.row().row(align=True)
 
-        ly_wide_text_op(rowMidMiddle, 'HORIZONTAL', text='—')
-        ly_wide_text_op(rowMidMiddle, 'CENTER', text='+')
-        ly_wide_text_op(rowMidMiddle, 'VERTICAL', text='|')
-        ly_wide_text_op(rowMiddle, 'RIGHT', text=' →')
-        ##
+        LyMidMidOp(rowMidMiddle, 'HORIZONTAL', icons.horizontal_c)
+        LyMidMidOp(rowMidMiddle.row(), 'CENTER', icons.center)
+        LyMidMidOp(rowMidMiddle.row(), 'VERTICAL', icons.vertical_b)
+        LyWideIconOp(rowMiddle, 'RIGHT', icons.arrow_right)
+
         rowBottom = colMain.row(align=True)
-        ly_wide_text_op(rowBottom, 'LEFT_BOTTOM', text='↙')
-        ly_wide_text_op(rowBottom.row(), 'BOTTOM', text='↓')
-        ly_wide_text_op(rowBottom, 'RIGHT_BOTTOM', text='↘')
+        LyWideIconOp(rowBottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
+        LyWideIconOp(rowBottom.row(), 'BOTTOM', icons.arrow_bottom)
+        LyWideIconOp(rowBottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
 
     @staticmethod
     def draw_texel_density(layer, prefix):
@@ -53,7 +61,7 @@ class UNIV_PT_General(Panel):
         row.operator(prefix + '.univ_texel_density_get')
         row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon='RESTRICT_SELECT_OFF')
-        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon='SETTINGS')
+        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
 
         split = layer.split(align=False)
         row = split.row(align=True)
@@ -103,7 +111,7 @@ class UNIV_PT_General(Panel):
     def draw_header(self, context):
         layout = self.layout
         row = layout.split(factor=.5)
-        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon='PREFERENCES')
+        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
         row.label(text='UniV')
 
     def draw(self, context):
@@ -112,23 +120,20 @@ class UNIV_PT_General(Panel):
         col = layout.column(align=True)
 
         col.label(text='Transform')
-        split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_crop').axis = 'XY'
-        row = split.row(align=True)
-        row.operator('uv.univ_crop', text='X').axis = 'X'
-        row.operator('uv.univ_crop', text='Y').axis = 'Y'
+        row = col.row(align=True)
+        row.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
+        row.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
 
-        split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_fill').axis = 'XY'
-        row = split.row(align=True)
-        row.operator('uv.univ_fill', text='X').axis = 'X'
-        row.operator('uv.univ_fill', text='Y').axis = 'Y'
+        row = col.row(align=True)
+        row.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
+        row.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
 
-        split = col.split(factor=0.65, align=True)
-        split.operator('uv.univ_orient').edge_dir = 'BOTH'
-        row = split.row(align=True)
-        row.operator('uv.univ_orient', text='→').edge_dir = 'HORIZONTAL'
-        row.operator('uv.univ_orient', text='↑').edge_dir = 'VERTICAL'
+        row = col.row(align=True)
+        row.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
+        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'HORIZONTAL'
+        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'VERTICAL'
 
         col_for_align = col.column()
         col_for_align.separator(factor=0.5)
@@ -138,26 +143,26 @@ class UNIV_PT_General(Panel):
         col_align = col.column(align=True)
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_rotate')
-        row.operator('uv.univ_flip')
+        row.operator('uv.univ_rotate', icon_value=icons.rotate)
+        row.operator('uv.univ_flip', icon_value=icons.flip)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_sort')
+        split.operator('uv.univ_sort', icon_value=icons.sort)
         row = split.row(align=True)
-        row.operator('uv.univ_distribute')
-
-        split = col_align.split(align=True)
-        row = split.row(align=True)
-        row.operator('uv.univ_home')
-        row.operator('uv.univ_shift')
-
-        split = col_align.split(align=True)
-        split.operator('uv.univ_random')
+        row.operator('uv.univ_distribute', icon_value=icons.distribute)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_adjust_td')
-        row.operator('uv.univ_normalize')
+        row.operator('uv.univ_home', icon_value=icons.home)
+        row.operator('uv.univ_shift', icon_value=icons.shift)
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_random', icon_value=icons.random)
+
+        split = col_align.split(align=True)
+        row = split.row(align=True)
+        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('uv.univ_normalize', icon_value=icons.normalize)
 
         self.draw_texel_density(col_align, 'uv')
 
@@ -167,8 +172,8 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         row.scale_y = 1.5
         # row.scale_x = 2
-        row.operator('uv.univ_pack')
-        row.popover(panel='UNIV_PT_PackSettings', text="", icon='SETTINGS')
+        row.operator('uv.univ_pack', icon_value=icons.pack)
+        row.popover(panel='UNIV_PT_PackSettings', text='', icon_value=icons.settings_a)
 
         # Misc
         col_align = col.column(align=True)
@@ -176,25 +181,25 @@ class UNIV_PT_General(Panel):
         col_align.label(text='Misc')
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_quadrify')
-        row.operator('uv.univ_straight')
+        row.operator('uv.univ_quadrify', icon_value=icons.quadrify)
+        row.operator('uv.univ_straight', icon_value=icons.straight)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_relax')
-        row.operator('uv.univ_unwrap')
+        row.operator('uv.univ_relax', icon_value=icons.relax)
+        row.operator('uv.univ_unwrap', icon_value=icons.unwrap)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_weld')
-        row.operator('uv.univ_stitch')
+        row.operator('uv.univ_weld', icon_value=icons.weld)
+        row.operator('uv.univ_stitch', icon_value=icons.stitch)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_pin', icon='PINNED')
+        split.operator('uv.univ_pin', icon_value=icons.pin)
 
         split = col_align.split(align=True)
         split.scale_y = 1.5
-        split.operator('uv.univ_stack')
+        split.operator('uv.univ_stack', icon_value=icons.stack)
 
         # Select
         col_align.label(text='Select')
@@ -202,46 +207,43 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_select_grow')
-        row.operator('uv.univ_select_edge_grow')
+        row.operator('uv.univ_select_grow', icon_value=icons.grow)
+        row.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_select_linked')
-        row.operator('uv.univ_select_by_cursor')
+        row.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
 
-        row = col_align.split(align=True)
-        row.operator('uv.univ_select_border')
+        row = col_align.row(align=True)
+        row.operator('uv.univ_select_border', icon_value=icons.border)
 
-        split = col_align.split(factor=0.65, align=True)
-        split.operator('uv.univ_select_border_edge_by_angle').edge_dir = 'BOTH'
-        row = split.row(align=True)
-        row.operator('uv.univ_select_border_edge_by_angle', text='H').edge_dir = 'HORIZONTAL'
-        row.operator('uv.univ_select_border_edge_by_angle', text='V').edge_dir = 'VERTICAL'
+        row = col_align.row(align=True)
+        row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
+        row.operator('uv.univ_select_border_edge_by_angle', text='', icon_value=icons.horizontal_a).edge_dir = 'HORIZONTAL'
+        row.operator('uv.univ_select_border_edge_by_angle', text='', icon_value=icons.vertical_a).edge_dir = 'VERTICAL'
 
-        split = col_align.split(factor=0.65, align=True)
-        split.operator('uv.univ_select_square_island').shape = 'SQUARE'
-        row = split.row(align=True)
-        row.operator('uv.univ_select_square_island', text='H').shape = 'HORIZONTAL'
-        row.operator('uv.univ_select_square_island', text='V').shape = 'VERTICAL'
+        row = col_align.row(align=True)
+        row.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
+        row.operator('uv.univ_select_square_island', text='',  icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
+        row.operator('uv.univ_select_square_island', text='',  icon_value=icons.vertical_a).shape = 'VERTICAL'
 
-        split = col_align.split(align=True)
-        row = split.row(align=True)
-        row.operator('uv.univ_select_by_area', text='Small').size_mode = 'SMALL'
-        row.operator('uv.univ_select_by_area', text='Medium').size_mode = 'MEDIUM'
-        row.operator('uv.univ_select_by_area', text='Large').size_mode = 'LARGE'
+        row = col_align.row(align=True)
+        row.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
+        row.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
+        row.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
 
         # Inspect
         col_align = col.column(align=True)
         col_align.label(text='Inspect')
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_check_zero')
-        split.operator('uv.univ_check_flipped')
+        split.operator('uv.univ_check_zero', icon_value=icons.zero)
+        split.operator('uv.univ_check_flipped', icon_value=icons.flipped)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_check_non_splitted')
-        split.operator('uv.univ_check_overlap')
+        split.operator('uv.univ_check_non_splitted', icon_value=icons.non_splitted)
+        split.operator('uv.univ_check_overlap', icon_value=icons.overlap)
 
         # Seam
         col_align = col.column(align=True)
@@ -249,14 +251,14 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_cut')
-        split.operator('uv.univ_seam_border')
+        split.operator('uv.univ_cut', icon_value=icons.cut)
+        split.operator('uv.univ_seam_border', icon_value=icons.border)
 
         layout.label(text='Texture')
         row = layout.row(align=True)
         row.scale_y = 1.5
-        row.operator('mesh.univ_checker')
-        row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
+        row.operator('mesh.univ_checker', icon_value=icons.checker)
+        row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
         self.draw_uv_layers(self.layout)
 
@@ -273,11 +275,11 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         col_align = col.column(align=True)
         col_align.label(text='Seam')
         split = col_align.split(align=True)
-        split.operator('mesh.univ_cut')
-        split.operator('mesh.univ_seam_border')
+        split.operator('mesh.univ_cut', icon_value=icons.cut)
+        split.operator('mesh.univ_seam_border', icon_value=icons.border)
 
         split = col_align.split(align=True)
-        split.operator('mesh.univ_angle')
+        split.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
         col_align.label(text='Project')
         row = col_align.row(align=True)
@@ -286,22 +288,22 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
 
         col_align.label(text='Stack')
         row = col_align.row(align=True)
-        row.operator('mesh.univ_stack', text='Stack')
+        row.operator('mesh.univ_stack', text='Stack', icon_value=icons.stack)
 
         col_align.label(text='Transform')
         col_align.operator('mesh.univ_gravity')
 
         row = col_align.row(align=True)
-        row.operator('mesh.univ_adjust_td')
-        row.operator('mesh.univ_normalize')
+        row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('mesh.univ_normalize', icon_value=icons.normalize)
 
         self.draw_texel_density(col_align, 'mesh')
 
         col_align.label(text='Texture')
         row = col_align.row(align=True)
         row.scale_y = 1.5
-        row.operator('mesh.univ_checker')
-        row.operator('wm.univ_checker_cleanup', text='', icon='TRASH')
+        row.operator('mesh.univ_checker', icon_value=icons.checker)
+        row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
         self.draw_uv_layers(layout)
 

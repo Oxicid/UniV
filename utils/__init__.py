@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import bpy # noqa
+import sys
+import subprocess
 import typing  # noqa
 import mathutils
 
@@ -28,6 +31,91 @@ class NoInit:
 
     def __len__(self):
         raise AttributeError(f'Object not initialized')
+
+
+class Pip:
+    """
+    The code was taken and modified from: https://github.com/s-leger/blender-pip/blob/master/blender_pip.py
+    Necessary to convert svg to png, used during addon development.
+    """
+    def __init__(self):
+        self._ensure_user_site_package()
+        self._ensure_pip()
+
+    @staticmethod
+    def _ensure_user_site_package():
+        import os
+        import site
+        site_package = site.getusersitepackages()
+        if not os.path.exists(site_package):
+            site_package = bpy.utils.user_resource('SCRIPTS', path="site_package", create=True)
+            site.addsitedir(site_package)
+        if site_package not in sys.path:
+            sys.path.append(site_package)
+
+    def _cmd(self, action, options, module):
+        if options is not None and "--user" in options:
+            self._ensure_user_site_package()
+
+        cmd = [sys.executable, "-m", "pip", action]
+
+        if options is not None:
+            cmd.extend(options.split(" "))
+
+        cmd.append(module)
+        return self._run(cmd)
+
+    @staticmethod
+    def _popen(cmd):
+        popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+        for stdout_line in iter(popen.stdout.readline, ""):
+            yield stdout_line
+        popen.stdout.close()
+        popen.wait()
+
+    def _run(self, cmd):
+        res = False
+        status = ""
+        for line in self._popen(cmd):
+            if "ERROR:" in line:
+                status = line.strip()
+            if "Error:" in line:
+                status = line.strip()
+            print(line)
+            if "Successfully" in line:
+                status = line.strip()
+                res = True
+        return res, status
+
+    def _ensure_pip(self):
+        pip_not_found = False
+        try:
+            import pip
+        except ImportError:
+            pip_not_found = True
+            pass
+        if pip_not_found:
+            self._run([sys.executable, "-m", "ensurepip", "--default-pip"])
+
+    @staticmethod
+    def upgrade_pip():
+        return Pip()._cmd("install", "--upgrade", "pip")
+
+    @staticmethod
+    def upgrade(module):
+        return Pip()._cmd("install", "--upgrade", module)
+
+    @staticmethod
+    def uninstall(module, options=None):
+        if options is None or options.strip() == "":
+            # force confirm
+            options = "-y"
+        return Pip()._cmd("uninstall", options, module)
+
+    @staticmethod
+    def install(module):
+        return Pip()._cmd('install', '-U', module)
+
 
 class OverlapHelper:
     lock_overlap: bpy.props.BoolProperty(name='Lock Overlaps', default=False)

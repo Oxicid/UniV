@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 18),
+    "version": (2, 9, 19),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -39,6 +39,7 @@ from .operators import toggle
 from .operators import transform
 from .operators import unwrap
 from . import ui
+from . import icons
 from . import keymaps
 from . import preferences
 
@@ -169,6 +170,7 @@ def register():
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
+    icons.icons.register_icons_()
     try:
         keymaps.add_keymaps()
     except AttributeError:
@@ -177,6 +179,7 @@ def register():
 
 def unregister():
     keymaps.remove_keymaps()
+    icons.icons.unregister_icons_()
     for handle in reversed(bpy.app.handlers.depsgraph_update_post):
         if handle.__name__.startswith('univ_'):
             bpy.app.handlers.depsgraph_update_post.remove(handle)
