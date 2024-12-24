@@ -59,19 +59,13 @@ class icons:
     zero = 0
 
     @classmethod
-    def load_icons_(cls):
-        for attr in dir(cls):
-            if not attr.endswith('_'):
-                print(getattr(cls, attr))
-
-    @classmethod
     def register_icons_(cls):
         from bpy.utils import previews
         if cls._icons_ is None:
             cls._icons_ = previews.new()
         else:
             cls.reset_icon_value_()
-        png_file_path = __file__.replace('__init__.py', 'png\\')
+        png_file_path = __file__.replace('__init__.py', 'png/')
 
         for attr in dir(cls):
             if not attr.endswith('_'):
