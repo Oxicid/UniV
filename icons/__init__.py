@@ -71,7 +71,7 @@ class icons:
             cls._icons_ = previews.new()
         else:
             cls.reset_icon_value_()
-        png_file_path = __file__.replace('__init__.py', 'png/').replace('\\', '/')
+        png_file_path = __file__.replace('__init__.py', 'png\\')
 
         for attr in dir(cls):
             if not attr.endswith('_'):

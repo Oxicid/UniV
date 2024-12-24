@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 32 32"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg6"
+   sodipodi:docname="univ_icon_unwrap.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs6" /><sodipodi:namedview
+   id="namedview6"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="18.893009"
+   inkscape:cx="12.094421"
+   inkscape:cy="13.470591"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg6" />
+    <g
+   transform="matrix(1.5292963,0,0,1.5292963,-1112.6207,-8.5056252)"
+   id="g6">
+        <g
+   id="Unwrap"
+   transform="translate(616,0.0241185)">
+            <rect
+   x="106"
+   y="0"
+   width="32"
+   height="32"
+   style="fill:none"
+   id="rect1" />
+            <g
+   transform="matrix(0.144928,0,0,0.144928,-87.6377,-194.507)"
+   id="g1">
+                <path
+   d="m 1457.31,1402.64 c 4.49,-1.57 8.7,-4.15 12.29,-7.74 l 11.4,-11.4 34.5,34.5 -11.4,11.4 c -3.59,3.59 -6.17,7.8 -7.74,12.29 h -10.75 c 1.85,-7.17 5.59,-13.95 11.21,-19.57 0,0 4.11,-4.12 4.11,-4.12 l -19.93,-19.93 -4.12,4.11 c -5.61,5.62 -12.4,9.36 -19.57,11.21 z"
+   style="fill:#dc87ff"
+   id="path1" />
+            </g>
+            <g
+   transform="matrix(0.144928,0,0,0.144928,-87.6377,-194.507)"
+   id="g2">
+                <path
+   d="m 1496.36,1463.31 c 1.57,4.49 4.15,8.7 7.74,12.29 l 11.4,11.4 -34.5,34.5 -11.4,-11.4 c -3.59,-3.59 -7.8,-6.17 -12.29,-7.74 v -10.75 c 7.17,1.85 13.96,5.59 19.57,11.21 0,0 4.12,4.11 4.12,4.11 l 19.93,-19.93 -4.11,-4.12 c -5.62,-5.61 -9.36,-12.4 -11.21,-19.57 z"
+   style="fill:#ff87a9"
+   id="path2" />
+            </g>
+            <g
+   transform="matrix(0.144928,0,0,0.144928,-87.6377,-194.507)"
+   id="g3">
+                <path
+   d="m 1435.69,1502.36 c -4.49,1.57 -8.7,4.15 -12.29,7.74 l -11.4,11.4 -34.5,-34.5 11.4,-11.4 c 3.59,-3.59 6.17,-7.8 7.74,-12.29 h 10.75 c -1.85,7.17 -5.59,13.96 -11.21,19.57 0,0 -4.11,4.12 -4.11,4.12 l 19.93,19.93 4.12,-4.11 c 5.62,-5.62 12.4,-9.36 19.57,-11.21 z"
+   style="fill:#7d87ff"
+   id="path3" />
+            </g>
+            <g
+   transform="matrix(0.144928,0,0,0.144928,-87.6377,-194.507)"
+   id="g4">
+                <path
+   d="m 1396.64,1441.69 c -1.57,-4.49 -4.15,-8.7 -7.74,-12.29 l -11.4,-11.4 34.5,-34.5 11.4,11.4 c 3.59,3.59 7.8,6.17 12.29,7.74 v 10.75 c -7.17,-1.85 -13.95,-5.59 -19.57,-11.21 0,0 -4.12,-4.11 -4.12,-4.11 l -19.93,19.93 4.11,4.12 c 5.62,5.62 9.36,12.4 11.21,19.57 z"
+   style="fill:#64d2ff"
+   id="path4" />
+            </g>
+            <g
+   transform="matrix(0.18704,0,0,0.18704,-186.16,-303.302)"
+   id="g5">
+                <path
+   d="m 1639.32,1690.28 -10.1,-0.03 v 27.02 c 0,5.6 2.55,8 8.4,8 h 20 c 5.85,0 8.35,-2.4 8.35,-8 v -27.01 h -10.1 l -0.01,26.96 h -16.57 z"
+   style="fill:#ffffff;fill-rule:nonzero"
+   id="path5" />
+            </g>
+        </g>
+    </g>
+</svg>

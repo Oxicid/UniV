@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 32 32"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg3"
+   sodipodi:docname="univ_icon_stack.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs3" /><sodipodi:namedview
+   id="namedview3"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="18.893009"
+   inkscape:cx="13.999887"
+   inkscape:cy="11.670984"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg3" />
+    <g
+   transform="matrix(1.5127548,0,0,1.5127548,-1281.9437,-8.8754781)"
+   id="g3">
+        <g
+   id="Stack"
+   transform="matrix(1.03226,0,0,1.03226,842,219.895)">
+            <rect
+   x="0"
+   y="-213"
+   width="31"
+   height="31"
+   style="fill:none"
+   id="rect1" />
+            <g
+   transform="matrix(1.41522,0,0,1.41522,5.16386,-231.693)"
+   id="g1">
+                <path
+   d="M 4.714,20.143 V 18 H 14 v 9.286 h -2.143 v -7.143 z"
+   style="fill:#7d87ff"
+   id="path1" />
+            </g>
+            <g
+   transform="matrix(1.31413,0,0,1.31413,1.52473,-224.819)"
+   id="g2">
+                <rect
+   x="4"
+   y="18"
+   width="10"
+   height="10"
+   style="fill:#62cdf9"
+   id="rect2" />
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 32 32"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg7"
+   sodipodi:docname="univ_icon_center.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs7" /><sodipodi:namedview
+   id="namedview7"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="13.359375"
+   inkscape:cx="30.652632"
+   inkscape:cy="17.02924"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg7" />
+    <g
+   transform="matrix(1.3742689,0,0,1.3742689,-201.77214,-179.17922)"
+   id="g7">
+        <g
+   id="Center"
+   transform="matrix(0.914286,0,0,0.914286,180.864,90.367)">
+            <rect
+   x="-42"
+   y="39"
+   width="35"
+   height="35"
+   style="fill:none"
+   id="rect1" />
+            <g
+   transform="matrix(1.00934,0,0,1.00934,0.228949,-0.527985)"
+   id="g5">
+                <g
+   transform="matrix(1.27558,0,0,1.27558,-162.263,-125.908)"
+   id="g1">
+                    <path
+   d="m 108.947,135.738 v -1.689 c 4.212,0.442 7.562,3.792 8.004,8.004 h -1.689 c -0.425,-3.285 -3.03,-5.89 -6.315,-6.315 z"
+   style="fill:#dc87ff"
+   id="path1" />
+                </g>
+                <g
+   transform="matrix(1.27558,0,0,1.27558,-162.263,-125.908)"
+   id="g2">
+                    <path
+   d="m 115.262,143.947 h 1.689 c -0.442,4.212 -3.792,7.562 -8.004,8.004 v -1.689 c 3.285,-0.425 5.89,-3.03 6.315,-6.315 z"
+   style="fill:#ff87a9"
+   id="path2" />
+                </g>
+                <g
+   transform="matrix(1.27558,0,0,1.27558,-162.263,-125.908)"
+   id="g3">
+                    <path
+   d="m 107.053,150.262 v 1.689 c -4.212,-0.442 -7.562,-3.792 -8.004,-8.004 h 1.689 c 0.425,3.285 3.03,5.89 6.315,6.315 z"
+   style="fill:#7d87ff"
+   id="path3" />
+                </g>
+                <g
+   transform="matrix(1.27558,0,0,1.27558,-162.263,-125.908)"
+   id="g4">
+                    <path
+   d="m 100.738,142.053 h -1.689 c 0.442,-4.212 3.792,-7.562 8.004,-8.004 v 1.689 c -3.285,0.425 -5.89,3.03 -6.315,6.315 z"
+   style="fill:#62cdf9"
+   id="path4" />
+                </g>
+            </g>
+            <g
+   transform="matrix(1.04763,0,0,1.28803,-134.501,-126.314)"
+   id="g6">
+                <path
+   d="m 104,142.747 h -3.836 V 141.12 H 104 V 138 h 2 v 3.12 h 4 v 1.627 h -4 V 146 h -2 z"
+   style="fill:#ffffff"
+   id="path5" />
+            </g>
+        </g>
+    </g>
+</svg>
