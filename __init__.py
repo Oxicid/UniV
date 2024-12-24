@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 17),
+    "version": (2, 9, 18),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -127,6 +127,7 @@ try:
         # Misc
         misc.UNIV_OT_Pin,
         misc.UNIV_OT_TD_PresetsProcessing,
+        misc.UNIV_OT_FixUVs,
         misc.UNIV_OT_Join,
         misc.UNIV_OT_Add,
         misc.UNIV_OT_Remove,

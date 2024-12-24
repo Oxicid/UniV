@@ -3,7 +3,8 @@
 
 import bpy
 from bpy.types import Panel
-from .preferences import univ_settings
+
+from .preferences import univ_settings, prefs
 
 REDRAW_UV_LAYERS = True
 
@@ -93,13 +94,15 @@ class UNIV_PT_General(Panel):
         col = row.column(align=True)
         col.operator('mesh.univ_add', icon='ADD', text='')
         col.operator('mesh.univ_remove', icon='REMOVE', text='')
-        col.separator()
+        col.separator(factor=0.25)
         col.operator('mesh.univ_move_up', icon='TRIA_UP', text='')
         col.operator('mesh.univ_move_down', icon='TRIA_DOWN', text='')
+        col.separator(factor=0.25)
+        col.operator('mesh.univ_fix_uvs', icon='EVENT_F', text='')
 
     def draw_header(self, context):
         layout = self.layout
-        row = layout.split(factor=.35)
+        row = layout.split(factor=.5)
         row.popover(panel='UNIV_PT_GlobalSettings', text="", icon='PREFERENCES')
         row.label(text='UniV')
 
@@ -326,6 +329,7 @@ class UNIV_PT_GlobalSettings(Panel):
         layout.prop(settings, 'padding', slider=True)
         layout.separator()
         layout.prop(settings, 'uv_layers_show')
+        layout.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
 
 
 class UNIV_PT_PackSettings(Panel):

@@ -76,6 +76,12 @@ def _update_uv_layers_active_idx(self, context):
                 if len(obj.data.uv_layers) >= idx+1:
                     if not uvs[idx].active:
                         uvs[idx].active = True
+        if prefs().enable_uv_layers_sync_borders_seam and bpy.context.mode == 'EDIT_MESH':
+            if bpy.context.area.type == 'VIEW_3D':
+                bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+            else:
+                bpy.ops.uv.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
@@ -190,6 +196,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
+    enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
 
     show_stretch: BoolProperty(name='Show Stretch', default=False)
     display_stretch_type: EnumProperty(name='Stretch Type',
@@ -225,6 +232,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.separator()
 
             layout.prop(self, 'max_pick_distance')
+            layout.prop(self, 'enable_uv_layers_sync_borders_seam')
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
