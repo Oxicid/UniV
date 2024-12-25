@@ -2028,8 +2028,108 @@ class UNIV_OT_SelectByArea(Operator):
                 self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} islands')
             else:
                 if counter_skipped:
-                    self.report({'INFO'}, f'The islands were already{sel_or_deselect}')
+                    self.report({'INFO'}, f'The islands were already {sel_or_deselect}')
                 else:
                     self.report({'WARNING'}, f'No found in the specified size')
+        umeshes.silent_update()
+        return {'FINISHED'}
+
+
+class UNIV_OT_Stacked(Operator):
+    bl_idname = "uv.univ_select_stacked"
+    bl_label = 'Stacked'
+    bl_description = "Select exact overlapped islands"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+
+    threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.row(align=True).prop(self, 'mode', expand=True)
+        layout.prop(self, 'threshold', slider=True)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def execute(self, context):
+        umeshes = types.UMeshes()
+        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+
+        all_islands = []
+        for umesh in reversed(umeshes):
+            umesh.update_tag = False
+            if islands := AdvIslands.calc_visible_with_mark_seam(umesh):
+                all_islands.extend(islands)
+
+        union_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, self.threshold)
+
+        counter = 0
+        counter_skipped = 0
+        for union_isl in union_islands:
+            if self.mode == 'SELECT':
+                if isinstance(union_isl, types.UnionIslands):
+                    for isl in union_isl:
+                        if isl.is_full_face_selected:
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        isl.select = True
+                        isl.umesh.update_tag = True
+                else:
+                    if union_isl.is_full_face_deselected:
+                        continue
+                    union_isl.select = False
+                    union_isl.umesh.update_tag = True
+            elif self.mode == 'ADDITION':
+                if isinstance(union_isl, types.UnionIslands):
+                    for isl in union_isl:
+                        if isl.is_full_face_selected:
+                            counter_skipped += 1
+                            continue
+
+                        counter += 1
+                        isl.select = True
+                        isl.umesh.update_tag = True
+            else:  # self.mode == 'DESELECT':
+                if isinstance(union_isl, types.UnionIslands):
+                    for isl in union_isl:
+                        if isl.is_full_face_deselected:
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        isl.select = False
+                        isl.umesh.update_tag = True
+
+        if not union_islands:
+            self.report({'WARNING'}, f'Islands not found')
+        else:
+            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
+            if counter:
+                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} stacked islands')
+            else:
+                if counter_skipped:
+                    self.report({'INFO'}, f'The stacked islands were already {sel_or_deselect}')
+                else:
+                    self.report({'WARNING'}, f'No found stacked islands')
         umeshes.silent_update()
         return {'FINISHED'}
