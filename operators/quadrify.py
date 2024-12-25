@@ -13,6 +13,7 @@ from math import hypot
 from itertools import chain
 from mathutils import Vector
 from bmesh.types import BMLoopUV
+from collections.abc import Callable
 from mathutils.geometry import area_tri
 
 from .. import utils
@@ -30,15 +31,46 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
+    def invoke(self, context, event):
+        from ..preferences import prefs
+        self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+        self.mouse_pos = None
+        if event.value == 'PRESS':
+            if context.area.ui_type == 'UV':
+                self.mouse_pos = utils.get_mouse_pos(context, event)
+            return self.execute(context)
+
+        return self.execute(context)
+
+    def __init__(self):
+        self.has_selected = True
+        self.islands_calc_type: Callable = Callable
+        self.umeshes: types.UMeshes | None = None
+        self.mouse_pos: Vector | None = None
+        self.max_distance: float | None = None
+
     def execute(self, context):
         if context.area.ui_type != 'UV':
             self.report({'WARNING'}, 'Active area must be UV')
             return {'CANCELLED'}
 
-        umeshes = types.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes(report=self.report)
+
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        if selected_umeshes:
+            self.umeshes = selected_umeshes
+            return self.quadrify_selected()
+        elif unselected_umeshes and self.mouse_pos:
+            self.umeshes = unselected_umeshes
+            return self.quadrify_pick()
+        else:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
+
+    def quadrify_selected(self):
         counter = 0
         selected_non_quads_counter = 0
-        for umesh in umeshes:
+        for umesh in self.umeshes:
             umesh.update_tag = False
             if dirt_islands := Islands.calc_extended_with_mark_seam(umesh):
                 uv = umesh.uv
@@ -59,9 +91,40 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         if selected_non_quads_counter:
             self.report({'WARNING'}, f"Ignored {selected_non_quads_counter} non-quad faces")
         elif not counter:
-            return umeshes.update()
+            return self.umeshes.update()
 
-        umeshes.silent_update()
+        self.umeshes.silent_update()
+        return {'FINISHED'}
+
+    def quadrify_pick(self):
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+
+        for umesh in self.umeshes:
+            if dirt_islands := Islands.calc_visible_with_mark_seam(umesh):
+                for d_island in dirt_islands:
+                    hit.find_nearest_island_by_crn(d_island)
+        if not hit:
+            self.report({'WARNING'}, "Islands not found")
+            return {'CANCELLED'}
+
+        links_static_with_quads, static_faces, quad_islands = self.split_by_static_faces_and_quad_islands_pick(hit.island)
+        if not quad_islands:
+            self.report({'WARNING'}, f"All {len(static_faces)} faces is non-quad")
+            return {'CANCELLED'}
+
+        for isl in quad_islands:
+            utils.set_faces_tag(isl, True)
+            quad(isl)
+
+        uv = hit.island.umesh.uv
+        for static_crn, quad_corners in links_static_with_quads:
+            static_co = static_crn[uv].uv
+            min_dist_quad_crn = min(quad_corners, key=lambda q_crn: (q_crn[uv].uv - static_co).length)
+            static_co[:] = min_dist_quad_crn[uv].uv
+
+        hit.island.umesh.update()
+        if static_faces:
+            self.report({'WARNING'}, f"Ignored {len(static_faces)} non-quad faces")
         return {'FINISHED'}
 
     def split_by_static_faces_and_quad_islands(self, island):
@@ -111,6 +174,29 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         fake_umesh = umesh.fake_umesh(quad_faces)
         islands = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
+
+    def split_by_static_faces_and_quad_islands_pick(self, island):
+        umesh = island.umesh
+        uv = umesh.uv
+        quad_faces = []
+        static_faces = []
+
+        for f in island:
+            if len(f.loops) == 4:
+                quad_faces.append(f)
+            else:
+                static_faces.append(f)
+
+        if not static_faces:
+            return [], static_faces, [island]
+        elif len(static_faces) == len(island):
+            return [], static_faces, []
+
+        utils.set_faces_tag(quad_faces)
+        links_static_with_quads = self.store_links_static_with_quads(static_faces, uv)
+        fake_umesh = umesh.fake_umesh(quad_faces)
+        islands = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        return links_static_with_quads, static_faces, islands
 
     @staticmethod
     def store_links_static_with_quads(faces, uv):
