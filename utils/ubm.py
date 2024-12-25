@@ -249,10 +249,15 @@ def linked_crn_vert_uv_for_transform(first, uv):
                 linked.append(bm_iter)
     return linked
 
-def linked_crn_uv_by_tag_unordered_included(crn, uv):
-    """Linked to arg corner by tag with arg corner and unordered"""
+def linked_crn_uv_by_crn_tag_unordered_included(crn, uv) -> list[BMLoop]:
+    """Linked to arg corner by **crn** tag with arg corner and unordered"""
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.tag and l_crn[uv].uv == first_co]
+
+def linked_crn_uv_by_face_tag_unordered_included(crn, uv) -> list[BMLoop]:
+    """Linked to arg corner by **face** tag with arg corner and unordered"""
+    first_co = crn[uv].uv
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.tag and l_crn[uv].uv == first_co]
 
 def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
     face_index = first.face.index

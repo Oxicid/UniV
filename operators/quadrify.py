@@ -10,14 +10,15 @@ if 'bpy' in locals():
 import bpy
 
 from math import hypot
+from itertools import chain
 from mathutils import Vector
-from collections import defaultdict
 from bmesh.types import BMLoopUV
 from mathutils.geometry import area_tri
 
 from .. import utils
 from .. import types
 from ..types import Islands, FaceIsland
+from ..utils import linked_crn_uv_by_face_tag_unordered_included
 
 class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_idname = "uv.univ_quadrify"
@@ -35,15 +36,92 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             return {'CANCELLED'}
 
         umeshes = types.UMeshes(report=self.report)
+        counter = 0
+        selected_non_quads_counter = 0
         for umesh in umeshes:
-            if islands := Islands.calc_selected_quad(umesh):
-                for island in islands:
-                    quad(island)
-            umesh.update_tag = bool(islands)
-        return umeshes.update()
+            umesh.update_tag = False
+            if dirt_islands := Islands.calc_extended_with_mark_seam(umesh):
+                uv = umesh.uv
+                for d_island in dirt_islands:
+                    links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(d_island)
+                    selected_non_quads_counter += len(non_quad_selected)
+                    for isl in quad_islands:
+                        utils.set_faces_tag(isl, True)
+                        quad(isl)
+                        counter += 1
+                        umesh.update_tag = True
+
+                    for static_crn, quad_corners in links_static_with_quads:
+                        static_co = static_crn[uv].uv
+                        min_dist_quad_crn = min(quad_corners, key=lambda q_crn: (q_crn[uv].uv - static_co).length)
+                        static_co[:] = min_dist_quad_crn[uv].uv
+
+        if selected_non_quads_counter:
+            self.report({'WARNING'}, f"Ignored {selected_non_quads_counter} non-quad faces")
+        elif not counter:
+            return umeshes.update()
+
+        umeshes.silent_update()
+        return {'FINISHED'}
+
+    def split_by_static_faces_and_quad_islands(self, island):
+        umesh = island.umesh
+        uv = umesh.uv
+        quad_faces = []
+        selected_non_quads = []
+        static_faces = []
+        if island.umesh.sync:
+            for f in island:
+                if f.select:
+                    if len(f.loops) == 4:
+                        quad_faces.append(f)
+                    else:
+                        selected_non_quads.append(f)
+                else:
+                    static_faces.append(f)
+        else:
+            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+                for f in island:
+                    corners = f.loops
+                    if all(crn[uv].select for crn in corners):
+                        if len(corners) == 4:
+                            quad_faces.append(f)
+                        else:
+                            selected_non_quads.append(f)
+                    else:
+                        static_faces.append(f)
+            else:
+                for f in island:
+                    corners = f.loops
+                    if all(crn[uv].select_edge for crn in corners):
+                        if len(corners) == 4:
+                            quad_faces.append(f)
+                        else:
+                            selected_non_quads.append(f)
+                    else:
+                        static_faces.append(f)
+
+        if not (static_faces or selected_non_quads):
+            return [], static_faces, selected_non_quads, [island]
+        elif len(static_faces) + len(selected_non_quads) == len(island):
+            return [], static_faces, selected_non_quads, []
+
+        utils.set_faces_tag(quad_faces)
+        links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
+        fake_umesh = umesh.fake_umesh(quad_faces)
+        islands = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        return links_static_with_quads, static_faces, selected_non_quads, islands
+
+    @staticmethod
+    def store_links_static_with_quads(faces, uv):
+        links_static_with_quads = []
+        for f in faces:
+            for crn in f.loops:
+                if linked_corners := linked_crn_uv_by_face_tag_unordered_included(crn, uv):
+                    links_static_with_quads.append((crn, linked_corners))
+        return links_static_with_quads
 
 def quad(island: FaceIsland):
-    co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(island)
     uv = island.umesh.uv
 
     def max_quad_uv_face_area(f):
@@ -56,17 +134,16 @@ def quad(island: FaceIsland):
         return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
 
     target_face = max(island, key=max_quad_uv_face_area)
+    co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, island.umesh.uv)
     shape_face(uv, target_face, co_and_linked_uv_corners)
     follow_active_uv(target_face, island)
 
-def calc_co_and_linked_uv_corners_dict(island: FaceIsland) -> defaultdict[Vector | list[BMLoopUV]]:
-    uv = island.umesh.uv
-    co_and_linked_uv_corners = defaultdict(list)
-    for f in island:
-        for corner in f.loops:
-            uv_corner = corner[uv]
-            co: Vector = uv_corner.uv.copy().freeze()
-            co_and_linked_uv_corners[co].append(uv_corner)  # noqa
+def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector | list[BMLoopUV]]:
+    co_and_linked_uv_corners = {}
+    for crn in f.loops:
+        co: Vector = crn[uv].uv.copy().freeze()
+        corners = linked_crn_uv_by_face_tag_unordered_included(crn, uv)
+        co_and_linked_uv_corners[co] = [crn[uv] for crn in corners]
 
     return co_and_linked_uv_corners
 
@@ -126,11 +203,11 @@ def shape_face(uv, target_face, co_and_linked_uv_corners):
 def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down, start_v):
     if start_v is None:
         start_v = left_up.uv
-    elif are_verts_quasi_equal(start_v, right_up):
+    elif utils.vec_isclose(start_v.uv, right_up.uv):
         start_v = right_up.uv
-    elif are_verts_quasi_equal(start_v, right_down):
+    elif utils.vec_isclose(start_v.uv, right_down.uv):
         start_v = right_down.uv
-    elif are_verts_quasi_equal(start_v, left_down):
+    elif utils.vec_isclose(start_v.uv, left_down.uv):
         start_v = left_down.uv
     else:
         start_v = left_up.uv
@@ -182,16 +259,13 @@ def follow_active_uv(f_act, island: FaceIsland):
 
     # our own local walker
     def walk_face_init(faces, f_act):  # noqa
-        # first tag all faces True (so we don't uv map them)
-        utils.set_faces_tag(faces.umesh.bm.faces)
-        # then tag faces arg False
-        utils.set_faces_tag(faces, False)
+
         # tag the active face True since we begin there
-        f_act.tag = True
+        f_act.tag = False
 
     def walk_face(f):  # noqa
         # all faces in this list must be tagged
-        f.tag = True
+        f.tag = False
         faces_a = [f]
         faces_b = []
 
@@ -202,9 +276,9 @@ def follow_active_uv(f_act, island: FaceIsland):
                     if l_edge.is_manifold and not l_edge.seam:
                         l_other = l.link_loop_radial_next
                         f_other = l_other.face
-                        if not f_other.tag:
+                        if f_other.tag:
                             yield l
-                            f_other.tag = True
+                            f_other.tag = False
                             faces_b.append(f_other)
             # swap
             faces_a, faces_b = faces_b, faces_a
@@ -330,9 +404,6 @@ def image_ratio():
         if img and img.size[0] != 0:
             ratio = img.size
     return ratio
-
-def are_verts_quasi_equal(a, b, allowed_error=0.00001):
-    return all(abs(v) < allowed_error for v in a.uv - b.uv)
 
 def hypot_vert(v1, v2):
     return hypot(*(v1 - v2))
