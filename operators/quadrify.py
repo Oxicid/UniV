@@ -12,7 +12,7 @@ import bpy
 from math import hypot
 from itertools import chain
 from mathutils import Vector
-from bmesh.types import BMLoopUV
+from bmesh.types import BMLoopUV, BMLoop
 from collections.abc import Callable
 from mathutils.geometry import area_tri
 
@@ -359,21 +359,18 @@ def follow_active_uv(f_act, island: AdvIsland):
             faces_a, faces_b = faces_b, faces_a
             faces_b.clear()
 
-    def walk_edgeloop(l):  # noqa
-        """
-        Could make this a generic function
-        """
+    def walk_edgeloop(l: BMLoop):  # noqa
         e_first = l.edge
         while True:
             e = l.edge  # noqa
             yield e
 
             # don't step past non-manifold edges
-            if e.is_manifold:
+            if not e.seam:
                 # walk around the quad and then onto the next face
-                l = l.link_loop_radial_next  # noqa
-                if len(l.face.verts) == 4:
-                    l = l.link_loop_next.link_loop_next  # noqa
+                next_crn = l.link_loop_radial_next
+                if next_crn != l and next_crn.face.tag:
+                    l = next_crn.link_loop_next.link_loop_next  # noqa
                     if l.edge is e_first:
                         break
                 else:
