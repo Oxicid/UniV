@@ -18,7 +18,7 @@ from mathutils.geometry import area_tri
 
 from .. import utils
 from .. import types
-from ..types import Islands, FaceIsland
+from ..types import AdvIslands, AdvIsland
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
 
 class UNIV_OT_Quadrify(bpy.types.Operator):
@@ -26,6 +26,10 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_label = "Quadrify"
     bl_description = "Align selected UV to rectangular distribution"
     bl_options = {'REGISTER', 'UNDO'}
+
+    shear: bpy.props.BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
+    xy_scale: bpy.props.BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
+    use_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -41,6 +45,13 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             return self.execute(context)
 
         return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        if self.shear or self.xy_scale:
+            layout.prop(self, 'use_aspect')
+        layout.prop(self, 'shear')
+        layout.prop(self, 'xy_scale')
 
     def __init__(self):
         self.has_selected = True
@@ -72,7 +83,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
-            if dirt_islands := Islands.calc_extended_with_mark_seam(umesh):
+            if dirt_islands := AdvIslands.calc_extended_with_mark_seam(umesh):
+                umesh.value = umesh.check_uniform_scale(report=self.report)
+                umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
                 uv = umesh.uv
                 for d_island in dirt_islands:
                     links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(d_island)
@@ -82,6 +95,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                         quad(isl)
                         counter += 1
                         umesh.update_tag = True
+
+                    if self.shear or self.xy_scale:
+                        self.quad_normalize(quad_islands, umesh)
 
                     for static_crn, quad_corners in links_static_with_quads:
                         static_co = static_crn[uv].uv
@@ -96,11 +112,29 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         self.umeshes.silent_update()
         return {'FINISHED'}
 
+    def quad_normalize(self, quad_islands, umesh):
+        # adjust and normalize
+        quad_islands = AdvIslands(quad_islands, umesh)
+        quad_islands.calc_tris_simple()
+        quad_islands.calc_flat_uv_coords(save_triplet=True)
+        quad_islands.calc_flat_unique_uv_coords()
+        quad_islands.calc_flat_3d_coords(save_triplet=True, scale=umesh.value)
+        quad_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
+        from .transform import UNIV_OT_Normalize_VIEW3D
+        for isl in quad_islands:
+            center = isl.bbox.center
+            isl.value = center
+            UNIV_OT_Normalize_VIEW3D.individual_scale(self, isl)  # noqa
+            isl.set_position(center, isl.calc_bbox().center)
+        if len(quad_islands) > 1:
+            tot_area_uv, tot_area_3d = UNIV_OT_Normalize_VIEW3D.avg_by_frequencies(self, quad_islands)  # noqa
+            UNIV_OT_Normalize_VIEW3D.normalize(self, quad_islands, tot_area_uv, tot_area_3d)  # noqa
+
     def quadrify_pick(self):
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
 
         for umesh in self.umeshes:
-            if dirt_islands := Islands.calc_visible_with_mark_seam(umesh):
+            if dirt_islands := AdvIslands.calc_visible_with_mark_seam(umesh):
                 for d_island in dirt_islands:
                     hit.find_nearest_island_by_crn(d_island)
         if not hit:
@@ -116,7 +150,13 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             utils.set_faces_tag(isl, True)
             quad(isl)
 
-        uv = hit.island.umesh.uv
+        umesh = hit.island.umesh
+        uv = umesh.uv
+        umesh.value = umesh.check_uniform_scale(report=self.report)
+        umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+        if self.shear or self.xy_scale:
+            self.quad_normalize(quad_islands, umesh)
+
         for static_crn, quad_corners in links_static_with_quads:
             static_co = static_crn[uv].uv
             min_dist_quad_crn = min(quad_corners, key=lambda q_crn: (q_crn[uv].uv - static_co).length)
@@ -172,7 +212,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         utils.set_faces_tag(quad_faces)
         links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
-        islands = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
     def split_by_static_faces_and_quad_islands_pick(self, island):
@@ -195,7 +235,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         utils.set_faces_tag(quad_faces)
         links_static_with_quads = self.store_links_static_with_quads(static_faces, uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
-        islands = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, islands
 
     @staticmethod
@@ -207,7 +247,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 
-def quad(island: FaceIsland):
+def quad(island: AdvIsland):
     uv = island.umesh.uv
 
     def max_quad_uv_face_area(f):
@@ -219,6 +259,7 @@ def quad(island: FaceIsland):
 
         return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
 
+    # TODO: Find most quare and large target face
     target_face = max(island, key=max_quad_uv_face_area)
     co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, island.umesh.uv)
     shape_face(uv, target_face, co_and_linked_uv_corners)
@@ -267,65 +308,19 @@ def shape_face(uv, target_face, co_and_linked_uv_corners):
         left_down = second_lowest
         right_down = first_lowest
 
-    verts = [left_up, left_down, right_down, right_up]
-
-    ratio_x, ratio_y = image_ratio()
-    _min = float('inf')
-    min_v = verts[0]
-    for v in verts:
-        if v is None:
-            continue
-        area = bpy.context.area
-        if area.ui_type == 'UV':
-            loc = area.spaces[0].cursor_location
-            hyp = hypot(loc.x / ratio_x - v.uv.x, loc.y / ratio_y - v.uv.y)
-            if hyp < _min:
-                _min = hyp
-                min_v = v
-
-    make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down, min_v)
+    make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down)
 
 
-def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down, start_v):
-    if start_v is None:
-        start_v = left_up.uv
-    elif utils.vec_isclose(start_v.uv, right_up.uv):
-        start_v = right_up.uv
-    elif utils.vec_isclose(start_v.uv, right_down.uv):
-        start_v = right_down.uv
-    elif utils.vec_isclose(start_v.uv, left_down.uv):
-        start_v = left_down.uv
-    else:
-        start_v = left_up.uv
-
+def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down):
     left_up = left_up.uv.copy().freeze()
     right_up = right_up.uv.copy().freeze()
     right_down = right_down.uv.copy().freeze()
     left_down = left_down.uv.copy().freeze()
 
-    if start_v == left_up:
-        final_scale_x = hypot_vert(left_up, right_up)
-        final_scale_y = hypot_vert(left_up, left_down)
-        curr_row_x = left_up.x
-        curr_row_y = left_up.y
-
-    elif start_v == right_up:
-        final_scale_x = hypot_vert(right_up, left_up)
-        final_scale_y = hypot_vert(right_up, right_down)
-        curr_row_x = right_up.x - final_scale_x
-        curr_row_y = right_up.y
-
-    elif start_v == right_down:
-        final_scale_x = hypot_vert(right_down, left_down)
-        final_scale_y = hypot_vert(right_down, right_up)
-        curr_row_x = right_down.x - final_scale_x
-        curr_row_y = right_down.y + final_scale_y
-
-    else:
-        final_scale_x = hypot_vert(left_down, right_down)
-        final_scale_y = hypot_vert(left_down, left_up)
-        curr_row_x = left_down.x
-        curr_row_y = left_down.y + final_scale_y
+    final_scale_x = hypot_vert(left_up, right_up)
+    final_scale_y = hypot_vert(left_up, left_down)
+    curr_row_x = left_up.x
+    curr_row_y = left_up.y
 
     for v in co_and_linked_uv_corners[left_up]:
         v.uv[:] = curr_row_x, curr_row_y
@@ -340,14 +335,8 @@ def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, ri
         v.uv[:] = curr_row_x, curr_row_y - final_scale_y
 
 
-def follow_active_uv(f_act, island: FaceIsland):
+def follow_active_uv(f_act, island: AdvIsland):
     uv = island.umesh.uv
-
-    # our own local walker
-    def walk_face_init(faces, f_act):  # noqa
-
-        # tag the active face True since we begin there
-        f_act.tag = False
 
     def walk_face(f):  # noqa
         # all faces in this list must be tagged
@@ -478,18 +467,9 @@ def follow_active_uv(f_act, island: FaceIsland):
 
                 edge_length_store[0] = edge_length_accum / edge_length_total
 
-    walk_face_init(island, f_act)
+    f_act.tag = False
     for l_prev_ in walk_face(f_act):
         apply_uv(l_prev_)
-
-def image_ratio():
-    ratio = 256, 256
-    area = bpy.context.area
-    if area and area.type == 'IMAGE_EDITOR':
-        img = area.spaces[0].image
-        if img and img.size[0] != 0:
-            ratio = img.size
-    return ratio
 
 def hypot_vert(v1, v2):
     return hypot(*(v1 - v2))

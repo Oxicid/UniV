@@ -2935,7 +2935,6 @@ class UNIV_OT_Stitch(Operator):
 
             uv = umesh.uv
             adv_islands = AdvIslands.calc_extended_or_visible(umesh, extended=False)
-            # print(adv_islands)
             if len(adv_islands) < 2:
                 umesh.update_tag = False
                 continue
@@ -3214,11 +3213,9 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         if not is_uv_area:
             self.umeshes.set_sync(True)
 
-        has_non_uniform_scale_obj = False
         for umesh in self.umeshes:
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
-            has_non_uniform_scale_obj |= bool(umesh.value)
 
         all_islands: list[AdvIsland | UnionIslands] = []
 
@@ -3242,8 +3239,6 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             adv_islands.calc_flat_uv_coords(save_triplet=True)
             adv_islands.calc_flat_unique_uv_coords()
             adv_islands.calc_flat_3d_coords(save_triplet=True, scale=umesh.value)
-
-            # TODO: Optimize calc area, when object one and scale simular by axis
             adv_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
 
         if not all_islands:
@@ -3276,13 +3271,13 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         xy_scale = self.xy_scale
 
         vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
-        uv_and_3d_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
+        uv_coords_and_3d_vectors_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
         for j in range(10):
             scale_cou = 0.0
             scale_cov = 0.0
             scale_cross = 0.0
 
-            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_and_3d_and_3d_areas:
+            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
                 try:
                     m.invert()
@@ -3412,7 +3407,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             return total_uv_area, total_3d_area
         else:
             idx_for_find = math.nextafter(median, max_area)
-            idx = self.np_find_nearest(areas, idx_for_find)
+            idx = UNIV_OT_Normalize_VIEW3D.np_find_nearest(areas, idx_for_find)
             total_uv_area = areas_uv[idx]
             total_3d_area = areas_3d[idx]
             if total_uv_area and total_3d_area:

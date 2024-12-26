@@ -1981,8 +1981,30 @@ class AdvIslands(Islands):
         if not self.islands:
             return False
         triangulated_islands = self.triangulate_islands()
-        for isl, tria_isl in zip(self.islands, triangulated_islands):
-            isl.tris = tria_isl
+        for isl, tris_isl in zip(self.islands, triangulated_islands):
+            isl.tris = tris_isl
+        return True
+
+    def calc_tris_simple(self):
+        if not self.islands:
+            return False
+        for isl in self.islands:
+            tris_isl = []
+            tris_isl_append = tris_isl.append
+            for f in isl:
+                corners = f.loops
+                if (n := len(corners)) == 4:
+                    l1, l2, l3, l4 = corners
+                    tris_isl_append((l1, l2, l3))
+                    tris_isl_append((l3, l4, l1))
+                elif n == 3:
+                    tris_isl_append(tuple(corners))
+                else:
+                    first_crn = corners[0]
+                    for i in range(1, n - 1):
+                        tris_isl_append((first_crn, corners[i], corners[i + 1]))
+
+            isl.tris = tris_isl
         return True
 
     def calc_flat_coords(self, save_triplet=False):
