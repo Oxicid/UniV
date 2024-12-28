@@ -9,6 +9,7 @@ import bpy
 import math
 
 from math import pi, cos, sin
+from bl_math import clamp
 from . import transform
 from .. import utils
 from .. import types
@@ -16,6 +17,7 @@ from ..types import BBox, MeshIsland, MeshIslands
 from bpy.props import *
 from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
+from ..preferences import univ_settings
 
 class UNIV_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
@@ -229,6 +231,7 @@ class UNIV_Normal(bpy.types.Operator):
 
         return eul.to_matrix().to_4x4()
 
+
 class UNIV_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
     bl_label = "Box"
@@ -309,6 +312,7 @@ class UNIV_BoxProject(bpy.types.Operator):
                 else:  # Z
                     for crn in f.loops:
                         crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+
 
 class ProjCameraInfo:
     def __init__(self):
@@ -626,3 +630,78 @@ class UNIV_ViewProject(bpy.types.Operator):
         for co in pointers_to_coords:
             co *= scale
             co += diff
+
+
+class UNIV_SmartProject(bpy.types.Operator):
+    bl_idname = 'mesh.univ_smart_project'
+    bl_label = 'Smart'
+    bl_description = 'Smart Projection'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    add_padding: IntProperty(name='Additional Padding', default=0, min=-16, max=16, subtype='PIXEL')
+    angle_limit: FloatProperty(name='Angle', default=math.radians(66), min=0, max=pi/2, subtype='ANGLE')
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        settings = univ_settings()
+        self.texture_size = min(int(settings.size_x), int(settings.size_y))
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        pad = univ_settings().padding
+        layout.label(text=f'Texture Size: {self.texture_size}')
+        layout.label(text=f'Padding: {int(clamp(pad + self.add_padding, 0, 100))} ({pad})')
+        layout.prop(self, 'add_padding', slider=True)
+        layout.prop(self, 'angle_limit', slider=True)
+
+    def __init__(self):
+        self.texture_size = 2048
+
+    def execute(self, context):
+        settings = univ_settings()
+        kwargs = {
+            'angle_limit': self.angle_limit,
+            'margin_method': 'FRACTION',
+            'island_margin': int(clamp(settings.padding + self.add_padding, 0, 100)) / 2 / self.texture_size,
+            'area_weight': 0,
+            'correct_aspect': True,
+            'scale_to_bounds': False,
+        }
+        # TODO: Add normalize and correct aspect by modifier
+        if context.mode == 'EDIT_MESH':
+            umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+            umeshes.set_sync()
+
+            selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                for umesh in selected:
+                    umesh.check_uniform_scale(report=self.report)
+                bpy.ops.uv.smart_project(**kwargs)
+            elif unselected:
+                for umesh in unselected:
+                    umesh.check_uniform_scale(report=self.report)
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.smart_project(**kwargs)
+                bpy.ops.mesh.select_all(action='DESELECT')
+            else:
+                self.report({'WARNING'}, 'Not found faces')
+                return {'CANCELLED'}
+        else:
+            if not any(obj.data.polygons for obj in bpy.context.selected_objects if obj.type == 'MESH'):
+                self.report({'WARNING'}, 'Not found faces')
+                return {'CANCELLED'}
+            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
+            for umesh in types.UMeshes.calc(self.report, verify_uv=False):
+                umesh.check_uniform_scale(report=self.report)
+
+            bpy.ops.mesh.reveal(select=True)
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.uv.smart_project(**kwargs)
+            bpy.ops.object.editmode_toggle()
+
+        return {'FINISHED'}

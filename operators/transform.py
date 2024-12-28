@@ -3706,7 +3706,7 @@ class UNIV_OT_Pack(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        settings = context.scene.univ_settings  # noqa
+        settings = univ_settings()
         args = {
             'udim_source': settings.udim_source,
             'rotate': settings.rotate,

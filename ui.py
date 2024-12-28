@@ -288,6 +288,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_box_project')
 
         row = col_align.row(align=True)
+        row.operator('mesh.univ_smart_project')
         row.operator('mesh.univ_view_project')
 
         col_align.label(text='Stack')
@@ -350,7 +351,13 @@ class UNIV_PT_PackSettings(Panel):
         layout = self.layout
         settings = univ_settings()
 
-        UNIV_PT_GlobalSettings.draw_global_settings(layout)
+        row = layout.row(align=True, heading='Size')
+        row.prop(settings, 'size_x', text='')
+        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
+        row.prop(settings, 'size_y', text='')
+
+        layout.prop(settings, 'padding', slider=True)
+        layout.separator()
 
         if not bpy.app.version >= (3, 6, 0):
             layout.prop(settings, 'rotate', toggle=1)
