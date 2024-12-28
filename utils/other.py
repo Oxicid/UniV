@@ -125,6 +125,7 @@ def get_areas_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IM
 def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
     for a in get_areas_by_type(area_type):
         return a
+    return None
 
 def update_univ_panels():
     import itertools

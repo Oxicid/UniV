@@ -17,10 +17,10 @@ class FakeBMesh:
         self.faces = isl
 
 class UMesh:
-    def __init__(self, bm, obj, is_edit_bm=True):
+    def __init__(self, bm, obj, is_edit_bm=True, verify_uv=True):
         self.bm: bmesh.types.BMesh | FakeBMesh = bm
         self.obj: bpy.types.Object = obj
-        self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify()
+        self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify() if verify_uv else None
         self.is_edit_bm: bool = is_edit_bm
         self.update_tag: bool = True
         self.sync: bool = utils.sync()
@@ -532,6 +532,15 @@ class UMeshes:
         for umesh in self.umeshes:
             umesh.ensure(face, edge, vert, force)
 
+    def verify_uv(self):
+        for umesh in self:
+            if not umesh.uv:
+                uv_layers = umesh.bm.loops.layers.uv
+                if not umesh.obj.data.uv_layers:
+                    umesh.uv = uv_layers.new('UVMap')
+                else:
+                    umesh.uv = uv_layers.verify()
+
     def loop(self):
         active = bpy.context.active_object
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
@@ -678,14 +687,14 @@ class UMeshes:
         return cls(bmeshes)
 
     @classmethod
-    def calc(cls, report=None):
+    def calc(cls, report=None, verify_uv=True):
         # Get umeshes without uv
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
                 if obj.type == 'MESH' and obj.data.polygons:
                     bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj))
+                    bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
@@ -697,7 +706,7 @@ class UMeshes:
                 bm = bmesh.new()
                 bm.from_mesh(data)
                 objs.sort(key=lambda a: a.name)
-                bmeshes.append(UMesh(bm, objs[0], False))
+                bmeshes.append(UMesh(bm, objs[0], False, verify_uv))
         return cls(bmeshes, report=report)
 
     @classmethod

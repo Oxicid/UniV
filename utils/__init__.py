@@ -208,6 +208,13 @@ def update_area_by_type(area_type: str):
             if area.type == area_type:
                 area.tag_redraw()
 
+def get_view3d_camera_data(v3d: bpy.types.SpaceView3D, rv3d: bpy.types.RegionView3D):
+    #  establish the camera object,
+    #  so we can default to view mapping if anything is wrong with it
+    if rv3d.view_perspective == 'CAMERA' and v3d.camera and v3d.camera.type == 'CAMERA':
+        return v3d.camera.data
+    return None
+
 def calc_any_unique_obj() -> list[bpy.types.Object]:
     # Get unique umeshes without uv
     objects = []

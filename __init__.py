@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 23),
+    "version": (2, 9, 24),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -123,6 +123,7 @@ try:
         # Project
         project.UNIV_Normal,
         project.UNIV_BoxProject,
+        project.UNIV_ViewProject,
         # Stack
         stack.UNIV_OT_Stack,
         stack.UNIV_OT_Stack_VIEW3D,

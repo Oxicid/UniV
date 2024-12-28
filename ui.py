@@ -287,6 +287,9 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_normal')
         row.operator('mesh.univ_box_project')
 
+        row = col_align.row(align=True)
+        row.operator('mesh.univ_view_project')
+
         col_align.label(text='Stack')
         row = col_align.row(align=True)
         row.operator('mesh.univ_stack', text='Stack', icon_value=icons.stack)
@@ -382,6 +385,7 @@ class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+        # TODO: Redraw if undo???
         settings = univ_settings()
         if index >= settings.uv_layers_size:
             return

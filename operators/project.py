@@ -6,12 +6,15 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import math
 
-from math import pi
+from math import pi, cos, sin
 from . import transform
 from .. import utils
 from .. import types
 from ..types import BBox, MeshIsland, MeshIslands
+from bpy.props import *
+from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 
 class UNIV_Normal(bpy.types.Operator):
@@ -44,7 +47,7 @@ class UNIV_Normal(bpy.types.Operator):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report)
+        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
         if self.umeshes.is_edit_mode:
             selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -54,10 +57,13 @@ class UNIV_Normal(bpy.types.Operator):
             elif unselected:
                 self.umeshes = unselected
                 self.has_selected = False
-            else:
-                return selected.update(info=self.info)
         else:
-            self.umeshes.ensure(face=True)
+            self.umeshes.ensure(face=True)  # TODO: Delete ensure?1
+
+        if not self.umeshes:
+            return self.umeshes.update(info=self.info)
+
+        self.umeshes.verify_uv()
 
         if self.use_correct_aspect:
             for umesh in self.umeshes:
@@ -254,7 +260,7 @@ class UNIV_BoxProject(bpy.types.Operator):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report)
+        self.umeshes = types.UMeshes.calc(self.report)  # TODO: Make like Normal or View
         if self.is_edit_mode:
             self.umeshes.filter_selected_faces()
         self.box()
@@ -303,3 +309,320 @@ class UNIV_BoxProject(bpy.types.Operator):
                 else:  # Z
                     for crn in f.loops:
                         crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+
+class ProjCameraInfo:
+    def __init__(self):
+        self.cam_angle = 0.0
+        self.cam_size = 0.0
+        self.aspect = Vector((1, 1))
+        self.shift = Vector((0, 0))
+        self.rot_mat = Matrix()
+        self.cam_inv = Matrix()
+        self.do_persp = False
+        self.do_pano = False
+        self.do_rot_mat = False
+
+    @classmethod
+    def uv_project_camera_info(cls, ob: bpy.types.Object, rot_mat, winx, winy):
+        uci = cls()
+        camera: bpy.types.Camera = ob.data
+        uci.do_pano = camera.type == 'PANO'
+        uci.do_persp = camera.type == 'PERSP'
+        uci.cam_angle = cls.focal_length_to_fov(camera.lens, camera.sensor_width) / 2.0
+        uci.cam_size = math.tan(uci.cam_angle) if uci.do_persp else camera.ortho_scale
+
+        cam_inv = ob.matrix_world.normalized()
+        if (res := cam_inv.inverted(None)) is not None:
+            uci.cam_inv = res
+            # normal projection
+            if rot_mat:
+                uci.rot_mat = rot_mat.copy()
+            uci.do_rot_mat = bool(rot_mat)
+
+            # also make aspect ratio adjustment factors
+            if winx > winy:
+                uci.aspect.x = 1.0
+                uci.aspect.y = winx/winy
+            else:
+                uci.aspect.x = winy/winx
+                uci.aspect.y = 1.0
+
+            # include 0.5f here to move the UVs into the center */
+            uci.shift.x = 0.5 - (camera.shift_x * uci.aspect.x)
+            uci.shift.y = 0.5 - (camera.shift_y * uci.aspect.y)
+            return uci
+        else:
+            return None
+
+    @staticmethod
+    def focal_length_to_fov(focal_length: float, sensor: float):
+        return 2.0 * math.atan((sensor / 2.0) / focal_length)
+
+
+class UNIV_ViewProject(bpy.types.Operator):
+    bl_idname = "mesh.univ_view_project"
+    bl_label = "View"
+    bl_description = "Projection by View"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    camera_bounds: BoolProperty(name='Camera Bounds', default=False)
+    use_crop: BoolProperty(name='Crop', default=True, description='Packs the islands into a base tile')
+    use_orthographic: BoolProperty(name='Use Orthographic', default=False)
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        self.area = context.area
+        if self.area.type != 'VIEW_3D':
+            self.area = utils.get_area_by_type('VIEW_3D')
+            if not self.area:
+                self.report({'WARNING'}, 'Active area must be 3D View')
+                return {'CANCELLED'}
+
+        self.v3d = self.area.spaces.active
+        self.region = [reg for reg in self.area.regions if reg.type == 'WINDOW'][0]
+        self.rv3d = self.region.data
+
+        self.camera = utils.get_view3d_camera_data(self.v3d, self.rv3d)  # noqa
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        if not self.use_orthographic and self.camera:
+            layout.prop(self, 'camera_bounds')
+        layout.prop(self, 'use_crop')
+        layout.prop(self, 'use_orthographic')
+        layout.prop(self, 'use_correct_aspect')
+
+    def __init__(self):
+        self.info = 'No found faces for manipulate'
+        self.has_selected: bool = True
+        self.umeshes: types.UMeshes | None = None
+        self.region = None
+        self.area = None
+        self.rv3d = None
+        self.v3d = None
+        self.faces_calc_type: Callable = Callable
+        self.camera = None
+
+    def execute(self, context):
+        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes.set_sync()
+        if self.umeshes.is_edit_mode:
+            selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                self.umeshes = selected
+                self.has_selected = True
+                self.faces_calc_type = utils.calc_selected_uv_faces
+            elif unselected:
+                self.umeshes = unselected
+                self.has_selected = False
+                self.faces_calc_type = utils.calc_visible_uv_faces
+        else:
+            self.faces_calc_type = lambda umesh_: umesh_.bm.faces
+
+        if not self.umeshes:
+            return self.umeshes.update(info=self.info)
+
+        self.umeshes.verify_uv()
+
+        if self.use_correct_aspect:
+            for umesh in self.umeshes:
+                umesh.aspect = utils.get_aspect_ratio(umesh)
+
+        self.view_project()
+
+        if not self.umeshes.is_edit_mode:
+            ret = self.umeshes.update(info=self.info)
+            self.umeshes.free()
+            bpy.context.area.tag_redraw()
+            return ret
+        return self.umeshes.update(info=self.info)
+
+    def view_project(self):
+        # objects_pos_avg = Vector()
+        # for umesh in self.umeshes:
+        #     loc, _, _ = umesh.obj.matrix_world.decompose()
+        #     objects_pos_avg += loc
+        # objects_pos_offset = -(objects_pos_avg * (1 / len(self.umeshes)))
+        # objects_pos_offset.resize(4)
+        pointers_to_coords = []
+        coords_append = pointers_to_coords.append
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
+            if self.use_orthographic:
+                rot_mat = self.uv_map_rotation_matrix_ex(umesh, aspect=aspect)
+                for f in self.faces_calc_type(umesh):
+                    for crn in f.loops:
+                        # uv_project_from_view_ortho
+                        pv = rot_mat @ crn.vert.co  # projected_vertex
+                        crn_co = crn[uv].uv
+                        crn_co[:] = -pv[0], pv[2]
+                        coords_append(crn_co)
+            elif self.camera:
+                # self.camera_bounds
+                r = bpy.context.scene.render
+                uci = ProjCameraInfo.uv_project_camera_info(
+                    self.v3d.camera,
+                    umesh.obj.matrix_world,
+                    (r.resolution_x * r.pixel_aspect_x) * 2 if self.camera_bounds else 1.0,
+                    (r.resolution_y * r.pixel_aspect_y) * 2 if self.camera_bounds else 1.0)
+                if uci:
+                    for f in self.faces_calc_type(umesh):
+                        for crn in f.loops:
+                            crn_co = crn[uv].uv
+                            coords_append(crn_co)
+                            self.uv_project_from_camera(crn_co, crn.vert.co, uci)
+                else:
+                    self.report({'WARNING'}, 'Not found camera info')
+                    return {'FINISHED'}
+            else:
+
+                winx = self.region.width
+                winy = self.region.height * aspect
+                pers_mat = self.rv3d.perspective_matrix
+                rot_mat = umesh.obj.matrix_world.copy()
+                for f in self.faces_calc_type(umesh):
+                    for crn in f.loops:
+                        crn_co = crn[uv].uv
+                        coords_append(crn_co)
+                        self.uv_project_from_view(crn_co, crn.vert.co, pers_mat, rot_mat, winx, winy)
+        if self.use_crop:
+            self.crop(pointers_to_coords)
+
+    @staticmethod
+    def uv_project_from_view(target: Vector, source: Vector, pers_mat, rot_mat, winx, winy):
+        pv4 = source.copy()
+        pv4.resize(4)
+        pv4[3] = 1.0
+        x = 0.0
+        y = 0.0
+
+        # rot_mat is the object matrix in this case */
+        pv4 = rot_mat @ pv4
+
+        # almost ED_view3d_project_short
+        pv4 = pers_mat @ pv4
+        if abs(pv4[3]) > 0.00001:  # avoid division by zero
+            target[0] = winx / 2.0 + (winx / 2.0) * pv4[0] / pv4[3]
+            target[1] = winy / 2.0 + (winy / 2.0) * pv4[1] / pv4[3]
+
+        else:
+            # scaling is lost but give a valid result
+            target[0] = winx / 2.0 + (winx / 2.0) * pv4[0]
+            target[1] = winy / 2.0 + (winy / 2.0) * pv4[1]
+
+        # v3d.pers_mat seems to do this funky scaling
+        if winx > winy:
+            y = (winx - winy) / 2.0
+            winy = winx
+        else:
+            x = (winy - winx) / 2.0
+            winx = winy
+
+        target[0] = (x + target[0]) / winx
+        target[1] = (y + target[1]) / winy
+
+    def uv_map_rotation_matrix_ex(self, umesh, up_angle_deg=90.0, side_angle_deg=0.0, radius=1.0, aspect=1.0):
+        # get rotation of the current view matrix
+        view_matrix = self.rv3d.view_matrix.copy()
+        view_matrix[3] = [0] * 4  # but shifting
+        # view_matrix[1][1] *= aspect
+
+        # get rotation of the current object matrix
+        rot_obj = umesh.obj.matrix_world.copy()
+        rot_obj[3] = [0] * 4  # but shifting
+
+        # rot_obj[3] = offset
+        rot_obj[3][3] = 0.0
+
+        rot_up = Matrix()
+        rot_up.zero()
+        rot_side = Matrix()
+        rot_side.zero()
+
+        # Compensate front/side.. against opengl x,y,z world definition.
+        # This is "a sledgehammer to crack a nut" (overkill), a few plus minus 1 will do here.
+        # I wanted to keep the reason here, so we're rotating.
+        side_angle = pi * (side_angle_deg + 180.0) / 180.0
+        rot_side[0][0] = cos(side_angle)
+        rot_side[0][1] = -sin(side_angle)
+        rot_side[1][0] = sin(side_angle)
+        rot_side[1][1] = cos(side_angle)
+        rot_side[2][2] = 1.0
+
+        up_angle = -(pi * up_angle_deg / 180.0)
+        rot_up[1][1] = cos(up_angle) / radius
+        rot_up[1][2] = -sin(up_angle) / radius
+        rot_up[2][1] = sin(up_angle) / radius
+        rot_up[2][2] = cos(up_angle) / radius
+        rot_up[0][0] = 1.0 / radius
+
+        # Calculate transforms
+        if aspect < 1:
+            aspect_mtx = Matrix.Diagonal((1, aspect, 1)).to_4x4()
+        else:
+            aspect_mtx = Matrix.Diagonal((1/aspect, 1, 1)).to_4x4()
+        return rot_up  @ aspect_mtx @ rot_side  @ view_matrix   @ rot_obj
+
+    @staticmethod
+    def uv_project_from_camera(target: Vector, source: Vector, uci: ProjCameraInfo):
+        pv4 = source.copy()
+        pv4.resize(4)
+        pv4[3] = 1.0
+
+        # rot_mat is the object matrix in this case
+        if uci.do_rot_mat:
+            pv4 = uci.rot_mat @ pv4  # check with swap matmul
+            # pv4 = pv4 @ uci.rot_mat  # check with swap matmul
+
+        # cam_inv is the inverse camera matrix
+        pv4 = uci.cam_inv @ pv4
+        # pv4 = pv4 @ uci.cam_inv
+
+        if uci.do_pano:
+            angle = math.atan2(pv4[0], -pv4[2]) / (pi * 2.0)  # angle around the camera
+
+            if uci.do_persp:
+                vec2d = Vector((pv4[0], pv4[2]))  # 2D position from the camera
+                target[0] = angle * (pi / uci.cam_angle)
+                target[1] = pv4[1] / (vec2d.length * (uci.cam_size * 2.0))
+            else:
+                target[0] = angle  # no correct method here, just map to  0-1
+                target[1] = pv4[1] / uci.cam_size
+        else:
+            if pv4[2] == 0.0:
+                pv4[2] = 0.00001  # don't allow div by 0
+
+            if not uci.do_persp:
+                target[:] = pv4.xy / uci.cam_size
+            else:
+                target[:] = ((-pv4.xy) * ((1.0 / uci.cam_size) / pv4[2])) / 2.0
+
+        target *= uci.aspect
+        #  adds camera shift + 0.5
+        target += uci.shift
+
+    @staticmethod
+    def crop(pointers_to_coords, padding=0.001):
+        bbox = BBox.calc_bbox(pointers_to_coords)
+        scale_x = ((1.0 - padding) / w) if (w := bbox.width) else 1
+        scale_y = ((1.0 - padding) / h) if (h := bbox.height) else 1
+
+        scale_x = scale_y = min(scale_x, scale_y)
+
+        scale = Vector((scale_x, scale_y))
+        bbox.scale(scale)
+        delta = Vector((padding, padding)) / 2 - bbox.min
+        pivot = bbox.center
+
+        diff = (pivot - pivot * scale) + delta
+
+        # TODO: Nearest crop (not start)
+        for co in pointers_to_coords:
+            co *= scale
+            co += diff
