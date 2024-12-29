@@ -123,7 +123,7 @@ class UMesh:
             elif self.is_full_face_deselected:
                 return False
             else:
-                return all(f.select for f in self.bm.faces)
+                return all(f.select for f in self.bm.faces if not f.hide)
 
         if not self.total_face_sel:
             return False

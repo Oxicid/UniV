@@ -165,7 +165,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def unwrap_sync_faces(self, **unwrap_kwargs):
         assert bpy.context.tool_settings.mesh_select_mode[2]
-        from ..utils import linked_crn_uv_unordered, shared_is_linked
+        from ..utils import linked_crn_uv_by_island_index_unordered, \
+            linked_crn_uv_by_island_index_unordered_included
         unique_number_for_multiply = 0
 
         unwrap_data: list = []
@@ -176,11 +177,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             uv = umesh.uv
             islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
-            if not self.mark_seam_inner_island:
-                islands_extended.indexing()
-
-            selected_islands = types.Islands.calc_selected_with_mark_seam(umesh)
-            selected_islands.indexing()
+            islands_extended.indexing()
 
             save_transform_islands = []
             for isl in islands_extended:
@@ -195,62 +192,62 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
 
+            if umesh.has_full_selected_uv_faces:
+                unwrap_data.append(([], [], save_transform_islands))
+                continue
+
             pinned = []
-            to_select = []
-            if not umesh.is_full_face_selected:
-                # TODO: Comment that
-                for f in selected_islands.faces_iter():
+            to_select_groups = []
+            for idx, island in enumerate(islands_extended):
+                if island.is_full_face_selected:
+                    continue
+                to_select = []
+                for f in island:
+                    if not f.select:
+                        continue
                     for crn in f.loops:
-                        for linked_crn in linked_crn_uv_unordered(crn, uv):
+                        for linked_crn in linked_crn_uv_by_island_index_unordered(crn, uv, idx):
                             linked_crn_face = linked_crn.face
-
-                            if linked_crn_face.index != -1 or linked_crn_face.hide:
+                            if linked_crn_face.select or linked_crn_face.tag:
                                 continue
-
-                            linked_crn_face.index = f.index
+                            linked_crn_face.tag = True
+                            # add neighboring non-selected faces
                             to_select.append(linked_crn_face)
+                to_select_groups.append(to_select)
 
+                island.set_corners_tag(False)
                 for f in to_select:
-                    f_index = f.index
                     for crn in f.loops:
-                        if (shared_crn := crn.link_loop_radial_prev) == crn:
-                            crn_uv = crn[uv]
+                        if crn.tag:
+                            continue
+                        linked_corners = linked_crn_uv_by_island_index_unordered_included(crn, uv, idx)
+                        for crn_ in linked_corners:
+                            crn_.tag = True
+
+                        if any(linked_crn.face.select for linked_crn in linked_corners):
+                            continue
+
+                        # if linked corners hasn't selected -> set pin
+                        for crn_ in linked_corners:
+                            crn_uv = crn_[uv]
                             if not crn_uv.pin_uv:
                                 crn_uv.pin_uv = True
                                 pinned.append(crn_uv)
                             continue
 
-                        shared_crn_face = shared_crn.face
-                        shared_face_index = shared_crn_face.index
-                        if shared_face_index == f_index:
-                            continue
-                        if shared_crn_face.select or shared_crn_face.hide:
-                            continue
-                        if not shared_is_linked(crn, shared_crn, uv):
-                            continue
-
-                        shared_crn_uv = crn[uv]
-                        if not shared_crn_uv.pin_uv:
-                            shared_crn_uv.pin_uv = True
-                            pinned.append(shared_crn_uv)
-
-                        shared_crn_next_uv = crn.link_loop_next[uv]
-                        if not shared_crn_next_uv.pin_uv:
-                            shared_crn_next_uv.pin_uv = True
-                            pinned.append(shared_crn_next_uv)
-
                 for f in to_select:
                     f.select = True
-            unwrap_data.append((pinned, to_select, save_transform_islands))
+            unwrap_data.append((pinned, to_select_groups, save_transform_islands))
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
         bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
 
-        for pinned, faces, islands in unwrap_data:
+        for pinned, faces_groups, islands in unwrap_data:
             for pin in pinned:
                 pin.pin_uv = False
-            for f in faces:
-                f.select = False
+            for faces in faces_groups:
+                for f in faces:
+                    f.select = False
             for isl in islands:
                 isl.inplace(self.unwrap_along)
                 isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
