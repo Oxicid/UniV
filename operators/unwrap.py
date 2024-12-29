@@ -7,6 +7,9 @@ if 'bpy' in locals():
 
 import bpy
 from .. import types
+# from .. import utils
+from ..utils import linked_crn_uv_by_island_index_unordered, \
+    linked_crn_uv_by_island_index_unordered_included
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
@@ -78,6 +81,22 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             umesh.bm.select_flush_mode()
         return self.umeshes.update()
 
+    @staticmethod
+    def has_unlinked_and_linked_selected_faces(f_, uv, idx):
+        unlinked_has_selected_face = False
+        linked_has_selected_face = False
+        for crn_ in f_.loops:
+            first_co = crn_[uv].uv
+            for l_crn in crn_.vert.link_loops:
+                if l_crn.face.index == idx:
+                    if l_crn[uv].uv == first_co:
+                        if l_crn.face.select:
+                            linked_has_selected_face = True
+                else:
+                    if l_crn.face.select:
+                        unlinked_has_selected_face = True
+        return unlinked_has_selected_face, linked_has_selected_face
+
     def unwrap_sync_verts_edges(self, **unwrap_kwargs):
         unique_number_for_multiply = 0
         pin_and_inplace = []
@@ -95,10 +114,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 raise NotImplemented
 
             uv = umesh.uv
+            # TODO: Full select unselected verts (with pins) of island for avoid incorrect behavior for relax OT
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
-
-            if not self.mark_seam_inner_island:
-                islands.indexing()
+            islands.indexing()
 
             for isl in islands:
                 if unwrap_kwargs:
@@ -108,23 +126,37 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 else:
                     isl.mark_seam_by_index(additional=True)
 
+            unpin_uvs = set()
             faces_to_select = set()
             verts_to_select = set()
 
             # Extend selected
-            for f in umesh.bm.faces:
-                if f.hide or f.select:
-                    continue
-                if sum(v.select for v in f.verts) not in (0, len(f.verts)):
-                    faces_to_select.add(f)
-                    for v in f.verts:
-                        if not v.select:
-                            verts_to_select.add(v)
+            for idx, isl in enumerate(islands):
+                for f in isl:
+                    if f.select:
+                        continue
+                    # TODO: Implement skip only border face select, when inner selected vert face exist
+                    # Skip full selected and full unselected
+                    if sum(v.select for v in f.verts) not in (0, len(f.verts)):
+                        unlinked_sel, linked_sel = self.has_unlinked_and_linked_selected_faces(f, uv, idx)
+                        # If there is a linked select face or there are selected only verts, then unwrap it
+                        if linked_sel or not (unlinked_sel or linked_sel):
+                            faces_to_select.add(f)
+                            for v in f.verts:
+                                if not v.select:
+                                    verts_to_select.add(v)
+                        else:
+                            # If only the unlinked face is selected, then pin it.
+                            for crn_ in f.loops:
+                                for l_crn_ in linked_crn_uv_by_island_index_unordered_included(crn_, uv, idx):
+                                    crn_uv = l_crn_[uv]
+                                    if not crn_uv.pin_uv:
+                                        crn_uv.pin_uv = True
+                                        unpin_uvs.add(crn_uv)
 
             for f in faces_to_select:
                 f.select = True
 
-            unpin_uvs = set()
             for v in verts_to_select:
                 v.select = True
                 for crn in v.link_loops:
@@ -165,8 +197,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def unwrap_sync_faces(self, **unwrap_kwargs):
         assert bpy.context.tool_settings.mesh_select_mode[2]
-        from ..utils import linked_crn_uv_by_island_index_unordered, \
-            linked_crn_uv_by_island_index_unordered_included
         unique_number_for_multiply = 0
 
         unwrap_data: list = []

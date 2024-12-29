@@ -1980,6 +1980,7 @@ class AdvIslands(Islands):
     def calc_tris(self):
         if not self.islands:
             return False
+        # TODO: if len(corners) == len(faces)*3: full triangulated
         triangulated_islands = self.triangulate_islands()
         for isl, tris_isl in zip(self.islands, triangulated_islands):
             isl.tris = tris_isl
