@@ -1522,6 +1522,7 @@ class UNIV_OT_Home(Operator):
                         counter += 1
         return counter
 
+
 class UNIV_OT_Shift(Operator):
     bl_idname = "uv.univ_shift"
     bl_label = 'Shift'
@@ -2150,6 +2151,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     @staticmethod
     def round_threshold(a, min_clip):
         return round(float(a) / min_clip) * min_clip
+
 
 class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_orient'
@@ -2881,6 +2883,7 @@ class UNIV_OT_Weld(Operator):
                 compare_index += 1
         return corners_groups
 
+
 class UNIV_OT_Stitch(Operator):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
@@ -3172,6 +3175,174 @@ class UNIV_OT_Stitch(Operator):
 
         adv_islands.weld_selected(target_isl, source_isl, selected=selected)
         return True
+
+
+class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
+    bl_idname = "uv.univ_reset_scale"
+    bl_label = 'Reset'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Reset the scale of separate UV islands, based on their area in 3D space\n\n" \
+                     f"Default - Reset islands scale\n" \
+                     f"Shift - Lock Overlaps"
+
+    shear: BoolProperty(name='Shear', default=True, description='Reduce shear within islands')
+    axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    use_aspect: BoolProperty(name='Correct Aspect', default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+        self.lock_overlap = event.shift
+        return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        self.draw_overlap()
+        layout.row(align=True).prop(self, 'axis', expand=True)
+        layout.prop(self, 'shear')
+        layout.prop(self, 'use_aspect')
+
+    def __init__(self):
+        self.umeshes: types.UMeshes | None = None
+
+    def execute(self, context):
+        self.umeshes = types.UMeshes(report=self.report)
+        for umesh in self.umeshes:
+            umesh.update_tag = False
+            umesh.value = umesh.check_uniform_scale(report=self.report)
+
+        all_islands: list[AdvIsland | UnionIslands] = []
+
+        islands_calc_type: Callable[[types.UMesh], AdvIslands]
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+            islands_calc_type = AdvIslands.calc_extended_with_mark_seam if selected_umeshes else AdvIslands.calc_visible_with_mark_seam
+        else:
+            islands_calc_type = AdvIslands.calc_with_hidden
+            for umesh in self.umeshes:
+                umesh.ensure(face=True)
+
+        for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+            adv_islands = islands_calc_type(umesh)
+            assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
+            all_islands.extend(adv_islands)
+            adv_islands.calc_tris_simple()
+            adv_islands.calc_flat_uv_coords(save_triplet=True)
+            adv_islands.calc_flat_unique_uv_coords()
+            adv_islands.calc_flat_3d_coords(save_triplet=True, scale=umesh.value)
+            adv_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
+
+        if not all_islands:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
+
+        if self.lock_overlap:
+            all_islands = self.calc_overlapped_island_groups(all_islands)
+
+        for isl in all_islands:
+            isl.value = isl.bbox.center  # isl.value == pivot
+            # TODO: Find how to calculate the shear for the X axis when aspect != 1 without rotation island
+            if self.axis == 'X' and isl.umesh.aspect != 1.0 and self.shear:
+                isl.rotate_simple(pi/2, isl.umesh.aspect)
+                self.individual_scale(isl, 'Y')
+                isl.rotate_simple(-pi/2, isl.umesh.aspect)
+                new_center = isl.calc_bbox().center
+            else:
+                new_center = self.individual_scale(isl, self.axis)
+            isl.set_position(isl.value, new_center)
+
+        self.umeshes.update(info='All islands were with scaled')
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
+    def individual_scale(self, isl: AdvIsland, axis):
+        from bl_math import clamp
+        aspect = isl.umesh.aspect
+        shear = self.shear
+        new_center = isl.value.copy()
+
+        vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
+        uv_coords_and_3d_vectors_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
+        for j in range(10):
+            scale_cou = 0.0
+            scale_cov = 0.0
+            scale_cross = 0.0
+
+            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
+                m = Matrix((uv_a - uv_c, uv_b - uv_c))
+                try:
+                    m.invert()
+                except ValueError:
+                    continue
+
+                cou = m[0][0] * vec_ac + m[0][1] * vec_bc
+                cov = m[1][0] * vec_ac + m[1][1] * vec_bc
+
+                scale_cou += cou.length * weight
+                scale_cov += cov.length * weight
+
+                if shear:
+                    cov.normalize()
+                    cou.normalize()
+                    scale_cross += cou.dot(cov) * weight
+
+            if scale_cou * scale_cov < 1e-10:
+                break
+
+            scale_factor_u = sqrt(scale_cou / scale_cov / aspect)
+            if axis != 'XY':
+                scale_factor_u **= 2
+
+            tolerance = 1e-5  # Trade accuracy for performance.
+            if shear:
+                t = Matrix.Identity(2)
+                t[0][0] = scale_factor_u
+                t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -0.5 * aspect, 0.5 * aspect)
+                t[0][1] = 0
+                t[1][1] = 1 / scale_factor_u
+
+                if axis == 'X':
+                    t[1][1] = 1
+                    temp = t[0][1]
+                    t[0][1] = t[1][0]
+                    t[1][0] = temp
+
+                elif axis == 'Y':
+                    t[0][0] = 1
+
+                err = abs(t[0][0] - 1.0) + abs(t[1][0]) + abs(t[0][1]) + abs(t[1][1] - 1.0)
+                if err < tolerance:
+                    break
+
+                # Transform
+                for uv_coord in isl.flat_unique_uv_coords:
+                    uv_coord.xy = t @ uv_coord
+                new_center = t @ new_center
+            else:
+                if math.isclose(scale_factor_u, 1.0, abs_tol=tolerance):
+                    break
+                scale = Vector((scale_factor_u, 1.0/scale_factor_u))
+                if axis == 'X':
+                    scale.y = 1
+                elif axis == 'Y':
+                    scale.x = 1
+
+                for uv_coord in isl.flat_unique_uv_coords:
+                    uv_coord *= scale
+                new_center *= scale
+            isl.umesh.update_tag = True
+        return new_center
+
 
 class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_normalize"
@@ -3739,6 +3910,7 @@ class UNIV_OT_Pack(Operator):
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
 
+
 class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_texel_density_set"
     bl_label = 'Set TD'
@@ -3861,7 +4033,6 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
                 utils.update_area_by_type('VIEW_3D')
             return res
         return self.umeshes.update(info='All islands adjusted')
-
 
 class UNIV_OT_TexelDensitySet(UNIV_OT_TexelDensitySet_VIEW3D):
     bl_idname = "uv.univ_texel_density_set"

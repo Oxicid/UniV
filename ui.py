@@ -131,6 +131,11 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
 
         row = col.row(align=True)
+        row.operator('uv.univ_reset_scale', icon='MOD_LENGTH').axis = 'XY'
+        row.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
+
+        row = col.row(align=True)
         row.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
         row.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'HORIZONTAL'
         row.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'VERTICAL'
