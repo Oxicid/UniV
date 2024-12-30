@@ -39,6 +39,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_description = "Used as a texture for testing UV maps"
     bl_options = {'REGISTER', 'UNDO'}
 
+    toggle: bpy.props.BoolProperty(name='Toggle', default=True, description='Off/On checker modifier')
     generated_type: bpy.props.EnumProperty(name='Texture', default='UV_GRID', items=generated_types)
     size_x: bpy.props.EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
     size_y: bpy.props.EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
@@ -50,6 +51,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
+        layout.prop(self, 'toggle')
         row = layout.row(align=True, heading='Texture Type')
         row.scale_x = 0.92
         row.prop(self, 'generated_type', expand=True)
@@ -76,18 +78,28 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
         mtl = self.get_checker_material()
 
-        if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
-            for node in mtl.node_tree.nodes:
-                if node.bl_idname == 'ShaderNodeTexImage':
-                    assert node.image.name.startswith(self.full_pattern_name)
-                    space_data = area.spaces.active
-                    space_data.image = node.image
-                    break
-
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
-            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker')
-        self.create_gn_checker_modifier(node_group, mtl)
+            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=self.toggle)
+
+        def set_active_image():
+            if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+                for node in mtl.node_tree.nodes:
+                    if node.bl_idname == 'ShaderNodeTexImage':
+                        assert node.image.name.startswith(self.full_pattern_name)
+                        space_data = area.spaces.active
+                        space_data.image = node.image
+                        break
+
+        if self.toggle:
+            if self.all_has_enable_gn_checker_modifier():
+                self.disable_all_gn_checker_modifier()
+            else:
+                set_active_image()
+                self.enable_and_set_gn_checker_modifier(node_group, mtl)
+        else:
+            set_active_image()
+            self.create_gn_checker_modifier(node_group, mtl)
         self.update_views()
         return {'FINISHED'}
 
@@ -240,6 +252,54 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     m['Socket_1'] = mtl
                 else:
                     m['Input_1'] = mtl
+
+    @staticmethod
+    def all_has_enable_gn_checker_modifier():
+        counter = 0
+        for obj in (selected_objects := [obj_ for obj_ in bpy.context.selected_objects if obj_.type == 'MESH']):
+            for m in obj.modifiers:
+                if isinstance(m, bpy.types.NodesModifier):
+                    if m.name.startswith('UniV Checker'):
+                        counter += (m.show_in_editmode and m.show_viewport)
+                        break
+        return len(selected_objects) == counter
+
+    @staticmethod
+    def enable_and_set_gn_checker_modifier(node_group, mtl):
+        for obj in bpy.context.selected_objects:
+            if not obj.type == 'MESH':
+                continue
+            has_checker_modifier = False
+            for m in obj.modifiers:
+                if not isinstance(m, bpy.types.NodesModifier):
+                    continue
+                if m.name.startswith('UniV Checker'):
+                    if not m.show_in_editmode:
+                        m.show_in_editmode = True
+                    if not m.show_viewport:
+                        m.show_viewport = True
+                    has_checker_modifier = True
+                    obj.update_tag()
+                    break
+            if not has_checker_modifier:
+                m = obj.modifiers.new(name='UniV Checker', type='NODES')
+                m.node_group = node_group
+                m.show_render = False
+                if 'Socket_1' in m:
+                    m['Socket_1'] = mtl
+                else:
+                    m['Input_1'] = mtl
+
+    @staticmethod
+    def disable_all_gn_checker_modifier():
+        for obj in bpy.context.selected_objects:
+            if obj.type == 'MESH':
+                for m in obj.modifiers:
+                    if isinstance(m, bpy.types.NodesModifier):
+                        if m.name.startswith('UniV Checker'):
+                            m.show_in_editmode = False
+                            m.show_viewport = False
+                            break
 
     @staticmethod
     def resolution_values_to_name(xsize: int, ysize: int):
