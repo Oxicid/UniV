@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+univ_pro/
 build/
 develop-eggs/
 dist/

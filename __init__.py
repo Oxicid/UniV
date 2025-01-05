@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (2, 9, 29),
+    "version": (3, 0, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -44,7 +44,12 @@ from . import keymaps
 from . import preferences
 
 try:
-    classes = (
+    from . import univ_pro
+except ImportError:
+    univ_pro = None
+
+try:
+    classes = [
         preferences.UNIV_AddonPreferences,
         preferences.UNIV_UV_Layers,
         preferences.UNIV_TexelPreset,
@@ -126,9 +131,6 @@ try:
         project.UNIV_BoxProject,
         project.UNIV_ViewProject,
         project.UNIV_SmartProject,
-        # Stack
-        stack.UNIV_OT_Stack,
-        stack.UNIV_OT_Stack_VIEW3D,
         # Misc
         misc.UNIV_OT_Pin,
         misc.UNIV_OT_TD_PresetsProcessing,
@@ -140,7 +142,19 @@ try:
         misc.UNIV_OT_MoveDown,
         misc.UNIV_OT_SetActiveRender,
         misc.UNIV_OT_UV_Layers_Manager,
-    )
+    ]
+    if univ_pro:
+        classes.extend((
+            # Stack
+            univ_pro.stack.UNIV_OT_Stack,
+            univ_pro.stack.UNIV_OT_Stack_VIEW3D,
+        ))
+    else:
+        classes.extend((
+            # Stack
+            stack.UNIV_OT_Stack,
+            stack.UNIV_OT_Stack_VIEW3D,
+        ))
 except AttributeError:
     traceback.print_exc()
     classes = ()
