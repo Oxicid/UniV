@@ -9,9 +9,9 @@ import bpy
 
 from . import unwrap
 from .. import types
+from .. import utils
 
 from ..types import Islands
-from .. import utils
 
 class RelaxData:
     def __init__(self, _umesh: types.UMesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
@@ -44,9 +44,6 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         if self.slim_support:
             self.layout.prop(self, 'legacy')
 
-    def invoke(self, context, event):
-        return self.execute(context)
-
     def __init__(self):
         super().__init__()
         self.slim_support: bool = bpy.app.version >= (4, 3, 0)
@@ -68,6 +65,14 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for umesh in self.umeshes:
                 umesh.bm.select_flush_mode()
         else:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            if not selected_umeshes and self.max_distance is not None:
+                return self.pick_unwrap(no_flip=True, iterations=self.iterations)
+
             if self.umeshes.sync:
                 if bpy.context.tool_settings.mesh_select_mode[2]:
                     self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)

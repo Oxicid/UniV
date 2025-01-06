@@ -6,8 +6,10 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+from mathutils import Vector
 from .. import types
-# from .. import utils
+from .. import utils
+from ..preferences import prefs
 from ..utils import linked_crn_uv_by_island_index_unordered, \
     linked_crn_uv_by_island_index_unordered_included
 
@@ -59,9 +61,17 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
+        if self.bl_idname.startswith('UV'):
+            if event.value == 'PRESS':
+                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+                self.mouse_pos = utils.get_mouse_pos(context, event)
+            else:
+                self.max_distance = None
         return self.execute(context)
 
     def __init__(self):
+        self.mouse_pos = Vector((0, 0))
+        self.max_distance: float | None = None
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
@@ -69,17 +79,81 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             self.umeshes.set_sync(True)
 
         self.umeshes = types.UMeshes()
-        if self.umeshes.sync:
-            if bpy.context.tool_settings.mesh_select_mode[2]:
-                self.unwrap_sync_faces()
-            else:
-                self.unwrap_sync_verts_edges()
-        else:
-            self.unwrap_non_sync()
 
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        if not selected_umeshes and self.max_distance is not None:
+            return self.pick_unwrap()
+        else:
+            if self.umeshes.sync:
+                if bpy.context.tool_settings.mesh_select_mode[2]:
+                    self.unwrap_sync_faces()
+                else:
+                    self.unwrap_sync_verts_edges()
+            else:
+                self.unwrap_non_sync()
+
+            for umesh in self.umeshes:
+                umesh.bm.select_flush_mode()
+            return self.umeshes.update()
+
+    def pick_unwrap(self, **unwrap_kwargs):
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            umesh.bm.select_flush_mode()
-        return self.umeshes.update()
+            for isl in types.AdvIslands.calc_visible_with_mark_seam(umesh):
+                hit.find_nearest_island(isl)
+
+        if not hit or (self.max_distance < hit.min_dist):
+            self.report({'INFO'}, 'Island not found within a given radius')
+            return {'CANCELLED'}
+
+        isl = hit.island
+        isl.select = True
+        shared_selected_faces = []
+        pinned_crn_uvs = []
+
+        if self.umeshes.sync and isl.umesh.total_face_sel != len(isl):
+            faces = set(isl)
+            uv = isl.umesh.uv
+            for f in isl.umesh.bm.faces:
+                if f.select and f not in faces:
+                    shared_selected_faces.append(f)
+                    for crn in f.loops:
+                        crn_uv = crn[uv]
+                        if not crn_uv.pin_uv:
+                            crn_uv.pin_uv = True
+                            pinned_crn_uvs.append(crn_uv)
+
+        unique_number_for_multiply = hash(isl[0])  # multiplayer
+        self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+
+        save_t = isl.save_transform()
+        save_t.save_coords(self.unwrap_along, self.blend_factor)
+
+        if self.mark_seam_inner_island:
+            isl.mark_seam(additional=True)
+        else:
+            islands = types.AdvIslands([isl], isl.umesh)
+            islands.indexing()
+            isl.mark_seam_by_index(additional=True)
+
+        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
+
+        save_t.inplace(self.unwrap_along)
+        save_t.apply_saved_coords(self.unwrap_along, self.blend_factor)
+
+        isl.select = False
+        if shared_selected_faces or pinned_crn_uvs:
+            for f in shared_selected_faces:
+                f.select = False
+            for crn_uv in pinned_crn_uvs:
+                crn_uv.pin_uv = False
+
+            isl.umesh.update()
+        return {'FINISHED'}
 
     @staticmethod
     def has_unlinked_and_linked_selected_faces(f_, uv, idx):

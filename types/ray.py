@@ -300,7 +300,7 @@ class KDMeshes:
 
 class IslandHit:
     def __init__(self, pt, min_dist=1e200):
-        self.island = None
+        self.island: AdvIsland | UnionIslands | None = None
         self.point = pt
         self.min_dist = min_dist
         self.crn = None
