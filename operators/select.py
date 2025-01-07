@@ -1835,7 +1835,7 @@ class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     def test_invoke(self, _event):
-        from .. import types
+        # from .. import types
         umesh = self.umeshes[0]
         islands = Islands.calc_selected(umesh)
         groups = [list(isl[0].loops) for isl in islands]

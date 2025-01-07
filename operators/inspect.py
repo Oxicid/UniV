@@ -145,6 +145,7 @@ class UNIV_OT_Check_Flipped(Operator):
         umeshes.update()
         return total_counter
 
+
 class UNIV_OT_Check_Non_Splitted(Operator):
     bl_idname = 'uv.univ_check_non_splitted'
     bl_label = 'Non-Splitted'
@@ -282,6 +283,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             r_text = f'Found: {sum(counters)} non splitted edges. {r_text}'
         return r_text
 
+
 class UNIV_OT_Check_Overlap(Operator):
     bl_idname = 'uv.univ_check_overlap'
     bl_label = 'Overlap'
@@ -289,27 +291,69 @@ class UNIV_OT_Check_Overlap(Operator):
                      "Unlike the default operator, this one informs about the number of faces with conflicts"
     bl_options = {'REGISTER', 'UNDO'}
 
+    check_mode: EnumProperty(name='Check Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('INEXACT', 'Inexact', '')))
+    threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+
+    def draw(self, context):
+        layout = self.layout
+        if self.check_mode == 'INEXACT':
+            layout.prop(self, 'threshold')
+        layout.row(align=True).prop(self, 'check_mode', expand=True)
+
     def execute(self, context):
+        umeshes = types.UMeshes()
+        if umeshes.sync:
+            if utils.get_select_mode_mesh() != 'FACE':
+                utils.set_select_mode_mesh('FACE')
+
         bpy.ops.uv.select_overlap()
+
         count = 0
-        for umesh in types.UMeshes():
-            if umesh.sync:
-                count += umesh.total_edge_sel
-            else:
-                if umesh.is_full_face_deselected:
-                    continue
-                uv = umesh.uv
-                if umesh.is_full_face_selected:
-                    for f in umesh.bm.faces:
-                        for crn in f.loops:
-                            count += crn[uv].select_edge
+        if self.check_mode == 'INEXACT':
+            all_islands = []
+            for umesh in umeshes:
+                adv_islands = types.AdvIslands.calc_extended_with_mark_seam(umesh)
+                for isl in reversed(adv_islands):
+                    if isl.has_flip_with_noflip():
+                        adv_islands.islands.remove(isl)
+                        noflip, flipped = isl.calc_islands_by_flip_with_mark_seam()
+                        adv_islands.islands.extend(noflip)
+                        adv_islands.islands.extend(flipped)
+                all_islands.extend(adv_islands)
+
+            overlapped = types.UnionIslands.calc_overlapped_island_groups(all_islands, self.threshold)
+            umeshes.update_tag = False
+            for isl in overlapped:
+                if isinstance(isl, types.AdvIsland):
+                    count += 1
                 else:
-                    for f in umesh.bm.faces:
-                        if f.select:
+                    isl.select = False
+                    isl.umesh.update_tag = True
+            umeshes.silent_update()
+            if count:
+                self.report({'WARNING'}, f"Found {count} islands with inexact overlap")
+            else:
+                self.report({'INFO'}, f"Inexact islands with overlap not found")
+            return {'FINISHED'}
+        else:
+            for umesh in umeshes:
+                if umesh.sync:
+                    count += umesh.total_edge_sel
+                else:
+                    if umesh.is_full_face_deselected:
+                        continue
+                    uv = umesh.uv
+                    if umesh.is_full_face_selected:
+                        for f in umesh.bm.faces:
                             for crn in f.loops:
                                 count += crn[uv].select_edge
-        if count:
-            self.report({'WARNING'}, f"Found about {count} edges with overlap")
-        else:
-            self.report({'INFO'}, f"Edges with overlap not found")
+                    else:
+                        for f in umesh.bm.faces:
+                            if f.select:
+                                for crn in f.loops:
+                                    count += crn[uv].select_edge
+            if count:
+                self.report({'WARNING'}, f"Found about {count} edges with overlap")
+            else:
+                self.report({'INFO'}, f"Edges with overlap not found")
         return {'FINISHED'}
