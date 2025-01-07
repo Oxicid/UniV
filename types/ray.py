@@ -14,7 +14,7 @@ from mathutils import Vector
 from mathutils.kdtree import KDTree
 from itertools import chain
 
-from . import Islands, AdvIslands, AdvIsland, UnionIslands, LoopGroups
+from . import Islands, FaceIsland, AdvIslands, AdvIsland, UnionIslands, LoopGroups
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 from math import isclose
@@ -300,13 +300,13 @@ class KDMeshes:
 
 class IslandHit:
     def __init__(self, pt, min_dist=1e200):
-        self.island: AdvIsland | UnionIslands | None = None
+        self.island: AdvIsland | FaceIsland | UnionIslands | None = None
         self.point = pt
         self.min_dist = min_dist
         self.crn = None
 
-    def find_nearest_island(self, island: AdvIsland | UnionIslands):
-        if isinstance(island, AdvIsland):
+    def find_nearest_island(self, island: AdvIsland | FaceIsland | UnionIslands):
+        if not isinstance(island, UnionIslands):
             island = (island, )
         pt = self.point
         min_dist = self.min_dist
