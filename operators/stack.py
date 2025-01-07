@@ -14,6 +14,7 @@ from ..utils import linked_crn_to_vert_by_face_index
 from .. import types
 from ..types import AdvIsland, AdvIslands
 from collections import deque, defaultdict
+from collections.abc import Callable
 
 from bmesh.types import BMFace, BMLoop
 
@@ -286,6 +287,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []
         self.counter: int = 0
+        self.calc_selected: Callable = AdvIslands.calc_selected
+        self.calc_non_selected: Callable = AdvIslands.calc_non_selected
 
     def execute(self, context) -> set[str]:
         self.counter = 0
@@ -327,7 +330,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def islands_preprocessing_selected_between(self, stack_type: typing.Type[T] = StackIsland) -> list[list[T]]:
         for umesh in reversed(self.umeshes):
-            selected = AdvIslands.calc_selected(umesh)
+            selected = self.calc_selected(umesh)
             if not selected:
                 self.umeshes.umeshes.remove(umesh)
                 continue
@@ -368,24 +371,25 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def islands_preprocessing_reference_and_source(self, stack_type=StackIsland):
         for umesh in reversed(self.umeshes):
-            selected = AdvIslands.calc_selected(umesh)
-            non_selected = AdvIslands.calc_non_selected(umesh)
+            # TODO: With expanded selection, you can calculate islands via calc_visible
+            #  and add them to selected and non_selected. This does not work with calc_selected.
+            selected = self.calc_selected(umesh)
+            non_selected = self.calc_non_selected(umesh)
 
-            if isinstance(selected.islands, utils.NoInit) and isinstance(non_selected.islands, utils.NoInit):
+            if not selected and not non_selected:
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            if isinstance(selected.islands, utils.NoInit) or not selected:
+            if isinstance(selected, types.MeshIslands):
+                selected = selected.to_adv_islands()
+                non_selected = non_selected.to_adv_islands()
+
+            if not selected:
                 proxi = non_selected
-            elif isinstance(non_selected.islands, utils.NoInit) or not non_selected:
+            elif not non_selected:
                 proxi = selected
             else:
                 proxi = AdvIslands(non_selected.islands + selected.islands, umesh)
-
-            if not proxi:
-                self.report({'WARNING'}, 'Undefined Behavior for stack OT')
-                self.umeshes.umeshes.remove(umesh)
-                continue
 
             proxi.indexing()
 

@@ -971,8 +971,7 @@ class AdvIsland(FaceIsland):
     def __str__(self):
         return f'Advanced Island. Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
 
-
-class IslandsBase:
+class IslandsBaseTagFilterPre:
     @staticmethod
     def tag_filter_all(umesh: _umesh.UMesh, tag=True):
         for face in umesh.bm.faces:
@@ -1033,37 +1032,6 @@ class IslandsBase:
                         face.tag = not all(l[uv].select_edge for l in face.loops) and face.select
 
     @staticmethod
-    def tag_filter_selected_quad(umesh: _umesh.UMesh):
-        uv = umesh.uv
-        if umesh.is_full_face_selected:
-            if umesh.sync:
-                for face in umesh.bm.faces:
-                    face.tag = len(face.loops) == 4
-                return
-            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
-                for face in umesh.bm.faces:
-                    corners = face.loops
-                    face.tag = all(crn[uv].select for crn in corners) and len(corners) == 4
-            else:
-                for face in umesh.bm.faces:
-                    corners = face.loops
-                    face.tag = all(crn[uv].select_edge for crn in corners) and len(corners) == 4
-            return
-
-        if umesh.sync:
-            for face in umesh.bm.faces:
-                face.tag = face.select and len(face.loops) == 4
-            return
-        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
-            for face in umesh.bm.faces:
-                corners = face.loops
-                face.tag = all(crn[uv].select for crn in corners) and face.select and len(corners) == 4
-        else:
-            for face in umesh.bm.faces:
-                corners = face.loops
-                face.tag = all(crn[uv].select_edge for crn in corners) and face.select and len(corners) == 4
-
-    @staticmethod
     def tag_filter_visible(umesh: _umesh.UMesh):
         if umesh.sync:
             for face in umesh.bm.faces:
@@ -1075,6 +1043,8 @@ class IslandsBase:
             else:
                 for face in umesh.bm.faces:
                     face.tag = face.select
+
+class IslandsBaseTagFilterPost:
 
     @staticmethod
     def island_filter_is_partial_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
@@ -1118,6 +1088,7 @@ class IslandsBase:
             uv = umesh.uv
             return any(crn[uv].select_edge for face in island for crn in face.loops)
 
+class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
     @staticmethod
     def calc_iter_ex(umesh: _umesh.UMesh):
         uv = umesh.uv
@@ -1314,6 +1285,15 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
+        if umesh.sync and umesh.is_full_face_selected:
+            return cls()
+
+        cls.tag_filter_non_selected(umesh)
+        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_visible_with_mark_seam(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
@@ -1337,14 +1317,6 @@ class Islands(IslandsBase):
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                        if cls.island_filter_is_any_face_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_selected_quad(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-        cls.tag_filter_selected_quad(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
