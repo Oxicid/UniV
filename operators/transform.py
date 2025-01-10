@@ -2624,6 +2624,7 @@ class UNIV_OT_Weld(Operator):
         self.edge_weld_counter = 0
         self.mouse_position: Vector | None = None
         self.stitched_islands = 0
+        self.update_seams = True
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
@@ -2896,6 +2897,7 @@ class UNIV_OT_Stitch(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
+    update_seams: BoolProperty(name='Update Seams', default=True)
     flip: BoolProperty(name='Flip', default=False)
 
     @classmethod
@@ -2916,6 +2918,7 @@ class UNIV_OT_Stitch(Operator):
         self.global_counter = 0
         self.mouse_position: Vector | None = None
         self.stitched_islands = 0
+        self.save_seams = False
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
@@ -3002,7 +3005,7 @@ class UNIV_OT_Stitch(Operator):
                 if not stitched:
                     break
 
-            if update_tag:
+            if update_tag and self.update_seams:
                 for adv in adv_islands:
                     if adv:
                         adv.mark_seam()
@@ -3077,7 +3080,7 @@ class UNIV_OT_Stitch(Operator):
                 update_tag |= stitched
                 if not stitched:
                     break
-            if update_tag:
+            if update_tag and self.update_seams:
                 for adv in target_islands:
                     if adv:
                         adv.mark_seam()
