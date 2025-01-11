@@ -1477,6 +1477,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     grow: BoolProperty(name='Select', default=True, description='Grow/Shrink toggle')
     max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
                              description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
+    prioritize_sharps: BoolProperty(name='Prioritize Sharps', default=True,
+                                    description='Gives 35% priority to an edge that has a Mark Sharp, works if there are more than 4 linked edges.')
 
     def __init__(self):
         self.umeshes: UMeshes | None = None
@@ -1491,6 +1493,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
 
         self.grow = not (event.ctrl or event.alt)
         return self.execute(context)
+
+    def draw(self, context):
+        layout = self.layout
+        if self.grow:
+            layout.prop(self, 'prioritize_sharps')
+        layout.prop(self, 'clamp_on_seam')
+        layout.prop(self, 'max_angle')
+        layout.prop(self, 'grow')
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
@@ -1606,8 +1616,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
 
             umesh.update_tag = update
 
-    @staticmethod
-    def grow_prev(crn, selected_dir, uv, max_angle, with_seam) -> 'BMLoop | None | False':
+    def grow_prev(self, crn, selected_dir, uv, max_angle, with_seam) -> 'BMLoop | None | False':
         prev_crn = crn.link_loop_prev
         shared = utils.shared_linked_crn_by_idx(crn, uv)
         cur_linked_corners = utils.linked_crn_uv_by_island_index_unordered(crn, uv, crn.face.index)
@@ -1646,20 +1655,29 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
             angle = max_angle * 1.0001
             for crn_ in cur_linked_corners:
                 angle_ = selected_dir.angle(crn_[uv].uv - crn_.link_loop_next[uv].uv, max_angle)
+
+                if self.prioritize_sharps:
+                    if not crn.edge.smooth and angle_ <= max_angle:
+                        angle_ *= 0.65
+
                 if angle_ < angle:
                     angle = angle_
                     min_crn = crn_
                 if (prev_crn_ := crn_.link_loop_prev) != shared:
                     angle_ = selected_dir.angle(crn_[uv].uv - prev_crn_[uv].uv, max_angle)
+
+                    if self.prioritize_sharps:
+                        if not prev_crn_.edge.smooth and angle_ <= max_angle:
+                            angle_ *= 0.65
+
                     if angle_ < angle:
                         angle = angle_
-                        min_crn = crn_.link_loop_prev
+                        min_crn = prev_crn_
 
             return min_crn
         return False
 
-    @staticmethod
-    def grow_next(crn, selected_dir, uv, max_angle, with_seam) -> 'BMLoop | None | False':
+    def grow_next(self, crn, selected_dir, uv, max_angle, with_seam) -> 'BMLoop | None | False':
         next_crn = crn.link_loop_next
         shared = utils.shared_linked_crn_by_idx(crn, uv)
         next_linked_corners = utils.linked_crn_uv_by_island_index_unordered(crn.link_loop_next, uv, crn.link_loop_next.face.index)
@@ -1696,12 +1714,22 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
             angle = max_angle * 1.0001
             for crn_ in next_linked_corners:
                 angle_ = selected_dir.angle(crn_.link_loop_next[uv].uv - crn_[uv].uv, max_angle)
+
+                if self.prioritize_sharps:
+                    if not crn.edge.smooth and angle_ <= max_angle:
+                        angle_ *= 0.65
+
                 if angle_ < angle:
                     angle = angle_
                     min_crn = crn_
 
                 if (prev_crn_ := crn_.link_loop_prev) != shared:
                     angle_ = selected_dir.angle(prev_crn_[uv].uv - crn_[uv].uv, max_angle)
+
+                    if self.prioritize_sharps:
+                        if not prev_crn_.edge.smooth and angle_ <= max_angle:
+                            angle_ *= 0.65
+
                     if angle_ < angle:
                         angle = angle_
                         min_crn = crn_.link_loop_prev
