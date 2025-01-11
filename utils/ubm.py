@@ -625,15 +625,19 @@ def calc_visible_uv_faces(umesh) -> list[BMFace] | typing.Sequence[BMFace]:
         return []
     return [f for f in umesh.bm.faces if f.select]
 
-def calc_unselected_uv_faces(umesh: 'types.UMesh') -> list[BMFace]:
+def calc_unselected_uv_faces_iter(umesh: 'types.UMesh') -> typing.Iterable[BMFace]:
     if umesh.sync:
         if umesh.is_full_face_selected:
             return []
-        return [f for f in umesh.bm.faces if not (f.select or f.hide)]
-    if umesh.is_full_face_deselected:
-        return []
-    uv = umesh.uv
-    return [f for f in umesh.bm.faces if f.select and any(not crn[uv].select_edge for crn in f.loops)]
+        return (f for f in umesh.bm.faces if not (f.select or f.hide))
+    else:
+        if umesh.is_full_face_deselected:
+            return []
+        uv = umesh.uv
+        return (f for f in umesh.bm.faces if f.select and not all(crn[uv].select_edge for crn in f.loops))  # TODO: Add by select_vert
+
+def calc_unselected_uv_faces(umesh: 'types.UMesh') -> list[BMFace]:
+    return list(calc_unselected_uv_faces_iter(umesh))
 
 def calc_uv_faces(umesh: 'types.UMesh', *, selected) -> list[BMFace]:
     if selected:

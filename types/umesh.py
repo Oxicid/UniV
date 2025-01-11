@@ -755,6 +755,13 @@ class UMeshes:
                             return True
         return False
 
+    def filter_by_selected_uv_faces(self) -> 'typing.NoReturn':
+        selected = []
+        for umesh in self:
+            if umesh.has_selected_uv_faces():
+                selected.append(umesh)
+        self.umeshes = selected
+
     def filtered_by_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
         """Warning: if bmesh has selected faces, non-selected might be without visible faces"""
         selected = []

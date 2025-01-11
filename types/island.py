@@ -668,6 +668,19 @@ class FaceIsland:
                 face = f
         return face
 
+    def tag_selected_faces(self, both=False):
+        if self.umesh.sync:
+            for f in self:
+                f.tag = f.select
+        else:
+            uv = self.umesh.uv
+            if both:
+                for f in self:
+                    f.tag = f.select and all(crn[uv].select_edge or crn[uv].select for crn in f.loops)
+            else:
+                for f in self:
+                    f.tag = f.select and all(crn[uv].select_edge for crn in f.loops)
+
     def clear(self):
         self.faces = []
         self.umesh = None
@@ -1052,7 +1065,7 @@ class IslandsBaseTagFilterPost:
             select = (face.select for face in island)
         else:
             uv = umesh.uv
-            select = (crn[uv].select_edge for face in island for crn in face.loops)
+            select = (all(crn[uv].select_edge for crn in face.loops) for face in island)  # TODO: Add vertex select
         first_check = next(select)
         return any(first_check is not i for i in select)
 
@@ -1331,8 +1344,22 @@ class Islands(IslandsBase):
     def calc_partial_selected(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls()
+        if umesh.sync:
+            if umesh.is_full_face_selected:
+                return cls()
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_partial_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
+        if umesh.is_full_face_deselected:
+            return cls()
+        if umesh.sync:
+            if umesh.is_full_face_selected:
+                return cls()
+        cls.tag_filter_visible(umesh)
+        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod

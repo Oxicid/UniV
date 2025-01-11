@@ -7,6 +7,11 @@ from bpy.types import Panel
 from .icons import icons
 from .preferences import univ_settings, prefs
 
+try:
+    from . import univ_pro
+except ImportError:
+    univ_pro = None
+
 REDRAW_UV_LAYERS = True
 
 class UNIV_PT_General(Panel):
@@ -308,6 +313,10 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_normalize', icon_value=icons.normalize)
 
         self.draw_texel_density(col_align, 'mesh')
+
+        if univ_pro:
+            col_align.label(text='Select')
+            col_align.operator('mesh.univ_select_flat', icon='NORMALS_FACE')
 
         col_align.label(text='Texture')
         row = col_align.row(align=True)
