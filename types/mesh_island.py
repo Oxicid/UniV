@@ -48,6 +48,10 @@ class MeshIsland:
             return self.__select_force(False)
         self._select_ex(False, mode)
 
+    def tag_selected_faces(self):
+        for f in self:
+            f.tag = f.select
+
     def to_adv_island(self) -> island.AdvIsland:
         adv_isl = island.AdvIsland(self.faces, self.umesh)
         adv_isl.value = self.value
@@ -77,11 +81,11 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
                 continue
             face.tag = False
 
-            parts_of_island = [face]
+            stack = [face]
             temp = []
 
-            while parts_of_island:  # Blank list == all faces of the island taken
-                for f in parts_of_island:
+            while stack:  # Blank list == all faces of the island taken
+                for f in stack:
                     for l in f.loops:  # Running through all the neighboring faces
                         link_face = l.link_loop_radial_next.face
                         if not link_face.tag:  # Skip appended
@@ -99,8 +103,8 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
                                 temp.append(ll.face)
                                 ll.face.tag = False
 
-                mesh_island.extend(parts_of_island)
-                parts_of_island = temp
+                mesh_island.extend(stack)
+                stack = temp
                 temp = []
 
             yield mesh_island
@@ -114,11 +118,11 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
                 continue
             face.tag = False
 
-            parts_of_island = [face]
+            stack = [face]
             temp = []
 
-            while parts_of_island:
-                for f in parts_of_island:
+            while stack:
+                for f in stack:
                     for l in f.loops:
                         shared_crn = l.link_loop_radial_prev
                         ff = shared_crn.face
@@ -129,8 +133,8 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
                         temp.append(ff)
                         ff.tag = False
 
-                isl.extend(parts_of_island)
-                parts_of_island = temp
+                isl.extend(stack)
+                stack = temp
                 temp = []
 
             yield isl
@@ -183,6 +187,30 @@ class MeshIslands(MeshIslandsBase):
 
         cls.tag_filter_non_selected(umesh)
         islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_partial_selected(cls, umesh: _umesh.UMesh):
+        assert umesh.sync
+        if umesh.is_full_face_deselected:
+            cls([], umesh)
+        if umesh.sync:
+            if umesh.is_full_face_selected:
+                cls([], umesh)
+        cls.tag_filter_visible(umesh)
+        islands = [MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_partial_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
+        assert umesh.sync
+        if umesh.is_full_face_deselected:
+            return cls([], umesh)
+        if umesh.sync:
+            if umesh.is_full_face_selected:
+                return cls([], umesh)
+        cls.tag_filter_visible(umesh)
+        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     def to_adv_islands(self) -> island.AdvIslands:

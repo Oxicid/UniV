@@ -229,6 +229,10 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_border', icon_value=icons.border)
         row.operator('uv.univ_select_stacked', icon_value=icons.stack)
 
+        if univ_pro:
+            row = col_align.row(align=True)
+            row.operator('uv.univ_select_flat', icon='NORMALS_FACE')
+
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
         row.operator('uv.univ_select_border_edge_by_angle', text='', icon_value=icons.horizontal_a).edge_dir = 'HORIZONTAL'

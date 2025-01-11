@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 0, 4),
+    "version": (3, 0, 5),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -150,6 +150,7 @@ try:
             univ_pro.stack.UNIV_OT_Stack_VIEW3D,
             # Select
             univ_pro.select.UNIV_OT_Select_Flat_VIEW3D,
+            univ_pro.select.UNIV_OT_Select_Flat,
         ))
     else:
         classes.extend((
