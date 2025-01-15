@@ -65,7 +65,7 @@ class UNIV_PT_General(Panel):
         row.operator(set_idname).custom_texel = -1.0
         row.operator(prefix + '.univ_texel_density_get')
         row.prop(settings, 'texel_density', text='')
-        row.operator(prefix + '.univ_select_texel_density', text='', icon='RESTRICT_SELECT_OFF')
+        row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
 
         split = layer.split(align=False)
@@ -222,7 +222,7 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.operator('uv.univ_select_linked')
+        row.operator('uv.univ_select_linked', icon_value=icons.linked)
         row.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
 
         row = col_align.row(align=True)
@@ -231,7 +231,7 @@ class UNIV_PT_General(Panel):
 
         if univ_pro:
             row = col_align.row(align=True)
-            row.operator('uv.univ_select_flat', icon='NORMALS_FACE')
+            row.operator('uv.univ_select_flat', icon_value=icons.flat)
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
@@ -267,7 +267,7 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.operator('uv.univ_cut', icon_value=icons.cut)
-        split.operator('uv.univ_seam_border', icon_value=icons.border)
+        split.operator('uv.univ_seam_border', icon_value=icons.border_seam)
 
         layout.label(text='Texture')
         row = layout.row(align=True)
@@ -291,26 +291,26 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         col_align.label(text='Seam')
         split = col_align.split(align=True)
         split.operator('mesh.univ_cut', icon_value=icons.cut)
-        split.operator('mesh.univ_seam_border', icon_value=icons.border)
+        split.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
 
         split = col_align.split(align=True)
         split.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
         col_align.label(text='Project')
         row = col_align.row(align=True)
-        row.operator('mesh.univ_normal')
-        row.operator('mesh.univ_box_project')
+        row.operator('mesh.univ_normal', icon_value=icons.normal)
+        row.operator('mesh.univ_box_project', icon_value=icons.box)
 
         row = col_align.row(align=True)
-        row.operator('mesh.univ_smart_project')
-        row.operator('mesh.univ_view_project')
+        row.operator('mesh.univ_smart_project', icon_value=icons.smart)
+        row.operator('mesh.univ_view_project', icon_value=icons.view)
 
         col_align.label(text='Stack')
         row = col_align.row(align=True)
         row.operator('mesh.univ_stack', text='Stack', icon_value=icons.stack)
 
         col_align.label(text='Transform')
-        col_align.operator('mesh.univ_gravity')
+        col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)
 
         row = col_align.row(align=True)
         row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
@@ -320,7 +320,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
 
         if univ_pro:
             col_align.label(text='Select')
-            col_align.operator('mesh.univ_select_flat', icon='NORMALS_FACE')
+            col_align.operator('mesh.univ_select_flat', icon_value=icons.flat)
 
         col_align.label(text='Texture')
         row = col_align.row(align=True)

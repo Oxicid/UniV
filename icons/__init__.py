@@ -4,6 +4,7 @@ import os
 class icons:
     _icons_ = None
     adjust = 0
+    arrow = 0
     arrow_bottom = 0
     arrow_bottom_left = 0
     arrow_bottom_right = 0
@@ -14,6 +15,8 @@ class icons:
     arrow_top_right = 0
     border = 0
     border_by_angle = 0
+    border_seam = 0
+    box = 0
     center = 0
     checker = 0
     crop = 0
@@ -22,15 +25,19 @@ class icons:
     distribute = 0
     edge_grow = 0
     fill = 0
+    flat = 0
     flip = 0
     flipped = 0
+    gravity = 0
     grow = 0
     home = 0
     horizontal_a = 0
     horizontal_c = 0
     large = 0
+    linked = 0
     medium = 0
     non_splitted = 0
+    normal = 0
     normalize = 0
     orient = 0
     overlap = 0
@@ -45,6 +52,7 @@ class icons:
     settings_b = 0
     shift = 0
     small = 0
+    smart = 0
     sort = 0
     square = 0
     stack = 0
@@ -53,6 +61,7 @@ class icons:
     unwrap = 0
     vertical_a = 0
     vertical_b = 0
+    view = 0
     weld = 0
     x = 0
     y = 0
