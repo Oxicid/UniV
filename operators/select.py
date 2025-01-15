@@ -1479,6 +1479,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                              description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
     prioritize_sharps: BoolProperty(name='Prioritize Sharps', default=True,
                                     description='Gives 35% priority to an edge that has a Mark Sharp, works if there are more than 4 linked edges.')
+    boundary_by_boundary: BoolProperty(name='Boundary by Boundary', default=True)
 
     def __init__(self):
         self.umeshes: UMeshes | None = None
@@ -1497,6 +1498,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
     def draw(self, context):
         layout = self.layout
         if self.grow:
+            layout.prop(self, 'boundary_by_boundary')
             layout.prop(self, 'prioritize_sharps')
         layout.prop(self, 'clamp_on_seam')
         layout.prop(self, 'max_angle')
@@ -1661,8 +1663,15 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                         angle_ *= 0.65
 
                 if angle_ < angle:
-                    angle = angle_
-                    min_crn = crn_
+                    if self.boundary_by_boundary:
+                        status_grow = bool(utils.shared_linked_crn_by_idx(crn_, uv))
+                        if bool(shared) is status_grow:
+                            angle = angle_
+                            min_crn = crn_
+                    else:
+                        angle = angle_
+                        min_crn = crn_
+
                 if (prev_crn_ := crn_.link_loop_prev) != shared:
                     angle_ = selected_dir.angle(crn_[uv].uv - prev_crn_[uv].uv, max_angle)
 
@@ -1671,8 +1680,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                             angle_ *= 0.65
 
                     if angle_ < angle:
-                        angle = angle_
-                        min_crn = prev_crn_
+                        if self.boundary_by_boundary:
+                            status_grow = bool(utils.shared_linked_crn_by_idx(prev_crn_, uv))
+                            if bool(shared) is status_grow:
+                                angle = angle_
+                                min_crn = prev_crn_
+                        else:
+                            angle = angle_
+                            min_crn = prev_crn_
 
             return min_crn
         return False
@@ -1720,8 +1735,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                         angle_ *= 0.65
 
                 if angle_ < angle:
-                    angle = angle_
-                    min_crn = crn_
+                    if self.boundary_by_boundary:
+                        status_grow = bool(utils.shared_linked_crn_by_idx(crn_, uv))
+                        if bool(shared) is status_grow:
+                            angle = angle_
+                            min_crn = crn_
+                    else:
+                        angle = angle_
+                        min_crn = crn_
 
                 if (prev_crn_ := crn_.link_loop_prev) != shared:
                     angle_ = selected_dir.angle(prev_crn_[uv].uv - crn_[uv].uv, max_angle)
@@ -1731,8 +1752,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                             angle_ *= 0.65
 
                     if angle_ < angle:
-                        angle = angle_
-                        min_crn = crn_.link_loop_prev
+                        if self.boundary_by_boundary:
+                            status_grow = bool(utils.shared_linked_crn_by_idx(prev_crn_, uv))
+                            if bool(shared) is status_grow:
+                                angle = angle_
+                                min_crn = prev_crn_
+                        else:
+                            angle = angle_
+                            min_crn = prev_crn_
             return min_crn
         return False
 
