@@ -10,6 +10,7 @@ from . import island
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh
 from bmesh.types import *
+from .. import utils
 
 class MeshIsland:
     def __init__(self, faces: list[BMFace], umesh: UMesh):
@@ -190,6 +191,44 @@ class MeshIslands(MeshIslandsBase):
         return cls(islands, umesh)
 
     @classmethod
+    def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
+        """Calc any edges selected islands"""
+        assert umesh.sync
+        if utils.get_select_mode_mesh() == 'FACE':
+            if umesh.is_full_face_deselected:
+                return cls([], umesh)
+        else:
+            if umesh.is_full_edge_deselected:
+                return cls([], umesh)
+
+        cls.tag_filter_visible(umesh)
+        if umesh.is_full_face_selected:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        else:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                       if cls.island_filter_is_any_edge_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_extended_any_edge_with_markseam(cls, umesh: _umesh.UMesh):
+        """Calc any edges selected islands, with markseam"""
+        assert umesh.sync
+        if utils.get_select_mode_mesh() == 'FACE':
+            if umesh.is_full_face_deselected:
+                return cls([], umesh)
+        else:
+            if umesh.is_full_edge_deselected:
+                return cls([], umesh)
+
+        cls.tag_filter_visible(umesh)
+        if umesh.is_full_face_selected:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                       if cls.island_filter_is_any_edge_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_partial_selected(cls, umesh: _umesh.UMesh):
         assert umesh.sync
         if umesh.is_full_face_deselected:
@@ -212,6 +251,14 @@ class MeshIslands(MeshIslandsBase):
         cls.tag_filter_visible(umesh)
         islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
+
+    def indexing(self):
+        if sum(len(isl) for isl in self.mesh_islands) != len(self.umesh.bm.faces):
+            for f in self.umesh.bm.faces:
+                f.index = -1
+        for idx, mesh_island in enumerate(self.mesh_islands):
+            for face in mesh_island:
+                face.index = idx
 
     def to_adv_islands(self) -> island.AdvIslands:
         adv_islands = []

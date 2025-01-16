@@ -22,7 +22,7 @@ from collections.abc import Callable
 from .. import utils
 from .. import types
 from ..preferences import prefs, univ_settings
-from ..types import Islands, AdvIslands, AdvIsland,  BBox, UMeshes
+from ..types import Islands, AdvIslands, AdvIsland, BBox, UMeshes, MeshIslands
 
 from ..utils import (
     face_centroid_uv,
@@ -1463,15 +1463,12 @@ class UNIV_OT_Select_Grow(Operator):
             return True
         return False
 
-
-class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
-    bl_idname = 'uv.univ_select_edge_grow'
+class UNIV_OT_Select_Edge_Grow_Base(Operator):
     bl_label = 'Edge Grow'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Edge Grow/Shrink Select\n\n" \
                      f"Default - Grow Select \n" \
-                     f"Ctrl or Alt - Shrink Select\n\n" \
-                     f"Has [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
+                     f"Ctrl or Alt - Shrink Select\n\n"
 
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
@@ -1505,6 +1502,11 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
         layout.prop(self, 'clamp_on_seam')
         layout.prop(self, 'max_angle')
         layout.prop(self, 'grow')
+
+
+class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
+    bl_idname = 'uv.univ_select_edge_grow'
+    bl_description = UNIV_OT_Select_Edge_Grow_Base.bl_description + "Has [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
@@ -1556,7 +1558,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                 if self.umeshes.sync:
                     for grew_crn in grew:
                         grew_crn.edge.select = True
-
+                else:
                     for grew_crn in grew:
                         utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
 
@@ -1569,7 +1571,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
         for umesh in self.umeshes:
             uv = umesh.uv
             update = False
-            if islands := self.calc_islands(umesh):
+            if islands := self.calc_islands(umesh):  # noqa
                 islands.indexing()
                 shrink = []
                 for isl in islands:
@@ -1832,6 +1834,266 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(Operator):
                     if angle_ < angle:
                         if self.boundary_by_boundary:
                             status_grow = bool(utils.shared_linked_crn_by_idx(prev_crn_, uv))
+                            if bool(shared) is status_grow:
+                                angle = angle_
+                                min_crn = prev_crn_
+                        else:
+                            angle = angle_
+                            min_crn = prev_crn_
+            return min_crn
+        return False
+
+
+class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
+    bl_idname = 'mesh.univ_select_edge_grow'
+
+    max_angle: FloatProperty(name='Angle', default=math.radians(30), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
+                             description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
+
+    def execute(self, context):
+        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes.set_sync()
+
+        self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else MeshIslands.calc_extended_any_edge
+
+        if self.umeshes.elem_mode not in ('VERTEX', 'EDGE'):
+            self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
+            return bpy.ops.uv.univ_select_grow(grow=self.grow)  # noqa
+
+        if self.grow:
+            self.grow_select()
+            self.umeshes.update(info='Not found edges for grow select')
+            return {'FINISHED'}
+
+        self.shrink_select()
+        self.umeshes.update(info='Not found edges for shrink select')
+        return {'FINISHED'}
+
+    def grow_select(self):
+
+        for umesh in reversed(self.umeshes):
+            update = False
+            if islands := self.calc_islands(umesh):  # noqa
+                islands.indexing()
+                grew = []
+                for isl in islands:
+                    corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
+                    for crn in corners:
+
+                        with_seam = not self.clamp_on_seam or crn.edge.seam
+                        selected_dir = crn.link_loop_next.vert.co - crn.vert.co
+
+                        if grow_prev_crn := self.grow_prev(crn, selected_dir, self.max_angle, with_seam):
+                            if not with_seam:
+                                if grow_prev_crn.edge.seam:
+                                    continue
+                            grew.append(grow_prev_crn)
+
+                        if grow_next_crn := self.grow_next(crn, selected_dir, self.max_angle, with_seam):
+                            if not with_seam:
+                                if grow_next_crn.edge.seam:
+                                    continue
+                            grew.append(grow_next_crn)
+
+                if self.umeshes.sync:
+                    for grew_crn in grew:
+                        grew_crn.edge.select = True
+
+                update |= bool(grew)
+
+            if not update:
+                self.umeshes.umeshes.remove(umesh)
+
+    def shrink_select(self):
+        for umesh in self.umeshes:
+            update = False
+            if islands := self.calc_islands(umesh):  # noqa
+                islands.indexing()
+                shrink = []
+                for isl in islands:
+                    corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
+                    for crn in corners:
+                        with_seam = not self.clamp_on_seam or crn.edge.seam
+                        selected_dir = crn.link_loop_next.vert.co - crn.vert.co
+
+                        if grow_prev_crn := self.grow_prev(crn, selected_dir, self.max_angle, with_seam):
+                            if not with_seam and grow_prev_crn.edge.seam:
+                                grow_prev_crn = None
+
+                        if grow_next_crn := self.grow_next(crn, selected_dir, self.max_angle, with_seam):
+                            if not with_seam and grow_next_crn.edge.seam:
+                                grow_next_crn = None
+
+                        if grow_prev_crn or grow_next_crn:
+                            shrink.append((crn, grow_prev_crn, grow_next_crn))
+
+                self.shrink_ex(shrink)
+
+                update |= bool(shrink)
+                if shrink:
+                    umesh.bm.select_history.validate()
+
+            umesh.update_tag = update
+
+    def shrink_ex(self, shrink: list[tuple[BMLoop, BMLoop, BMLoop]]):
+        if self.umeshes.elem_mode == 'EDGE':
+            for cur_crn, prev_crn, next_crn in shrink:
+                cur_crn.edge.select = False
+        else:
+            for cur_crn, prev_crn, next_crn in shrink:
+                if prev_crn:
+                    more_one_selected_edges = sum(e.select for e in cur_crn.link_loop_next.vert.link_edges) > 1
+                    cur_crn.vert.select = False
+                    cur_crn.edge.select = False
+                    cur_crn.link_loop_next.vert.select = more_one_selected_edges
+                elif next_crn:
+                    more_one_selected_edges = sum(e.select for e in cur_crn.vert.link_edges) > 1
+                    cur_crn.link_loop_next.vert.select = False
+                    cur_crn.edge.select = False
+                    cur_crn.vert.select = more_one_selected_edges
+                else:
+                    cur_crn.vert.select = False
+                    cur_crn.link_loop_next.vert.select = False
+                    cur_crn.edge.select = False
+
+    def grow_prev(self, crn, selected_dir, max_angle, with_seam) -> 'BMLoop | None | False':
+        prev_crn = crn.link_loop_prev
+        shared = utils.shared_linked_crn_to_edge_by_idx(crn)
+        cur_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(crn)
+
+        # Skip if selected or with seam
+        if prev_crn.edge.select:
+            return None
+
+        if with_seam:
+            for crn__ in cur_linked_corners:
+                if crn__.edge.select:
+                    return None
+                if (prev_crn__ := crn__.link_loop_prev) != shared:
+                    if prev_crn__.edge.select:
+                        return None
+        else:
+            if prev_crn.edge.seam:
+                return None
+            for crn__ in cur_linked_corners:
+                crn_edge = crn__.edge
+                if crn_edge.select or crn_edge.seam:
+                    return None
+                if (prev_crn__ := crn__.link_loop_prev) != shared:
+                    prev_crn_edge = prev_crn__.edge
+                    if prev_crn_edge.seam or prev_crn_edge.select:
+                        return None
+
+        if not len(cur_linked_corners):
+            if selected_dir.angle(crn.vert.co - prev_crn.vert.co, max_angle) <= max_angle:
+                return prev_crn
+        elif len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 \
+                and shared \
+                and len(cur_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx(crn)) == 3 \
+                and utils.shared_linked_crn_to_edge_by_idx(cur_quad_linked_crn_uv[1]):  # noqa # pylint:disable=used-before-assignment
+            return cur_quad_linked_crn_uv[1]
+        else:
+            min_crn = None
+            angle = max_angle * 1.0001
+            for crn_ in cur_linked_corners:
+                angle_ = selected_dir.angle(crn_.vert.co - crn_.link_loop_next.vert.co, max_angle)
+                if self.prioritize_sharps:
+                    if not crn_.edge.smooth and angle_ <= max_angle:
+                        angle_ *= 0.65
+
+                if angle_ < angle:
+                    if self.boundary_by_boundary:
+                        status_grow = bool(utils.shared_linked_crn_to_edge_by_idx(crn_))
+                        if bool(shared) is status_grow:
+                            angle = angle_
+                            min_crn = crn_
+                    else:
+                        angle = angle_
+                        min_crn = crn_
+
+                if (prev_crn_ := crn_.link_loop_prev) != shared:
+                    angle_ = selected_dir.angle(crn_.vert.co - prev_crn_.vert.co, max_angle)
+                    if self.prioritize_sharps:
+                        if not prev_crn_.edge.smooth and angle_ <= max_angle:
+                            angle_ *= 0.65
+
+                    if angle_ < angle:
+                        if self.boundary_by_boundary:
+                            status_grow = bool(utils.shared_linked_crn_to_edge_by_idx(prev_crn_))
+                            if bool(shared) is status_grow:
+                                angle = angle_
+                                min_crn = prev_crn_
+                        else:
+                            angle = angle_
+                            min_crn = prev_crn_
+
+            return min_crn
+        return False
+
+    def grow_next(self, crn, selected_dir, max_angle, with_seam) -> 'BMLoop | None | False':
+        next_crn = crn.link_loop_next
+        shared = utils.shared_linked_crn_to_edge_by_idx(crn)
+        next_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(next_crn)
+
+        # Skip if selected or with seam
+        if with_seam:
+            for crn__ in next_linked_corners:
+                if crn__.edge.select:
+                    return None
+                if (prev_crn__ := crn__.link_loop_prev) != shared:
+                    if prev_crn__.edge.select:
+                        return None
+        else:
+            if next_crn.edge.seam:
+                return None
+            for crn__ in next_linked_corners:
+                crn_edge = crn__.edge
+                if crn_edge.select or crn_edge.seam:
+                    return None
+                if (prev_crn__ := crn__.link_loop_prev) != shared:
+                    prev_crn_edge = prev_crn__.edge
+                    if prev_crn_edge.seam or prev_crn_edge.select:
+                        return None
+
+        if not len(next_linked_corners):
+            if selected_dir.angle(next_crn.link_loop_next.vert.co - next_crn.vert.co, max_angle) <= max_angle:
+                return next_crn
+
+        elif len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 \
+                and shared \
+                and len(next_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx(next_crn)) == 3 \
+                and utils.shared_linked_crn_to_edge_by_idx(next_quad_linked_crn_uv[1].link_loop_prev):  # noqa # pylint:disable=used-before-assignment
+            return next_quad_linked_crn_uv[1].link_loop_prev
+        else:
+            min_crn = None
+            angle = max_angle * 1.0001
+            for crn_ in next_linked_corners:
+                angle_ = selected_dir.angle(crn_.link_loop_next.vert.co - crn_.vert.co, max_angle)
+
+                if self.prioritize_sharps:
+                    if not crn_.edge.smooth and angle_ <= max_angle:
+                        angle_ *= 0.65
+
+                if angle_ < angle:
+                    if self.boundary_by_boundary:
+                        status_grow = bool(utils.shared_linked_crn_to_edge_by_idx(crn_))
+                        if bool(shared) is status_grow:
+                            angle = angle_
+                            min_crn = crn_
+                    else:
+                        angle = angle_
+                        min_crn = crn_
+
+                if (prev_crn_ := crn_.link_loop_prev) != shared:
+                    angle_ = selected_dir.angle(prev_crn_.vert.co - crn_.vert.co, max_angle)
+
+                    if self.prioritize_sharps:
+                        if not prev_crn_.edge.smooth and angle_ <= max_angle:
+                            angle_ *= 0.65
+
+                    if angle_ < angle:
+                        if self.boundary_by_boundary:
+                            status_grow = bool(utils.shared_linked_crn_to_edge_by_idx(prev_crn_))
                             if bool(shared) is status_grow:
                                 angle = angle_
                                 min_crn = prev_crn_

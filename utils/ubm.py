@@ -36,6 +36,11 @@ def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
         if crn.link_loop_next[uv].uv == shared[uv].uv and crn[uv].uv == shared.link_loop_next[uv].uv:
             return shared
 
+def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
+    shared = crn.link_loop_radial_prev
+    if shared != crn:
+        return shared
+
 def set_faces_tag(faces, tag=True):
     for f in faces:
         f.tag = tag
@@ -300,6 +305,35 @@ def linked_crn_uv_by_idx(crn: BMLoop, uv: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_to_vert_by_idx(crn: BMLoop):
+    """Linked to arg corner by island index with arg corner"""
+    first_vert = crn.vert
+    idx = crn.face.index
+    linked = []
+    bm_iter = crn
+
+    while True:
+        bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # get ccw corner
+        if first_vert != bm_iter.vert:  # Skip boundary or flipped
+            bm_iter = crn
+            linked_cw = []
+            while True:
+                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
+                if first_vert != bm_iter.vert:  # Skip boundary or flipped
+                    break
+
+                if bm_iter == crn:
+                    break
+                if bm_iter.face.index == idx:
+                    linked_cw.append(bm_iter)
+            linked.extend(linked_cw[::-1])
+            break
+        if bm_iter == crn:
+            break
+        if bm_iter.face.index == idx:
+            linked.append(bm_iter)
+    return linked
+
 def linked_crn_uv_by_idx_unordered(crn: BMLoop, uv: BMLayerItem):
     """Linked to arg corner by island index without arg corner
     simular - linked_crn_uv_by_island_index_unordered
@@ -326,7 +360,6 @@ def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: i
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
-# TODO: Check
 def linked_crn_to_vert_by_face_index(crn):
     """Linked to vertex by face index without arg corner"""
     idx = crn.face.index
@@ -334,6 +367,11 @@ def linked_crn_to_vert_by_face_index(crn):
     linked.rotate(-linked.index(crn))
     linked.popleft()
     return linked
+
+def linked_crn_to_vert_by_island_index_unordered(crn):
+    """Linked to vertex by island index without arg corner"""
+    idx = crn.face.index
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx]
 
 def select_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):
     bm_iter = first

@@ -593,6 +593,7 @@ class UMeshes:
         for umesh in self:
             umesh.sync = state
         self.sync = state
+        self.elem_mode = utils.get_select_mode_mesh() if state else utils.get_select_mode_uv()
 
     def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""

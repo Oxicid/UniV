@@ -1478,11 +1478,8 @@ class Islands(IslandsBase):
     def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         if umesh.sync:
-            if (elem_mode := utils.get_select_mode_mesh()) == 'FACE':  # TODO: Add elem_mode field to UMesh
+            if utils.get_select_mode_mesh() == 'FACE':
                 if umesh.is_full_face_deselected:
-                    return cls()
-            elif elem_mode == 'VERTEX':
-                if umesh.is_full_vert_deselected:
                     return cls()
             else:
                 if umesh.is_full_edge_deselected:

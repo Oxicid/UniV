@@ -5,7 +5,7 @@ import bpy
 from collections import defaultdict
 
 keys = []
-keys_areas = ['UV Editor', 'Window', 'Object Mode']
+keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']
 other_conflict_areas = ['Frames']
 
 
@@ -18,15 +18,28 @@ def add_keymaps():
             print('UniV: Failed to add keymaps. Result = ', kc)
         return
 
+    ### Object Mode
     km = kc.keymaps.new(name='Object Mode')
     kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
     keys.append((km, kmi))
 
+    ### Mesh
+    km = kc.keymaps.new(name='Mesh')
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', alt=True)
+    kmi.properties.grow = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', alt=True)
+    kmi.properties.grow = False
+    keys.append((km, kmi))
+
+    ### Window
     km = kc.keymaps.new(name='Window')
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
     kmi.properties.mode = 'SPLIT'
     keys.append((km, kmi))
-    #
+
+    ### UV Editor
     km = kc.keymaps.new(name='UV Editor')
 
     kmi = km.keymap_items.new('uv.univ_sync_uv_toggle', 'ACCENT_GRAVE', 'PRESS')
