@@ -1232,20 +1232,16 @@ class UNIV_OT_Select_Pick(Operator):
         return {'FINISHED'}
 
 
-class UNIV_OT_Select_Grow(Operator):
-    bl_idname = 'uv.univ_select_grow'
+class UNIV_OT_Select_Grow_Base(Operator):
     bl_label = 'Grow'
-    bl_description = "Select more UV vertices connected to initial selection\n\n" \
-                     "Default - Grow\n" \
-                     "Ctrl or Alt - Shrink\n\n" \
-                     "Has [Ctrl + Scroll Up/Down] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     grow: BoolProperty(name='Select', default=True)
+    clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
+                                description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
 
     def __init__(self):
-        self.mouse_pos = Vector((0, 0))
-        self.max_distance: float | None = None
+        self.calc_islands: Callable = Callable
         self.umeshes: UMeshes | None = None
 
     @classmethod
@@ -1259,8 +1255,17 @@ class UNIV_OT_Select_Grow(Operator):
         self.grow = not (event.ctrl or event.alt)
         return self.execute(context)
 
+
+class UNIV_OT_Select_Grow(UNIV_OT_Select_Grow_Base):
+    bl_idname = 'uv.univ_select_grow'
+    bl_description = "Select more UV vertices connected to initial selection\n\n" \
+                     "Default - Grow\n" \
+                     "Ctrl or Alt - Shrink\n\n" \
+                     "Has [Ctrl + Scroll Up/Down] keymap"
+
     def execute(self, context):
         self.umeshes = UMeshes()
+        self.calc_islands = Islands.calc_visible_with_mark_seam if self.clamp_on_seam else Islands.calc_visible
         if self.grow:
             return self.grow_select()
         else:
@@ -1277,7 +1282,7 @@ class UNIV_OT_Select_Grow(Operator):
                 continue
 
             uv = umesh.uv
-            if islands := Islands.calc_visible_with_mark_seam(umesh):
+            if islands := self.calc_islands(umesh):  # noqa
                 islands.indexing()
                 for idx, isl in enumerate(islands):
                     if sync:
@@ -1344,7 +1349,7 @@ class UNIV_OT_Select_Grow(Operator):
                     continue
 
             uv = umesh.uv
-            if islands := Islands.calc_visible_with_mark_seam(umesh):
+            if islands := self.calc_islands(umesh):  # noqa
                 islands.indexing()
                 for idx, isl in enumerate(islands):
                     if sync:
@@ -1463,6 +1468,169 @@ class UNIV_OT_Select_Grow(Operator):
             return True
         return False
 
+
+class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
+    bl_idname = 'mesh.univ_select_grow'
+    bl_description = "Select more vertices connected to initial selection\n\n" \
+                     "Default - Grow\n" \
+                     "Ctrl or Alt - Shrink\n\n" \
+                     "Has [Ctrl + Scroll Up/Down] keymap"
+
+    def execute(self, context):
+        self.umeshes = UMeshes()
+        self.umeshes.set_sync()
+        self.calc_islands = MeshIslands.calc_visible_with_mark_seam if self.clamp_on_seam else MeshIslands.calc_visible
+
+        if self.grow:
+            return self.grow_select()
+        else:
+            return self.shrink()
+
+    def grow_select(self):
+        for umesh in self.umeshes:
+            if umesh.is_full_face_selected:
+                continue
+            if utils.get_select_mode_mesh() == 'FACE' and umesh.is_full_face_deselected:
+                continue
+
+            # TODO: Add support edges without faces
+            if islands := self.calc_islands(umesh):  # noqa
+                islands.indexing()
+                for idx, isl in enumerate(islands):
+                    if self.umeshes.elem_mode == 'FACE':
+                        for f in isl:
+                            if not f.select:
+                                f.tag = any(l_crn.face.select for crn in f.loops for l_crn in utils.linked_crn_to_vert_by_island_index_unordered(crn))
+                    else:
+                        if umesh.is_full_face_deselected:
+                            # TODO: Improve behavior when linked edge selected
+                            if self.umeshes.elem_mode == 'VERTEX':
+                                for f in isl:
+                                    if not f.select:
+                                        f.tag = any(v.select for v in f.verts)
+                            else:
+                                for f in isl:
+                                    if not f.select:
+                                        f.tag = any(e.select for e in f.edges)
+                        else:
+                            for f in isl:
+                                if not f.select:
+                                    f.tag = self.is_grow_face(f)
+                for isl in islands:
+                    for f in isl:
+                        if f.tag:
+                            f.select = True
+
+                umesh.update()
+
+        return {'FINISHED'}
+
+    def shrink(self):
+        sync = self.umeshes.sync
+        is_sync_face_mode = utils.get_select_mode_mesh() == 'FACE' and sync
+
+        for umesh in self.umeshes:
+            if sync:
+                if (is_sync_face_mode and umesh.is_full_face_deselected) or \
+                        (not is_sync_face_mode and umesh.is_full_vert_deselected):
+                    continue
+            else:
+                if umesh.is_full_face_deselected:
+                    continue
+
+            uv = umesh.uv
+            if islands := self.calc_islands(umesh):  # noqa
+                islands.indexing()
+                for idx, isl in enumerate(islands):
+                    if self.umeshes.elem_mode == 'FACE':
+                        for f in isl:
+                            if f.select:
+                                f.tag = any(not l_crn.face.select for crn in f.loops
+                                            for l_crn in utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx))
+                    else:
+                        if umesh.is_full_face_deselected:
+                            for f in isl:
+                                if not f.select:
+                                    f.tag = any(v.select for v in f.verts)
+                        else:
+                            for f in isl:
+                                if not f.select:
+                                    f.tag = self.is_shrink_face(f, idx)
+
+                if self.umeshes.elem_mode == 'FACE':
+                    for isl in islands:
+                        for f in isl:
+                            if f.tag:
+                                f.select = False
+                else:
+                    for isl in islands:
+                        for f in isl:
+                            if f.tag:
+                                f.select = False
+                                for v in f.verts:
+                                    v.select = False
+                umesh.bm.select_flush(False)
+
+            umesh.update()
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def is_grow_face(face: BMFace):
+        for crn in face.loops:
+            crn_vert = crn.vert
+            if not crn_vert.select:
+                continue
+
+            if len(utils.linked_crn_to_vert_by_island_index_unordered(crn)) + 1 == len(crn_vert.link_loops):
+                return True
+
+            crn_edge = crn.edge
+
+            if crn_edge.is_boundary and crn_edge.select:
+                return True
+
+            if crn_vert.select and crn.link_loop_next.vert.select and not (crn_edge.seam or crn.edge.is_boundary):
+                return True
+
+        return False
+
+    @staticmethod
+    def handle_deselect_vertex(face: BMFace, idx):
+        for v in face.verts:
+            if v.select:
+                for ff in v.link_faces:
+                    if ff.index not in (idx, -1):
+                        if ff.select:
+                            break
+                else:
+                    v.select = False
+
+    def is_shrink_face(self, face: BMFace, idx):
+        has_selected_verts = False  # noqa
+        for v in face.verts:
+            if v.select:
+                has_selected_verts = True
+                if not v.is_boundary:
+                    break
+                for ff in v.link_faces:
+                    if ff.index not in (idx, -1):
+                        break
+        else:
+            return True
+
+        if has_selected_verts:
+            for crn in face.loops:
+                if crn.vert.select:
+                    for ff in crn.vert.link_faces:
+                        if ff.index not in (idx, -1):
+                            if ff.select:
+                                self.handle_deselect_vertex(face, idx)
+                                return False
+            return True
+        return False
+
+
 class UNIV_OT_Select_Edge_Grow_Base(Operator):
     bl_label = 'Edge Grow'
     bl_options = {'REGISTER', 'UNDO'}
@@ -1514,7 +1682,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
         if self.umeshes.elem_mode not in ('VERTEX', 'EDGE'):
             self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
-            return bpy.ops.uv.univ_select_grow(grow=self.grow)  # noqa
+            return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         if self.grow:
             self.grow_select()
@@ -1858,7 +2026,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
         if self.umeshes.elem_mode not in ('VERTEX', 'EDGE'):
             self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
-            return bpy.ops.uv.univ_select_grow(grow=self.grow)  # noqa
+            return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         if self.grow:
             self.grow_select()

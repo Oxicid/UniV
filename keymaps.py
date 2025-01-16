@@ -25,6 +25,17 @@ def add_keymaps():
 
     ### Mesh
     km = kc.keymaps.new(name='Mesh')
+
+    # Grow
+    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = False
+    keys.append((km, kmi))
+
+    # Edge grow
     kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', alt=True)
     kmi.properties.grow = True
     keys.append((km, kmi))

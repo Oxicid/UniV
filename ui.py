@@ -321,7 +321,9 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         col_align.label(text='Select')
         if univ_pro:
             col_align.operator('mesh.univ_select_flat', icon_value=icons.flat)
-        col_align.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
+        row = col_align.row(align=True)
+        row.operator('mesh.univ_select_grow', icon_value=icons.grow)
+        row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
 
         col_align.label(text='Texture')
         row = col_align.row(align=True)

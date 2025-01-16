@@ -182,6 +182,12 @@ class MeshIslands(MeshIslandsBase):
         return cls([MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)], umesh)
 
     @classmethod
+    def calc_visible_with_mark_seam(cls, umesh: _umesh.UMesh):
+        cls.tag_filter_visible(umesh)
+        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
     def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.sync and umesh.is_full_face_selected:
             return cls([], umesh)
