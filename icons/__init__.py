@@ -47,7 +47,9 @@ class icons:
     random = 0
     relax = 0
     remove = 0
+    reset = 0
     rotate = 0
+    select_stacked = 0
     settings_a = 0
     settings_b = 0
     shift = 0

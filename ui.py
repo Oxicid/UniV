@@ -136,7 +136,7 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
 
         row = col.row(align=True)
-        row.operator('uv.univ_reset_scale', icon='MOD_LENGTH').axis = 'XY'
+        row.operator('uv.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
         row.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
         row.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
 
@@ -227,7 +227,7 @@ class UNIV_PT_General(Panel):
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border', icon_value=icons.border)
-        row.operator('uv.univ_select_stacked', icon_value=icons.stack)
+        row.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
 
         if univ_pro:
             row = col_align.row(align=True)

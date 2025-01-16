@@ -155,6 +155,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             isl.umesh.update()
         return {'FINISHED'}
 
+    # TODO: Implement has unlinked_and_linked_selected_edges
     @staticmethod
     def has_unlinked_and_linked_selected_faces(f_, uv, idx):
         unlinked_has_selected_face = False
