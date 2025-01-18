@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 0, 10),
+    "version": (3, 0, 12),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -153,7 +153,13 @@ try:
             # Select
             univ_pro.select.UNIV_OT_Select_Flat_VIEW3D,
             univ_pro.select.UNIV_OT_Select_Flat,
+
         ))
+        for idx, opt in enumerate(classes):
+            if opt is select.UNIV_OT_Select_Edge_Grow_VIEW2D:
+                classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW3D)
+                classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW2D)
+                break
     else:
         classes.extend((
             # Stack

@@ -3102,6 +3102,7 @@ class UNIV_OT_Stitch(Operator):
         crn_b1 = source[-1].link_loop_next
         crn_b2 = source[0]
 
+        # If zero length LoopGroup might be circular
         if UNIV_OT_Stitch.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
             bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(tar, tar.umesh.uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners

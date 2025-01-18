@@ -232,6 +232,7 @@ class UNIV_PT_General(Panel):
         if univ_pro:
             row = col_align.row(align=True)
             row.operator('uv.univ_select_flat', icon_value=icons.flat)
+            row.operator('uv.univ_select_loop', icon_value=icons.loop_select)
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
@@ -320,7 +321,9 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
 
         col_align.label(text='Select')
         if univ_pro:
-            col_align.operator('mesh.univ_select_flat', icon_value=icons.flat)
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_select_flat', icon_value=icons.flat)
+            row.operator('mesh.univ_select_loop', icon_value=icons.loop_select)
         row = col_align.row(align=True)
         row.operator('mesh.univ_select_grow', icon_value=icons.grow)
         row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)

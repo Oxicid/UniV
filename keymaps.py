@@ -44,6 +44,9 @@ def add_keymaps():
     kmi.properties.grow = False
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
+    keys.append((km, kmi))
+
     ### Window
     km = kc.keymaps.new(name='Window')
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
@@ -88,6 +91,9 @@ def add_keymaps():
 
     kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', alt=True)
     kmi.properties.grow = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
     keys.append((km, kmi))
 
     # Rotate

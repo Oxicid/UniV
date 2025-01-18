@@ -35,6 +35,7 @@ class icons:
     horizontal_c = 0
     large = 0
     linked = 0
+    loop_select = 0
     medium = 0
     non_splitted = 0
     normal = 0

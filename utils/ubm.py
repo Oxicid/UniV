@@ -38,7 +38,7 @@ def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
 
 def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
-    if shared != crn:
+    if shared != crn and crn.face.index == shared.face.index:
         return shared
 
 def set_faces_tag(faces, tag=True):
