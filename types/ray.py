@@ -304,6 +304,7 @@ class IslandHit:
         self.point = pt
         self.min_dist = min_dist
         self.crn = None
+        self.face = None
 
     def find_nearest_island(self, island: AdvIsland | FaceIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
@@ -337,6 +338,52 @@ class IslandHit:
                     min_dist = dist
 
         if self.min_dist != min_dist:
+            self.min_dist = min_dist
+            if isinstance(island, tuple):
+                self.island = island[0]
+            else:
+                self.island = island
+
+            return True
+        return False
+
+    def find_nearest_island_with_face(self, island: AdvIsland | FaceIsland | UnionIslands):
+        if not isinstance(island, UnionIslands):
+            island = (island, )
+        pt = self.point
+        min_dist = self.min_dist
+        min_face = None
+
+        zero_pt = Vector((0.0, 0.0))
+        for isl in island:
+            uv = isl.umesh.uv
+            for f in isl:
+                face_center = zero_pt.copy()
+                corners = f.loops
+                v_prev = corners[-1][uv].uv
+                for crn in corners:
+                    v_curr = crn[uv].uv
+                    face_center += v_curr
+
+                    close_pt = closest_pt_to_line(pt, v_prev, v_curr)
+
+                    if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                        if point_inside_face(pt, f, uv):
+                            min_dist = dist
+                            min_face = f
+                            # This is necessary for the inequality check to be successful
+                            self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                    elif dist < min_dist:
+                        min_dist = dist
+                        min_face = f
+                    v_prev = v_curr
+
+                if (dist := (face_center / len(corners) - pt).length) < min_dist:
+                    min_dist = dist
+                    min_face = f
+
+        if self.min_dist != min_dist:
+            self.face = min_face
             self.min_dist = min_dist
             if isinstance(island, tuple):
                 self.island = island[0]

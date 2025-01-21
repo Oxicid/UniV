@@ -1635,9 +1635,10 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
 class UNIV_OT_Select_Edge_Grow_Base(Operator):
     bl_label = 'Edge Grow'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = f"Edge Grow/Shrink Select\n\n" \
-                     f"Default - Grow Select \n" \
-                     f"Ctrl or Alt - Shrink Select\n\n"
+    bl_description = "Edge Grow/Shrink Select\n\n" \
+                     "Default - Grow Select \n" \
+                     "Ctrl or Alt - Shrink Select\n\n" \
+                     "Has [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
 
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
@@ -1675,7 +1676,6 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
 
 class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = 'uv.univ_select_edge_grow'
-    bl_description = UNIV_OT_Select_Edge_Grow_Base.bl_description + "Has [Alt + Scroll Up/Down] keymap, but it conflicts with the Frame Offset operator"
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)

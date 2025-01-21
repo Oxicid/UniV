@@ -153,6 +153,8 @@ try:
             # Select
             univ_pro.select.UNIV_OT_Select_Flat_VIEW3D,
             univ_pro.select.UNIV_OT_Select_Flat,
+            # Transform
+            univ_pro.drag.UNIV_OT_Drag,
 
         ))
         for idx, opt in enumerate(classes):

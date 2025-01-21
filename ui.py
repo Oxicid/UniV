@@ -215,6 +215,11 @@ class UNIV_PT_General(Panel):
         col_align.label(text='Select')
         col_align = col.column(align=True)
 
+        if univ_pro:
+            row = col_align.row(align=True)
+            row.operator('uv.univ_select_flat', icon_value=icons.flat)
+            row.operator('uv.univ_select_loop', icon_value=icons.loop_select)
+
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_select_grow', icon_value=icons.grow)
@@ -228,11 +233,6 @@ class UNIV_PT_General(Panel):
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border', icon_value=icons.border)
         row.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
-
-        if univ_pro:
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_flat', icon_value=icons.flat)
-            row.operator('uv.univ_select_loop', icon_value=icons.loop_select)
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'

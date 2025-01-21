@@ -29,7 +29,146 @@ class eSnapPointMode(enum.IntFlag):
     FACE = 1 << 3
     ALL = VERTEX | EDGE | FACE
 
-class UNIV_OT_QuickSnap(bpy.types.Operator):
+class SnapMode:
+    def __init__(self):
+        self.sync: bool = utils.sync()
+        self.snap_points_mode: eSnapPointMode = eSnapPointMode.VERTEX
+
+    def snap_mode_init(self):
+        self.snap_points_mode = eSnapPointMode.VERTEX
+        if prefs().snap_points_default == 'FOLLOW_MODE':
+            if self.sync:
+                if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+                    self.snap_points_mode |= eSnapPointMode.EDGE
+                if bpy.context.tool_settings.mesh_select_mode[2]:  # FACE
+                    self.snap_points_mode |= eSnapPointMode.FACE
+            else:
+                uv_mode = utils.get_select_mode_uv()
+                if uv_mode in ('FACE', 'ISLAND'):
+                    self.snap_points_mode |= eSnapPointMode.FACE
+                elif uv_mode == 'EDGE':
+                    self.snap_points_mode |= eSnapPointMode.EDGE
+        else:
+            self.snap_points_mode = eSnapPointMode.ALL
+
+    def snap_mode_update(self, event):
+        match event.type:
+            case 'ONE':
+                if event.shift:
+                    self.snap_points_mode ^= eSnapPointMode.VERTEX
+                else:
+                    self.snap_points_mode = eSnapPointMode.VERTEX
+            case 'TWO':
+                if event.shift:
+                    self.snap_points_mode ^= eSnapPointMode.EDGE
+                else:
+                    self.snap_points_mode = eSnapPointMode.EDGE
+            case 'THREE':
+                if event.shift:
+                    self.snap_points_mode ^= eSnapPointMode.FACE
+                else:
+                    self.snap_points_mode = eSnapPointMode.FACE
+            case _:
+                if event.shift:
+                    self.snap_points_mode ^= eSnapPointMode.ALL
+                else:
+                    self.snap_points_mode = eSnapPointMode.ALL
+
+
+class QuickSnap_KDMeshes:
+    def __init__(self):
+        self.sync = True
+        self.umeshes = None
+        self.kdmeshes = None
+        self.visible = None
+
+    def calc_elem_kdmeshes_sync(self):
+        assert self.sync
+
+        kdmeshes = []
+        for umesh in self.umeshes:
+            groups = LoopGroup.calc_dirt_loop_groups(umesh)
+            for _g in groups:
+                _g.set_tag()
+            kdmesh = KDMesh(umesh, loop_groups=groups)
+            kdmesh.calc_all_trees_loop_group()
+            kdmeshes.append(kdmesh)
+
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def calc_elem_kdmeshes_visible(self):
+        assert self.visible
+
+        kdmeshes = []
+        for umesh in self.umeshes:
+            if faces := utils.calc_visible_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
+                kdmesh = KDMesh(umesh, isl)
+                kdmesh.calc_all_trees()
+                kdmeshes.append(kdmesh)
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def calc_elem_kdmeshes_selected(self):
+        assert self.sync
+        assert not self.visible
+
+        kdmeshes = []
+        for umesh in self.umeshes:
+            if faces := utils.calc_selected_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
+                kdmesh = KDMesh(umesh, isl)
+                kdmesh.calc_all_trees()
+                kdmeshes.append(kdmesh)
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def calc_elem_kdmeshes_unselected(self):
+        assert self.sync
+        assert not self.visible
+
+        kdmeshes = []
+        for umesh in self.umeshes:
+            if faces := utils.calc_unselected_uv_faces(umesh):
+                f_isl = FaceIsland(faces, umesh)
+                isl = Islands([f_isl], umesh)
+                kdmesh = KDMesh(umesh, isl)
+                kdmesh.calc_all_trees()
+                kdmeshes.append(kdmesh)
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def calc_crn_edge_selected_kdmeshes(self):
+        assert not self.visible
+        assert not self.sync
+        kdmeshes = []
+        for umesh in self.umeshes:
+            umesh.tag_selected_corners(both=True)
+            kdmesh = KDMesh(umesh)
+            kdmesh.calc_all_trees_from_static_corners_by_tag()
+            kdmeshes.append(kdmesh)
+
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def calc_island_kdmeshes(self, extended=False):
+        kdmeshes = []
+        for umesh in self.umeshes:
+            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+                kdmesh = KDMesh(umesh, islands)
+                kdmesh.calc_all_trees()
+                kdmeshes.append(kdmesh)
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+    def recalc_island_kd_meshes(self):
+        kdmeshes = []
+        for umesh in self.umeshes:
+            if islands := Islands.calc_non_selected_extended(umesh):
+                kdmesh = KDMesh(umesh, islands)
+                kdmesh.calc_all_trees()
+                kdmeshes.append(kdmesh)
+        self.kdmeshes = KDMeshes(kdmeshes)
+
+
+class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
     bl_label = "Quick Snap"
     bl_options = {'REGISTER', 'UNDO'}
@@ -42,10 +181,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def __init__(self):
-        self.sync: bool = utils.sync()
+        super().__init__()
         self.umeshes: types.UMeshes | None = None
         self.kdmeshes: KDMeshes | None = None
-        self.rmesh: KDMesh | None = None
 
         self.area: bpy.types.Area | None = None
         self.view: bpy.types.View2D | None = None
@@ -66,7 +204,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         self.radius: float = 0.0
         self.axis: str = ''
         self.grid_snap: bool = False
-        self.snap_points_mode: eSnapPointMode = eSnapPointMode.VERTEX
 
         self._cancel: bool = False
 
@@ -78,6 +215,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
             self.report({'INFO'}, 'Area must be UV')
             return {'CANCELLED'}
         self.view = context.region.view2d
+        self.sync = utils.sync()
         self.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
         self.refresh_draw_points()
         self.register_draw()
@@ -109,6 +247,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
 
         if event.type in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'MIDDLEMOUSE'}:
             return {'PASS_THROUGH'}
+
+        # TODO: Test
+        # if event.type == 'INBETWEEN_MOUSEMOVE':  # fix over move
+        #     return {'RUNNING_MODAL'}
 
         self.calc_radius_and_mouse_position(event)
 
@@ -302,46 +444,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
                     self.calc_elem_kdmeshes_visible()
                 else:
                     self.calc_crn_edge_selected_kdmeshes()
-
-    def snap_mode_init(self):
-        self.snap_points_mode = eSnapPointMode.VERTEX
-        if prefs().snap_points_default == 'FOLLOW_MODE':
-            if self.sync:
-                if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
-                    self.snap_points_mode |= eSnapPointMode.EDGE
-                if bpy.context.tool_settings.mesh_select_mode[2]:  # FACE
-                    self.snap_points_mode |= eSnapPointMode.FACE
-            else:
-                uv_mode = utils.get_select_mode_uv()
-                if uv_mode in ('FACE', 'ISLAND'):
-                    self.snap_points_mode |= eSnapPointMode.FACE
-                elif uv_mode == 'EDGE':
-                    self.snap_points_mode |= eSnapPointMode.EDGE
-        else:
-            self.snap_points_mode = eSnapPointMode.ALL
-
-    def snap_mode_update(self, event):
-        match event.type:
-            case 'ONE':
-                if event.shift:
-                    self.snap_points_mode ^= eSnapPointMode.VERTEX
-                else:
-                    self.snap_points_mode = eSnapPointMode.VERTEX
-            case 'TWO':
-                if event.shift:
-                    self.snap_points_mode ^= eSnapPointMode.EDGE
-                else:
-                    self.snap_points_mode = eSnapPointMode.EDGE
-            case 'THREE':
-                if event.shift:
-                    self.snap_points_mode ^= eSnapPointMode.FACE
-                else:
-                    self.snap_points_mode = eSnapPointMode.FACE
-            case _:
-                if event.shift:
-                    self.snap_points_mode ^= eSnapPointMode.ALL
-                else:
-                    self.snap_points_mode = eSnapPointMode.ALL
 
     def pick_drag_object(self, kd_data: KDData):
         assert not self.island_mode
@@ -554,91 +656,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator):
         _kdmesh.calc_all_trees_from_static_corners_by_tag()
         if not _kdmesh:
             self.kdmeshes.kdmeshes.remove(_kdmesh)
-
-    def calc_elem_kdmeshes_sync(self):
-        assert self.sync
-
-        kdmeshes = []
-        for umesh in self.umeshes:
-            groups = LoopGroup.calc_dirt_loop_groups(umesh)
-            for _g in groups:
-                _g.set_tag()
-            kdmesh = KDMesh(umesh, loop_groups=groups)
-            kdmesh.calc_all_trees_loop_group()
-            kdmeshes.append(kdmesh)
-
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def calc_elem_kdmeshes_visible(self):
-        assert self.visible
-
-        kdmeshes = []
-        for umesh in self.umeshes:
-            if faces := utils.calc_visible_uv_faces(umesh):
-                f_isl = FaceIsland(faces, umesh)
-                isl = Islands([f_isl], umesh)
-                kdmesh = KDMesh(umesh, isl)
-                kdmesh.calc_all_trees()
-                kdmeshes.append(kdmesh)
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def calc_elem_kdmeshes_selected(self):
-        assert self.sync
-        assert not self.visible
-
-        kdmeshes = []
-        for umesh in self.umeshes:
-            if faces := utils.calc_selected_uv_faces(umesh):
-                f_isl = FaceIsland(faces, umesh)
-                isl = Islands([f_isl], umesh)
-                kdmesh = KDMesh(umesh, isl)
-                kdmesh.calc_all_trees()
-                kdmeshes.append(kdmesh)
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def calc_elem_kdmeshes_unselected(self):
-        assert self.sync
-        assert not self.visible
-
-        kdmeshes = []
-        for umesh in self.umeshes:
-            if faces := utils.calc_unselected_uv_faces(umesh):
-                f_isl = FaceIsland(faces, umesh)
-                isl = Islands([f_isl], umesh)
-                kdmesh = KDMesh(umesh, isl)
-                kdmesh.calc_all_trees()
-                kdmeshes.append(kdmesh)
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def calc_crn_edge_selected_kdmeshes(self):
-        assert not self.visible
-        assert not self.sync
-        kdmeshes = []
-        for umesh in self.umeshes:
-            umesh.tag_selected_corners(both=True)
-            kdmesh = KDMesh(umesh)
-            kdmesh.calc_all_trees_from_static_corners_by_tag()
-            kdmeshes.append(kdmesh)
-
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def calc_island_kdmeshes(self, extended=False):
-        kdmeshes = []
-        for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
-                kdmesh = KDMesh(umesh, islands)
-                kdmesh.calc_all_trees()
-                kdmeshes.append(kdmesh)
-        self.kdmeshes = KDMeshes(kdmeshes)
-
-    def recalc_island_kd_meshes(self):
-        kdmeshes = []
-        for umesh in self.umeshes:
-            if islands := Islands.calc_non_selected_extended(umesh):
-                kdmesh = KDMesh(umesh, islands)
-                kdmesh.calc_all_trees()
-                kdmeshes.append(kdmesh)
-        self.kdmeshes = KDMeshes(kdmeshes)
 
     def calc_radius_and_mouse_position(self, event):
         mouse_position = Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))

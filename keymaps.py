@@ -4,6 +4,11 @@
 import bpy
 from collections import defaultdict
 
+try:
+    from . import univ_pro
+except ImportError:
+    univ_pro = None
+
 keys = []
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']
 other_conflict_areas = ['Frames']
@@ -93,8 +98,9 @@ def add_keymaps():
     kmi.properties.grow = False
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
-    keys.append((km, kmi))
+    if univ_pro:
+        kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
+        keys.append((km, kmi))
 
     # Rotate
     ## Default. CW.
@@ -309,6 +315,11 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS', alt=True)
     kmi.properties.quick_start = False
     keys.append((km, kmi))
+
+    # Drag
+    if univ_pro:
+        kmi = km.keymap_items.new('uv.univ_drag', 'LEFTMOUSE', 'ANY', alt=True)
+        keys.append((km, kmi))
 
     # Cut
     kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS')

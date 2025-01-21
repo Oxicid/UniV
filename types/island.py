@@ -681,6 +681,41 @@ class FaceIsland:
                 for f in self:
                     f.tag = f.select and all(crn[uv].select_edge for crn in f.loops)
 
+    def has_flip_with_noflip(self):
+        from ..utils import is_flipped_uv
+        uv = self.umesh.uv
+        flip_state = is_flipped_uv(self[-1], uv)
+        for f in self:
+            if flip_state != is_flipped_uv(f, uv):
+                return True
+        return False
+
+    def calc_islands_by_flip_with_mark_seam(self) -> 'tuple[Islands | AdvIslands, Islands | AdvIslands]':
+        """Warning: All 'bm.faces' must be untagged"""
+        from ..utils import is_flipped_uv
+        uv = self.umesh.uv
+        no_flipped_faces = []
+        flipped_faces = []
+        for f in self:
+            if is_flipped_uv(f, uv):
+                flipped_faces.append(f)
+            else:
+                f.tag = True
+                no_flipped_faces.append(f)
+
+        assert no_flipped_faces and flipped_faces
+        isl_type = type(self)
+        islands_type = Islands if (isl_type is FaceIsland) else AdvIslands
+        fake_umesh = self.umesh.fake_umesh(no_flipped_faces)
+        no_flipped_islands = islands_type([isl_type(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
+
+        fake_umesh.bm.faces = flipped_faces
+        for flipped_f in flipped_faces:
+            flipped_f.tag = True
+        flipped_islands = islands_type([isl_type(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
+
+        return no_flipped_islands, flipped_islands
+
     def clear(self):
         self.faces = []
         self.umesh = None
@@ -815,40 +850,6 @@ class AdvIsland(FaceIsland):
         else:
             self._bbox = BBox.calc_bbox_uv(self.faces, self.umesh.uv)
         return self._bbox
-
-    def has_flip_with_noflip(self):
-        from ..utils import is_flipped_uv
-        uv = self.umesh.uv
-        flip_state = is_flipped_uv(self[-1], uv)
-        for f in self:
-            if flip_state != is_flipped_uv(f, uv):
-                return True
-        return False
-
-    def calc_islands_by_flip_with_mark_seam(self) -> 'tuple[AdvIslands, AdvIslands]':
-        """Warning: All 'bm.faces' must be untagged"""
-        from ..utils import is_flipped_uv
-        uv = self.umesh.uv
-        no_flipped_faces = []
-        flipped_faces = []
-        for f in self:
-            if is_flipped_uv(f, uv):
-                flipped_faces.append(f)
-            else:
-                f.tag = True
-                no_flipped_faces.append(f)
-
-        assert no_flipped_faces and flipped_faces
-
-        fake_umesh = self.umesh.fake_umesh(no_flipped_faces)
-        no_flipped_islands = AdvIslands([AdvIsland(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
-
-        fake_umesh.bm.faces = flipped_faces
-        for flipped_f in flipped_faces:
-            flipped_f.tag = True
-        flipped_islands = AdvIslands([AdvIsland(i, self.umesh) for i in Islands.calc_with_markseam_iter_ex(fake_umesh)], self.umesh)
-
-        return no_flipped_islands, flipped_islands
 
     @property
     def bbox(self) -> BBox:
