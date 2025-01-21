@@ -12,7 +12,8 @@ def get_aspect_ratio(umesh=None):
     if umesh:
         # Aspect from checker
         if modifiers := [m for m in umesh.obj.modifiers if m.name.startswith('UniV Checker')]:
-            for node in modifiers[0]["Input_1"].node_tree.nodes:
+            socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
+            for node in modifiers[0][socket].node_tree.nodes:
                 if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
                     image_width, image_height = image.size
                     if image_height:
