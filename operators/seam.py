@@ -248,7 +248,10 @@ class UNIV_OT_Angle(Operator):
             else:
                 angle = self.angle
 
-            bevel_weight_key = umesh.bm.edges.layers.bevel_weight.active
+            if bpy.app.version >= (4, 0, 0):
+                bevel_weight_key = umesh.bm.edges.layers.float.get('bevel_weight_edge')
+            else:
+                bevel_weight_key = umesh.bm.edges.layers.bevel_weight.active
             check_weights = self.by_weight and bevel_weight_key
 
             if umesh.is_full_face_selected:
