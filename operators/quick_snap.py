@@ -81,6 +81,11 @@ class QuickSnap_KDMeshes:
         self.umeshes = None
         self.kdmeshes = None
         self.visible = None
+        self.radius = None
+        self.mouse_position = None
+        self.snap_points_mode = None
+        self.view = None
+        self.grid_snap = None
 
     def calc_elem_kdmeshes_sync(self):
         assert self.sync
@@ -167,6 +172,68 @@ class QuickSnap_KDMeshes:
                 kdmeshes.append(kdmesh)
         self.kdmeshes = KDMeshes(kdmeshes)
 
+    def find(self):
+        pt: tuple[Vector, int, float] = tuple((Vector((inf, inf, inf)), 0, inf))
+        elem: BMFace | BMLoop | None = None
+        r_kdmesh: KDMesh | None = None
+
+        r = self.radius
+        co = self.mouse_position
+
+        for kdmesh in self.kdmeshes:
+            if self.snap_points_mode & eSnapPointMode.VERTEX and (min_res_ := kdmesh.kdtree_crn_points.find(co))[0]:
+                if min_res_[2] <= r and min_res_[2] < pt[2]:
+                    pt = min_res_
+                    elem = kdmesh.corners_vert[min_res_[1]]
+                    r_kdmesh = kdmesh
+
+            if self.snap_points_mode & eSnapPointMode.EDGE and (min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
+                if min_res_[2] <= r and min_res_[2] < pt[2]:
+                    pt = min_res_
+                    elem = kdmesh.corners_center[min_res_[1]]
+                    r_kdmesh = kdmesh
+            if self.snap_points_mode & eSnapPointMode.FACE and (min_res_ := kdmesh.kdtree_face_points.find(co))[0]:
+                if min_res_[2] <= r and min_res_[2] < pt[2]:
+                    pt = min_res_
+                    elem = kdmesh.faces[min_res_[1]]
+                    r_kdmesh = kdmesh
+
+        return KDData(pt, elem, r_kdmesh)
+
+    def find_nearest_target_pt(self):
+        kd_data = self.find()
+
+        m_pos = self.mouse_position.to_2d()
+        zoom = View2D.get_zoom(self.view)
+        divider = 1/8 if zoom <= 1600 else 1 / 64
+        divider = divider if zoom <= 12800 else 1 / 64 / 8
+        pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
+        dist = (pos - m_pos).length
+
+        if self.grid_snap \
+                and dist <= self.radius and dist < kd_data.distance:
+            kd_data.found = (pos, 0, 0.0)
+            kd_data.kdmesh = True
+        return kd_data
+
+    def find_range(self):
+        coords = []
+        if eSnapPointMode.VERTEX in self.snap_points_mode:
+            res = self.kdmeshes.find_range_vert(self.mouse_position, self.radius)
+            coords = self.kdmeshes.range_to_coords(res)
+        if eSnapPointMode.EDGE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_crn_center(self.mouse_position, self.radius)
+            if coords:
+                coords.extend(self.kdmeshes.range_to_coords(res))
+            else:
+                coords = self.kdmeshes.range_to_coords(res)
+        if eSnapPointMode.FACE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_face_center(self.mouse_position, self.radius)
+            if coords:
+                coords.extend(self.kdmeshes.range_to_coords(res))
+            else:
+                coords = self.kdmeshes.range_to_coords(res)
+        return coords
 
 class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
@@ -358,53 +425,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
             return {'RUNNING_MODAL'}
         return {'RUNNING_MODAL'}
-
-    def find_range(self):
-        coords = []
-        if eSnapPointMode.VERTEX in self.snap_points_mode:
-            res = self.kdmeshes.find_range_vert(self.mouse_position, self.radius)
-            coords = self.kdmeshes.range_to_coords(res)
-        if eSnapPointMode.EDGE in self.snap_points_mode:
-            res = self.kdmeshes.find_range_crn_center(self.mouse_position, self.radius)
-            if coords:
-                coords.extend(self.kdmeshes.range_to_coords(res))
-            else:
-                coords = self.kdmeshes.range_to_coords(res)
-        if eSnapPointMode.FACE in self.snap_points_mode:
-            res = self.kdmeshes.find_range_face_center(self.mouse_position, self.radius)
-            if coords:
-                coords.extend(self.kdmeshes.range_to_coords(res))
-            else:
-                coords = self.kdmeshes.range_to_coords(res)
-        return coords
-
-    def find(self):
-        pt: tuple[Vector, int, float] = tuple((Vector((inf, inf, inf)), 0, inf))
-        elem: BMFace | BMLoop | None = None
-        r_kdmesh: KDMesh | None = None
-
-        r = self.radius
-        co = self.mouse_position
-
-        for kdmesh in self.kdmeshes:
-            if self.snap_points_mode & eSnapPointMode.VERTEX and (min_res_ := kdmesh.kdtree_crn_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.corners_vert[min_res_[1]]
-                    r_kdmesh = kdmesh
-
-            if self.snap_points_mode & eSnapPointMode.EDGE and (min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.corners_center[min_res_[1]]
-                    r_kdmesh = kdmesh
-            if self.snap_points_mode & eSnapPointMode.FACE and (min_res_ := kdmesh.kdtree_face_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.faces[min_res_[1]]
-                    r_kdmesh = kdmesh
-
-        return KDData(pt, elem, r_kdmesh)
 
     def preprocessing(self):
         if self.island_mode:
@@ -663,22 +683,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.radius = utils.get_max_distance_from_px(dist, self.view)
         self.mouse_position = mouse_position.to_3d()
 
-    def find_nearest_target_pt(self):
-        kd_data = self.find()
-
-        m_pos = self.mouse_position.to_2d()
-        zoom = View2D.get_zoom(self.view)
-        divider = 1/8 if zoom <= 1600 else 1 / 64
-        divider = divider if zoom <= 12800 else 1 / 64 / 8
-        pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
-        dist = (pos - m_pos).length
-
-        if self.grid_snap \
-                and dist <= self.radius and dist < kd_data.distance:
-            kd_data.found = (pos, 0, 0.0)
-            kd_data.kdmesh = True
-        return kd_data
-
     def register_draw(self):
         self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_ui_draw_callback, (), 'WINDOW', 'POST_PIXEL')
         self.handler = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_draw_callback, (), 'WINDOW', 'POST_VIEW')
@@ -716,11 +720,12 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         if area.ui_type != 'UV':
             return
 
+        n_panel_width = next(r.width for r in area.regions if r.type == 'UI')
         max_dim = 240
-        if area.width < max_dim * 2:
+        if (area.width - n_panel_width) < max_dim or area.height < max_dim:
             return
 
-        first_col = area.width - max_dim
+        first_col = area.width - max_dim - n_panel_width
         second_col = first_col + 90
 
         gpu.state.blend_set('ALPHA')
