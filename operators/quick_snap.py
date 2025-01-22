@@ -178,7 +178,7 @@ class QuickSnap_KDMeshes:
         r_kdmesh: KDMesh | None = None
 
         r = self.radius
-        co = self.mouse_position
+        co = self.mouse_position.to_3d()
 
         for kdmesh in self.kdmeshes:
             if self.snap_points_mode & eSnapPointMode.VERTEX and (min_res_ := kdmesh.kdtree_crn_points.find(co))[0]:
