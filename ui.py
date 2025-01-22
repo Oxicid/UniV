@@ -103,7 +103,6 @@ class UNIV_PT_General(Panel):
             columns=4,
             # type='GRID'
         )
-
         col = row.column(align=True)
         col.operator('mesh.univ_add', icon='ADD', text='')
         col.operator('mesh.univ_remove', icon='REMOVE', text='')
@@ -180,7 +179,7 @@ class UNIV_PT_General(Panel):
         col_align = col.column(align=True)
         split = col_align.split(align=True)
         row = split.row(align=True)
-        row.scale_y = 1.5
+        row.scale_y = 1.3
         # row.scale_x = 2
         row.operator('uv.univ_pack', icon_value=icons.pack)
         row.popover(panel='UNIV_PT_PackSettings', text='', icon_value=icons.settings_a)
@@ -205,10 +204,7 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_stitch', icon_value=icons.stitch)
 
         split = col_align.split(align=True)
-        split.operator('uv.univ_pin', icon_value=icons.pin)
-
-        split = col_align.split(align=True)
-        split.scale_y = 1.5
+        split.scale_y = 1.3
         split.operator('uv.univ_stack', icon_value=icons.stack)
 
         # Select
@@ -261,10 +257,13 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_check_non_splitted', icon_value=icons.non_splitted)
         split.operator('uv.univ_check_overlap', icon_value=icons.overlap)
 
-        # Seam
+        # Mark
         col_align = col.column(align=True)
-        col_align.label(text='Seam')
+        col_align.label(text='Mark')
         col_align.separator(factor=0.35)
+
+        split = col_align.split(align=True)
+        split.operator('uv.univ_pin', icon_value=icons.pin)
 
         split = col_align.split(align=True)
         split.operator('uv.univ_cut', icon_value=icons.cut)
@@ -272,7 +271,7 @@ class UNIV_PT_General(Panel):
 
         layout.label(text='Texture')
         row = layout.row(align=True)
-        row.scale_y = 1.5
+        row.scale_y = 1.35
         row.operator('mesh.univ_checker', icon_value=icons.checker)
         row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
@@ -289,7 +288,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         col = layout.column(align=True)
 
         col_align = col.column(align=True)
-        col_align.label(text='Seam')
+        col_align.label(text='Mark')
         split = col_align.split(align=True)
         split.operator('mesh.univ_cut', icon_value=icons.cut)
         split.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
@@ -330,7 +329,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
 
         col_align.label(text='Texture')
         row = col_align.row(align=True)
-        row.scale_y = 1.5
+        row.scale_y = 1.35
         row.operator('mesh.univ_checker', icon_value=icons.checker)
         row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
