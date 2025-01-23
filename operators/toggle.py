@@ -111,7 +111,7 @@ class UNIV_OT_SplitUVToggle(Operator):
                     active_area.type = 'IMAGE_EDITOR'
                     active_area.ui_type = 'UV'
 
-                    image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
+                    image_editor = [space for space in active_area.spaces if space.type == 'IMAGE_EDITOR'][0]
                     if hasattr(image_editor, 'show_gizmo_navigate'):
                         image_editor.show_gizmo_navigate = False
 
