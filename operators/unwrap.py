@@ -75,17 +75,16 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
+        self.umeshes = types.UMeshes()
         if context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
-
-        self.umeshes = types.UMeshes()
 
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
         if not self.umeshes:
             return self.umeshes.update()
 
-        if not selected_umeshes and self.max_distance is not None:
+        if not selected_umeshes and self.max_distance is not None and context.area.ui_type == 'UV':
             return self.pick_unwrap()
         else:
             if self.umeshes.sync:
