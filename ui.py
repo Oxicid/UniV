@@ -141,8 +141,8 @@ class UNIV_PT_General(Panel):
 
         row = col.row(align=True)
         row.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
-        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'HORIZONTAL'
-        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'VERTICAL'
+        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
+        row.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
 
         col_for_align = col.column()
         col_for_align.separator(factor=0.5)

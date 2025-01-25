@@ -332,6 +332,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
                 if space.type == 'VIEW_3D':
                     if space.shading.type == 'SOLID':
                         if space.shading.color_type != 'TEXTURE':
+                            space.shading.color_type = 'TEXTURE'
                             changed = True
                     elif space.shading.type == 'WIREFRAME':
                         space.shading.type = 'SOLID'
