@@ -61,6 +61,7 @@ class icons:
     stack = 0
     stitch = 0
     straight = 0
+    transfer = 0
     unwrap = 0
     vertical_a = 0
     vertical_b = 0
