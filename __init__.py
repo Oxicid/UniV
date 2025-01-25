@@ -155,6 +155,8 @@ try:
             univ_pro.select.UNIV_OT_Select_Flat,
             # Transform
             univ_pro.drag.UNIV_OT_Drag,
+            # Transfer
+            univ_pro.transfer.UNIV_OT_Transfer,
 
         ))
         for idx, opt in enumerate(classes):

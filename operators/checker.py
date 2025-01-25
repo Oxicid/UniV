@@ -326,12 +326,19 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     @staticmethod
     def update_views():
+        changed = False
         for area in utils.get_areas_by_type('VIEW_3D'):
             for space in area.spaces:
                 if space.type == 'VIEW_3D':
                     if space.shading.type == 'SOLID':
+                        if space.shading.color_type != 'TEXTURE':
+                            changed = True
+                    elif space.shading.type == 'WIREFRAME':
+                        space.shading.type = 'SOLID'
                         space.shading.color_type = 'TEXTURE'
-        bpy.context.view_layer.update()
+                        changed = True
+        if changed:
+            bpy.context.view_layer.update()
 
     def x_check(self, name):
         """Has 'x' after resolution"""

@@ -298,6 +298,8 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
 
         col_align.label(text='Project')
         row = col_align.row(align=True)
+        row.operator('mesh.univ_transfer')
+        row = col_align.row(align=True)
         row.operator('mesh.univ_normal', icon_value=icons.normal)
         row.operator('mesh.univ_box_project', icon_value=icons.box)
 
@@ -305,9 +307,10 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_smart_project', icon_value=icons.smart)
         row.operator('mesh.univ_view_project', icon_value=icons.view)
 
-        col_align.label(text='Stack')
+        col_align.label(text='Misc')
         row = col_align.row(align=True)
-        row.operator('mesh.univ_stack', text='Stack', icon_value=icons.stack)
+        row.scale_y = 1.35
+        row.operator('mesh.univ_stack', icon_value=icons.stack)
 
         col_align.label(text='Transform')
         col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)

@@ -4,11 +4,6 @@
 import bpy
 from collections import defaultdict
 
-try:
-    from . import univ_pro
-except ImportError:
-    univ_pro = None
-
 keys = []
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']
 other_conflict_areas = ['Frames']
@@ -22,6 +17,11 @@ def add_keymaps():
         if debug():
             print('UniV: Failed to add keymaps. Result = ', kc)
         return
+
+    try:
+        from . import univ_pro
+    except ImportError:
+        univ_pro = None
 
     ### Object Mode
     km = kc.keymaps.new(name='Object Mode')

@@ -595,6 +595,14 @@ class UMeshes:
         self.sync = state
         self.elem_mode = utils.get_select_mode_mesh() if state else utils.get_select_mode_uv()
 
+    def active_to_first(self):
+        active_obj = bpy.context.active_object
+        for idx, umesh in enumerate(self.umeshes):
+            if umesh.obj == active_obj:
+                if idx != 0:
+                    self.umeshes[0], self.umeshes[idx] = self.umeshes[idx], self.umeshes[0]
+                break
+
     def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""
         for umesh in self:
