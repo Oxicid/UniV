@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 0, 19),
+    "version": (3, 1, 0),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -157,6 +157,8 @@ try:
             univ_pro.drag.UNIV_OT_Drag,
             # Transfer
             univ_pro.transfer.UNIV_OT_Transfer,
+            # Misc
+            univ_pro.rectify.UNIV_OT_Rectify,
 
         ))
         for idx, opt in enumerate(classes):

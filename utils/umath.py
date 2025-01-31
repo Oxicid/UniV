@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
-# import numpy as np
+import numpy as np
 from bl_math import lerp
 from mathutils import Vector
 
@@ -44,9 +44,29 @@ def remap(i_min: float, i_max: float, o_min: float, o_max: float, v: float) -> f
     """
     return lerp(o_min, o_max, inv_lerp(i_min, i_max, v))
 
+def weighted_linear_space(start, stop, w):
+    if len(w) == 1:
+        return np.array([start, stop], dtype=np.float32)
+
+    start = np.array([start], dtype=np.float32)
+    stop = np.array([stop], dtype=np.float32)
+
+    if not isinstance(w, np.ndarray):
+        w = np.array(w, dtype=np.float32)
+
+    nw = w / np.sum(w)  # Normalize weights
+    cum_w = np.insert(np.cumsum(nw), 0, 0)  # Create cumulative weight sum
+    return start + np.outer(cum_w, stop - start)
+
+def round_vector_to_cardinal(v):
+    x, y = v
+    if abs(x) >= abs(y):
+        return Vector([np.sign(x), 0])
+    else:
+        return Vector([0, np.sign(y)])
+
 def round_threshold(a, min_clip):
     return round(float(a) / min_clip) * min_clip
-
 
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     line_vec = l_b - l_a

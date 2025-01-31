@@ -327,6 +327,13 @@ class FaceIsland:
             for crn in f.loops:
                 crn.tag = tag
 
+    def set_boundary_tag(self):
+        uv = self.umesh.uv
+        is_boundary = utils.is_boundary_sync if self.umesh.sync else utils.is_boundary_non_sync
+        for f in self:
+            for crn in f.loops:
+                crn.tag = crn.edge.seam or is_boundary(crn, uv)
+
     def set_selected_crn_edge_tag(self, umesh):
         if umesh.sync:
             for f in self:
@@ -340,6 +347,31 @@ class FaceIsland:
 
     def iter_corners_by_tag(self):
         return (crn for f in self for crn in f.loops if crn.tag)
+
+    def set_pins(self, state=True, with_pinned=False) -> list[bmesh.types.BMLoopUV] | None:
+        if with_pinned:
+            assert state
+        uv = self.umesh.uv
+        if with_pinned:
+            pinned_crn: list[bmesh.types.BMLoopUV] = []
+            for f in self:
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    if not crn_uv.pin_uv:
+                        crn_uv.pin_uv = True
+                        pinned_crn.append(crn_uv)
+            return pinned_crn
+        else:
+            for f in self:
+                for crn in f.loops:
+                    crn[uv].pin_uv = state
+
+    def calc_selected_vert_corners_iter(self):
+        if self.umesh.sync:
+            return (crn for f in self for crn in f.loops if crn.vert.select)
+        else:
+            uv = self.umesh.uv
+            return (crn for f in self for crn in f.loops if crn[uv].select)
 
     def tag_selected_corner_verts_by_verts(self, umesh):
         corners = (_crn for f in self for _crn in f.loops)
@@ -658,6 +690,7 @@ class FaceIsland:
                 else:
                     crn.edge.seam = shared_crn.face.index != index
 
+    # TODO: Add mark seam with index
     def calc_max_uv_area_face(self):
         uv = self.umesh.uv
         area = -1.0
@@ -734,6 +767,9 @@ class FaceIsland:
 
     def __str__(self):
         return f'Face Island. Faces count = {len(self.faces)}'
+
+    def __hash__(self):
+        return hash(self[0])
 
 class AdvIslandInfo:
     def __init__(self):
@@ -1396,6 +1432,19 @@ class Islands(IslandsBase):
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)
+                       if cls.island_filter_is_any_vert_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_extended_by_vert_with_mark_seam(cls, umesh: _umesh.UMesh):
+        if not umesh.has_selected_uv_verts():
+            return cls()
+
+        cls.tag_filter_visible(umesh)
+        if umesh.sync and umesh.is_full_face_selected:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                        if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 

@@ -10,7 +10,7 @@ from mathutils import Vector
 from collections import defaultdict
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import prev_disc, linked_crn_uv_by_crn_tag_unordered_included, vec_isclose_to_zero
+from ..utils import prev_disc, linked_crn_uv_by_crn_tag_unordered_included, linked_crn_uv, vec_isclose_to_zero
 from . import umesh as _umesh
 from . import bbox
 from .. import utils
@@ -21,6 +21,11 @@ class LoopGroup:
         self.corners: list[BMLoop] = []
         self.tag = True
         self.dirt = False
+        self._length_uv: float | None = None
+        self._length_3d: float | None = None
+        self.weights: list[float] | None = None
+        self.chain_linked_corners: list[list[BMLoop]] = []
+        self.chain_linked_corners_mask: list[bool] = []
 
     def is_cyclic_vert(self):
         if len(self.corners) > 1:
@@ -156,7 +161,7 @@ class LoopGroup:
         return islands_for_stitch
 
     def tagging(self, island):
-        func: typing.Callable = self.boundary_tag_sync if utils.sync() else self.boundary_tag
+        func: typing.Callable = self.boundary_tag_sync if island.umesh.sync else self.boundary_tag
         for f in island:
             for crn in f.loops:
                 func(crn)
@@ -236,6 +241,92 @@ class LoopGroup:
 
     def calc_bbox(self):
         return bbox.BBox.calc_bbox_uv_corners(self.corners, self.umesh.uv)
+
+    def calc_length_uv(self):
+        uv = self.umesh.uv
+        length = 0.0
+        for crn in self:
+            length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
+        self._length_uv = length
+        return length
+
+    def calc_length_3d(self):
+        length = 0.0
+        for crn in self:
+            length += crn.edge.calc_length()
+        self._length_3d = length
+        return length
+
+    @property
+    def length_uv(self):
+        if self._length_uv is None:
+            return self.calc_length_uv()
+        return self._length_uv
+
+    @length_uv.setter
+    def length_uv(self, v):
+        self._length_uv = v
+
+    @property
+    def length_3d(self):
+        if self._length_3d is None:
+            return self.calc_length_3d()
+        return self._length_3d
+
+    @length_3d.setter
+    def length_3d(self, v):
+        self._length_3d = v
+
+    def get_vector(self):
+        uv = self.umesh.uv
+        vec = self[-1].link_loop_next[uv].uv - self[0][uv].uv
+        if vec == Vector((0.0, 0.0)):
+            for crn in self:
+                vec = crn.link_loop_next[uv].uv - crn[uv].uv
+                if vec != Vector((0.0, 0.0)):
+                    return vec
+        return vec
+
+    def set_pins(self, state=True):
+        assert self.chain_linked_corners
+        uv = self.umesh.uv
+        for linked_groups in self.chain_linked_corners:
+            for crn in linked_groups:
+                crn[uv].pin_uv = state
+
+    def set_pins_by_mask(self):
+        assert self.chain_linked_corners
+        uv = self.umesh.uv
+        for linked_groups, state in zip(self.chain_linked_corners, self.chain_linked_corners_mask):
+            for crn in linked_groups:
+                crn[uv].pin_uv = state
+
+    def calc_chain_linked_corners_mask_from_short_path(self, short_path):
+        assert self.chain_linked_corners
+        mask = []
+        uv = self.umesh.uv
+        path_corners = set(short_path)
+        for corners in self.chain_linked_corners:
+            mask.append(corners[0][uv].pin_uv or any((l_crn in path_corners) for l_crn in corners))
+        self.chain_linked_corners_mask = mask
+
+    def calc_chain_linked_corners(self):
+        uv = self.umesh.uv
+        for crn in chain(self, [self[-1].link_loop_next]):
+            linked = linked_crn_uv(crn, uv)
+            linked.insert(0, crn)
+            self.chain_linked_corners.append(linked)
+
+    def distribute(self, start, end):
+        assert self.chain_linked_corners
+        uv = self.umesh.uv
+        if self.weights is None:
+            self.weights = [crn.edge.calc_length() for crn in self]
+
+        points = utils.weighted_linear_space(start, end, self.weights)
+        for corners, co in zip(self.chain_linked_corners, points):
+            for l_crn in corners:
+                l_crn[uv].uv = co
 
     @classmethod
     def calc_dirt_loop_groups(cls, umesh):
@@ -323,6 +414,37 @@ class LoopGroups:
     def __init__(self, loop_groups, umesh):
         self.loop_groups: list[LoopGroup] = loop_groups
         self.umesh: _umesh.UMesh | None = umesh
+        self.tag = True
+
+    @classmethod
+    def calc_by_boundary_crn_tags(cls, isl):
+        """Warning: Need indexing and tags by boundary"""
+        uv = isl.umesh.uv
+        loop_groups = []
+        for crn in isl.iter_corners_by_tag():
+            crn.tag = False
+            group = [crn]
+            temp_crn: BMLoop | None = crn
+            while temp_crn:
+                next_crn = temp_crn.link_loop_next
+                if next_crn.tag:
+                    next_crn.tag = False
+                    temp_crn = next_crn
+                    group.append(next_crn)
+                    continue
+                for linked_crn in reversed(linked_crn_uv(next_crn, uv)):
+                    if linked_crn.tag:
+                        linked_crn.tag = False
+                        temp_crn = linked_crn
+                        group.append(linked_crn)
+                        break
+                else:
+                    temp_crn = None
+
+            lg = LoopGroup(isl.umesh)
+            lg.corners = group
+            loop_groups.append(lg)
+        return cls(loop_groups, isl.umesh)
 
     def indexing(self, _=None):
         for f in self.umesh.bm.faces:
@@ -338,6 +460,14 @@ class LoopGroups:
 
     def move(self, delta: Vector):
         return bool(sum(lg.move(delta) for lg in self.loop_groups))
+
+    def set_pins(self, state=True):
+        for lg in self:
+            lg.set_pins(state)
+
+    def set_pins_by_mask(self):
+        for lg in self:
+            lg.set_pins_by_mask()
 
     def __iter__(self) -> typing.Iterator[LoopGroup]:
         return iter(self.loop_groups)

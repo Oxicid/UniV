@@ -161,9 +161,18 @@ class UMesh:
         return False
 
     def has_selected_uv_edges(self) -> bool:
-        """Warning: Edges might be without corners in sync mode"""
         if self.sync:
-            return bool(self.total_edge_sel)
+            if not self.total_edge_sel:
+                return False
+            elif self.total_face_sel:
+                return True
+            else:
+                for f in self.bm.faces:
+                    if not f.hide:
+                        for e in f.edges:
+                            if e.select:
+                                return True
+                return False
         if not self.total_face_sel:
             return False
         uv = self.uv
@@ -172,9 +181,18 @@ class UMesh:
         return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
 
     def has_selected_uv_verts(self) -> bool:
-        """Warning: Edges might be without corners in sync mode"""
         if self.sync:
-            return bool(self.total_vert_sel)
+            if not self.total_vert_sel:
+                return False
+            elif self.total_face_sel:
+                return True
+            else:
+                for f in self.bm.faces:
+                    if not f.hide:
+                        for v in f.verts:
+                            if v.select:
+                                return True
+                return False
         if not self.total_face_sel:
             return False
         uv = self.uv
@@ -768,6 +786,13 @@ class UMeshes:
         selected = []
         for umesh in self:
             if umesh.has_selected_uv_faces():
+                selected.append(umesh)
+        self.umeshes = selected
+
+    def filter_by_selected_uv_verts(self) -> 'typing.NoReturn':
+        selected = []
+        for umesh in self:
+            if umesh.has_selected_uv_verts():
                 selected.append(umesh)
         self.umeshes = selected
 

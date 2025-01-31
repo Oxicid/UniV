@@ -2359,9 +2359,15 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     def test_invoke(self, _event):
         # from .. import types
         umesh = self.umeshes[0]
-        islands = Islands.calc_selected(umesh)
-        groups = [list(isl[0].loops) for isl in islands]
-        self.calc_from_corners(groups, umesh.uv)
+        uv = umesh.uv
+        islands = Islands.calc_visible(umesh)
+        islands[0].set_tag()
+        sel_crn = [crn for isl in islands for f in isl for crn in f.loops if crn[uv].select]
+        a = sel_crn[0]
+        b = sel_crn[1]
+        path = utils.ShortPath.calc_path_uv_vert(islands[0], a, b, [])
+
+        self.calc_from_corners(path, umesh.uv)
 
     # def test_invoke(self, _event):
     #     self.max_angle = math.radians(20)  # noqa

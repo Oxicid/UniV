@@ -188,6 +188,10 @@ class UNIV_PT_General(Panel):
         col_align = col.column(align=True)
 
         col_align.label(text='Misc')
+        if univ_pro:
+            split = col_align.split(align=True)
+            split.operator('uv.univ_rectify')
+
         split = col_align.split(align=True)
         row = split.row(align=True)
         row.operator('uv.univ_quadrify', icon_value=icons.quadrify)

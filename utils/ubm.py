@@ -760,3 +760,134 @@ def calc_uv_corners(umesh: 'types.UMesh', *, selected) -> list[BMLoop]:
     if selected:
         return calc_selected_uv_vert_corners(umesh)
     return calc_visible_uv_corners(umesh)
+
+class ShortPath:
+
+    @staticmethod
+    def vert_tag_add_adjacent_uv(heap, l_a: BMLoop, loops_prev: list[BMLoop | None], cost: list[float], uv):
+        from itertools import chain
+        import heapq
+        l_a_index = l_a.index
+        uv_a = l_a[uv].uv
+
+        # Loop over faces of face, but do so by first looping over loops.
+        for l in chain(linked_crn_uv(l_a, uv), [l_a]):  # TODO: Add by index included and mark seam and bi-direct linked?
+            #  'l_a' is already tagged, tag all adjacent.
+
+            l.tag = True
+            l_b = l.link_loop_next
+
+            while True:
+                if not l_b.tag:
+                    uv_b = l_b[uv].uv
+                    # We know 'l_b' is not visited, check it out!
+                    l_b_index = l_b.index
+                    cost_cut = (uv_a - uv_b).length
+                    cost_new = cost[l_a_index] + cost_cut
+
+                    if cost[l_b_index] > cost_new:
+                        cost[l_b_index] = cost_new
+                        loops_prev[l_b_index] = l_a
+                        heapq.heappush(heap, (cost_new, id(l_b), l_b))
+
+                # This means we only step onto `l->prev` & `l->next`.
+                if l_b == l.link_loop_next:
+                    l_b = l.link_loop_prev.link_loop_prev
+                if (l_b := l_b.link_loop_next) == l:
+                    break
+
+    @staticmethod
+    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners):
+        import heapq
+        from collections import deque
+        path = deque()
+        # BM_ELEM_TAG flag is used to store visited edges
+        uv = isl.umesh.uv
+        heap = []
+
+        # NOTE: would pass BM_EDGE except we are looping over all faces anyway.
+        # BM_mesh_elem_index_ensure(bm, BM_LOOP); NOTE: not needed for face tag.
+        i = 0
+        for f in isl:
+            for crn in f.loops:
+                crn.tag = False
+                crn.index = i
+                i += 1
+
+        for exclude_crn in exclude_corners:
+            exclude_crn.tag = True
+
+        # Allocate.
+        loops_prev = [None] * i
+        cost = [1e300] * i
+
+        # Regular dijkstra the shortest path, but over UV loops instead of vertices.
+        heapq.heappush(heap, (0.0, l_src.index, l_src))
+        cost[l_src.index] = 0.0
+
+        while heap:
+            l = heapq.heappop(heap)[2]
+            if (l.vert == l_dst.vert) and l[uv].uv == l_dst[uv].uv:
+                while True:
+                    path.appendleft(l)
+                    if not (l := loops_prev[l.index]):
+                        break
+                break
+
+            if not l.tag:
+                #  Adjacent loops are tagged while stepping to avoid 2x loops.
+                l.tag = True
+                ShortPath.vert_tag_add_adjacent_uv(heap, l, loops_prev, cost, uv)
+
+        return list(path)
+
+    @staticmethod
+    def path_to_loop_group_for_rect(path, umesh):
+        assert path
+
+        uv = umesh.uv
+        chain_linked_corners = []
+        for crn in path:
+            linked = linked_crn_uv(crn, uv)
+            linked.insert(0, crn)
+            chain_linked_corners.append(linked)
+
+        it = iter(path)
+        prev_vert_co = next(it).vert.co
+
+        weights = []
+        for crn in it:
+            cur_vert_co = crn.vert.co
+            length = (prev_vert_co - cur_vert_co).length
+            weights.append(length)
+            prev_vert_co = cur_vert_co
+
+        lg = types.LoopGroup(umesh)
+        lg.corners = path
+        lg.chain_linked_corners = chain_linked_corners
+        lg.dirt = True
+        lg.weights = weights
+        return lg
+
+    @staticmethod
+    def calc_length_3d_and_uv_from_path(path, umesh):  # TODO: Add aspect
+        uv = umesh.uv
+        it = iter(path)
+        first_crn = next(it)
+
+        prev_uv_co = first_crn[uv].uv
+        prev_vert_co = first_crn.vert.co
+
+        total_length_3d = 0.0
+        total_length_uv = 0.0
+
+        for crn in it:
+            cur_uv_co = crn[uv].uv
+            cur_vert_co = crn.vert.co
+            total_length_3d += (prev_vert_co - cur_vert_co).length
+            total_length_uv += (prev_uv_co - cur_uv_co).length
+
+            prev_uv_co = cur_uv_co
+            prev_vert_co = cur_vert_co
+
+        return total_length_3d, total_length_uv
