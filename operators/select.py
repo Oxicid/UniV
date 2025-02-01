@@ -1478,7 +1478,8 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                      "Has [Ctrl + Scroll Up/Down] keymap"
 
     def execute(self, context):
-        self.umeshes = UMeshes()
+        self.umeshes = UMeshes.calc(verify_uv=False)
+
         self.umeshes.set_sync()
         self.calc_islands = MeshIslands.calc_visible_with_mark_seam if self.clamp_on_seam else MeshIslands.calc_visible
 

@@ -652,9 +652,10 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH' and obj.data.uv_layers and obj.data.polygons:
+                if obj.type == 'MESH' and obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj))
+                    if bm.faces:
+                        bmeshes.append(UMesh(bm, obj))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
@@ -719,9 +720,10 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH' and obj.data.polygons:
+                if obj.type == 'MESH':
                     bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
+                    if bm.faces:
+                        bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
