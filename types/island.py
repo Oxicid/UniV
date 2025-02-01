@@ -837,6 +837,25 @@ class AdvIsland(FaceIsland):
     def calc_flat_uv_coords(self, save_triplet_=False):
         self.calc_flat_coords(save_triplet_)
 
+    def calc_tris_simple(self):
+        tris_isl = []
+        tris_isl_append = tris_isl.append
+        for f in self:
+            corners = f.loops
+            if (n := len(corners)) == 4:
+                l1, l2, l3, l4 = corners
+                tris_isl_append((l1, l2, l3))
+                tris_isl_append((l3, l4, l1))
+            elif n == 3:
+                tris_isl_append(tuple(corners))
+            else:
+                first_crn = corners[0]
+                for i in range(1, n - 1):
+                    tris_isl_append((first_crn, corners[i], corners[i + 1]))
+
+        self.tris = tris_isl
+        return bool(tris_isl)
+
     def calc_flat_unique_uv_coords(self):
         uv = self.umesh.uv
         self.flat_unique_uv_coords = [crn[uv].uv for f in self for crn in f.loops]
@@ -2033,26 +2052,7 @@ class AdvIslands(Islands):
         return True
 
     def calc_tris_simple(self):
-        if not self.islands:
-            return False
-        for isl in self.islands:
-            tris_isl = []
-            tris_isl_append = tris_isl.append
-            for f in isl:
-                corners = f.loops
-                if (n := len(corners)) == 4:
-                    l1, l2, l3, l4 = corners
-                    tris_isl_append((l1, l2, l3))
-                    tris_isl_append((l3, l4, l1))
-                elif n == 3:
-                    tris_isl_append(tuple(corners))
-                else:
-                    first_crn = corners[0]
-                    for i in range(1, n - 1):
-                        tris_isl_append((first_crn, corners[i], corners[i + 1]))
-
-            isl.tris = tris_isl
-        return True
+        return bool(sum(isl.calc_tris_simple() for isl in self.islands))
 
     def calc_flat_coords(self, save_triplet=False):
         for island in self.islands:

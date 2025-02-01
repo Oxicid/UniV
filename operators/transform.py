@@ -3254,11 +3254,11 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             # TODO: Find how to calculate the shear for the X axis when aspect != 1 without rotation island
             if self.axis == 'X' and isl.umesh.aspect != 1.0 and self.shear:
                 isl.rotate_simple(pi/2, isl.umesh.aspect)
-                self.individual_scale(isl, 'Y')
+                self.individual_scale(isl, 'Y',  self.shear)
                 isl.rotate_simple(-pi/2, isl.umesh.aspect)
                 new_center = isl.calc_bbox().center
             else:
-                new_center = self.individual_scale(isl, self.axis)
+                new_center = self.individual_scale(isl, self.axis, self.shear)
             isl.set_position(isl.value, new_center)
 
         self.umeshes.update(info='All islands were with scaled')
@@ -3269,10 +3269,10 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 
         return {'FINISHED'}
 
-    def individual_scale(self, isl: AdvIsland, axis):
+    @staticmethod
+    def individual_scale(isl: AdvIsland, axis, shear):
         from bl_math import clamp
         aspect = isl.umesh.aspect
-        shear = self.shear
         new_center = isl.value.copy()
 
         vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
@@ -3284,6 +3284,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 
             for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
+                # TODO: Skip zero areas isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol = 0.00001)
                 try:
                     m.invert()
                 except ValueError:

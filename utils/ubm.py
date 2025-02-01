@@ -764,7 +764,7 @@ def calc_uv_corners(umesh: 'types.UMesh', *, selected) -> list[BMLoop]:
 class ShortPath:
 
     @staticmethod
-    def vert_tag_add_adjacent_uv(heap, l_a: BMLoop, loops_prev: list[BMLoop | None], cost: list[float], uv):
+    def vert_tag_add_adjacent_uv(heap, l_a: BMLoop, loops_prev: list[BMLoop | None], cost: list[float], uv, prioritize_corners, bound_priority_factor):
         from itertools import chain
         import heapq
         l_a_index = l_a.index
@@ -783,6 +783,8 @@ class ShortPath:
                     # We know 'l_b' is not visited, check it out!
                     l_b_index = l_b.index
                     cost_cut = (uv_a - uv_b).length
+                    if l_b in prioritize_corners:
+                        cost_cut *= bound_priority_factor
                     cost_new = cost[l_a_index] + cost_cut
 
                     if cost[l_b_index] > cost_new:
@@ -797,7 +799,7 @@ class ShortPath:
                     break
 
     @staticmethod
-    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners):
+    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners, prioritize_corners: set[BMLoop] | tuple = (), bound_priority_factor=0.9):
         import heapq
         from collections import deque
         path = deque()
@@ -819,7 +821,7 @@ class ShortPath:
 
         # Allocate.
         loops_prev = [None] * i
-        cost = [1e300] * i
+        cost = [1e100] * i
 
         # Regular dijkstra the shortest path, but over UV loops instead of vertices.
         heapq.heappush(heap, (0.0, l_src.index, l_src))
@@ -837,7 +839,7 @@ class ShortPath:
             if not l.tag:
                 #  Adjacent loops are tagged while stepping to avoid 2x loops.
                 l.tag = True
-                ShortPath.vert_tag_add_adjacent_uv(heap, l, loops_prev, cost, uv)
+                ShortPath.vert_tag_add_adjacent_uv(heap, l, loops_prev, cost, uv, prioritize_corners, bound_priority_factor)
 
         return list(path)
 
