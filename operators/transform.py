@@ -2977,7 +2977,7 @@ class UNIV_OT_Stitch(Operator):
                 for _isl in target_islands:
                     _isl.calc_selected_edge_length()
 
-                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)
+                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)  # TODO: Replace info
 
                 for _isl in reversed(target_islands):
                     if _isl.info.edge_length < 1e-06:
@@ -2995,10 +2995,11 @@ class UNIV_OT_Stitch(Operator):
 
                     while True:
                         local_stitched = False
-                        for _ in tar.calc_first(target_isl):
-                            source = tar.calc_shared_group()
-                            res = UNIV_OT_Stitch.stitch_ex(self, tar, source, adv_islands)
-                            local_stitched |= res
+                        if target_isl:  # TODO: Stitch_ex remove faces and other attrs, change logic
+                            for _ in tar.calc_first(target_isl):
+                                source = tar.calc_shared_group()
+                                res = UNIV_OT_Stitch.stitch_ex(self, tar, source, adv_islands)
+                                local_stitched |= res
                         stitched |= local_stitched
                         if not local_stitched:
                             break
