@@ -18,6 +18,7 @@ from bpy.props import *
 
 from math import pi, sin, cos, atan2, sqrt, isclose
 from mathutils import Vector, Matrix
+from mathutils.geometry import area_tri
 from collections import defaultdict
 
 from bmesh.types import BMLoop
@@ -3283,8 +3284,9 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             scale_cross = 0.0
 
             for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
+                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-9):
+                    continue
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
-                # TODO: Skip zero areas isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol = 0.00001)
                 try:
                     m.invert()
                 except ValueError:
@@ -3454,6 +3456,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             scale_cross = 0.0
 
             for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
+                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-9):
+                    continue
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
                 try:
                     m.invert()
