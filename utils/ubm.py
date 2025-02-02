@@ -13,6 +13,7 @@ from math import isclose
 from mathutils import Vector
 from mathutils.geometry import area_tri, intersect_point_tri_2d
 from collections import deque
+from itertools import chain
 
 from .. import types
 
@@ -799,7 +800,7 @@ class ShortPath:
                     break
 
     @staticmethod
-    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners, prioritize_corners: set[BMLoop] | tuple = (), bound_priority_factor=0.9):
+    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners_group, prioritize_corners: set[BMLoop] | tuple = (), bound_priority_factor=0.9):
         import heapq
         from collections import deque
         path = deque()
@@ -816,8 +817,16 @@ class ShortPath:
                 crn.index = i
                 i += 1
 
-        for exclude_crn in exclude_corners:
-            exclude_crn.tag = True
+        if exclude_corners_group:
+            for exclude_lg in exclude_corners_group:
+                for chain_corners in exclude_lg.chain_linked_corners:
+                    for crn in chain_corners:
+                        crn.tag = True
+
+            dst_corners = exclude_corners_group[0].chain_linked_corners[-1]
+            src_corners = exclude_corners_group[2].chain_linked_corners[0]
+            for crn in chain(dst_corners, src_corners):
+                crn.tag = False
 
         # Allocate.
         loops_prev = [None] * i
