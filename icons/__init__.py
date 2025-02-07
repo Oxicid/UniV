@@ -46,6 +46,7 @@ class icons:
     pin = 0
     quadrify = 0
     random = 0
+    rectify = 0
     relax = 0
     remove = 0
     reset = 0

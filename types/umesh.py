@@ -740,7 +740,7 @@ class UMeshes:
 
     @classmethod
     def calc_any_unique(cls, report=None):
-        # Get unique umeshes without uv
+        """ Get unique umeshes without uv """
         umeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:

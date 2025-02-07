@@ -190,7 +190,7 @@ class UNIV_PT_General(Panel):
         col_align.label(text='Misc')
         if univ_pro:
             split = col_align.split(align=True)
-            split.operator('uv.univ_rectify')
+            split.operator('uv.univ_rectify', icon_value=icons.rectify)
 
         split = col_align.split(align=True)
         row = split.row(align=True)
@@ -233,6 +233,8 @@ class UNIV_PT_General(Panel):
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border', icon_value=icons.border)
         row.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
+
+        col_align.separator(factor=0.35)
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
