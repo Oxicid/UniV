@@ -31,6 +31,13 @@ def is_pair(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
     return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
            crn[uv].uv == _rad_prev.link_loop_next[uv].uv
 
+def is_pair_by_idx(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
+    if crn == _rad_prev or crn.face.index != _rad_prev.face.index:
+        return False
+    return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
+           crn[uv].uv == _rad_prev.link_loop_next[uv].uv  # noqa
+
+
 def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn and crn.face.index == shared.face.index:
@@ -375,24 +382,16 @@ def linked_crn_to_vert_by_island_index_unordered(crn):
     return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx]
 
 def select_linked_crn_uv_vert(first: BMLoop, uv: BMLayerItem):
-    bm_iter = first
-    while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
-            break
-        crn_uv_bm_iter = bm_iter[uv]
-        if first[uv].uv == crn_uv_bm_iter.uv:  # TODO: Optimize and test
-            crn_uv_bm_iter.select = True
+    first_uv_co = first[uv].uv
+    for crn in first.vert.link_loops:
+        crn_uv = crn[uv]
+        if first_uv_co == crn_uv.uv:
+            crn_uv.select = True
 
 def select_crn_uv_edge(crn: BMLoop, uv):
-    link_crn_next = crn.link_loop_next
+    crn[uv].select_edge = True
     select_linked_crn_uv_vert(crn, uv)
-    select_linked_crn_uv_vert(link_crn_next, uv)
-
-    crn_uv_a = crn[uv]
-    crn_uv_b = link_crn_next[uv]
-    crn_uv_a.select = True
-    crn_uv_a.select_edge = True
-    crn_uv_b.select = True
+    select_linked_crn_uv_vert(crn.link_loop_next, uv)
 
 def select_crn_uv_edge_with_shared_by_idx(crn: BMLoop, uv, force=False):
     idx = crn.face.index

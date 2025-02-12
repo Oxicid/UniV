@@ -716,7 +716,7 @@ class UMeshes:
 
     @classmethod
     def calc(cls, report=None, verify_uv=True):
-        # Get umeshes without uv
+        """ Get umeshes without uv but with faces"""
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
@@ -739,14 +739,14 @@ class UMeshes:
         return cls(bmeshes, report=report)
 
     @classmethod
-    def calc_any_unique(cls, report=None):
-        """ Get unique umeshes without uv """
+    def calc_any_unique(cls, report=None, verify_uv=True):
+        """ Get unique umeshes without uv and without faces"""
         umeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
                 if obj.type == 'MESH':
                     bm = bmesh.from_edit_mesh(obj.data)
-                    umeshes.append(UMesh(bm, obj))
+                    umeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
 
@@ -758,7 +758,7 @@ class UMeshes:
                 bm = bmesh.new()
                 bm.from_mesh(data)
                 objs.sort(key=lambda a: a.name)
-                umeshes.append(UMesh(bm, objs[0], False))
+                umeshes.append(UMesh(bm, objs[0], False, verify_uv))
         return cls(umeshes, report=report)
 
     def filter_selected_faces(self):
