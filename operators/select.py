@@ -2244,7 +2244,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
     island_mode: EnumProperty(name='Mode', default='ISLAND', items=(('ISLAND', 'Island', ''), ('FACE', 'Face', '')))
 
     target_texel: FloatProperty(name='Texel', default=512, min=1, soft_min=32, soft_max=2048, max=10_000)
-    threshold: FloatProperty(name='Texel', default=0.01, min=0, soft_max=50, max=10_000)
+    threshold: FloatProperty(name='Threshold', default=0.01, min=0, soft_max=50, max=10_000)
 
     def draw(self, context):
         layout = self.layout
@@ -2338,14 +2338,8 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         if not has_elem:
             self.report({'WARNING'}, f'{self.island_mode.capitalize() + "s"} not found')
         else:
-            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
-            if counter:
-                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} {self.island_mode + "s"}')
-            else:
-                if counter_skipped:
-                    self.report({'INFO'}, f'The {self.island_mode.capitalize() + "s"} were already {sel_or_deselect}')
-                else:
-                    self.report({'WARNING'}, f'No found {self.island_mode.capitalize() + "s"} in the specified texel')
+            if not counter and not counter_skipped:
+                self.report({'WARNING'}, f'No found {self.island_mode.capitalize() + "s"} in the specified texel')
         umeshes.silent_update()
         return {'FINISHED'}
 
@@ -2649,13 +2643,7 @@ class UNIV_OT_Stacked(Operator):
         if not union_islands:
             self.report({'WARNING'}, f'Islands not found')
         else:
-            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
-            if counter:
-                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} stacked islands')
-            else:
-                if counter_skipped:
-                    self.report({'INFO'}, f'The stacked islands were already {sel_or_deselect}')
-                else:
-                    self.report({'WARNING'}, f'No found stacked islands')
+            if not counter and not counter_skipped:
+                self.report({'WARNING'}, f'No found stacked islands')
         umeshes.silent_update()
         return {'FINISHED'}
