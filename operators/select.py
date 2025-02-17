@@ -1540,15 +1540,13 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                 if umesh.is_full_face_deselected:
                     continue
 
-            uv = umesh.uv
             if islands := self.calc_islands(umesh):  # noqa
                 islands.indexing()
                 for idx, isl in enumerate(islands):
                     if self.umeshes.elem_mode == 'FACE':
                         for f in isl:
                             if f.select:
-                                f.tag = any(not l_crn.face.select for crn in f.loops
-                                            for l_crn in utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx))
+                                f.tag = any(not l_crn.face.select for crn in f.loops for l_crn in utils.linked_crn_to_vert_by_island_index_unordered(crn))
                     else:
                         if umesh.is_full_face_deselected:
                             for f in isl:
@@ -2435,8 +2433,8 @@ class UNIV_OT_SelectByArea(Operator):
         ('Y', 'Size Y', ''),
     ))
 
-    threshold: FloatProperty(name='Threshold', default=0.01, min=0, soft_min=0.01, soft_max=0.1, max=0.5, subtype='FACTOR')
-    lower_slider: FloatProperty(name='Low', default=0.2, min=0, max=0.9, subtype='PERCENTAGE',
+    threshold: FloatProperty(name='Threshold', default=0.005, min=0, soft_min=0.005, soft_max=0.1, max=0.5, subtype='FACTOR')
+    lower_slider: FloatProperty(name='Low', default=0.1, min=0, max=0.9, subtype='PERCENTAGE',
         update=lambda self, _: setattr(self, 'higher_slider', self.lower_slider+0.05) if self.higher_slider-0.05 < self.lower_slider else None)
     higher_slider: FloatProperty(name='High', default=0.8, min=0.1, max=1, subtype='PERCENTAGE',
         update=lambda self, _: setattr(self, 'lower_slider', self.higher_slider-0.05) if self.higher_slider-0.05 < self.lower_slider else None)
@@ -2557,14 +2555,8 @@ class UNIV_OT_SelectByArea(Operator):
         if not islands_of_mesh:
             self.report({'WARNING'}, f'Islands not found')
         else:
-            sel_or_deselect = "deselected" if self.mode == "DESELECT" else "selected"
-            if counter:
-                self.report({'INFO'}, f'{sel_or_deselect.capitalize()} {counter} islands')
-            else:
-                if counter_skipped:
-                    self.report({'INFO'}, f'The islands were already {sel_or_deselect}')
-                else:
-                    self.report({'WARNING'}, f'No found in the specified size')
+            if not counter and not counter_skipped:
+                self.report({'WARNING'}, f'No found in the specified size')
         umeshes.silent_update()
         return {'FINISHED'}
 

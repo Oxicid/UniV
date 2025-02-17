@@ -299,7 +299,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
     all_channels: BoolProperty(name='All Channels', default=False)
     addition: BoolProperty(name='Addition', default=False)
-    selected: BoolProperty(name='Selected', default=False)
+    selected: BoolProperty(name='Selected Islands', default=False)
     mtl: BoolProperty(name='Mtl', default=True)
     by_sharps: BoolProperty(name='By Sharps', default=False)
 
