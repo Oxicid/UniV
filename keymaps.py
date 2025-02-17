@@ -41,15 +41,15 @@ def add_keymaps():
     keys.append((km, kmi))
 
     # Edge grow
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', alt=True)
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.grow = True
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', alt=True)
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.grow = False
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
+    kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
     keys.append((km, kmi))
 
     ### Window
@@ -90,16 +90,16 @@ def add_keymaps():
     keys.append((km, kmi))
 
     # Edge Grow (Conflict)
-    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', alt=True)
+    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.grow = True
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', alt=True)
+    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.grow = False
     keys.append((km, kmi))
 
     if univ_pro:
-        kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
+        kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
         keys.append((km, kmi))
 
     # Rotate
