@@ -104,7 +104,11 @@ class icons:
     @classmethod
     def unregister_icons_(cls):
         from bpy.utils import previews
-        previews.remove(cls._icons_)
+        try:
+            previews.remove(cls._icons_)
+        except KeyError:
+            pass
+
         cls.reset_icon_value_()
 
     @staticmethod

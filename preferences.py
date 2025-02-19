@@ -82,10 +82,11 @@ def _update_uv_layers_active_idx(self, context):
                     if not uvs[idx].active:
                         uvs[idx].active = True
         if prefs().enable_uv_layers_sync_borders_seam and bpy.context.mode == 'EDIT_MESH':
-            if bpy.context.area.type == 'VIEW_3D':
-                bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
-            else:
-                bpy.ops.uv.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+            if area := bpy.context.area:
+                if area.type == 'VIEW_3D':
+                    bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+                else:
+                    bpy.ops.uv.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
 
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
