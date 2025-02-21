@@ -701,17 +701,17 @@ class UMeshes:
         return cls(bmeshes)
 
     @classmethod
-    def calc_all_objects(cls):
+    def calc_all_objects(cls, verify_uv=True):
         bmeshes = []
         for obj in bpy.data.objects:
             if obj.type == 'MESH':
                 if obj.mode == 'EDIT':
                     bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj))
+                    bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
                 else:
                     bm = bmesh.new()
                     bm.from_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj, False))
+                    bmeshes.append(UMesh(bm, obj, False, verify_uv=verify_uv))
         return cls(bmeshes)
 
     @classmethod

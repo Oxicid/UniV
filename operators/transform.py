@@ -1387,7 +1387,7 @@ class UNIV_OT_Home(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1412,14 +1412,26 @@ class UNIV_OT_Home(Operator):
             self.report({'WARNING'}, "Cursor not found")
             return {'CANCELLED'}
 
-        self.umeshes = types.UMeshes()
-        self.umeshes.update_tag = False
+        self.umeshes = types.UMeshes.calc_any_unique(verify_uv=False)
 
         mod_counter, attr_counter = self.remove_shift_md()  # remove_shift_md changes update tag
         changed_modifiers_count = self.uv_shift_reset_array_and_mirror_and_warp()
         changed_modifiers_count += mod_counter
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        report_info = ''
+        if changed_modifiers_count:
+            report_info += f"Changed {changed_modifiers_count} modifiers."
+        if attr_counter:
+            report_info += f"Deleted {attr_counter} shift attributes."
+
+        self.umeshes = types.UMeshes()
+        self.umeshes.update_tag = False
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        else:
+            selected_umeshes = self.umeshes
+            unselected_umeshes = []
+
         if selected_umeshes:
             self.umeshes = selected_umeshes
             self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
@@ -1427,36 +1439,28 @@ class UNIV_OT_Home(Operator):
             self.umeshes = unselected_umeshes
             self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
         else:
-            if changed_modifiers_count or attr_counter:
-                counter_info = ''
-                if changed_modifiers_count:
-                    counter_info += f"Changed {changed_modifiers_count} modifiers."
-                if attr_counter:
-                    counter_info += f"Deleted {attr_counter} shift attributes."
-                self.report({'INFO'}, counter_info)
-                return
+            if report_info:
+                self.report({'INFO'}, report_info)
+                return {'FINISHED'}
             else:
                 self.report({'WARNING'}, self.no_change_info)
                 return {'CANCELLED'}
+
+        if not self.umeshes.is_edit_mode:
+            self.islands_calc_type = AdvIslands.calc_with_hidden_with_mark_seam
 
         counter = 0
         for umesh in self.umeshes:
             for island in self.islands_calc_type(umesh):  # noqa
                 counter += self.home(island, cursor_loc)
 
-        report_info = ''
-        if counter:
-            report_info += f'Moved {counter} islands. '
-        if changed_modifiers_count:
-            report_info += f"Changed {changed_modifiers_count} modifiers."
-        if attr_counter:
-            report_info += f"Deleted {attr_counter} shift attributes."
-
-        if report_info:
-            self.report({'INFO'}, report_info)
+        if counter or report_info:
+            if report_info:
+                self.report({'INFO'}, report_info)
         else:
             self.report({'WARNING'}, self.no_change_info)
         self.umeshes.silent_update()
+        self.umeshes.free()
         return {'FINISHED'}
 
     @staticmethod
@@ -1468,7 +1472,7 @@ class UNIV_OT_Home(Operator):
         return tag
 
     def remove_shift_md(self):
-        all_object = set(types.UMeshes.calc_all_objects()) - set(self.umeshes)
+        all_object = set(types.UMeshes.calc_all_objects(verify_uv=False)) - set(self.umeshes)
         mod_counter = 0
         attr_counter = 0
         for umesh in self.umeshes:
@@ -1478,23 +1482,37 @@ class UNIV_OT_Home(Operator):
                     mod_counter += 1
 
             # safe attr for instances if not zero
-            if not any(all_umesh.obj.data == umesh.obj.data for all_umesh in all_object):
-                for attr in reversed(umesh.bm.faces.layers.int.values()):
-                    if attr.name.startswith('univ_shift'):
-                        umesh.bm.faces.layers.int.remove(attr)
-                        umesh.update_tag = True
-                        attr_counter += 1
+            instances = (inst_umesh for inst_umesh in all_object if inst_umesh.obj.data == umesh.obj.data)
+            has_inst_with_shift_mod = False
+            for i_mesh in instances:
+                for mod in i_mesh.obj.modifiers:
+                    if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
+                        has_inst_with_shift_mod = True
+                        break
 
-            for attr in reversed(umesh.bm.faces.layers.int.values()):
-                if attr.name.startswith('univ_shift'):
-                    if not any(f[attr] for f in umesh.bm.faces):
-                        umesh.bm.faces.layers.int.remove(attr)
-                        umesh.update_tag = True
-                        attr_counter += 1
+            if not has_inst_with_shift_mod:
+                if self.umeshes.is_edit_mode:
+                    for attr in reversed(umesh.bm.faces.layers.int.values()):
+                        if attr.name.startswith('univ_shift'):
+                            umesh.bm.faces.layers.int.remove(attr)
+                            umesh.update_tag = True
+                            attr_counter += 1
+                else:
+                    for attr in reversed(umesh.obj.data.attributes):
+                        if attr.name.startswith('univ_shift'):
+                            umesh.obj.data.attributes.remove(attr)
+                            umesh.update_tag = True
+                            attr_counter += 1
 
+        # Remove modifiers without univ_shift attr
         for other_umesh in all_object:
             if any(other_umesh.obj.data == umesh.obj.data for umesh in self.umeshes):
-                if not any(attr.name.startswith('univ_shift') for attr in other_umesh.bm.faces.layers.int.values()):
+                if self.umeshes.is_edit_mode:
+                    attributes = other_umesh.bm.faces.layers.int.values()
+                else:
+                    attributes = other_umesh.obj.data.attributes
+
+                if not any(attr.name.startswith('univ_shift') for attr in attributes):
                     for mod in reversed(other_umesh.obj.modifiers):
                         if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
                             other_umesh.obj.modifiers.remove(mod)
@@ -1543,7 +1561,7 @@ class UNIV_OT_Shift(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1572,10 +1590,17 @@ class UNIV_OT_Shift(Operator):
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = types.UMeshes.calc_any_unique(verify_uv=False)
         changed_modifiers = self.shift_array_and_mirror_and_warp()
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        # TODO: Remove gn modifier when shift without modifier
+        self.umeshes = types.UMeshes()
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        else:
+            selected_umeshes = self.umeshes
+            unselected_umeshes = []
+
         if selected_umeshes:
             self.has_selected = True
             self.umeshes = selected_umeshes
@@ -1593,12 +1618,14 @@ class UNIV_OT_Shift(Operator):
                 self.report({'WARNING'}, 'Islands not found')
                 return {'CANCELLED'}
 
+        if not self.umeshes.is_edit_mode:
+            self.islands_calc_type = AdvIslands.calc_with_hidden_with_mark_seam
+
         umeshes_without_attributes = []
         if self.with_modifier and self.gn_shift:
             for umesh in self.umeshes:
                 if 'univ_shift' not in umesh.obj.data.attributes:
-                    umesh.obj.data.attributes.new('univ_shift', 'INT', 'FACE')
-                    umesh.mesh_to_bmesh()
+                    umesh.bm.faces.layers.int.new('univ_shift')
                     umeshes_without_attributes.append(umesh)
 
         all_islands = []
@@ -1621,7 +1648,7 @@ class UNIV_OT_Shift(Operator):
         counter = 0
         deleted_attr_counter = 0
         threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
-        # TODO: Add calc Union by bbox for exact (speedup)
+
         overlapped_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
         for over_isl in reversed(overlapped_islands):
             if isinstance(over_isl, AdvIsland) or len(over_isl) == 1:
@@ -1643,6 +1670,7 @@ class UNIV_OT_Shift(Operator):
                     over_isl[0], over_isl[index_for_bigger] = over_isl[index_for_bigger], over_isl[0]
 
             for idx, isl in enumerate(over_isl):
+                isl.umesh.value = 1
                 if self.with_modifier and self.gn_shift:
                     if idx:
                         shift_attr = isl.umesh.bm.faces.layers.int.get('univ_shift')
@@ -1668,7 +1696,7 @@ class UNIV_OT_Shift(Operator):
         if self.with_modifier and self.gn_shift:
             node_group = self.get_shift_node_group()
             for umesh in self.umeshes:
-                if umesh.update_tag:
+                if umesh.update_tag or isinstance(umesh.value, int):
                     utils.remove_univ_duplicate_modifiers(umesh.obj, 'UniV Shift')
                     self.create_gn_shift_modifier(umesh, node_group)
 
@@ -1688,17 +1716,18 @@ class UNIV_OT_Shift(Operator):
                         changed_modifiers += 1
 
         report_info = ''
-        if counter:
-            report_info += f'Shifted {counter} overlapped islands. '
         if changed_modifiers:
             report_info += f"Changed {changed_modifiers} modifiers."
         if deleted_attr_counter:
             report_info += f"Deleted {deleted_attr_counter} unused attributes."
+
         if report_info:
             self.report({'INFO'}, report_info)
-        else:
+        elif not counter:
             self.report({'WARNING'}, 'Not found islands and modifiers for shift')
+
         self.umeshes.silent_update()
+        self.umeshes.free()
         return {'FINISHED'}
 
     def shift_array_and_mirror_and_warp(self):
