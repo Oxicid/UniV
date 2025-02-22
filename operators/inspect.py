@@ -294,6 +294,10 @@ class UNIV_OT_Check_Overlap(Operator):
     check_mode: EnumProperty(name='Check Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('INEXACT', 'Inexact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
     def draw(self, context):
         layout = self.layout
         if self.check_mode == 'INEXACT':
