@@ -1978,6 +1978,10 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     def execute(self, context):
         self.non_valid_counter = 0
         self.umeshes = types.UMeshes(report=self.report)
+        if not self.umeshes:
+            self.report({'WARNING'}, 'Objects not found')
+            return {'CANCELLED'}
+
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         if not self.is_edit_mode:

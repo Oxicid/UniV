@@ -328,7 +328,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
         settings = univ_settings()
         context = bpy.context
         active_obj = context.active_object
-        if not active_obj or active_obj.type != 'MESH':
+        if not active_obj or active_obj.type != 'MESH' or not context.selected_objects:
             if settings.uv_layers_size:
                 settings.uv_layers_size = 0
                 utils.update_univ_panels()
@@ -623,7 +623,10 @@ class UNIV_OT_Add(Operator):
 
     def execute(self, context):
         settings = univ_settings()
-        objects = utils.calc_any_unique_obj()
+        if not (objects := utils.calc_any_unique_obj()):
+            self.report({'WARNING'}, 'Objects not found')
+            return {'CANCELLED'}
+
         target_min_size = min(len(obj.data.uv_layers) for obj in objects)+1
         if self.add_missed:
             target_max_size = max(len(obj.data.uv_layers) for obj in objects)+1
@@ -692,7 +695,10 @@ class UNIV_OT_Remove(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        objects = utils.calc_any_unique_obj()
+        if not (objects := utils.calc_any_unique_obj()):
+            self.report({'WARNING'}, 'Objects not found')
+            return {'CANCELLED'}
+
         max_size = max(len(obj.data.uv_layers) for obj in objects)
 
         if max_size == 0:
@@ -766,7 +772,10 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
     #     return self.execute(context)
 
     def execute(self, context):
-        objects = utils.calc_any_unique_obj()
+        if not (objects := utils.calc_any_unique_obj()):
+            self.report({'WARNING'}, 'Objects not found')
+            return {'CANCELLED'}
+
         removed_extra_channels_counter = sum(self.sanitize_uv(obj.data) for obj in objects)
 
         uv_names, conflicts_counter = self.sanitize_attr_names_and_get_names(objects)
