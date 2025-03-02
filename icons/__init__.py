@@ -1,5 +1,11 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+# The icons were created by Vitaly Zhdanov https://www.youtube.com/@diffusecolor , for which he is very thankful!
+# His work gave the project a finished and professional look.
+# Excellent detailing and stylish design made the interface more convenient and pleasant.
+# Thank you for the work done!
+
 import os
 class icons:
     _icons_ = None

@@ -1,7 +1,7 @@
 # UniV
 Blender Addon for UV Editor which aims to cover all sorts of operators for working with UV
 
-[![Watch the video](https://i.ytimg.com/vi/KxYE8IHpVbE/maxresdefault.jpg)](https://youtu.be/KxYE8IHpVbE)
+[![Watch the video](https://i.ytimg.com/vi/-LEZl2Q9lhY/maxresdefault.jpg)](https://youtu.be/-LEZl2Q9lhY)
 
 Buy:
 
