@@ -175,7 +175,8 @@ def calc_min_align_angle_pt(points):
     align_angle_pre = mathutils.geometry.box_fit_2d(points)
     return find_min_rotate_angle(align_angle_pre)
 
-def get_cursor_location() -> Vector:
+
+def get_cursor_location() -> Vector | None:
     if bpy.context.area.ui_type == 'UV':
         return bpy.context.space_data.cursor_location.copy()
     for window in bpy.context.window_manager.windows:
@@ -187,7 +188,7 @@ def get_cursor_location() -> Vector:
 def get_mouse_pos(context, event):
     return Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
 
-def get_tile_from_cursor() -> Vector:
+def get_tile_from_cursor() -> Vector | None:
     if cursor := get_cursor_location():
         return Vector((math.floor(val) for val in cursor))
 
@@ -224,7 +225,7 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
                 objects.append(obj)
     else:
         from collections import defaultdict
-        data_and_objects: defaultdict[bpy.types.Mesh | list[bpy.types.Object]] = defaultdict(list)
+        data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
 
         for obj in bpy.context.selected_objects:
             if obj.type == 'MESH':

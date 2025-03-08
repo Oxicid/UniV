@@ -476,9 +476,12 @@ class UNIV_OT_UV_Layers_Manager(Operator):
 
     @staticmethod
     def append_handler_with_delay():
-        if univ_settings().uv_layers_show:
-            bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
-        return
+        try:
+            if univ_settings().uv_layers_show:
+                bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
+        except Exception as e:
+            print('Failed to add a handler for UV Layer system.', e)
+
 
 class UNIV_OT_MoveUpDownBase(Operator):
     bl_options = {'REGISTER', 'UNDO'}

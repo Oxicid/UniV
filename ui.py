@@ -23,13 +23,13 @@ class UNIV_PT_General(Panel):
 
     @staticmethod
     def draw_align_buttons(where):
-        def LyWideIconOp(layer, direct, icon):
+        def ly_wide_icon_op(layer, direct, icon):
             row = layer.row(align=True)
             row.ui_units_x = 3
             row.scale_x = 2.05
             row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
 
-        def LyMidMidOp(layer, direct, icon):
+        def ly_mid_mid_op(layer, direct, icon):
             row = layer.row(align=True)
             row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
             row.scale_x = 2
@@ -37,24 +37,24 @@ class UNIV_PT_General(Panel):
         colMain = where.column(align=True)
         rowTop = colMain.row(align=True)
 
-        LyWideIconOp(rowTop, 'LEFT_UPPER', icons.arrow_top_left)
-        LyWideIconOp(rowTop.row(), 'UPPER', icons.arrow_top)
-        LyWideIconOp(rowTop, 'RIGHT_UPPER', icons.arrow_top_right)
+        ly_wide_icon_op(rowTop, 'LEFT_UPPER', icons.arrow_top_left)
+        ly_wide_icon_op(rowTop.row(), 'UPPER', icons.arrow_top)
+        ly_wide_icon_op(rowTop, 'RIGHT_UPPER', icons.arrow_top_right)
 
         rowMiddle = colMain.row().row(align=True)
-        LyWideIconOp(rowMiddle, 'LEFT', icons.arrow_left)
+        ly_wide_icon_op(rowMiddle, 'LEFT', icons.arrow_left)
 
         rowMidMiddle = rowMiddle.row().row(align=True)
 
-        LyMidMidOp(rowMidMiddle, 'HORIZONTAL', icons.horizontal_c)
-        LyMidMidOp(rowMidMiddle.row(), 'CENTER', icons.center)
-        LyMidMidOp(rowMidMiddle.row(), 'VERTICAL', icons.vertical_b)
-        LyWideIconOp(rowMiddle, 'RIGHT', icons.arrow_right)
+        ly_mid_mid_op(rowMidMiddle, 'HORIZONTAL', icons.horizontal_c)
+        ly_mid_mid_op(rowMidMiddle.row(), 'CENTER', icons.center)
+        ly_mid_mid_op(rowMidMiddle.row(), 'VERTICAL', icons.vertical_b)
+        ly_wide_icon_op(rowMiddle, 'RIGHT', icons.arrow_right)
 
         rowBottom = colMain.row(align=True)
-        LyWideIconOp(rowBottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
-        LyWideIconOp(rowBottom.row(), 'BOTTOM', icons.arrow_bottom)
-        LyWideIconOp(rowBottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
+        ly_wide_icon_op(rowBottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
+        ly_wide_icon_op(rowBottom.row(), 'BOTTOM', icons.arrow_bottom)
+        ly_wide_icon_op(rowBottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
 
     @staticmethod
     def draw_texel_density(layer, prefix):

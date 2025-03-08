@@ -72,7 +72,7 @@ class StackIsland:  # TODO: Split for source and target islands
         self.face_start_pattern_backward: deque[np.array] = deque()
         self.start_faces_patterns_backward: list[list[deque[np.array], deque[BMLoop]]] = []
 
-        self.ngons_with_faces: defaultdict[int | list[BMFace]] = defaultdict(list)
+        self.ngons_with_faces: defaultdict[int, list[BMFace]] = defaultdict(list)
         self.np_ngons_with_faces: np.array = np.array([], dtype='int32')
 
     def preprocessing(self):
@@ -110,11 +110,11 @@ class StackIsland:  # TODO: Split for source and target islands
 
         self.np_ngons_with_faces = np_ngons_with_faces[np_ngons_with_faces[:, 0].argsort()]
 
-    def calc_linked_corners_pattern(self, idx):
+    def calc_linked_corners_pattern(self, idx) -> list[deque[np.ndarray] | deque[BMLoop]]:
         init_face: BMFace = self.unique_faces[idx]
         face_idx = init_face.index
 
-        face_start_pattern: deque[np.array] = deque()  # [shared face size, linked face size]
+        face_start_pattern: deque[np.ndarray] = deque()  # [shared face size, linked face size]
         face_start_pattern_crn: deque[BMLoop] = deque(init_face.loops)
 
         index_of_max_elem = face_start_pattern_crn.index(max(face_start_pattern_crn, key=lambda _crn: _crn.edge.calc_length()))
@@ -136,7 +136,7 @@ class StackIsland:  # TODO: Split for source and target islands
         return [face_start_pattern, face_start_pattern_crn]
 
     def calc_all_linked_corners_pattern(self):
-        start_faces_patterns: list[list[deque[np.array], deque[BMLoop]]] = []
+        start_faces_patterns: list[list[deque[np.ndarray] | deque[BMLoop]]] = []
         for idx, sequ in enumerate(self.unique_faces):
             # continue
             if not idx:

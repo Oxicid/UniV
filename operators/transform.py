@@ -169,7 +169,7 @@ class UNIV_OT_Crop(Operator):
 
     @staticmethod
     def crop_inplace(axis, padding, umeshes, proportional, inplace=True, extended=True):
-        islands_of_tile: dict[int | list[tuple[FaceIsland | BBox]]] = {}
+        islands_of_tile: dict[int, list[tuple[FaceIsland, BBox]]] = {}
         for umesh in umeshes:
             if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
                 for island in islands:
@@ -650,7 +650,6 @@ class UNIV_OT_Align(Operator):
                 return 1, -1
             case _:
                 raise NotImplementedError(direction)
-        return
 
 class UNIV_OT_Flip(Operator):
     bl_idname = 'uv.univ_flip'

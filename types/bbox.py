@@ -421,7 +421,7 @@ class BBox:
 
         return dx * dx + dy * dy <= radius * radius
 
-    def transform_pt_v(self, *dst: 'BBox', xy_src: list[float]) -> list[float]:
+    def transform_pt_v(self, dst: 'BBox', xy_src: list[float]) -> list[float]:
         xy_dst = [0.0, 0.0]
         xy_dst[0] = ((xy_src[0] - self.xmin) / (self.xmax - self.xmin))
         xy_dst[0] = dst.xmin + ((dst.xmax - dst.xmin) * xy_dst[0])

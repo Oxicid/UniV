@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
-import collections
 
 if 'bpy' in locals():
     from .. import reload
@@ -14,6 +13,8 @@ import typing
 import enum
 import itertools
 import numpy as np
+import collections
+from collections import defaultdict
 
 from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_tri_tri_2d as isect_tris_2d
@@ -632,7 +633,7 @@ class FaceIsland:
             else:
                 return self.__info_face_select_sync()
 
-    def calc_materials(self, umesh: _umesh.UMesh) -> tuple[str]:
+    def calc_materials(self, umesh: _umesh.UMesh) -> tuple[str, ...]:
         indexes = set()
         for f in self.faces:
             indexes.add(f.material_index)
@@ -959,7 +960,7 @@ class AdvIsland(FaceIsland):
                     v_prev = corners[-1].vert.co * scale
                     for crn in corners:
                         v_curr = crn.vert.co * scale
-                        # inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
+                        # inplace optimization ~20%: n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
                         v_prev_yzx = v_prev.yzx
                         v_prev_zxy = v_prev.zxy
 
@@ -1738,10 +1739,10 @@ class Islands(IslandsBase):
     def faces_iter(self):
         return (f for isl in self for f in isl)
 
-    def __iter__(self) -> typing.Iterator['FaceIsland | AdvIsland']:
+    def __iter__(self) -> typing.Iterator[FaceIsland]:
         return iter(self.islands)
 
-    def __getitem__(self, idx) -> 'FaceIsland | AdvIsland':
+    def __getitem__(self, idx) -> FaceIsland:  # TODO: Add type[typing.Self].island_type
         return self.islands[idx]
 
     def __bool__(self):
@@ -1776,9 +1777,9 @@ class UnionIslandsController:
         return self._islands[0].umesh.sync
 
 class UnionIslands(Islands):
-    def __init__(self, islands):
+    def __init__(self, islands: list[AdvIsland]):
         super().__init__([])
-        self.islands: list[AdvIsland | FaceIsland] = islands
+        self.islands = islands
         self.umesh = UnionIslandsController(islands)
         # self.flat_coords = []
         self.convex_coords = []
@@ -1836,7 +1837,7 @@ class UnionIslands(Islands):
 
     @property
     def flat_unique_uv_coords(self):
-        return itertools.chain.from_iterable(isl.flat_unique_uv_coords for isl in self)
+        return itertools.chain.from_iterable(isl.flat_unique_uv_coords for isl in self)  # noqa
 
     @property
     def select(self):
@@ -1852,14 +1853,14 @@ class UnionIslands(Islands):
 
     def calc_convex_points(self):
         points = []
-        if self[0].convex_coords:
+        if self[0].convex_coords:  # noqa
             for island in self:
-                points.extend(island.convex_coords)
+                points.extend(island.convex_coords)  # noqa
             self.convex_coords = [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
             return self.convex_coords
-        elif self[0].flat_coords:
+        elif self[0].flat_coords:  # noqa
             for island in self:
-                points.extend(island.flat_coords)
+                points.extend(island.flat_coords)  # noqa
             self.convex_coords = [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
             return self.convex_coords
         else:
@@ -1899,7 +1900,7 @@ class UnionIslands(Islands):
                     return np.all(a_matches) and np.all(b_matches)
 
             # reduce islands by len
-            islands_by_len: collections.defaultdict[int | list[AdvIsland]] = collections.defaultdict(list)
+            islands_by_len: defaultdict[int, list[AdvIsland]] = defaultdict(list)
             for isl in adv_islands:
                 islands_by_len[len(isl)].append(isl)
 
@@ -1910,7 +1911,7 @@ class UnionIslands(Islands):
                     single_islands.append(single_island)
 
             # reduce islands by bbox
-            islands_by_bbox: collections.defaultdict[tuple[float | int] | list[AdvIsland]] = collections.defaultdict(list)
+            islands_by_bbox: defaultdict[tuple[float | int, ...], list[AdvIsland]] = defaultdict(list)
             for size, list_of_isl in islands_by_len_.items():
                 for isl in list_of_isl:
                     bbox = isl.bbox
@@ -1926,10 +1927,10 @@ class UnionIslands(Islands):
             islands_by_len_ = islands_by_bbox_
 
             # reduce by area_uv
-            islands_by_ngons: collections.defaultdict[typing.Any | list[AdvIsland]] = collections.defaultdict(list)
+            islands_by_ngons: defaultdict[typing.Any, list[AdvIsland]] = defaultdict(list)
             if adv_islands[0].area_uv != -1.0:
                 for list_of_isl in islands_by_len_.values():
-                    islands_by_area_uv: collections.defaultdict[float | list[AdvIsland]] = collections.defaultdict(list)
+                    islands_by_area_uv: defaultdict[float, list[AdvIsland]] = defaultdict(list)
                     for isl in list_of_isl:
                         islands_by_area_uv[round(isl.area_uv, threshold_to_precision)].append(isl)
 
@@ -2023,6 +2024,12 @@ class UnionIslands(Islands):
     def pop(self, island):
         self.islands.pop(island)
 
+    def __iter__(self) -> typing.Iterator[AdvIsland]:
+        return iter(self.islands)
+
+    def __getitem__(self, idx) -> AdvIsland:  # TODO: Add type[typing.Self].island_type
+        return self.islands[idx]
+
 
 class AdvIslands(Islands):
     island_type = AdvIsland
@@ -2078,3 +2085,9 @@ class AdvIslands(Islands):
     def calc_materials(self, umesh: _umesh.UMesh):
         for isl in self:
             isl.calc_materials(umesh)
+
+    def __iter__(self) -> typing.Iterator[AdvIsland]:
+        return iter(self.islands)
+
+    def __getitem__(self, idx) -> AdvIsland:
+        return self.islands[idx]

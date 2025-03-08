@@ -265,7 +265,7 @@ def quad(island: AdvIsland):
     shape_face(uv, target_face, co_and_linked_uv_corners)
     follow_active_uv(target_face, island)
 
-def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector | list[BMLoopUV]]:
+def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector, list[BMLoopUV]]:
     co_and_linked_uv_corners = {}
     for crn in f.loops:
         co: Vector = crn[uv].uv.copy().freeze()

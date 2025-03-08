@@ -1,19 +1,5 @@
-"""
-Created by Oxicid
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # Everything that happens below is thanks to the K-410
 # The code was taken and modified from the 'btypes' module: https://github.com/K-410/btypes/tree/fafc510bd9de3aa3201edf5ad9bced26a5298bc0
@@ -108,10 +94,10 @@ class BArray(StructBase):
             return cls._cache[c_type]
 
         elif c_type is None:
-            BArray = cls
+            BArray = cls  # noqa
 
         else:
-            class BArray(Structure):
+            class BArray(Structure):  # noqa
                 __name__ = __qualname__ = f"BArray{cls.__qualname__}"
                 _fields_ = (
                     ("data_", c_void_p),
@@ -157,7 +143,7 @@ class BVector(StructBase):
     _fields_ = (("begin", c_void_p),
                 ("end", c_void_p),
                 ("capacity_end", c_void_p),
-                ("_pad", c_char * 32))
+                ("_pad", c_char * 32))  # noqa
 
     _cache = {}
 
@@ -166,14 +152,14 @@ class BVector(StructBase):
             return cls._cache[c_type]
 
         elif c_type is None:
-            BVector = cls
+            BVector = cls  # noqa
         else:
-            class BVector(Structure):
+            class BVector(Structure):  # noqa
                 __name__ = __qualname__ = f"BVector{cls.__qualname__}"
                 _fields_ = (("begin", c_void_p),
                             ("end", c_void_p),
                             ("capacity_end", POINTER(c_type)),
-                            ("_pad", c_char * 32))
+                            ("_pad", c_char * 32))  # noqa
                 __len__ = cls.__len__
                 __iter__ = cls.__iter__
                 __next__ = cls.__next__
@@ -224,10 +210,10 @@ class ListBase(Structure):
             return cls._cache[c_type]
 
         elif c_type is None:
-            ListBase = cls
+            ListBase = cls  # noqa
 
         else:
-            class ListBase(Structure):
+            class ListBase(Structure):  # noqa
                 __name__ = __qualname__ = f"ListBase{cls.__qualname__}"
                 _fields_ = (("first", POINTER(c_type)),
                             ("last",  POINTER(c_type)))
@@ -282,8 +268,8 @@ class View2D(StructBase):
     hor: rcti
     mask: rcti
 
-    min: c_float * 2
-    max: c_float * 2
+    min: c_float * 2  # noqa
+    max: c_float * 2  # noqa
 
     minzoom: c_float
     maxzoom: c_float
@@ -308,7 +294,7 @@ class View2D(StructBase):
     alpha_vert: c_char
     alpha_hor: c_char
 
-    _pad6: c_char * 6
+    _pad6: c_char * 6  # noqa
 
     sms: c_void_p  # SmoothView2DStore
     smooth_timer: c_void_p  # wmTimer
@@ -330,13 +316,13 @@ class View2D(StructBase):
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
-    idname: c_char * 64
+    idname: c_char * 64  # noqa
 
 
 class PanelCategoryDyn(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
-    idname: c_char * 64
+    idname: c_char * 64  # noqa
     rect: rcti
 
 
@@ -353,7 +339,7 @@ class ARegion(StructBase):
 
     if version > (3, 5):
         category_scroll: c_int
-        _pad0: c_char * 4
+        _pad0: c_char * 4  # noqa
 
     visible: c_short
     regiontype: c_short
@@ -443,7 +429,7 @@ class ID(StructBase):
     lib:                    c_void_p  # Library
     asset_data:             c_void_p  # AssetMetaData
 
-    name:                   c_char * 66  # MAX_ID_NAME
+    name:                   c_char * 66  # MAX_ID_NAME  # noqa
     flag:                   c_short
     tag:                    c_int
     us:                     c_int
@@ -469,14 +455,14 @@ class ReportList(StructBase):
     printlevel:     c_int
     storelevel:     c_int
     flag:           c_int
-    _pad4:          c_char * 4
+    _pad4:          c_char * 4  # noqa
     reporttimer:    c_void_p  # wmTimer
 
 
 class UndoStep(StructBase):
     next: lambda: POINTER(UndoStep)
     prev: lambda: POINTER(UndoStep)
-    name: c_char * 64
+    name: c_char * 64  # noqa
     type: c_void_p
 
     data_size:          c_size_t
@@ -527,7 +513,7 @@ class wmWindowManager(StructBase):
     autosavetimer:              c_void_p  # wmTimer
     undo_stack:                 c_void_p  # UndoStack
     is_interface_locked:        c_char
-    _pad7:                      c_char * 7
+    _pad7:                      c_char * 7  # noqa
     message_bus:                c_void_p  # wmMsgBus
 
 class CBMesh(StructBase):

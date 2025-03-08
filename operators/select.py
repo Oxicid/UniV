@@ -103,7 +103,7 @@ class UNIV_OT_SelectLinked(Operator):
         if self.deselect is False:
             if context.area.ui_type == 'UV':
                 return bpy.ops.uv.select_linked()
-            if uv_areas := [area for area in context.screen.areas if area.uv_type == 'UV']:
+            if uv_areas := [area for area in context.screen.areas if area.ui_type == 'UV']:
                 with context.temp_override(area=uv_areas[0]):  # noqa
                     return bpy.ops.uv.select_linked()
             return {'CANCELLED'}

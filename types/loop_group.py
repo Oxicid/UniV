@@ -150,7 +150,7 @@ class LoopGroup:
         crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
 
     @staticmethod
-    def calc_island_index_for_stitch(island) -> defaultdict[int | list[BMLoop]]:
+    def calc_island_index_for_stitch(island) -> defaultdict[int, list[BMLoop]]:
         islands_for_stitch = defaultdict(list)
         for f in island:
             for crn in f.loops:
