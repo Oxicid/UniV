@@ -63,7 +63,8 @@ class UNIV_OT_Crop(Operator):
             layout.prop(self, 'inplace')
         layout.prop(self, 'padding', slider=True)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mode: str = 'DEFAULT'
 
     def invoke(self, context, event):
@@ -304,7 +305,8 @@ class UNIV_OT_Align(Operator):
                 return {'CANCELLED'}
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes = None
 
     def execute(self, context):
@@ -696,7 +698,8 @@ class UNIV_OT_Flip(Operator):
                 return {'CANCELLED'}
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes = []
         self.scale = Vector((1, 1))
 
@@ -833,7 +836,8 @@ class UNIV_OT_Rotate(Operator):
             self.mode = 'DEFAULT'
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes = []
         self.angle = 0.0
         self.aspect = 1.0
@@ -934,7 +938,8 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         self.align = event.alt
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
         self.update_tag: bool = False
         self.cursor_loc: Vector | None = None
@@ -1174,7 +1179,8 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
         self.break_ = event.alt
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: types.UMeshes | None = None
         self.cursor_loc: Vector | None = None
@@ -1394,7 +1400,8 @@ class UNIV_OT_Home(Operator):
         self.to_cursor = event.ctrl
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.has_selected = True
         self.gn_mod_counter = 0
         self.shift_attrs_counter = 0
@@ -1583,7 +1590,8 @@ class UNIV_OT_Shift(Operator):
             row.prop(self, 'warp_shift', toggle=1)
         layout.prop(self, 'with_modifier', toggle=1)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
         self.umeshes: types.UMeshes | None = None
@@ -1965,7 +1973,8 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
         self.bound_between = 'CROP' if event.ctrl else 'OFF'
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.seed = 1000
         self.aspect = 1.0
         self.non_valid_counter = 0
@@ -2223,7 +2232,8 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.aspect: float = 1.0
         # WARNING: Possible potential error when calling via bpy.ops.uv.univ_orient('DEFAULT') when an old value is used
         self.mouse_pos: Vector | None = None
@@ -2475,7 +2485,8 @@ class UNIV_OT_Gravity(Operator):
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.axis = 'AUTO'
         self.skip_count: int = 0
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
@@ -2649,7 +2660,8 @@ class UNIV_OT_Weld(Operator):
 
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: types.UMeshes | None = None
         self.global_counter = 0
@@ -2945,7 +2957,8 @@ class UNIV_OT_Stitch(Operator):
         self.between = event.alt
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.sync = utils.sync()
         self.umeshes: types.UMeshes | None = None
         self.global_counter = 0
@@ -3244,7 +3257,8 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         layout.prop(self, 'shear')
         layout.prop(self, 'use_aspect')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
@@ -3415,7 +3429,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             layout.prop(self, 'invert')
         layout.prop(self, 'use_aspect')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
@@ -3663,8 +3678,8 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         self.invert = event.ctrl or event.alt
         return self.execute(context)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mouse_pos = Vector((0, 0))
         self.max_distance: float | None = None
 
@@ -3974,7 +3989,8 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
     def draw(self, context):
         self.draw_overlap()
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.texel: float = 1.0
         self.texture_size: float = 2048.0
         self.has_selected = True
@@ -4088,7 +4104,8 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.texel: float = 1.0
         self.texture_size: float = 2048.0
         self.has_selected = True

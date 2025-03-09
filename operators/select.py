@@ -447,9 +447,8 @@ class UNIV_OT_Select_Square_Island(Operator):
 
     threshold: FloatProperty(name='Square Threshold', default=0.05, min=0, max=1)
 
-    def __init__(self):
-        self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.elem_mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
 
     @classmethod
@@ -469,12 +468,12 @@ class UNIV_OT_Select_Square_Island(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        if self.sync and utils.get_select_mode_mesh() != 'FACE':
+        self.umeshes = UMeshes(report=self.report)
+
+        if self.umeshes.sync and self.umeshes != 'FACE':
             if self.mode != 'ADDITIONAL':
                 utils.set_select_mode_mesh('FACE')
-                self.elem_mode = 'FACE'
-
-        self.umeshes = UMeshes(report=self.report)
+                self.umeshes.elem_mode = 'FACE'
 
         if self.mode == 'DESELECT':
             self.deselect()
@@ -502,7 +501,7 @@ class UNIV_OT_Select_Square_Island(Operator):
     def deselect(self):
         for umesh in self.umeshes:
             update_tag = False
-            if self.sync and types.PyBMesh.is_full_face_deselected(umesh.bm):
+            if self.umeshes.sync and umesh.is_full_face_deselected:
                 umesh.update_tag = False
                 continue
 
@@ -525,7 +524,7 @@ class UNIV_OT_Select_Square_Island(Operator):
     def addition(self):
         for umesh in self.umeshes:
             update_tag = False
-            if self.sync and types.PyBMesh.is_full_face_selected(umesh.bm):
+            if self.umeshes.sync and umesh.is_full_face_selected:
                 umesh.update_tag = False
                 continue
 
@@ -595,7 +594,8 @@ class UNIV_OT_Select_Border_Edge_by_Angle(Operator):
         layout = self.layout
         layout.prop(self, 'angle', slider=True)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.x_vec = Vector((1, 0))
         self.y_vec = Vector((0, 1))
         self.angle_45 = math.pi / 4
@@ -1007,8 +1007,8 @@ class UNIV_OT_Select_Border(Operator):
         row = self.layout.row(align=True)
         row.prop(self, 'mode', expand=True)
 
-    def __init__(self):
-        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
 
     @classmethod
@@ -1032,7 +1032,6 @@ class UNIV_OT_Select_Border(Operator):
     def execute(self, context):
         if context.scene.tool_settings.use_uv_select_sync:
             bpy.ops.uv.univ_sync_uv_toggle()  # noqa
-            self.sync = False
         if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
             utils.set_select_mode_uv('EDGE')
 
@@ -1157,7 +1156,8 @@ class UNIV_OT_Select_Pick(Operator):
 
     select: BoolProperty(name='Select', default=True)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mouse_pos = Vector((0, 0))
         self.max_distance: float | None = None
         self.umeshes: UMeshes | None = None
@@ -1231,7 +1231,7 @@ class UNIV_OT_Select_Pick(Operator):
 
         return {'FINISHED'}
 
-
+# TODO: Grow after 0.3 (within 0.3-1.5 sec) sec and no effect repeat - without seam clamp
 class UNIV_OT_Select_Grow_Base(Operator):
     bl_label = 'Grow'
     bl_options = {'REGISTER', 'UNDO'}
@@ -1241,7 +1241,8 @@ class UNIV_OT_Select_Grow_Base(Operator):
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.calc_islands: Callable = Callable
         self.umeshes: UMeshes | None = None
 
@@ -1648,7 +1649,8 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                                     description='Gives 35% priority to an edge that has a Mark Sharp, works if there are more than 4 linked edges.')
     boundary_by_boundary: BoolProperty(name='Boundary by Boundary', default=True)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.calc_islands: Callable = Callable
         self.umeshes: UMeshes | None = None
 
@@ -2350,7 +2352,7 @@ class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     def test_invoke(self, _event):
-        # from .. import types
+        # from .. import types  # noqa
         umesh = self.umeshes[0]
         uv = umesh.uv
         islands = Islands.calc_visible(umesh)

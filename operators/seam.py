@@ -43,14 +43,14 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self):
-        self.sync = utils.sync()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
         self.umeshes = types.UMeshes(report=self.report)
 
-        if self.sync:
+        if self.umeshes.sync:
             self.cut_view_2d_sync()
         else:
             self.cut_view_2d_no_sync()
@@ -150,8 +150,8 @@ class UNIV_OT_Cut_VIEW3D(Operator):
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self):
-        self.sync = utils.sync()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
@@ -184,6 +184,7 @@ class UNIV_OT_Cut_VIEW3D(Operator):
                     e.seam = True
                 elif not self.addition:
                     e.seam = False
+
 
 class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"
@@ -225,8 +226,8 @@ class UNIV_OT_Angle(Operator):
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self):
-        self.sync = utils.sync()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
@@ -286,6 +287,7 @@ class UNIV_OT_Angle(Operator):
 
         self.umeshes.update()
         return {'FINISHED'}
+
 
 class UNIV_OT_SeamBorder_VIEW3D(Operator):
     bl_idname = "mesh.univ_seam_border"
@@ -400,6 +402,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
         umeshes.update()
         return {'FINISHED'}
+
 
 class UNIV_OT_SeamBorder(UNIV_OT_SeamBorder_VIEW3D):
     bl_idname = "uv.univ_seam_border"

@@ -43,7 +43,8 @@ class UNIV_Normal(bpy.types.Operator):
         self.individual = event.shift
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
         self.umeshes: types.UMeshes | None = None
@@ -258,7 +259,8 @@ class UNIV_BoxProject(bpy.types.Operator):
         col.separator()
         col.prop(self, 'use_correct_aspect', toggle=1)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: types.UMeshes | None = None
 
@@ -401,7 +403,8 @@ class UNIV_ViewProject(bpy.types.Operator):
         layout.prop(self, 'use_orthographic')
         layout.prop(self, 'use_correct_aspect')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
         self.umeshes: types.UMeshes | None = None
@@ -658,7 +661,8 @@ class UNIV_SmartProject(bpy.types.Operator):
         layout.prop(self, 'add_padding', slider=True)
         layout.prop(self, 'angle_limit', slider=True)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.texture_size = 2048
 
     def execute(self, context):

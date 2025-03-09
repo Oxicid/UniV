@@ -53,7 +53,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
         self.umeshes: types.UMeshes | None = None

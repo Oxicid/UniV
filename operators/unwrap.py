@@ -69,7 +69,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 self.max_distance = None
         return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mouse_pos = Vector((0, 0))
         self.max_distance: float | None = None
         self.umeshes: types.UMeshes | None = None

@@ -29,7 +29,8 @@ class UNIV_OT_Pin(Operator):
 
     clear: BoolProperty(name='Clear', default=False)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
 
     @classmethod

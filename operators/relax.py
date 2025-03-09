@@ -44,8 +44,8 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         if self.slim_support:
             self.layout.prop(self, 'legacy')
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.slim_support: bool = bpy.app.version >= (4, 3, 0)
         if self.slim_support:
             self.unwrap = 'MINIMUM_STRETCH'

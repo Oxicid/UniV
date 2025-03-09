@@ -282,7 +282,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     # def invoke(self, context, event):
     #     return self.execute(context)
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []

@@ -61,7 +61,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
         row.prop(self, 'lock_size', text='', icon='LOCKED' if self.lock_size else 'UNLOCKED')
         row.prop(self, 'size_y', text='')
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.pattern_name: str = ''
         self.resolution_name: str = ''
         self.full_pattern_name: str = ''
