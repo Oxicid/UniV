@@ -105,11 +105,6 @@ def add_keymaps():
 
     # Rotate
     ## Default. CW.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'R', 'DOUBLE_CLICK')  # Work if not selection.
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'DEFAULT'
-    keys.append((km, kmi))
-
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'DEFAULT'

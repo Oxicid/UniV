@@ -1646,6 +1646,12 @@ class Islands(IslandsBase):
         return cls.calc_visible(umesh)
 
     @classmethod
+    def calc_extended_or_visible_with_mark_seam(cls, umesh: _umesh.UMesh, *, extended) -> 'Islands':
+        if extended:
+            return cls.calc_extended_with_mark_seam(umesh)
+        return cls.calc_visible_with_mark_seam(umesh)
+
+    @classmethod
     def calc_any_extended_or_visible_non_manifold(cls, umesh: _umesh.UMesh, *, extended) -> 'Islands':
         if extended:
             return cls.calc_extended_any_vert_non_manifold(umesh)

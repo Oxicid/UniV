@@ -316,10 +316,9 @@ class UNIV_OT_Hide(Operator):
             utils.set_select_mode_mesh('FACE')
 
         self.umeshes = UMeshes(report=self.report)
-
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
-
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
         if not self.umeshes:
             return self.umeshes.update()
         if not selected_umeshes and self.mouse_pos:
