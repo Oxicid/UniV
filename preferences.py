@@ -205,14 +205,6 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
 
-    show_stretch: BoolProperty(name='Show Stretch', default=False)
-    display_stretch_type: EnumProperty(name='Stretch Type',
-        items=(
-            ('AREA', 'Area', ''),
-            ('ANGLE', 'Angle', '')
-        ),
-        default='AREA')
-
     max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
@@ -231,12 +223,6 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, 'snap_points_default')
             layout.separator()
             layout.prop(self, 'show_split_toggle_uv_button')
-
-            row = layout.row()
-            row.active = self.show_stretch
-            row.prop(self, 'show_stretch')
-            row.prop(self, 'display_stretch_type', text='')
-            row.separator()
 
             layout.prop(self, 'max_pick_distance')
             layout.prop(self, 'enable_uv_layers_sync_borders_seam')

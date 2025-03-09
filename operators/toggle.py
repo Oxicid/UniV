@@ -6,6 +6,7 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import time
 import traceback
 
 from .. import utils
@@ -207,8 +208,6 @@ class UNIV_OT_SplitUVToggle(Operator):
                     bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
 
                     image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                    image_editor.uv_editor.show_stretch = prefs().show_stretch
-                    image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                     if hasattr(image_editor, 'show_gizmo_navigate'):
                         image_editor.show_gizmo_navigate = False
 
@@ -323,6 +322,7 @@ class UNIV_OT_SplitUVToggle(Operator):
 class UNIV_OT_SyncUVToggle(Operator):
     bl_idname = 'uv.univ_sync_uv_toggle'
     bl_label = 'Sync UV Toggle'
+    bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
@@ -472,3 +472,85 @@ def univ_header_split_btn(self, _context):
     if prefs().show_split_toggle_uv_button:
         layout = self.layout
         layout.operator('wm.univ_split_uv_toggle', text='', icon='SCREEN_BACK')
+
+
+LAST_STRETCH_TYPE: str = ''
+LAST_STRETCH_TIME: float = 0.0
+STRETCH_SPACE_DATA: bpy.types.Space | None = None
+
+class UNIV_OT_StretchUVToggle(Operator):
+    bl_idname = 'uv.univ_stretch_uv_toggle'
+    bl_label = 'Stretch UV Toggle'
+
+    swap: BoolProperty(name='Swap', default=False)
+
+    def execute(self, context):
+        active_area = context.area
+        if active_area.type == 'IMAGE_EDITOR' and active_area.ui_type != 'UV':
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+
+        global LAST_STRETCH_TYPE
+        global STRETCH_SPACE_DATA
+
+        if not self.swap:
+            STRETCH_SPACE_DATA = None
+
+        uv_editor = context.space_data.uv_editor
+        if self.swap:
+            global LAST_STRETCH_TIME
+            LAST_STRETCH_TIME = time.perf_counter()
+            uv_editor.show_stretch = True
+            if not LAST_STRETCH_TYPE or LAST_STRETCH_TYPE == 'ANGLE':
+                uv_editor.display_stretch_type = 'AREA'
+                LAST_STRETCH_TYPE = 'AREA'
+            else:
+                uv_editor.display_stretch_type = 'ANGLE'
+                LAST_STRETCH_TYPE = 'ANGLE'
+        else:
+            STRETCH_SPACE_DATA = context.space_data
+            bpy.app.timers.register(self.register_,  first_interval=0.22)
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def register_():
+        global LAST_STRETCH_TYPE
+        global STRETCH_SPACE_DATA
+        global LAST_STRETCH_TIME
+
+        if isinstance(STRETCH_SPACE_DATA, type(None)):
+            return None
+
+        delta = time.perf_counter() - LAST_STRETCH_TIME
+        if delta < 0.22:
+            STRETCH_SPACE_DATA = None
+            return None
+
+        uv_editor = STRETCH_SPACE_DATA.uv_editor
+        if uv_editor.show_stretch:
+            uv_editor.show_stretch = False
+            LAST_STRETCH_TYPE = uv_editor.display_stretch_type
+            return None
+
+        uv_editor.show_stretch = True
+        if not LAST_STRETCH_TYPE:
+            LAST_STRETCH_TYPE = 'ANGLE'
+
+        uv_editor.display_stretch_type = LAST_STRETCH_TYPE
+
+        STRETCH_SPACE_DATA = None
+        return None
+
+
+class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
+    bl_idname = 'uv.univ_show_modified_uv_edges_toggle'
+    bl_label = 'Show Modified UV Edges Toggle'
+
+    def execute(self, context):
+        active_area = context.area
+        if active_area.type == 'IMAGE_EDITOR' and active_area.ui_type != 'UV':
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+        context.space_data.uv_editor.show_modified_edges ^= 1
+        return {'FINISHED'}

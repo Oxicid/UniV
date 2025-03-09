@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 1, 7),
+    "version": (3, 1, 9),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -101,6 +101,8 @@ def load_register_types():
             # Toggles
             toggle.UNIV_OT_SplitUVToggle,
             toggle.UNIV_OT_SyncUVToggle,
+            toggle.UNIV_OT_StretchUVToggle,
+            toggle.UNIV_OT_ShowModifiedUVEdgeToggle,
             # Selects
             select.UNIV_OT_SelectLinked,
             select.UNIV_OT_Select_By_Cursor,

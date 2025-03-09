@@ -54,6 +54,7 @@ def add_keymaps():
 
     ### Window
     km = kc.keymaps.new(name='Window')
+
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
     kmi.properties.mode = 'SPLIT'
     keys.append((km, kmi))
@@ -338,6 +339,19 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_orient', 'O', 'PRESS')
     kmi.properties.edge_dir = 'BOTH'
     keys.append((km, kmi))
+
+    # Stretch Toggle
+    kmi = km.keymap_items.new('uv.univ_stretch_uv_toggle', 'Z', 'DOUBLE_CLICK')
+    kmi.properties.swap = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_stretch_uv_toggle', 'Z', 'CLICK')
+    kmi.properties.swap = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_show_modified_uv_edges_toggle', 'Z', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
 
     for _, kmi in keys:
         kmi.active = False
