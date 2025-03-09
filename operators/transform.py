@@ -3648,10 +3648,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         idx = (np.abs(array - value)).argmin()
         return idx
 
-
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
     bl_description = UNIV_OT_Normalize_VIEW3D.bl_description + "\n\nHas [Shift + A] keymap"
+
 
 class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "mesh.univ_adjust_td"
@@ -3914,6 +3914,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         utils.update_area_by_type('VIEW_3D')
 
         return {'FINISHED'}
+
 class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
     bl_idname = "uv.univ_adjust_td"
     bl_description = UNIV_OT_AdjustScale_VIEW3D.bl_description + "\n\nHas [Alt + A] keymap, but it conflicts with the 'Deselect All' operator"

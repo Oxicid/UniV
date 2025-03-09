@@ -267,7 +267,7 @@ class UNIV_BoxProject(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = types.UMeshes.calc(self.report)  # TODO: Make like Normal or View
         if self.is_edit_mode:
-            self.umeshes.filter_selected_faces()
+            self.umeshes.filter_by_selected_mesh_faces()
         self.box()
         if not self.is_edit_mode:
             self.umeshes.update('No faces for manipulate')

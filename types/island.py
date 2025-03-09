@@ -470,6 +470,25 @@ class FaceIsland:
                     luv.select_edge = state
 
     @property
+    def hide(self):
+        raise NotImplementedError()
+
+    @hide.setter
+    def hide(self, state: bool):
+        if self.umesh.sync:
+            fast_find_faces = set(self.faces)
+            for face in self.faces:
+                face.hide = state
+                for e in face.edges:
+                    e.hide = all(f_from_e in fast_find_faces for f_from_e in e.link_faces if not f_from_e.hide)
+                for v in face.verts:
+                    # Warning: This implementation hides one vertex of the wire edge
+                    v.hide = all(f_from_v in fast_find_faces for f_from_v in v.link_faces if not f_from_v.hide)
+        else:
+            for face in self.faces:
+                face.select = not state
+
+    @property
     def select_all_elem(self):
         raise NotImplementedError()
 

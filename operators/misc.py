@@ -13,9 +13,11 @@ from bpy.types import Operator
 from bpy.props import *
 from collections import Counter
 from .. import utils
+from .. import types
 from ..types import UMeshes
 from .. import preferences
-from ..preferences import univ_settings
+from ..preferences import prefs, univ_settings
+from mathutils import Vector
 
 class UNIV_OT_Pin(Operator):
     bl_idname = 'uv.univ_pin'
@@ -282,6 +284,81 @@ class UNIV_OT_Join(Operator):
         return counter
 
 
+class UNIV_OT_Hide(Operator):
+    bl_idname = "uv.univ_hide"
+    bl_label = 'Hide'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Hide selected UV"
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        if not (context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV'):
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+
+        if event.value == 'PRESS':
+            self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+            self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+            return self.execute(context)
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes: UMeshes | None = None
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
+
+    def execute(self, context):
+        if not utils.sync() and utils.get_select_mode_mesh() != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+
+        self.umeshes = UMeshes(report=self.report)
+
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        if not self.umeshes:
+            return self.umeshes.update()
+        if not selected_umeshes and self.mouse_pos:
+            return self.pick_hide()
+
+        if not self.umeshes.sync:
+            self.umeshes.filter_by_selected_uv_faces()
+            if self.umeshes:  # noqa: pycharm is reachable moment
+                for umesh in self.umeshes:
+                    for f in utils.calc_selected_uv_faces_iter(umesh):
+                        f.select = False
+                return self.umeshes.update()
+            else:
+                return bpy.ops.uv.hide(unselected=False)
+        else:
+            self.umeshes.filter_by_selected_mesh_faces()
+            if not self.umeshes:
+                return bpy.ops.uv.hide(unselected=False)
+            else:
+                for umesh in self.umeshes:
+                    for f in utils.calc_selected_uv_faces_iter(umesh):
+                        f.hide = True
+            return self.umeshes.update()
+
+    def pick_hide(self):
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        for umesh in self.umeshes:
+            for isl in types.AdvIslands.calc_visible_with_mark_seam(umesh):
+                hit.find_nearest_island_by_crn(isl)
+
+        if not hit:
+            self.report({'INFO'}, 'Island not found within a given radius')
+            return {'CANCELLED'}
+
+        hit.island.hide = True
+        hit.island.umesh.update()
+        return {'FINISHED'}
+
+
 class UNIV_OT_UV_Layers_Manager(Operator):
     bl_idname = 'uv.univ_layers_manager'
     bl_label = 'UV Maps'
@@ -482,7 +559,6 @@ class UNIV_OT_UV_Layers_Manager(Operator):
                 bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
         except Exception as e:
             print('Failed to add a handler for UV Layer system.', e)
-
 
 class UNIV_OT_MoveUpDownBase(Operator):
     bl_options = {'REGISTER', 'UNDO'}

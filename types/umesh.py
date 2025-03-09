@@ -763,7 +763,7 @@ class UMeshes:
                 umeshes.append(UMesh(bm, objs[0], False, verify_uv))
         return cls(umeshes, report=report)
 
-    def filter_selected_faces(self):
+    def filter_by_selected_mesh_faces(self):
         for umesh in reversed(self.umeshes):
             if umesh.is_full_face_deselected:
                 self.umeshes.remove(umesh)

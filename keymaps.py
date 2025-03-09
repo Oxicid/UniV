@@ -352,6 +352,9 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_show_modified_uv_edges_toggle', 'Z', 'PRESS', alt=True)
     keys.append((km, kmi))
 
+    # Hide
+    kmi = km.keymap_items.new('uv.univ_hide', 'H', 'PRESS')
+    keys.append((km, kmi))
 
     for _, kmi in keys:
         kmi.active = False
