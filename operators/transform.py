@@ -28,6 +28,7 @@ from .. import types
 from .. import info
 from ..types import (
     BBox,
+    UMeshes,
     Islands,
     AdvIslands,
     AdvIsland,
@@ -684,6 +685,9 @@ class UNIV_OT_Flip(Operator):
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
+            if context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV':
+                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+                self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
         self.axis = 'Y' if event.alt else 'X'
         match event.ctrl, event.shift:
@@ -700,40 +704,46 @@ class UNIV_OT_Flip(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes = []
+        self.umeshes: UMeshes | None = None
         self.scale = Vector((1, 1))
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         self.scale = self.get_flip_scale_from_axis(self.axis)
+
+        self.umeshes = UMeshes(report=self.report)
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if not self.umeshes:
+            return self.umeshes.update()
+        if not selected_umeshes and self.mouse_pos:
+            return self.pick_flip()
 
         match self.mode:
             case 'DEFAULT':
-                self.flip_ex(extended=self.umeshes.has_selected_uv_faces)
+                self.flip_ex(extended=selected_umeshes)
             case 'BY_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
                     self.umeshes.report({'INFO'}, "Cursor not found")
-                self.flip_by_cursor(cursor=cursor_loc, extended=self.umeshes.has_selected_uv_faces)
+                    return {'FINISHED'}
+                self.flip_by_cursor(cursor=cursor_loc, extended=selected_umeshes)
             case 'INDIVIDUAL':
-                self.flip_individual(extended=self.umeshes.has_selected_uv_faces)
-            case 'FLIPPED':
-                self.flip_flipped(extended=self.umeshes.has_selected_uv_faces)
-            case _:
-                raise NotImplementedError(self.mode)
-
+                self.flip_individual(extended=selected_umeshes)
+            case _: # 'FLIPPED':
+                self.flip_flipped(extended=selected_umeshes)
         return self.umeshes.update()
 
     def flip_ex(self, extended):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
-
-        if not islands_of_mesh:
-            return
 
         pivot = general_bbox.center
         for islands in islands_of_mesh:
@@ -741,54 +751,74 @@ class UNIV_OT_Flip(Operator):
 
     def flip_by_cursor(self, cursor, extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
     def flip_individual(self, extended):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
 
     def flip_flipped(self, extended):
-        islands_count = 0
-
         for umesh in self.umeshes:
-            if islands := self.calc_extended_or_visible_flipped_islands(umesh, extended=extended):
+            if islands := self.calc_extended_or_visible_flipped_islands_with_mark_seam(umesh, extended=extended):
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
-                islands_count += len(islands)
             umesh.update_tag = bool(islands)
 
-        if not islands_count:
+        if not self.umeshes.update_tag:
             return self.report({'INFO'}, 'Flipped islands not found')
-        return self.report({'INFO'}, f'Found {islands_count} Flipped islands')
 
     @staticmethod
-    def calc_extended_or_visible_flipped_islands(umesh: types.UMesh, extended):
+    def calc_extended_or_visible_flipped_islands_with_mark_seam(umesh: types.UMesh, extended):
         uv = umesh.uv
         if extended:
             if umesh.is_full_face_deselected:
-                return Islands()
+                return AdvIslands()
 
-        Islands.tag_filter_visible(umesh)
+        AdvIslands.tag_filter_visible(umesh)
 
         for f_ in umesh.bm.faces:
             if f_.tag:
                 f_.tag = utils.is_flipped_uv(f_, uv)
 
         if extended:
-            islands_ = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(umesh) if
-                       Islands.island_filter_is_any_face_selected(i, umesh)]
+            islands_ = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh) if
+                       AdvIslands.island_filter_is_any_face_selected(i, umesh)]
         else:
-            islands_ = [Islands.island_type(i, umesh) for i in Islands.calc_iter_ex(umesh)]
-        return Islands(islands_, umesh)
+            islands_ = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh)]
+        return AdvIslands(islands_, umesh)
 
     @staticmethod
     def get_flip_scale_from_axis(axis):
         return Vector((-1, 1)) if axis == 'X' else Vector((1, -1))
+
+    def pick_flip(self):
+        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        if self.mode == 'FLIPPED':
+            islands_calc_type = self.calc_extended_or_visible_flipped_islands_with_mark_seam
+        else:
+            islands_calc_type = AdvIslands.calc_extended_or_visible_with_mark_seam
+
+        for umesh in self.umeshes:
+            for isl in islands_calc_type(umesh, extended=False):
+                hit.find_nearest_island_by_crn(isl)
+
+        if not hit:
+            message = 'Island not found within a given radius'
+            if self.mode == 'FLIPPED':
+                self.report({'INFO'}, 'Flipped ' + message.lower())
+            else:
+                self.report({'INFO'}, message)
+            return {'CANCELLED'}
+
+        pivot = utils.get_cursor_location() if self.mode == 'BY_CURSOR' else hit.island.bbox.center
+        hit.island.scale(scale=self.scale, pivot=pivot)
+        hit.island.umesh.update()
+        return {'FINISHED'}
 
 
 class UNIV_OT_Rotate(Operator):
@@ -841,7 +871,7 @@ class UNIV_OT_Rotate(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
         self.angle = 0.0
         self.aspect = 1.0
         self.max_distance: float = 0.0
@@ -851,7 +881,7 @@ class UNIV_OT_Rotate(Operator):
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -884,7 +914,7 @@ class UNIV_OT_Rotate(Operator):
     def rotate_by_cursor(self, extended):
         if not (cursor := utils.get_cursor_location()):
             self.report({'INFO'}, "Cursor not found")
-            return {'CANCELLED'}
+            return {'FINISHED'}
         for umesh in self.umeshes:
             if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
@@ -968,11 +998,11 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
         self.update_tag: bool = False
         self.cursor_loc: Vector | None = None
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
         self.update_tag = False
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         if self.to_cursor:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")
@@ -3987,9 +4017,9 @@ class UNIV_OT_Pack(Operator):
     @staticmethod
     def press_enter_key():
         import ctypes
-        VK_RETURN = 0x0D  # Enter
-        KEYDOWN = 0x0000  # Press
-        KEYUP = 0x0002  # Release
+        VK_RETURN = 0x0D  # Enter  # noqa
+        KEYDOWN = 0x0000  # Press  # noqa
+        KEYUP = 0x0002  # Release  # noqa
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
 

@@ -103,6 +103,10 @@ def add_keymaps():
         kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
         keys.append((km, kmi))
 
+    # Flip
+    kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
+    keys.append((km, kmi))
+
     # Rotate
     ## Default. CW.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
