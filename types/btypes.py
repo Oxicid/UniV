@@ -33,8 +33,8 @@ bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_
 
 def info_(self):
     print('', '=' * 80, '\n', self)
-    Name, Size = 'Name', 'Size'
-    print(f"{Name: <17}{Size: ^11}Offset   Value")
+    name_, size_ = 'Name', 'Size'
+    print(f"{name_: <17}{size_: ^11}Offset   Value")
     ofs = 0
     total_size = 0
     for name, *dtype in self._fields_:
@@ -333,15 +333,21 @@ class ARegion(StructBase):
 
     view2D: View2D
     winrct: rcti
-    drawrct: rcti
+
+    if version <= (4, 3):
+        drawrct: rcti
+
     winx: c_short
     winy: c_short
 
     if version > (3, 5):
         category_scroll: c_int
-        _pad0: c_char * 4  # noqa
+        if version <= (4, 3):
+            _pad0: c_char * 4  # noqa
 
-    visible: c_short
+    if version <= (4, 3):
+        visible: c_short
+
     regiontype: c_short
     alignment: c_short
     flag: c_short
@@ -349,20 +355,38 @@ class ARegion(StructBase):
     sizex: c_short
     sizey: c_short
 
-    do_draw: c_short
-    do_draw_overlay: c_short
+    if version <= (4, 3):
+        do_draw: c_short
+        do_draw_overlay: c_short
     overlap: c_short
     flagfullscreen: c_short
 
-    type: c_void_p  # ARegionType
+    if version <= (4, 3):
+        type: c_void_p  # ARegionType
+        uiblocks: ListBase
+    else:
+        _pad0: c_char * 2  # noqa
 
-    uiblocks: ListBase
     panels: ListBase  # Panel
     panels_category_active: ListBase(PanelCategoryStack)
     ui_lists: ListBase
     ui_previews: ListBase
-    handlers: ListBase
-    panels_category: ListBase(PanelCategoryDyn)
+
+    if version <= (4, 3):
+        handlers: ListBase
+        panels_category: ListBase(PanelCategoryDyn)
+    else:
+        view_states: ListBase
+
+    if version <= (4, 3):
+        gizmo_map: c_void_p
+        regiontimer: c_void_p
+        draw_buffer: c_void_p
+
+        headerstr: c_void_p
+    regiondata: c_void_p
+
+    # runtime: ARegion_Runtime
 
     @staticmethod
     def get_n_panel_from_area(_area: bpy.types.Area):
@@ -373,41 +397,50 @@ class ARegion(StructBase):
 
     @staticmethod
     def set_active_category(name: str, area: bpy.types.Area) -> bool:
-        name = name.encode('utf-8')
-        c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
-        # Checking for a category in the N-Panel
-        if not any(category for category in c_region.panels_category if category.idname == name):
-            available_categories = [category.idname.decode("utf-8") for category in c_region.panels_category]
-            if c_region.alignment == 1:
-                raise AttributeError('N-Panel aligned, cannot be set active category')
-            raise AttributeError(f'Category \'{name.decode("utf-8")}\' not found in {available_categories}')
+        if bpy.app.version >= (4, 2, 0):
+            reg = next(r for r in area.regions if r.type == 'UI')
+            try:
+                if reg.active_panel_category != name:
+                    reg.active_panel_category = name
+                return True
+            except NameError:
+                return False
+        else:
+            name = name.encode('utf-8')
+            c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
+            # Checking for a category in the N-Panel
+            if not any(category for category in c_region.panels_category if category.idname == name):
+                available_categories = [category.idname.decode("utf-8") for category in c_region.panels_category]
+                if c_region.alignment == 1:
+                    raise AttributeError('N-Panel aligned, cannot be set active category')
+                raise AttributeError(f'Category \'{name.decode("utf-8")}\' not found in {available_categories}')
 
-        # Check for the possibility to set an active category (for the presence of an allocated memory cell)
-        if not (category_history := list(category for category in c_region.panels_category_active)):
-            raise AttributeError(f'Unable to set a category because Blender did not allocate memory for active panels')
+            # Check for the possibility to set an active category (for the presence of an allocated memory cell)
+            if not (category_history := list(category for category in c_region.panels_category_active)):
+                raise AttributeError(f'Unable to set a category because Blender did not allocate memory for active panels')
 
-        # Check that the active panel with the given name is already active
-        if category_history[0].idname == name:
-            return False
-        # If history length == 1, set it to
-        if len(category_history) == 1:
+            # Check that the active panel with the given name is already active
+            if category_history[0].idname == name:
+                return False
+            # If history length == 1, set it to
+            if len(category_history) == 1:
+                category_history[0].idname = name
+                return True
+
+            # Swap
+            category_from_history = None
+            for category in category_history:
+                if category.idname == name:
+                    category_from_history = category
+                    break
+
+            if not category_from_history:
+                category_history[0].idname = name
+                return True
+
+            category_from_history.idname = category_history[0].idname
             category_history[0].idname = name
             return True
-
-        # Swap
-        category_from_history = None
-        for category in category_history:
-            if category.idname == name:
-                category_from_history = category
-                break
-
-        if not category_from_history:
-            category_history[0].idname = name
-            return True
-
-        category_from_history.idname = category_history[0].idname
-        category_history[0].idname = name
-        return True
 
 # source/blender/makesdna/DNA_ID.h | rev 362
 class ID_Runtime_Remap(StructBase):
