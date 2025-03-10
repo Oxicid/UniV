@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 2, 1),
+    "version": (3, 2, 3),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -143,6 +143,7 @@ def load_register_types():
             # Misc
             misc.UNIV_OT_Pin,
             misc.UNIV_OT_Hide,
+            misc.UNIV_OT_SetCursor2D,
             misc.UNIV_OT_TD_PresetsProcessing,
             misc.UNIV_OT_FixUVs,
             misc.UNIV_OT_Join,

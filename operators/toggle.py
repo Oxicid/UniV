@@ -293,8 +293,6 @@ class UNIV_OT_SplitUVToggle(Operator):
                     if AREA in scr.areas[:]:
                         with bpy.context.temp_override(area=AREA, screen=scr):  # noqa
                             bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
-                            bpy.context.space_data.uv_editor.show_stretch = prefs().show_stretch
-                            bpy.context.space_data.uv_editor.display_stretch_type = prefs().display_stretch_type
                             if hasattr(bpy.context.space_data, 'show_gizmo_navigate'):
                                 bpy.context.space_data.show_gizmo_navigate = False
                         break

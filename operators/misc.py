@@ -357,6 +357,127 @@ class UNIV_OT_Hide(Operator):
         hit.island.umesh.update()
         return {'FINISHED'}
 
+LAST_MOUSE_POS = -100_000, -100_000
+REPEAT_MOUSE_POS_COUNT = 0
+
+class UNIV_OT_SetCursor2D(Operator):
+    bl_idname = "uv.univ_set_cursor_2d"
+    bl_label = 'Set Cursor 2D'
+
+    # TODO: Implement 3D Ctrl + Shift + Right Mouse Button for consistent with 2D
+
+    def invoke(self, context, event):
+        if not (context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV'):
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+
+        global LAST_MOUSE_POS
+        global REPEAT_MOUSE_POS_COUNT
+        int_mouse_pos = (event.mouse_region_x, event.mouse_region_y)
+        if LAST_MOUSE_POS == int_mouse_pos:
+            REPEAT_MOUSE_POS_COUNT += 1
+        else:
+            REPEAT_MOUSE_POS_COUNT = 0
+            LAST_MOUSE_POS = int_mouse_pos
+
+        if REPEAT_MOUSE_POS_COUNT >= 3:
+            REPEAT_MOUSE_POS_COUNT = 0
+
+        max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+        mouse_pos = Vector(context.region.view2d.region_to_view(*int_mouse_pos))
+
+        pt = None
+        min_dist = max_distance
+        mouse_pos = mouse_pos
+
+        if REPEAT_MOUSE_POS_COUNT != 1:
+            if context.mode == 'EDIT_MESH' and REPEAT_MOUSE_POS_COUNT == 0:
+                grid_pt = Vector(utils.round_threshold(v, 1/2) for v in mouse_pos)
+                if (grid_dist := (grid_pt - mouse_pos).length * 2.0) < min_dist:
+                    pt = grid_pt
+                    min_dist = grid_dist
+            else:
+                zoom = types.View2D.get_zoom(context.region.view2d)
+                divider = 1 / 8 if zoom <= 1600 else 1 / 64
+                divider = divider if zoom <= 12800 else 1 / 64 / 8
+
+                grid_pt = Vector(utils.round_threshold(v, divider) for v in mouse_pos)
+                if (grid_dist := (grid_pt - mouse_pos).length) < min_dist:
+                    pt = grid_pt
+                    min_dist = grid_dist
+
+        if context.mode == 'EDIT_MESH' and REPEAT_MOUSE_POS_COUNT == 0:
+            zero_pt = Vector((0.0, 0.0))
+            for umesh in (umeshes := UMeshes()):
+                uv = umesh.uv
+                if prefs().snap_points_default == 'ALL':
+                    for f in utils.calc_visible_uv_faces(umesh):
+                        face_center_sum = zero_pt.copy()
+                        corners = f.loops
+                        prev_co = corners[-1][uv].uv
+                        for crn in corners:
+                            cur_co = crn[uv].uv
+                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                                pt = cur_co
+                                min_dist = dist
+                            edge_center = (prev_co + cur_co) * 0.5
+                            if (dist := (edge_center - mouse_pos).length) < min_dist:
+                                pt = edge_center
+                                min_dist = dist
+
+                            prev_co = cur_co
+                            face_center_sum += cur_co
+                        face_center = face_center_sum / len(corners)
+                        if (dist := (face_center - mouse_pos).length) < min_dist:
+                            pt = face_center
+                            min_dist = dist
+
+                elif umeshes.elem_mode == 'VERTEX':
+                    for f in utils.calc_visible_uv_faces(umesh):
+                        for crn in f.loops:
+                            uv_co = crn[uv].uv
+                            if (length := (mouse_pos - uv_co).length) < min_dist:
+                                pt = uv_co
+                                min_dist = length
+                elif umeshes.elem_mode == 'EDGE':
+                    for f in utils.calc_visible_uv_faces(umesh):
+                        corners = f.loops
+                        prev_co = corners[-1][uv].uv
+                        for crn in corners:
+                            cur_co = crn[uv].uv
+                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                                pt = cur_co
+                                min_dist = dist
+                            edge_center = (prev_co + cur_co) * 0.5
+                            if (dist := (edge_center - mouse_pos).length) < min_dist:
+                                pt = edge_center
+                                min_dist = dist
+                            prev_co = cur_co
+                else:
+                    for f in utils.calc_visible_uv_faces(umesh):
+                        face_center_sum = zero_pt.copy()
+                        corners = f.loops
+                        for crn in corners:
+                            cur_co = crn[uv].uv
+                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                                pt = cur_co
+                                min_dist = dist
+                            face_center_sum += cur_co
+                        face_center = face_center_sum / len(corners)
+                        if (dist := (face_center - mouse_pos).length) < min_dist:
+                            pt = face_center
+                            min_dist = dist
+
+        if not pt:
+            if REPEAT_MOUSE_POS_COUNT == 1:
+                self.report({'INFO'}, 'Force Set Cursor 2D to Mouse position')
+            pt = mouse_pos
+        elif REPEAT_MOUSE_POS_COUNT == 2:
+            self.report({'INFO'}, 'Force Set Cursor 2D to Grid')
+
+        context.space_data.cursor_location = pt
+        return {'FINISHED'}
+
 
 class UNIV_OT_UV_Layers_Manager(Operator):
     bl_idname = 'uv.univ_layers_manager'
