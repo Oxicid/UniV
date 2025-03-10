@@ -4024,12 +4024,17 @@ class UNIV_OT_Pack(Operator):
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
 
 
-class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
+class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_set"
     bl_label = 'Set TD'
     bl_description = "Set Texel Density"
     bl_options = {'REGISTER', 'UNDO'}
 
+    grouping_type: EnumProperty(name='Grouping Type', default='NONE',
+                                items=(('NONE', 'None', ''), ('OVERLAP', 'Overlap', ''), ('UNION', 'Union', '')))
+    lock_overlap_mode: bpy.props.EnumProperty(name='Lock Overlaps Mode', default='ANY',
+                                              items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
     custom_texel: FloatProperty(name='Custom Texel', default=-1, options={'HIDDEN'})
 
     @classmethod
@@ -4039,11 +4044,19 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.lock_overlap = event.shift
+        if event.shift:
+            self.grouping_type = 'UNION' if event.alt else 'OVERLAP'
+        else:
+            self.grouping_type = 'NONE'
         return self.execute(context)
 
     def draw(self, context):
-        self.draw_overlap()
+        layout = self.layout  # noqa
+        if self.grouping_type == 'OVERLAP':
+            if self.lock_overlap_mode == 'EXACT':
+                layout.prop(self, 'threshold', slider=True)
+            layout.row().prop(self, 'lock_overlap_mode', expand=True)
+        layout.row(align=True).prop(self, 'grouping_type', expand=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -4098,7 +4111,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
             if adv_islands := self.islands_calc_type(umesh):  # noqa
                 umesh.value = umesh.check_uniform_scale(report=self.report)
 
-                if self.lock_overlap:
+                if self.grouping_type != 'NONE':
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_uv_coords(save_triplet=True)
                     all_islands.extend(adv_islands)
@@ -4106,7 +4119,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
                 adv_islands.calc_area_uv()
                 adv_islands.calc_area_3d(scale=umesh.value)
 
-                if not self.lock_overlap:
+                if self.grouping_type == 'NONE':
                     for isl in adv_islands:
                         if (status := isl.set_texel(self.texel, self.texture_size)) is None:
                             zero_area_islands.append(isl)
@@ -4116,14 +4129,25 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
                 if self.has_selected:
                     selected_islands_of_mesh.append(adv_islands)
 
-        if self.lock_overlap:
-            overlapped_islands = self.calc_overlapped_island_groups(all_islands)
+        if self.grouping_type != 'NONE':
+            if self.grouping_type == 'OVERLAP':
+                threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
+                groups_of_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+                for isl in groups_of_islands:
+                    if (status := isl.set_texel(self.texel, self.texture_size)) is None:
+                        zero_area_islands.append(isl)
+                        continue
+                    isl.umesh.update_tag |= status
+            else:
+                union_islands = types.UnionIslands(all_islands)
+                status = union_islands.set_texel(self.texel, self.texture_size)
+                union_islands.umesh.update_tag = status in (True, None)
 
-            for isl in overlapped_islands:
-                if (status := isl.set_texel(self.texel, self.texture_size)) is None:
-                    zero_area_islands.append(isl)
-                    continue
-                isl.umesh.update_tag |= status
+                for u_isl in union_islands:
+                    area_3d = sqrt(u_isl.area_3d)
+                    area_uv = sqrt(u_isl.area_uv) * self.texture_size
+                    if isclose(area_3d, 0.0, abs_tol=1e-6) or isclose(area_uv, 0.0, abs_tol=1e-6):
+                        zero_area_islands.append(union_islands)
 
         if zero_area_islands:
             self.report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
@@ -4133,7 +4157,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
                         isl.select = False
                 for isl in zero_area_islands:
                     isl.select = True
-
+            self.umeshes.update_tag = True
             self.umeshes.silent_update()
             if not self.umeshes.is_edit_mode:
                 self.umeshes.free()
@@ -4141,12 +4165,13 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator, utils.OverlapHelper):
             return {'FINISHED'}
 
         if not self.umeshes.is_edit_mode:
-            res = self.umeshes.update(info='All islands adjusted')
+            self.umeshes.update(info='All islands adjusted')
             self.umeshes.free()
             if self.umeshes.update_tag:
                 utils.update_area_by_type('VIEW_3D')
-            return res
-        return self.umeshes.update(info='All islands adjusted')
+            return {'FINISHED'}
+        self.umeshes.update(info='All islands adjusted')
+        return {'FINISHED'}
 
 class UNIV_OT_TexelDensitySet(UNIV_OT_TexelDensitySet_VIEW3D):
     bl_idname = "uv.univ_texel_density_set"

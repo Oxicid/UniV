@@ -1677,7 +1677,7 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_with_hidden_with_mark_seam(cls, umesh: _umesh.UMesh):
+    def calc_with_hidden_with_mark_seam(cls, umesh: _umesh.UMesh) -> 'typing.Self':
         cls.tag_filter_all(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         return cls(islands, umesh)
