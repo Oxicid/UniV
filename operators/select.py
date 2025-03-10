@@ -2243,10 +2243,15 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         ('ADDITION', 'Addition', ''),
         ('DESELECT', 'Deselect', ''),
     ))
+    compare_type: EnumProperty(name='Compare Type', default='LESS', items=(
+        ('LESS', 'Less', ''),
+        ('EQUAL', 'Equal', ''),
+        ('GREATER', 'Greater', ''),
+    ))
     island_mode: EnumProperty(name='Mode', default='ISLAND', items=(('ISLAND', 'Island', ''), ('FACE', 'Face', '')))
 
     target_texel: FloatProperty(name='Texel', default=512, min=1, soft_min=32, soft_max=2048, max=10_000)
-    threshold: FloatProperty(name='Threshold', default=0.01, min=0, soft_max=50, max=10_000)
+    threshold: FloatProperty(name='Threshold', default=0.01, min=0, soft_min=0.0001, soft_max=50, max=10_000)
 
     def draw(self, context):
         layout = self.layout
@@ -2256,6 +2261,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         row.prop(self, 'island_mode', expand=True)
         layout.prop(self, 'target_texel', slider=True)
         layout.prop(self, 'threshold', slider=True)
+        layout.row(align=True).prop(self, 'compare_type', expand=True)
 
     def invoke(self, context, event):
         self.target_texel = univ_settings().texel_density
@@ -2307,8 +2313,14 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
 
                     texel = area_uv / area_3d if area_3d else 0
 
+                    if not (compared_result := isclose(texel, self.target_texel, abs_tol=self.threshold)):
+                        if self.compare_type == 'LESS':
+                            compared_result = texel < self.target_texel
+                        elif self.compare_type == 'GREATER':
+                            compared_result = texel > self.target_texel
+
                     if self.mode == 'SELECT':
-                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                        if compared_result:
                             if has_selected and isl.is_full_face_selected:
                                 counter_skipped += 1
                                 continue
@@ -2321,7 +2333,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                             isl.select = False
                             umesh.update_tag = True
                     elif self.mode == 'ADDITION':
-                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                        if compared_result:
                             if has_selected and isl.is_full_face_selected:
                                 counter_skipped += 1
                                 continue
@@ -2329,7 +2341,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                             isl.select = True
                             umesh.update_tag = True
                     else:  # self.mode == 'DESELECT':
-                        if isclose(texel, self.target_texel, abs_tol=self.threshold):
+                        if compared_result:
                             if isl.is_full_face_deselected:
                                 counter_skipped += 1
                                 continue
