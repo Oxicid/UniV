@@ -34,27 +34,27 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
             row.scale_x = 2
 
-        colMain = where.column(align=True)
-        rowTop = colMain.row(align=True)
+        col_main = where.column(align=True)
+        row_top = col_main.row(align=True)
 
-        ly_wide_icon_op(rowTop, 'LEFT_UPPER', icons.arrow_top_left)
-        ly_wide_icon_op(rowTop.row(), 'UPPER', icons.arrow_top)
-        ly_wide_icon_op(rowTop, 'RIGHT_UPPER', icons.arrow_top_right)
+        ly_wide_icon_op(row_top, 'LEFT_UPPER', icons.arrow_top_left)
+        ly_wide_icon_op(row_top.row(), 'UPPER', icons.arrow_top)
+        ly_wide_icon_op(row_top, 'RIGHT_UPPER', icons.arrow_top_right)
 
-        rowMiddle = colMain.row().row(align=True)
-        ly_wide_icon_op(rowMiddle, 'LEFT', icons.arrow_left)
+        row_middle = col_main.row().row(align=True)
+        ly_wide_icon_op(row_middle, 'LEFT', icons.arrow_left)
 
-        rowMidMiddle = rowMiddle.row().row(align=True)
+        row_mid_middle = row_middle.row().row(align=True)
 
-        ly_mid_mid_op(rowMidMiddle, 'HORIZONTAL', icons.horizontal_c)
-        ly_mid_mid_op(rowMidMiddle.row(), 'CENTER', icons.center)
-        ly_mid_mid_op(rowMidMiddle.row(), 'VERTICAL', icons.vertical_b)
-        ly_wide_icon_op(rowMiddle, 'RIGHT', icons.arrow_right)
+        ly_mid_mid_op(row_mid_middle, 'HORIZONTAL', icons.horizontal_c)
+        ly_mid_mid_op(row_mid_middle.row(), 'CENTER', icons.center)
+        ly_mid_mid_op(row_mid_middle.row(), 'VERTICAL', icons.vertical_b)
+        ly_wide_icon_op(row_middle, 'RIGHT', icons.arrow_right)
 
-        rowBottom = colMain.row(align=True)
-        ly_wide_icon_op(rowBottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
-        ly_wide_icon_op(rowBottom.row(), 'BOTTOM', icons.arrow_bottom)
-        ly_wide_icon_op(rowBottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
+        row_bottom = col_main.row(align=True)
+        ly_wide_icon_op(row_bottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
+        ly_wide_icon_op(row_bottom.row(), 'BOTTOM', icons.arrow_bottom)
+        ly_wide_icon_op(row_bottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
 
     @staticmethod
     def draw_texel_density(layer, prefix):
@@ -284,9 +284,12 @@ class UNIV_PT_General(Panel):
         self.draw_uv_layers(self.layout)
 
 
-class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
+class UNIV_PT_General_VIEW_3D(Panel):
+    bl_label = ''
     bl_idname = 'UNIV_PT_General_VIEW3D'
     bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "UniV"
 
     def draw(self, context):
         layout = self.layout
@@ -326,7 +329,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
         row.operator('mesh.univ_normalize', icon_value=icons.normalize)
 
-        self.draw_texel_density(col_align, 'mesh')
+        UNIV_PT_General.draw_texel_density(col_align, 'mesh')
 
         col_align.label(text='Select')
         if univ_pro:
@@ -343,7 +346,7 @@ class UNIV_PT_General_VIEW_3D(UNIV_PT_General):
         row.operator('mesh.univ_checker', icon_value=icons.checker)
         row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
-        self.draw_uv_layers(layout)
+        UNIV_PT_General.draw_uv_layers(layout)
 
 
 class UNIV_PT_GlobalSettings(Panel):
