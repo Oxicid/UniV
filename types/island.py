@@ -469,24 +469,57 @@ class FaceIsland:
                     luv.select = state
                     luv.select_edge = state
 
-    @property
-    def hide(self):
-        raise NotImplementedError()
 
-    @hide.setter
-    def hide(self, state: bool):
+    def hide_first(self):
         if self.umesh.sync:
-            fast_find_faces = set(self.faces)
             for face in self.faces:
-                face.hide = state
-                for e in face.edges:
-                    e.hide = all(f_from_e in fast_find_faces for f_from_e in e.link_faces if not f_from_e.hide)
-                for v in face.verts:
-                    # Warning: This implementation hides one vertex of the wire edge
-                    v.hide = all(f_from_v in fast_find_faces for f_from_v in v.link_faces if not f_from_v.hide)
+                face.hide_set(True)
         else:
             for face in self.faces:
-                face.select = not state
+                face.select = False
+
+    def hide_second(self):
+        if self.umesh.sync:
+            fast_find_faces = set(self.faces)
+            mode = utils.get_select_mode_mesh()
+            if mode in ('FACE', 'EDGE'):
+                for face in self.faces:
+                    face.hide_set(True)
+                    for e in face.edges:
+                        e.select = False
+                        if all(f_from_e in fast_find_faces for f_from_e in e.link_faces if not f_from_e.hide):
+                            e.hide = True
+                    for v in face.verts:
+                        if all(f_from_v in fast_find_faces for f_from_v in v.link_faces if not f_from_v.hide):
+                            v.hide = True
+            else:
+                to_select_verts = []
+                # for face in self.faces:
+                #     for v in face.verts:
+                #         # Warning: This implementation hides one vertex of the wire edge
+                #         if all(f_from_v in fast_find_faces for f_from_v in v.link_faces if not f_from_v.hide):
+                #             v.hide = True
+                #         elif v.select:
+                #             to_select_verts.append(v)
+
+                for face in self.faces:
+                    face.hide = True
+                for face in self.faces:
+                    for e in face.edges:
+                        if all(f_from_e in fast_find_faces for f_from_e in e.link_faces if not f_from_e.hide):
+                            e.select = True
+                            e.hide = True
+                    for v in face.verts:
+                        # Warning: This implementation hides one vertex of the wire edge
+                        if all(f_from_v in fast_find_faces for f_from_v in v.link_faces if not f_from_v.hide):
+                            # v.select = False
+                            v.hide_set(True)
+
+                for v in to_select_verts:
+                    v.select_set(True)
+        else:
+            for face in self.faces:
+                face.select = False
 
     @property
     def select_all_elem(self):

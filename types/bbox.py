@@ -276,7 +276,7 @@ class BBox:
         if self.ymax > ymax:
             self.ymax = ymax
 
-    def translate(self, xy: typing.Sequence[float]):
+    def translate(self, xy: typing.Sequence[float] | Vector):
         self.xmin += xy[0]
         self.ymin += xy[1]
         self.xmax += xy[0]

@@ -37,11 +37,11 @@ start = time()
 shader: gpu.types.GPUShader | None = None
 batch: gpu.types.GPUBatch | None = None
 
-def draw_callback_px():
+def draw_callback_px(color):
     global shader
     global batch
     shader.bind()
-    shader.uniform_float("color", (1, 1, 0, 1))
+    shader.uniform_float("color", color)
     batch.draw(shader)
 
     for a in bpy.context.screen.areas:
@@ -64,7 +64,7 @@ def uv_area_draw_timer():
     uv_handle = None
     return
 
-def add_draw_rect(data):
+def add_draw_rect(data, color=(1, 1, 0, 1)):
     global start
     global shader
     global batch
@@ -78,7 +78,7 @@ def add_draw_rect(data):
     if not (uv_handle is None):
         bpy.types.SpaceImageEditor.draw_handler_remove(uv_handle, 'WINDOW')
 
-    uv_handle = bpy.types.SpaceImageEditor.draw_handler_add(draw_callback_px, (), 'WINDOW', 'POST_VIEW')
+    uv_handle = bpy.types.SpaceImageEditor.draw_handler_add(draw_callback_px, (color,), 'WINDOW', 'POST_VIEW')
     bpy.app.timers.register(uv_area_draw_timer)
 
 class UNIV_OT_SelectLinked(Operator):

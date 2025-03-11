@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
@@ -316,6 +315,10 @@ class UNIV_OT_Hide(Operator):
             utils.set_select_mode_mesh('FACE')
 
         self.umeshes = UMeshes(report=self.report)
+        # print(self.umeshes[0].total_face_sel)
+        # print(self.umeshes[0].total_edge_sel)
+        # print(self.umeshes[0].total_vert_sel)
+        # print()
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -324,24 +327,22 @@ class UNIV_OT_Hide(Operator):
         if not selected_umeshes and self.mouse_pos:
             return self.pick_hide()
 
-        if not self.umeshes.sync:
-            self.umeshes.filter_by_selected_uv_faces()
-            if self.umeshes:  # noqa: pycharm is reachable moment
-                for umesh in self.umeshes:
-                    for f in utils.calc_selected_uv_faces_iter(umesh):
-                        f.select = False
-                return self.umeshes.update()
-            else:
-                return bpy.ops.uv.hide(unselected=False)
+        if self.umeshes.sync:
+            return bpy.ops.uv.hide(unselected=False)
+            # if self.umeshes.elem_mode == 'FACE':
+            #
+            # self.umeshes.filter_by_selected_mesh_faces()
+            # if not self.umeshes:
+            #     return bpy.ops.uv.hide(unselected=False)
+            # else:
+            #     for umesh in self.umeshes:
+            #         isl = types.FaceIsland(utils.calc_selected_uv_faces(umesh), umesh)
+            #         isl.hide_first()
+            #         umesh.bm.select_flush_mode()
+            #         umesh.bm.select_flush(False)
+            # return self.umeshes.update()
         else:
-            self.umeshes.filter_by_selected_mesh_faces()
-            if not self.umeshes:
-                return bpy.ops.uv.hide(unselected=False)
-            else:
-                for umesh in self.umeshes:
-                    for f in utils.calc_selected_uv_faces_iter(umesh):
-                        f.hide = True
-            return self.umeshes.update()
+            return bpy.ops.uv.hide(unselected=False)
 
     def pick_hide(self):
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
@@ -353,7 +354,7 @@ class UNIV_OT_Hide(Operator):
             self.report({'INFO'}, 'Island not found within a given radius')
             return {'CANCELLED'}
 
-        hit.island.hide = True
+        hit.island.hide_first()
         hit.island.umesh.update()
         return {'FINISHED'}
 
@@ -476,6 +477,89 @@ class UNIV_OT_SetCursor2D(Operator):
             self.report({'INFO'}, 'Force Set Cursor 2D to Grid')
 
         context.space_data.cursor_location = pt
+        return {'FINISHED'}
+
+
+class UNIV_OT_Focus(Operator):
+    bl_idname = "uv.univ_focus"
+    bl_label = 'Focus'
+
+    def invoke(self, context, event):
+        if not (context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV'):
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+        assert context.mode == 'EDIT_MESH'
+
+        bounds = types.BBox()
+        umeshes = UMeshes()
+        color = (1,1,0,1)
+        for umesh in umeshes:
+            uv = umesh.uv
+            bounds.update(crn[uv].uv for crn in utils.calc_selected_uv_vert_corners_iter(umesh))
+        if bounds == types.BBox():
+            color = (0,1,1,1)
+            for umesh in umeshes:
+                uv = umesh.uv
+                bounds.update(crn[uv].uv for crn in utils.calc_visible_uv_corners_iter(umesh))
+        if bounds == types.BBox():
+            color = (1,0,0,1)
+            bounds.xmin = 0.0
+            bounds.ymin = 0.0
+            bounds.xmax = 1.0
+            bounds.ymax = 1.0
+
+        draw_data = bounds.draw_data_lines()
+
+
+        n_panel_width = next(r.width for r in context.area.regions if r.type == 'UI')
+        bounds.scale(1.2)  # Add padding
+
+        space_data = context.area.spaces.active
+        sima = types.SpaceImage.get_fields(space_data)
+
+        image_size = [256, 256]
+        aspect = [1, 1]
+        if space_data.image:
+            image_width_, image_height_ = space_data.image.size
+            if image_height_:
+                aspect = list(space_data.image.display_aspect)
+                image_size[:] = image_width_, image_height_
+        image_size_without_aspect = image_size.copy()
+
+        image_size[0] *= aspect[0]
+        image_size[1] *= aspect[1]
+
+        # adjust offset and zoom
+        c_region = types.ARegion.get_fields(context.region)
+
+        size_y = c_region.winrct.height / ((bounds.height + 0.00001) * image_size[1])
+        size_x = (c_region.winrct.width - n_panel_width) / ((bounds.width+ 0.00001) * image_size[0])
+
+        zoom = min(size_x, size_y)
+        if zoom > 100.0:
+            zoom = 100.0
+
+        sima.xof = round((bounds.center_x - 0.5) * image_size[0] + (n_panel_width / zoom) / 2)
+        sima.yof = round((bounds.center_y - 0.5) * image_size[1])
+
+        # sima_zoom_set
+        old_zoom = sima.zoom
+        sima.zoom = zoom
+        if zoom < 0.1 or zoom > 4.0:
+            w, h = image_size_without_aspect
+            w *= zoom
+            h *= zoom
+            if (w < 4) and (h < 4) and zoom < old_zoom:
+                sima.zoom = old_zoom
+            elif c_region.winrct.width <= zoom:
+                sima.zoom = old_zoom
+            elif c_region.winrct.height <= zoom:
+                sima.zoom = old_zoom
+
+        from .select import add_draw_rect
+        add_draw_rect(draw_data, color)
+
+        context.region.tag_redraw()
         return {'FINISHED'}
 
 

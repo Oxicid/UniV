@@ -313,6 +313,88 @@ class View2D(StructBase):
         v2d = cls.from_address(view.as_pointer())
         return (v2d.mask.xmax - v2d.mask.xmin) / (v2d.cur.xmax - v2d.cur.xmin)  # noqa
 
+# source/blender/makesdna/DNA_ID.h | rev 362
+class ID_Runtime_Remap(StructBase):
+    status:                 c_int
+    skipped_refcounted:     c_int
+    skipped_direct:         c_int
+    skipped_indirect:       c_int
+
+
+# source/blender/makesdna/DNA_ID.h | rev 362
+class ID_Runtime(StructBase):
+    remap: ID_Runtime_Remap
+    depsgraph:                  c_void_p
+    _pad:                  c_void_p
+
+
+class ID(StructBase):
+    next:                   c_void_p
+    prev:                   c_void_p
+
+    newid:                  lambda: POINTER(ID)
+    lib:                    c_void_p  # Library
+    asset_data:             c_void_p  # AssetMetaData
+
+    name:                   c_char * 66  # MAX_ID_NAME  # noqa
+    flag:                   c_short
+    tag:                    c_int
+    us:                     c_int
+    icon_id:                c_int
+    recalc:                 c_uint
+    recalc_up_to_undo_push: c_uint
+    recalc_after_undo_push: c_uint
+
+    session_uuid:           c_uint
+
+    properties:             c_void_p  # IDProperty
+    override_library:       c_void_p  # IDOverrideLibrary
+    orig_id:                lambda: POINTER(ID)
+    py_instance:            c_void_p
+    library_weak_reference: c_void_p
+    runtime:                ID_Runtime
+
+class ImageUser(StructBase):
+    scene: c_void_p
+    framenr: c_int
+    frames: c_int
+    offset: c_int
+    sfra: c_int
+    cycl: c_char
+    multiview_eye: c_char
+    pass_: c_short
+    tile: c_int
+    multi_index: c_short
+    view: c_short
+    layer: c_short
+    flag: c_short
+
+
+class Histogram(StructBase):
+    pad: c_char * 5160  # noqa
+
+class Scopes(StructBase):
+    pad: c_char * 5272  # noqa
+
+class SpaceImage(StructBase):
+    next: c_void_p
+    prev: c_void_p
+    regionbase: ListBase
+    spacetype: c_char
+    link_flag: c_char
+    _pad0: c_char * 6  # noqa
+    image: c_void_p
+    iuser: ImageUser
+    scopes: Scopes
+    sample_line_hist: Histogram
+    gpd: c_void_p
+    cursor: c_float * 2  # noqa
+    xof: c_float
+    yof: c_float
+    zoom: c_float
+    centx: c_float
+    centy: c_float
+
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
@@ -441,45 +523,6 @@ class ARegion(StructBase):
             category_from_history.idname = category_history[0].idname
             category_history[0].idname = name
             return True
-
-# source/blender/makesdna/DNA_ID.h | rev 362
-class ID_Runtime_Remap(StructBase):
-    status:                 c_int
-    skipped_refcounted:     c_int
-    skipped_direct:         c_int
-    skipped_indirect:       c_int
-
-
-# source/blender/makesdna/DNA_ID.h | rev 362
-class ID_Runtime(StructBase):
-    remap:                  ID_Runtime_Remap
-
-class ID(StructBase):
-    next:                   c_void_p
-    prev:                   c_void_p
-
-    newid:                  lambda: POINTER(ID)
-    lib:                    c_void_p  # Library
-    asset_data:             c_void_p  # AssetMetaData
-
-    name:                   c_char * 66  # MAX_ID_NAME  # noqa
-    flag:                   c_short
-    tag:                    c_int
-    us:                     c_int
-    icon_id:                c_int
-    recalc:                 c_uint
-    recalc_up_to_undo_push: c_uint
-    recalc_after_undo_push: c_uint
-
-    session_uuid:           c_uint
-
-    properties:             c_void_p  # IDProperty
-    override_library:       c_void_p  # IDOverrideLibrary
-    orig_id:                lambda: POINTER(ID)
-    py_instance:            c_void_p
-    library_weak_reference: c_void_p
-    _pad1:                  c_void_p
-    runtime:                ID_Runtime
 
 
 # source/blender/makesdna/DNA_windowmanager_types.h | rev 362
