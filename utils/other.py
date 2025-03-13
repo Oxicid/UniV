@@ -90,6 +90,14 @@ def get_select_mode_mesh() -> T_mesh_select_modes:
     else:
         return 'VERTEX'
 
+def get_select_mode_mesh_reversed() -> T_mesh_select_modes:
+    if bpy.context.tool_settings.mesh_select_mode[0]:
+        return 'VERTEX'
+    elif bpy.context.tool_settings.mesh_select_mode[1]:
+        return 'EDGE'
+    else:
+        return 'FACE'
+
 def set_select_mode_mesh(mode: T_mesh_select_modes):
     if get_select_mode_mesh() == mode:
         return

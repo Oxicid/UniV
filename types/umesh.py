@@ -10,8 +10,10 @@ import mathutils
 from collections import defaultdict
 from math import pi
 
+from bmesh.types import BMFace
+
 from .. import utils
-from ..types import PyBMesh
+from ..types import PyBMesh#, AdvIsland
 
 class FakeBMesh:
     def __init__(self, isl):
@@ -30,6 +32,7 @@ class UMesh:
         # self.islands_calc_subtype
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
         self.aspect: float = 1.0
+        self.sequence: list[BMFace] | list['AdvIsland'] = []  # noqa
 
     def update(self, force=False):
         if not self.update_tag:
@@ -621,7 +624,12 @@ class UMeshes:
             if umesh.obj == active_obj:
                 if idx != 0:
                     self.umeshes[0], self.umeshes[idx] = self.umeshes[idx], self.umeshes[0]
-                break
+                return True
+        if self.umeshes:
+            bpy.context.view_layer.objects.active = self.umeshes[0]
+            return True
+        return False
+
 
     def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""

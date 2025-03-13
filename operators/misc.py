@@ -315,10 +315,8 @@ class UNIV_OT_Hide(Operator):
             utils.set_select_mode_mesh('FACE')
 
         self.umeshes = UMeshes(report=self.report)
-        # print(self.umeshes[0].total_face_sel)
-        # print(self.umeshes[0].total_edge_sel)
-        # print(self.umeshes[0].total_vert_sel)
-        # print()
+        if self.umeshes:
+            self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -327,20 +325,33 @@ class UNIV_OT_Hide(Operator):
         if not selected_umeshes and self.mouse_pos:
             return self.pick_hide()
 
+        if not self.umeshes.active_to_first():
+            return {'FINISHED'}
+
         if self.umeshes.sync:
-            return bpy.ops.uv.hide(unselected=False)
-            # if self.umeshes.elem_mode == 'FACE':
-            #
-            # self.umeshes.filter_by_selected_mesh_faces()
-            # if not self.umeshes:
-            #     return bpy.ops.uv.hide(unselected=False)
-            # else:
-            #     for umesh in self.umeshes:
-            #         isl = types.FaceIsland(utils.calc_selected_uv_faces(umesh), umesh)
-            #         isl.hide_first()
-            #         umesh.bm.select_flush_mode()
-            #         umesh.bm.select_flush(False)
-            # return self.umeshes.update()
+            if self.umeshes.elem_mode == 'FACE':
+                return bpy.ops.uv.hide(unselected=False)
+
+            self.umeshes.filter_by_selected_mesh_faces()
+            if not self.umeshes:
+                # TODO: Implement hide by view box
+                return bpy.ops.uv.hide(unselected=False)
+
+            if self.umeshes.elem_mode == 'VERTEX':
+                self.vert_hide_sync_preprocessing()
+            elif self.umeshes.elem_mode == 'EDGE':
+                self.edge_hide_sync_preprocessing()
+
+            res = bpy.ops.uv.hide(unselected=False)
+            for umesh in self.umeshes:
+                if umesh.sequence:
+                    for f in umesh.sequence:
+                        f.hide_set(False)
+                    umesh.update()
+                if preferences.debug():
+                    if umesh.total_face_sel or umesh.total_edge_sel or umesh.total_vert_sel:
+                        self.report({'WARNING'}, 'Undefined Behavior: Has selected elements even after applying Hide operation')
+            return res
         else:
             return bpy.ops.uv.hide(unselected=False)
 
@@ -357,6 +368,132 @@ class UNIV_OT_Hide(Operator):
         hit.island.hide_first()
         hit.island.umesh.update()
         return {'FINISHED'}
+
+    def vert_hide_sync_preprocessing(self):
+        def is_hide_face():
+            for crn in f.loops:
+                crn_vert = crn.vert
+                if crn_vert.select:
+                    if all(not f__.select for f__ in crn_vert.link_faces):
+                        return True
+                    for crn__ in self.linked_crn_to_vert_sync_without_idx_pair_walk_iter(crn, uv):
+                        if crn__.face.select:
+                            return True
+            return False
+
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            visible_faces = utils.calc_visible_uv_faces(umesh)
+            for f in visible_faces:
+                # Skip selected and unselected face
+                if f.select or not any(crn_.vert.select for crn_ in f.loops):
+                    continue
+                if not is_hide_face():
+                    umesh.sequence.append(f)
+
+    def edge_hide_sync_preprocessing(self):
+        def is_hide_face():
+            for crn in f.loops:
+                if crn.edge.select:
+                    pair = crn.link_loop_radial_prev
+                    pair_face = pair.face
+                    if pair_face.hide:
+                        return True
+
+                    if utils.is_pair(crn, crn.link_loop_radial_prev, uv):
+                        return True
+                    else:
+                        if pair_face.select:
+                            continue
+                        else:
+                            return True
+            return False
+
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            visible_faces = utils.calc_visible_uv_faces(umesh)
+            for f in visible_faces:
+                # Skip selected and unselected face
+                if f.select or not any(crn_.edge.select for crn_ in f.loops):
+                    continue
+
+                if not is_hide_face():
+                    umesh.sequence.append(f)
+
+    @staticmethod
+    def linked_crn_to_vert_sync_without_idx_pair_walk(crn: bmesh.types.BMLoop, uv):
+        """Linked to arg corner by island index with arg corner"""
+        is_pair = utils.is_pair
+        first_vert = crn.vert
+
+        linked = []
+        bm_iter = crn
+        # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
+        iterated = False
+        while True:
+            prev_crn = bm_iter.link_loop_prev
+            pair_ccw = prev_crn.link_loop_radial_prev
+            if pair_ccw == crn and iterated:
+                break
+            iterated = True
+
+            # Finish CCW
+            if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or pair_ccw.face.hide or not is_pair(prev_crn, pair_ccw, uv):
+                bm_iter = crn
+                linked_cw = []
+                while True:
+                    pair_cw = bm_iter.link_loop_radial_prev
+                    # Skip flipped and boundary
+                    if pair_cw == bm_iter:
+                        break
+
+                    next_crn = pair_cw.link_loop_next
+                    if next_crn == crn:
+                        break
+
+                    if (first_vert != next_crn.vert) or next_crn.face.hide or not utils.is_pair(bm_iter, pair_cw, uv):
+                        break
+                    bm_iter = next_crn
+                    linked_cw.append(next_crn)
+                linked.extend(linked_cw[::-1])
+                break
+            bm_iter = pair_ccw
+            linked.append(bm_iter)
+        assert len(linked) == len(set(linked))
+        return linked
+
+    @staticmethod
+    def linked_crn_to_vert_sync_without_idx_pair_walk_iter(crn: bmesh.types.BMLoop, uv):
+        """CW corners not reverse"""
+        first_vert = crn.vert
+        iterated = False
+        bm_iter = crn
+        while True:
+            prev_crn = bm_iter.link_loop_prev
+            pair_ccw = prev_crn.link_loop_radial_prev
+            if pair_ccw == crn and iterated:
+                break
+            iterated = True
+            # Finish CCW
+            if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or pair_ccw.face.hide or not utils.is_pair(prev_crn, pair_ccw, uv):
+                bm_iter = crn
+                while True:
+                    pair_cw = bm_iter.link_loop_radial_prev
+                    # Skip flipped and boundary
+                    if pair_cw == bm_iter:
+                        break
+
+                    next_crn = pair_cw.link_loop_next
+                    if next_crn == crn:
+                        break
+
+                    if (first_vert != next_crn.vert) or next_crn.face.hide or not utils.is_pair(bm_iter, pair_cw, uv):
+                        break
+                    yield next_crn
+                    bm_iter = next_crn
+                break
+            yield pair_ccw
+            bm_iter = pair_ccw
 
 LAST_MOUSE_POS = -100_000, -100_000
 REPEAT_MOUSE_POS_COUNT = 0
