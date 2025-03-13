@@ -53,6 +53,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     def execute(self, context):
 
         self.umeshes = types.UMeshes()
+        self.umeshes.fix_context()
         if not self.slim_support or self.legacy:
             if self.umeshes.sync:
                 if bpy.context.tool_settings.mesh_select_mode[2]:

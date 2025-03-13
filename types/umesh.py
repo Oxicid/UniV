@@ -625,11 +625,19 @@ class UMeshes:
                 if idx != 0:
                     self.umeshes[0], self.umeshes[idx] = self.umeshes[idx], self.umeshes[0]
                 return True
-        if self.umeshes:
-            bpy.context.view_layer.objects.active = self.umeshes[0]
-            return True
         return False
 
+    def fix_context(self):
+        """If umesh without polygons, then it is not in the list. Set the first umesh with polygons as active,
+            so that the context of default operators (bpy.ops.uv) works correctly.
+            But it doesn't help when the operator is called via keymap."""
+        if self.umeshes:
+            active_obj = bpy.context.active_object
+            if any(True for umesh in self.umeshes if (act_umesh := umesh).obj == active_obj):
+                if not act_umesh.total_corners:
+                    bpy.context.view_layer.objects.active = self.umeshes[0].obj
+            else:
+                bpy.context.view_layer.objects.active = self.umeshes[0].obj
 
     def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""

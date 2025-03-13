@@ -35,6 +35,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
         assert (context.area.ui_type == 'UV')
 
         umeshes = types.UMeshes(report=self.report)
+        umeshes.fix_context()
         for umesh in umeshes.loop():
             main(self, umesh)
         return {'FINISHED'}

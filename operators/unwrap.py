@@ -77,6 +77,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def execute(self, context):
         self.umeshes = types.UMeshes()
+        self.umeshes.fix_context()
         if context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
 

@@ -3990,6 +3990,9 @@ class UNIV_OT_Pack(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
+        umeshes = UMeshes.calc(verify_uv=False)
+        umeshes.fix_context()
+
         settings = univ_settings()
         args = {
             'udim_source': settings.udim_source,

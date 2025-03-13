@@ -35,6 +35,7 @@ class UNIV_OT_Check_Zero(Operator):
     def execute(self, context):
         sync = bpy.context.scene.tool_settings.use_uv_select_sync
         umeshes = types.UMeshes()
+        umeshes.fix_context()
         total_counter = self.zero(self.precision, umeshes, sync)
 
         if not total_counter:
@@ -94,6 +95,7 @@ class UNIV_OT_Check_Flipped(Operator):
 
     def execute(self, context):
         umeshes = types.UMeshes()
+        umeshes.fix_context()
         total_counter = self.flipped(umeshes)
 
         if not total_counter:
@@ -168,6 +170,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 
     def execute(self, context):
         umeshes = types.UMeshes()
+        umeshes.fix_context()
         bpy.ops.uv.select_all(action='DESELECT')
 
         # clamp angle
@@ -306,6 +309,7 @@ class UNIV_OT_Check_Overlap(Operator):
 
     def execute(self, context):
         umeshes = types.UMeshes()
+        umeshes.fix_context()
         if umeshes.sync:
             if utils.get_select_mode_mesh() != 'FACE':
                 utils.set_select_mode_mesh('FACE')

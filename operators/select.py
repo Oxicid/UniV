@@ -101,6 +101,9 @@ class UNIV_OT_SelectLinked(Operator):
 
     def execute(self, context):
         if self.deselect is False:
+            umeshes = UMeshes.calc(verify_uv=False)
+            umeshes.fix_context()
+
             if context.area.ui_type == 'UV':
                 return bpy.ops.uv.select_linked()
             if uv_areas := [area for area in context.screen.areas if area.ui_type == 'UV']:
@@ -113,6 +116,7 @@ class UNIV_OT_SelectLinked(Operator):
 
     def deselect_linked(self, sync):
         umeshes = UMeshes(report=self.report)
+        umeshes.fix_context()
 
         if sync and umeshes.elem_mode == 'VERTEX':
             for umesh in umeshes:

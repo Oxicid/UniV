@@ -47,6 +47,7 @@ class UNIV_OT_Pin(Operator):
 
     def execute(self, context):
         self.umeshes = UMeshes()
+        self.umeshes.fix_context()
         set_pin_state = not self.clear
 
         if context.mode == 'EDIT_MESH':
@@ -315,6 +316,8 @@ class UNIV_OT_Hide(Operator):
             utils.set_select_mode_mesh('FACE')
 
         self.umeshes = UMeshes(report=self.report)
+        self.umeshes.fix_context()
+
         if self.umeshes:
             self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
@@ -324,9 +327,6 @@ class UNIV_OT_Hide(Operator):
             return self.umeshes.update()
         if not selected_umeshes and self.mouse_pos:
             return self.pick_hide()
-
-        if not self.umeshes.active_to_first():
-            return {'FINISHED'}
 
         if self.umeshes.sync:
             if self.umeshes.elem_mode == 'FACE':

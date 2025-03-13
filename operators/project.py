@@ -678,6 +678,7 @@ class UNIV_SmartProject(bpy.types.Operator):
         # TODO: Add normalize and correct aspect by modifier
         if context.mode == 'EDIT_MESH':
             umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+            umeshes.fix_context()
             umeshes.set_sync()
 
             selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -702,6 +703,9 @@ class UNIV_SmartProject(bpy.types.Operator):
 
             for umesh in types.UMeshes.calc(self.report, verify_uv=False):
                 umesh.check_uniform_scale(report=self.report)
+
+            umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+            umeshes.fix_context()
 
             bpy.ops.mesh.reveal(select=True)
             bpy.ops.mesh.select_all(action='SELECT')

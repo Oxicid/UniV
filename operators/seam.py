@@ -49,6 +49,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
     def execute(self, context) -> set[str]:
         self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes.fix_context()
 
         if self.umeshes.sync:
             self.cut_view_2d_sync()
