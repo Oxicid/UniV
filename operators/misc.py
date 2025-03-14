@@ -312,7 +312,8 @@ class UNIV_OT_Hide(Operator):
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
-        if not utils.sync() and utils.get_select_mode_mesh() != 'FACE':
+        is_incorrect_hide_mod_for_non_sync = not utils.sync() and utils.get_select_mode_mesh_reversed() != 'FACE'
+        if is_incorrect_hide_mod_for_non_sync:
             utils.set_select_mode_mesh('FACE')
 
         self.umeshes = UMeshes(report=self.report)
@@ -353,7 +354,19 @@ class UNIV_OT_Hide(Operator):
                         self.report({'WARNING'}, 'Undefined Behavior: Has selected elements even after applying Hide operation')
             return res
         else:
-            return bpy.ops.uv.hide(unselected=False)
+            # bpy.ops.uv.hide sometimes works incorrectly in 'FACE' mode too,
+            # maybe it's something to do with not updating bm.select_mode
+            for umesh in self.umeshes:
+                if is_incorrect_hide_mod_for_non_sync:
+                    umesh.bm.select_mode = {'FACE'}
+                uv = umesh.uv
+                update_tag = False
+                for f in utils.calc_visible_uv_faces(umesh):
+                    if any(crn[uv].select for crn in f.loops):
+                        f.select = False
+                        update_tag = True
+                umesh.update_tag = update_tag
+            return self.umeshes.update()
 
     def pick_hide(self):
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
