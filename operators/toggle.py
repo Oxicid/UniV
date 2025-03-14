@@ -505,6 +505,16 @@ class UNIV_OT_StretchUVToggle(Operator):
             else:
                 uv_editor.display_stretch_type = 'ANGLE'
                 LAST_STRETCH_TYPE = 'ANGLE'
+
+            umeshes = types.UMeshes.calc(verify_uv=False)
+            count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
+            umeshes.free()
+
+            txt = LAST_STRETCH_TYPE.capitalize()
+            if count_non_default_scale:
+                txt = [f'Warning: The scale hasn`t been applied to {count_non_default_scale} objects', txt]
+            from ..  import draw
+            draw.TextDraw.draw(txt)
         else:
             STRETCH_SPACE_DATA = context.space_data
             bpy.app.timers.register(self.register_,  first_interval=0.22)
@@ -537,9 +547,19 @@ class UNIV_OT_StretchUVToggle(Operator):
 
         uv_editor.display_stretch_type = LAST_STRETCH_TYPE
 
+        umeshes = types.UMeshes.calc(verify_uv=False)
+        count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
+        umeshes.free()
+
+        txt = LAST_STRETCH_TYPE.capitalize()
+        if count_non_default_scale:
+            txt = [f'Warning: The scale hasn`t been applied to {count_non_default_scale} objects', txt]
+
+        from .. import draw
+        draw.TextDraw.draw(txt)
+
         STRETCH_SPACE_DATA = None
         return None
-
 
 class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
     bl_idname = 'uv.univ_show_modified_uv_edges_toggle'
