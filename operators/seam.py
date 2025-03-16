@@ -9,11 +9,15 @@ import bpy
 import math
 import bl_math
 
+from mathutils import Vector
 from bpy.types import Operator
 from bpy.props import *
+
 from .. import utils
 from .. import types
 from ..types import Islands
+from ..preferences import prefs
+
 
 class UNIV_OT_Cut_VIEW2D(Operator):
     bl_idname = "uv.univ_cut"
@@ -38,18 +42,35 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         self.layout.column(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
+        if not (context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV'):
+            self.report({'WARNING'}, 'Active area must be UV type')
+            return {'CANCELLED'}
+
         if event.value == 'PRESS':
+            self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+            self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
+
         self.addition = event.shift
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.umeshes: types.UMeshes | None = None
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
 
     def execute(self, context) -> set[str]:
         self.umeshes = types.UMeshes(report=self.report)
         self.umeshes.fix_context()
+
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if not self.umeshes:
+            return self.umeshes.update()
+        if not selected_umeshes and self.mouse_pos:
+            return self.pick_cut()
 
         if self.umeshes.sync:
             self.cut_view_2d_sync()
@@ -58,6 +79,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         if self.unwrap != 'NONE':
             self.unwrap_after_unwrap()
         self.umeshes.update()
+
+        self.umeshes.umeshes.extend(visible_umeshes)
+        from .. import draw
+        color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+        coords = draw.mesh_extract.extract_seams(self.umeshes)
+        draw.LinesDrawSimple.draw_register(coords, color)
         return {'FINISHED'}
 
     def cut_view_2d_sync(self):
@@ -131,6 +158,29 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             for isl in save_transform_islands:
                 isl.shift()
                 isl.inplace()
+
+    def pick_cut(self):
+        hit = types.CrnEdgeHit(self.mouse_pos, self.max_distance)
+        for umesh in self.umeshes:
+            hit.find_nearest_crn_by_visible_faces(umesh)
+
+        if not hit:
+            self.report({'WARNING'}, 'Edge not found within a given radius')
+            return {'CANCELLED'}
+        else:
+            e = hit.crn.edge
+            had_seam = e.seam
+            if not had_seam:
+                hit.crn.edge.seam = True
+                hit.umesh.update()
+
+            from .. import draw
+            color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+            coords = draw.mesh_extract.extract_seams(self.umeshes)
+            draw.LinesDrawSimple.draw_register(coords, color)
+            if coords:
+                bpy.context.area.tag_redraw()
+            return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
 class UNIV_OT_Cut_VIEW3D(Operator):

@@ -429,3 +429,46 @@ class IslandHit:
 
     def __bool__(self):
         return bool(self.island)
+
+
+class CrnEdgeHit:
+    def __init__(self, pt, min_dist=1e200):
+        self.point = pt
+        self.min_dist = min_dist
+        self.crn: BMLoop | None = None
+        self.umesh = None
+
+    def find_nearest_crn_by_visible_faces(self, umesh):
+        from .. import utils
+        pt = self.point
+        min_dist = self.min_dist
+        min_crn = None
+        uv = umesh.uv
+
+        for f in utils.calc_visible_uv_faces(umesh):
+            corners = f.loops
+            v_prev = corners[-1][uv].uv
+            for crn in corners:
+                v_curr = crn[uv].uv
+
+                close_pt = closest_pt_to_line(pt, v_prev, v_curr)
+
+                if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                    if point_inside_face(pt, f, uv):
+                        min_dist = dist
+                        min_crn = crn
+                        self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                elif dist < min_dist:
+                    min_dist = dist
+                    min_crn = crn
+                v_prev = v_curr
+
+        if self.min_dist != min_dist:
+            self.min_dist = min_dist
+            self.crn = min_crn.link_loop_prev
+            self.umesh = umesh
+            return True
+        return False
+
+    def __bool__(self):
+        return bool(self.crn)

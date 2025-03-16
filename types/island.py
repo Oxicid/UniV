@@ -234,8 +234,8 @@ class SaveTransform:
 
 
 class FaceIsland:
-    def __init__(self, faces: list[BMFace], umesh: _umesh.UMesh):
-        self.faces: list[BMFace] = faces
+    def __init__(self, faces: list[BMFace] | typing.Iterable[BMFace], umesh: _umesh.UMesh):
+        self.faces: list[BMFace] | typing.Iterable[BMFace] = faces
         self.umesh: _umesh.UMesh = umesh
         self.value: float | int | Vector = -1  # value for different purposes
 
@@ -830,7 +830,7 @@ class AdvIslandInfo:
         self.scale: Vector | None = None
 
 class AdvIsland(FaceIsland):
-    def __init__(self, faces: list[BMFace] | tuple = (), umesh: _umesh.UMesh | None = None):
+    def __init__(self, faces: list[BMFace] | tuple | typing.Iterable[BMFace] = (), umesh: _umesh.UMesh | None = None):
         super().__init__(faces, umesh)
         self.tris: list[tuple[BMLoop]] = []
         self.flat_unique_uv_coords: list[Vector] = []

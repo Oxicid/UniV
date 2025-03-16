@@ -108,7 +108,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 hit.find_nearest_island(isl)
 
         if not hit or (self.max_distance < hit.min_dist):
-            self.report({'INFO'}, 'Island not found within a given radius')
+            self.report({'WARNING'}, 'Island not found within a given radius')
             return {'CANCELLED'}
 
         isl = hit.island

@@ -1,16 +1,34 @@
-"""
-Created by Oxicid
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
+from ... import types
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+def extract_seams(umeshes: types.UMeshes):
+    coords = []
+    coords_append = coords.append
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-"""
+    for umesh in umeshes:
+        uv = umesh.uv
+        if umesh.is_full_face_selected:
+            for e in umesh.bm.edges:
+                if e.seam and (corners := getattr(e, 'link_loops', None)):
+                    for crn in corners:
+                        coords_append(crn[uv].uv)
+                        coords_append(crn.link_loop_next[uv].uv)
+        else:
+            if umesh.sync:
+                for e in umesh.bm.edges:
+                    if e.seam and (corners := getattr(e, 'link_loops', None)):
+                        for crn in corners:
+                            if not crn.face.hide:
+                                coords_append(crn[uv].uv)
+                                coords_append(crn.link_loop_next[uv].uv)
+            else:
+                if umesh.is_full_face_deselected:
+                    continue
+                for e in umesh.bm.edges:
+                    if e.seam and (corners := getattr(e, 'link_loops', None)):
+                        for crn in corners:
+                            if crn.face.select:
+                                coords_append(crn[uv].uv)
+                                coords_append(crn.link_loop_next[uv].uv)
+    return coords
