@@ -389,7 +389,7 @@ class UNIV_OT_Hide(Operator):
                 if crn_vert.select:
                     if all(not f__.select for f__ in crn_vert.link_faces):
                         return True
-                    for crn__ in self.linked_crn_to_vert_sync_without_idx_pair_walk_iter(crn, uv):
+                    for crn__ in utils.linked_crn_to_vert_pair_iter(crn, uv, True):
                         if crn__.face.select:
                             return True
             return False
@@ -433,80 +433,6 @@ class UNIV_OT_Hide(Operator):
                 if not is_hide_face():
                     umesh.sequence.append(f)
 
-    @staticmethod
-    def linked_crn_to_vert_sync_without_idx_pair_walk(crn: bmesh.types.BMLoop, uv):
-        """Linked to arg corner by island index with arg corner"""
-        is_pair = utils.is_pair
-        first_vert = crn.vert
-
-        linked = []
-        bm_iter = crn
-        # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
-        iterated = False
-        while True:
-            prev_crn = bm_iter.link_loop_prev
-            pair_ccw = prev_crn.link_loop_radial_prev
-            if pair_ccw == crn and iterated:
-                break
-            iterated = True
-
-            # Finish CCW
-            if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or pair_ccw.face.hide or not is_pair(prev_crn, pair_ccw, uv):
-                bm_iter = crn
-                linked_cw = []
-                while True:
-                    pair_cw = bm_iter.link_loop_radial_prev
-                    # Skip flipped and boundary
-                    if pair_cw == bm_iter:
-                        break
-
-                    next_crn = pair_cw.link_loop_next
-                    if next_crn == crn:
-                        break
-
-                    if (first_vert != next_crn.vert) or next_crn.face.hide or not utils.is_pair(bm_iter, pair_cw, uv):
-                        break
-                    bm_iter = next_crn
-                    linked_cw.append(next_crn)
-                linked.extend(linked_cw[::-1])
-                break
-            bm_iter = pair_ccw
-            linked.append(bm_iter)
-        assert len(linked) == len(set(linked))
-        return linked
-
-    @staticmethod
-    def linked_crn_to_vert_sync_without_idx_pair_walk_iter(crn: bmesh.types.BMLoop, uv):
-        """CW corners not reverse"""
-        first_vert = crn.vert
-        iterated = False
-        bm_iter = crn
-        while True:
-            prev_crn = bm_iter.link_loop_prev
-            pair_ccw = prev_crn.link_loop_radial_prev
-            if pair_ccw == crn and iterated:
-                break
-            iterated = True
-            # Finish CCW
-            if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or pair_ccw.face.hide or not utils.is_pair(prev_crn, pair_ccw, uv):
-                bm_iter = crn
-                while True:
-                    pair_cw = bm_iter.link_loop_radial_prev
-                    # Skip flipped and boundary
-                    if pair_cw == bm_iter:
-                        break
-
-                    next_crn = pair_cw.link_loop_next
-                    if next_crn == crn:
-                        break
-
-                    if (first_vert != next_crn.vert) or next_crn.face.hide or not utils.is_pair(bm_iter, pair_cw, uv):
-                        break
-                    yield next_crn
-                    bm_iter = next_crn
-                break
-            yield pair_ccw
-            bm_iter = pair_ccw
 
 LAST_MOUSE_POS = -100_000, -100_000
 REPEAT_MOUSE_POS_COUNT = 0

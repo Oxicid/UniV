@@ -2709,6 +2709,7 @@ class UNIV_OT_Weld(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
+                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
                 self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
         self.use_by_distance = event.alt
@@ -2722,6 +2723,7 @@ class UNIV_OT_Weld(Operator):
         self.global_counter = 0
         self.seam_clear_counter = 0
         self.edge_weld_counter = 0
+        self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
         self.stitched_islands = 0
         self.update_seams = True
@@ -2760,18 +2762,21 @@ class UNIV_OT_Weld(Operator):
 
     def weld(self):
         from ..utils import weld_crn_edge_by_idx
+
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if not self.umeshes:
+            return self.umeshes.update()
+        if not selected_umeshes and self.mouse_position:
+            self.umeshes.umeshes = []
+            return
+            # return self.pick_weld()
+
+
         islands_of_mesh = []
-        for umesh in reversed(self.umeshes):
+        for umesh in self.umeshes:
             uv = umesh.uv
-            if not umesh.sync:
-                if umesh.is_full_face_deselected or \
-                        not any(l[uv].select_edge for f in umesh.bm.faces if f.select for l in f.loops):
-                    self.umeshes.umeshes.remove(umesh)
-                    continue
-            else:
-                if umesh.is_full_edge_deselected:
-                    self.umeshes.umeshes.remove(umesh)
-                    continue
 
             local_seam_clear_counter = 0
             local_edge_weld_counter = 0
@@ -2783,7 +2788,6 @@ class UNIV_OT_Weld(Operator):
                 for idx, isl in enumerate(islands):
                     isl.set_selected_crn_edge_tag(umesh)
 
-                    idx = isl[0].index
                     for crn in isl.iter_corners_by_tag():
                         shared = crn.link_loop_radial_prev
                         if shared == crn:
@@ -2829,13 +2833,13 @@ class UNIV_OT_Weld(Operator):
             umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
 
             if islands:
-                islands_of_mesh.append((umesh, islands))
+                islands_of_mesh.append(islands)
 
         if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
             return
 
         if not self.umeshes.sync:
-            for umesh, islands in islands_of_mesh:
+            for islands in islands_of_mesh:
                 uv = islands.umesh.uv
 
                 local_seam_clear_counter = 0
@@ -2853,7 +2857,7 @@ class UNIV_OT_Weld(Operator):
 
                 self.seam_clear_counter += local_seam_clear_counter
                 self.edge_weld_counter += local_edge_weld_counter
-                umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+                islands.umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
 
             if self.seam_clear_counter + self.edge_weld_counter:
                 return
@@ -2983,6 +2987,32 @@ class UNIV_OT_Weld(Operator):
                         union_corners.append(isl)
                 compare_index += 1
         return corners_groups
+
+    def pick_weld(self):
+        hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
+        for umesh in self.umeshes:
+            hit.find_nearest_crn_by_visible_faces(umesh)
+
+        if not hit:
+            self.report({'WARNING'}, 'Edge not found within a given radius')
+        else:
+            shared = hit.crn.link_loop_radial_prev
+            if (shared == hit.crn or
+                    bool(shared.face.hide if hit.umesh.sync else not shared.face.select)):
+                self.report({'WARNING'}, 'Edge is boundary')
+                return
+
+            if hit.crn.link_loop_next.vert != shared.vert:
+                self.report({'WARNING'}, 'Edge has 3D flipped face')
+                return
+
+            e = hit.crn.edge
+            had_seam = e.seam
+            if not had_seam:
+                hit.crn.edge.seam = True
+                hit.umesh.update()
+
+            return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
 class UNIV_OT_Stitch(Operator):

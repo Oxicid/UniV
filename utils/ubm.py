@@ -97,7 +97,7 @@ def calc_total_area_3d(faces, scale):
             v_prev = corners[-1].vert.co * scale
             for crn in corners:
                 v_curr = crn.vert.co * scale
-                # inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
+                # (inplace optimization ~20%) - n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
                 v_prev_yzx = v_prev.yzx
                 v_prev_zxy = v_prev.zxy
 
@@ -181,6 +181,14 @@ def prev_disc(l: BMLoop) -> BMLoop:
     return l.link_loop_prev.link_loop_radial_prev
 
 
+def is_invisible_func(sync):
+    if sync:
+        return BMFace.hide.__get__
+    else:
+        __is_select = BMFace.select.__get__
+        return lambda f: not __is_select(f)
+
+
 def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
     first_vert = first.vert
     first_co = first[uv].uv
@@ -209,10 +217,91 @@ def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
             linked.append(bm_iter)
     return linked
 
+def linked_crn_to_vert_pair_iter(crn: BMLoop, uv, sync):
+    """CW corners not reverse"""
+    is_invisible = is_invisible_func(sync)
+    first_vert = crn.vert
+    iterated = False
+    bm_iter = crn
+    while True:
+        prev_crn = bm_iter.link_loop_prev
+        pair_ccw = prev_crn.link_loop_radial_prev
+        if pair_ccw == crn and iterated:
+            break
+        iterated = True
+        # Finish CCW
+        if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or is_invisible(pair_ccw.face) or not is_pair(prev_crn, pair_ccw, uv):
+            bm_iter = crn
+            while True:
+                pair_cw = bm_iter.link_loop_radial_prev
+                # Skip flipped and boundary
+                if pair_cw == bm_iter:
+                    break
+
+                next_crn = pair_cw.link_loop_next
+                if next_crn == crn:
+                    break
+
+                if (first_vert != next_crn.vert) or is_invisible(next_crn.face) or not is_pair(bm_iter, pair_cw, uv):
+                    break
+                yield next_crn
+                bm_iter = next_crn
+            break
+        yield pair_ccw
+        bm_iter = pair_ccw
+
+
+def linked_crn_to_vert_pair_walk(crn: BMLoop, uv, sync: bool):
+    """Linked to arg corner by island index with arg corner"""
+    is_invisible = is_invisible_func(sync)
+    first_vert = crn.vert
+
+    linked = []
+    bm_iter = crn
+    # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
+    iterated = False
+    while True:
+        prev_crn = bm_iter.link_loop_prev
+        pair_ccw = prev_crn.link_loop_radial_prev
+        if pair_ccw == crn and iterated:
+            break
+        iterated = True
+
+        # Finish CCW
+        if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or is_invisible(pair_ccw.face) or not is_pair(prev_crn, pair_ccw, uv):
+            bm_iter = crn
+            linked_cw = []
+            while True:
+                pair_cw = bm_iter.link_loop_radial_prev
+                # Skip flipped and boundary
+                if pair_cw == bm_iter:
+                    break
+
+                next_crn = pair_cw.link_loop_next
+                if next_crn == crn:
+                    break
+
+                if (first_vert != next_crn.vert) or is_invisible(next_crn.face) or not is_pair(bm_iter, pair_cw, uv):
+                    break
+                bm_iter = next_crn
+                linked_cw.append(next_crn)
+            linked.extend(linked_cw[::-1])
+            break
+        bm_iter = pair_ccw
+        linked.append(bm_iter)
+    # assert len(linked) == len(set(linked))
+    return linked
+
+
 def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
     first_co = first[uv].uv
     linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
     linked.remove(first)
+    return linked
+
+def linked_crn_uv_unordered_included(first: BMLoop, uv: BMLayerItem):
+    first_co = first[uv].uv
+    linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
     return linked
 
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
