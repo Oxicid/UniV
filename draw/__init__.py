@@ -6,5 +6,5 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 from .text import TextDraw
-from .lines import LinesDrawSimple
+from .lines import LinesDrawSimple, DotLinesDrawSimple
 from . import mesh_extract

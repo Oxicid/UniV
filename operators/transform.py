@@ -9,6 +9,7 @@ import bpy
 import math
 import random
 import bl_math
+from itertools import chain
 from collections.abc import Callable
 
 import numpy as np
@@ -2745,7 +2746,25 @@ class UNIV_OT_Weld(Operator):
                 if not self.umeshes.final():
                     self.weld_by_distance_all(selected=False)
         else:
+
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            from .. import draw
+            for umesh in chain(selected_umeshes, visible_umeshes):
+                umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
+
+            if not self.umeshes:
+                return self.umeshes.update()
+            if not selected_umeshes and self.mouse_position:
+                self.pick_weld()
+                self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+                bpy.context.area.tag_redraw()
+                return {'FINISHED'}
+
             self.weld()
+            self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+            bpy.context.area.tag_redraw()
 
             if self.stitched_islands:
                 self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
@@ -2762,17 +2781,6 @@ class UNIV_OT_Weld(Operator):
 
     def weld(self):
         from ..utils import weld_crn_edge_by_idx
-
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
-
-        if not self.umeshes:
-            return self.umeshes.update()
-        if not selected_umeshes and self.mouse_position:
-            self.umeshes.umeshes = []
-            return
-            # return self.pick_weld()
-
 
         islands_of_mesh = []
         for umesh in self.umeshes:
@@ -2995,24 +3003,98 @@ class UNIV_OT_Weld(Operator):
 
         if not hit:
             self.report({'WARNING'}, 'Edge not found within a given radius')
-        else:
-            shared = hit.crn.link_loop_radial_prev
-            if (shared == hit.crn or
-                    bool(shared.face.hide if hit.umesh.sync else not shared.face.select)):
-                self.report({'WARNING'}, 'Edge is boundary')
-                return
+            return
 
-            if hit.crn.link_loop_next.vert != shared.vert:
-                self.report({'WARNING'}, 'Edge has 3D flipped face')
-                return
+        sync = hit.umesh.sync
+        ref_crn = hit.crn
+        shared = ref_crn.link_loop_radial_prev
+        is_visible = utils.is_visible_func(sync)
+        if shared == ref_crn or not is_visible(shared.face):
+            self.report({'INFO'}, 'Edge is boundary')
+            return
 
-            e = hit.crn.edge
-            had_seam = e.seam
-            if not had_seam:
-                hit.crn.edge.seam = True
+        if ref_crn.link_loop_next.vert != shared.vert:
+            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
+            return
+
+        uv = hit.umesh.uv
+        e = ref_crn.edge
+        if utils.is_pair(ref_crn, shared, uv):
+            if e.seam:
+                e.seam = False
                 hit.umesh.update()
+                return
+            return
 
-            return {'FINISHED'} if had_seam else {'FINISHED'}
+        # fast calculate, if edge has non-manifold links
+        if ref_crn[uv].uv == shared.link_loop_next[uv].uv:  # check a
+            for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                crn[uv].uv = ref_crn.link_loop_next[uv].uv  # link b
+            e.seam = False
+            hit.umesh.update()
+            return
+        elif ref_crn.link_loop_next[uv].uv == shared[uv].uv:  # check b
+            shared_next_crn = shared.link_loop_next
+            for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
+                crn[uv].uv = ref_crn[uv].uv  # link a
+            e.seam = False
+            hit.umesh.update()
+            return
+
+        ref_isl, isl_set = hit.calc_island_non_manifold()
+
+        if shared.face in isl_set:
+            shared_next_crn = shared.link_loop_next
+            for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
+                crn[uv].uv = ref_crn[uv].uv
+
+            for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                crn[uv].uv = ref_crn.link_loop_next[uv].uv
+            e.seam = False
+            hit.umesh.update()
+        else:
+            hit.crn = shared
+            trans_isl, _ = hit.calc_island_with_seam()
+            UNIV_OT_Stitch.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared)
+            hit.umesh.update()
+        return
+
+    @staticmethod
+    def filter_and_draw_lines(umeshes_a, umeshes_b):
+        welded = []
+        with_seam = []
+        welded_append = welded.append
+        with_seam_append = with_seam.append
+
+        is_visible = utils.is_visible_func(umeshes_a.sync)
+
+        # TODO: Optimize by update tag umesh (if umesh without tag_update -> not welded edges)
+        for umesh in chain(umeshes_a, umeshes_b):
+            uv = umesh.uv
+            for e in umesh.sequence:
+                if e.seam:
+                    for crn in e.link_loops:
+                        if is_visible(crn.face):
+                            with_seam_append(crn[uv].uv)
+                            with_seam_append(crn.link_loop_next[uv].uv)
+                else:
+                    toggle = False
+                    for crn in e.link_loops:
+                        if is_visible(crn.face):
+                            if toggle:
+                                welded_append(crn[uv].uv)
+                                welded_append(crn.link_loop_next[uv].uv)
+                            else:
+                                welded_append(crn.link_loop_next[uv].uv)
+                                welded_append(crn[uv].uv)
+                                toggle = True
+
+        from .. import draw
+        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+        draw.LinesDrawSimple.draw_register(with_seam, seam_color)
+
+        welded_color = (0.1, 0.1, 1.0, 1.0)
+        draw.DotLinesDrawSimple.draw_register(welded, welded_color)
 
 
 class UNIV_OT_Stitch(Operator):
@@ -3037,6 +3119,7 @@ class UNIV_OT_Stitch(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
+                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
                 self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
         self.between = event.alt
@@ -3047,22 +3130,45 @@ class UNIV_OT_Stitch(Operator):
         self.sync = utils.sync()
         self.umeshes: types.UMeshes | None = None
         self.global_counter = 0
+        self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
         self.stitched_islands = 0
         self.save_seams = False
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        from .. import draw
+        for umesh in chain(selected_umeshes, visible_umeshes):
+            umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
+
         self.global_counter = 0
         self.stitched_islands = 0
+
         if self.between:
+            if not selected_umeshes:
+                self.umeshes.umeshes = []
             self.stitch_between()
         else:
+            if not self.umeshes:
+                return self.umeshes.update()
+            if not selected_umeshes and self.mouse_position:
+                self.pick_stitch()
+                UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+                bpy.context.area.tag_redraw()
+                return {'FINISHED'}
+
             self.stitch()
             if self.stitched_islands:
                 self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
 
-        return self.umeshes.update(info='Not found edges for stitch')
+        UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+        bpy.context.area.tag_redraw()
+        # TODO: Remove edges from selected edges (self.stitch and self.stitch_between)
+        self.umeshes.update(info='Not found edges for stitch')
+        return {'FINISHED'}
 
     def stitch(self):
         for umesh in self.umeshes:
@@ -3312,6 +3418,83 @@ class UNIV_OT_Stitch(Operator):
         adv_islands.weld_selected(target_isl, source_isl, selected=selected)
         return True
 
+    @staticmethod
+    def stitch_pick_ex(ref_isl: AdvIsland, trans: AdvIsland, ref_crn: BMLoop, trans_crn: BMLoop):
+        uv = ref_isl.umesh.uv
+
+        if utils.is_flipped_uv(ref_crn.face, uv) != utils.is_flipped_uv(trans_crn.face, uv):
+            trans.scale_simple(Vector((1, -1)))
+
+        pt_a1, pt_a2 = ref_crn[uv].uv, ref_crn.link_loop_next[uv].uv
+        pt_b1, pt_b2 = trans_crn.link_loop_next[uv].uv, trans_crn[uv].uv
+
+        normal_a = pt_a1 - pt_a2
+        normal_b = pt_b1 - pt_b2
+
+        length_a = normal_a.length
+        length_b = normal_b.length
+        # Scale
+        if not (length_a < 1e-06 or length_b < 1e-06):
+            scale = length_a / length_b
+            trans.scale_simple(Vector((scale, scale)))
+
+            rotate_angle = normal_a.angle_signed(normal_b)
+            trans.rotate_simple(rotate_angle)
+
+        trans.move(pt_a1 - pt_b1)
+
+        trans_a = [trans_crn] + utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, ref_isl.umesh.sync)
+        for crn in trans_a:
+            crn[uv].uv = ref_crn.link_loop_next[uv].uv
+
+        trans_next = trans_crn.link_loop_next
+        trans_b = [trans_next] + utils.linked_crn_to_vert_pair_with_seam(trans_next, uv, ref_isl.umesh.sync)
+        for crn in trans_b:
+            crn[uv].uv = ref_crn[uv].uv
+
+        ref_crn.edge.seam = False
+
+    def pick_stitch(self):
+        hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
+        for umesh in self.umeshes:
+            hit.find_nearest_crn_by_visible_faces(umesh)
+
+        if not hit:
+            self.report({'WARNING'}, 'Edge not found within a given radius')
+            return
+
+        sync = hit.umesh.sync
+        ref_crn = hit.crn
+        shared = ref_crn.link_loop_radial_prev
+        is_visible = utils.is_visible_func(sync)
+        if shared == ref_crn or not is_visible(shared.face):
+            self.report({'WARNING'}, 'Edge is boundary')
+            return
+
+        if ref_crn.link_loop_next.vert != shared.vert:
+            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
+            return
+
+        uv = hit.umesh.uv
+        e = ref_crn.edge
+        if utils.is_pair(ref_crn, shared, uv):
+            if e.seam:
+                e.seam = False
+                hit.umesh.update()
+                return
+            self.report({'INFO'}, 'The edge was already stitched, no action was taken')
+            return
+
+        ref_isl, isl_set = hit.calc_island_with_seam()
+
+        if shared.face in isl_set:
+            self.report({'WARNING'}, 'It is not possible to use Stitch on itself, use Weld operator')
+        else:
+            hit.crn = shared
+            trans_isl, _ = hit.calc_island_with_seam()
+            self.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared)
+            hit.umesh.update()
+        return
 
 class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_reset_scale"

@@ -18,6 +18,7 @@ from . import Islands, FaceIsland, AdvIslands, AdvIsland, UnionIslands, LoopGrou
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 from math import isclose
+from .. import utils
 from ..utils import closest_pt_to_line, point_inside_face
 
 class KDData:
@@ -469,6 +470,60 @@ class CrnEdgeHit:
             self.umesh = umesh
             return True
         return False
+
+    def calc_island_with_seam(self):
+        assert self.crn, 'Not found picked corner'
+
+        uv = self.umesh.uv
+        island: set[BMFace] = {self.crn.face}
+        is_visible = utils.is_visible_func(self.umesh.sync)
+
+        stack = []
+        parts_of_island = [self.crn.face]
+        while parts_of_island:
+            for f in parts_of_island:
+                for l in f.loops:
+                    if l.edge.seam:
+                        continue
+                    pair_crn = l.link_loop_radial_prev
+                    ff = pair_crn.face
+                    if ff in island or not is_visible(ff):
+                        continue
+
+                    if (l[uv].uv == pair_crn.link_loop_next[uv].uv and
+                            l.link_loop_next[uv].uv == pair_crn[uv].uv):
+                        island.add(ff)
+                        stack.append(ff)
+            parts_of_island = stack
+            stack = []
+
+        return AdvIsland(list(island), self.umesh), island
+
+    def calc_island_non_manifold(self) -> tuple[AdvIsland, set[BMFace]]:
+        assert self.crn, 'Not found picked corner'
+
+        uv = self.umesh.uv
+        island: set[BMFace] = {self.crn.face}
+        is_visible = utils.is_visible_func(self.umesh.sync)
+
+        stack = []
+        parts_of_island = [self.crn.face]
+        while parts_of_island:
+            for f in parts_of_island:
+                for l in f.loops:
+                    pair_crn = l.link_loop_radial_prev
+                    ff = pair_crn.face
+                    if ff in island or not is_visible(ff):
+                        continue
+
+                    if (l[uv].uv == pair_crn.link_loop_next[uv].uv or
+                            l.link_loop_next[uv].uv == pair_crn[uv].uv):
+                        island.add(ff)
+                        stack.append(ff)
+            parts_of_island = stack
+            stack = []
+
+        return AdvIsland(list(island), self.umesh), island
 
     def __bool__(self):
         return bool(self.crn)

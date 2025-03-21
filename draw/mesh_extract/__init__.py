@@ -32,3 +32,24 @@ def extract_seams(umeshes: types.UMeshes):
                                 coords_append(crn[uv].uv)
                                 coords_append(crn.link_loop_next[uv].uv)
     return coords
+
+def extract_edges_with_seams(umesh: types.UMesh):
+    edges = []
+    edges_append = edges.append
+
+    if umesh.is_full_face_selected:
+        for e in umesh.bm.edges:
+            if e.seam and hasattr(e, 'link_loops'):
+                edges_append(e)
+    else:
+        if umesh.sync:
+            for e in umesh.bm.edges:
+                if e.seam and hasattr(e, 'link_loops'):
+                    edges_append(e)
+        else:
+            if umesh.is_full_face_deselected:
+                return []
+            for e in umesh.bm.edges:
+                if e.seam and hasattr(e, 'link_loops'):
+                    edges_append(e)
+    return edges
