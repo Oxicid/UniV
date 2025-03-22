@@ -1643,7 +1643,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_visible_non_manifold(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        islands = [cls.island_type(i, umesh) for i in cls.calc_iter_non_manifold_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
