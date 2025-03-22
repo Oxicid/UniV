@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 4, 1),
+    "version": (3, 4, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -33,6 +33,7 @@ from .operators import quick_snap
 from .operators import relax
 from .operators import seam
 from .operators import select
+from .operators import stitch_and_weld
 from .operators import stack
 from .operators import straight
 from .operators import toggle
@@ -68,6 +69,9 @@ def load_register_types():
             inspect.UNIV_OT_Check_Flipped,
             inspect.UNIV_OT_Check_Non_Splitted,
             inspect.UNIV_OT_Check_Overlap,
+            # Stitch and Weld
+            stitch_and_weld.UNIV_OT_Weld,
+            stitch_and_weld.UNIV_OT_Stitch,
             # Transforms
             transform.UNIV_OT_Orient,
             transform.UNIV_OT_Gravity,
@@ -81,8 +85,6 @@ def load_register_types():
             transform.UNIV_OT_Home,
             transform.UNIV_OT_Shift,
             transform.UNIV_OT_Random,
-            transform.UNIV_OT_Weld,
-            transform.UNIV_OT_Stitch,
             transform.UNIV_OT_ResetScale,
             transform.UNIV_OT_AdjustScale,
             transform.UNIV_OT_AdjustScale_VIEW3D,
