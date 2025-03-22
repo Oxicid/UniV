@@ -2721,41 +2721,35 @@ class UNIV_OT_Weld(Operator):
         super().__init__(*args, **kwargs)
         self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: types.UMeshes | None = None
-        self.global_counter = 0
-        self.seam_clear_counter = 0
-        self.edge_weld_counter = 0
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
-        self.stitched_islands = 0
         self.update_seams = True
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
-        self.global_counter = 0
-        self.seam_clear_counter = 0
-        self.edge_weld_counter = 0
-        self.stitched_islands = 0
 
         if self.use_by_distance:
-            if self.weld_by_distance_type == 'BY_ISLANDS':
-                self.weld_by_distance_island(extended=True)
-                if not self.umeshes.final():
-                    self.weld_by_distance_island(extended=False)
-            else:
-                self.weld_by_distance_all(selected=True)
-                if not self.umeshes.final():
-                    self.weld_by_distance_all(selected=False)
-        else:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            if self.weld_by_distance_type == 'BY_ISLANDS':
+                self.weld_by_distance_island(extended=bool(selected_umeshes))
+            else:
+                self.weld_by_distance_all(selected=bool(selected_umeshes))
+        else:
             selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            if not self.umeshes:
+                return self.umeshes.update()
 
             from .. import draw
             for umesh in chain(selected_umeshes, visible_umeshes):
                 umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
-            if not self.umeshes:
-                return self.umeshes.update()
             if not selected_umeshes and self.mouse_position:
                 self.pick_weld()
                 self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
@@ -2766,16 +2760,6 @@ class UNIV_OT_Weld(Operator):
             self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
             bpy.context.area.tag_redraw()
 
-            if self.stitched_islands:
-                self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
-            else:
-                if self.edge_weld_counter and self.seam_clear_counter:
-                    self.report({'INFO'}, f"Welded {self.edge_weld_counter} edges. Cleared mark seams edges = {self.seam_clear_counter} ")
-                elif self.edge_weld_counter:
-                    self.report({'INFO'}, f"Welded {self.edge_weld_counter} edges.")
-                elif self.seam_clear_counter:
-                    self.report({'INFO'}, f"Cleared seams edges = {self.seam_clear_counter} ")
-
         self.umeshes.update(info='Not found verts for weld')
         return {'FINISHED'}
 
@@ -2785,10 +2769,7 @@ class UNIV_OT_Weld(Operator):
         islands_of_mesh = []
         for umesh in self.umeshes:
             uv = umesh.uv
-
-            local_seam_clear_counter = 0
-            local_edge_weld_counter = 0
-
+            update_tag = False
             if islands := Islands.calc_extended_any_edge_non_manifold(umesh):
                 umesh.set_corners_tag(False)
                 islands.indexing()
@@ -2820,54 +2801,42 @@ class UNIV_OT_Weld(Operator):
                         if is_splitted_a and is_splitted_b:
                             weld_crn_edge_by_idx(crn, shared_next, idx, uv)
                             weld_crn_edge_by_idx(crn_next, shared, idx, uv)
-                            local_edge_weld_counter += 1
+                            update_tag |= True
                         elif is_splitted_a:
                             weld_crn_edge_by_idx(crn, shared_next, idx, uv)
-                            local_edge_weld_counter += 1
+                            update_tag |= True
                         elif is_splitted_b:
                             weld_crn_edge_by_idx(crn_next, shared, idx, uv)
-                            local_edge_weld_counter += 1
+                            update_tag |= True
 
                         edge = crn.edge
                         if edge.seam:
                             edge.seam = False
-                            local_seam_clear_counter += 1
+                            update_tag |= True
 
                         crn.tag = False
                         shared.tag = False
-
-            self.seam_clear_counter += local_seam_clear_counter
-            self.edge_weld_counter += local_edge_weld_counter
-            umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
+            umesh.update_tag = update_tag
 
             if islands:
                 islands_of_mesh.append(islands)
 
-        if not self.umeshes or (self.seam_clear_counter + self.edge_weld_counter):
+        if self.umeshes.update_tag:
             return
 
         if not self.umeshes.sync:
             for islands in islands_of_mesh:
+                update_tag = False
                 uv = islands.umesh.uv
-
-                local_seam_clear_counter = 0
-                local_edge_weld_counter = 0
-
                 for idx, isl in enumerate(islands):
                     for crn in isl.iter_corners_by_tag():
                         utils.copy_pos_to_target_with_select(crn, uv, idx)
-
-                        edge = crn.edge
                         if crn.edge.seam:
-                            edge.seam = False
-                            local_seam_clear_counter += 1
-                        local_edge_weld_counter += 1
+                            crn.edge.seam = False
+                        update_tag |= True
+                islands.umesh.update_tag = update_tag
 
-                self.seam_clear_counter += local_seam_clear_counter
-                self.edge_weld_counter += local_edge_weld_counter
-                islands.umesh.update_tag = bool(local_seam_clear_counter + local_edge_weld_counter)
-
-            if self.seam_clear_counter + self.edge_weld_counter:
+            if self.umeshes.update_tag:
                 return
 
         UNIV_OT_Stitch.stitch(self)  # noqa TODO: Implement inheritance
@@ -2875,7 +2844,7 @@ class UNIV_OT_Weld(Operator):
     def weld_by_distance_island(self, extended):
         for umesh in self.umeshes:
             uv = umesh.uv
-            local_counter = 0
+            update_tag = False
             if islands := Islands.calc_any_extended_or_visible_non_manifold(umesh, extended=extended):
                 # Tagging
                 for f in umesh.bm.faces:
@@ -2887,29 +2856,24 @@ class UNIV_OT_Weld(Operator):
                     else:
                         isl.set_corners_tag(True)
 
-                    corners = (crn for f in isl for crn in f.loops if crn.tag)
-                    for crn in corners:
+                    for crn in isl.iter_corners_by_tag():
                         crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
-                        local_counter += self.weld_corners_in_vert(crn_in_vert, uv)
+                        update_tag |= self.weld_corners_in_vert(crn_in_vert, uv)
 
-            if local_counter:
-                for _isl in islands:
-                    _isl.mark_seam()
-            umesh.update_tag = bool(islands)
-            self.global_counter += local_counter
+                if update_tag:
+                    for isl in islands:
+                        isl.mark_seam()
+            umesh.update_tag = update_tag
 
-        if self.umeshes.final() and self.global_counter == 0:
+        if not self.umeshes.update_tag:
             self.umeshes.cancel_with_report(info='Not found verts for weld')
-
-        if self.global_counter:
-            self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
 
     def weld_by_distance_all(self, selected):
         # TODO: Refactor this, use iterator
         for umesh in self.umeshes:
             umesh.tag_visible_corners()
             uv = umesh.uv
-            local_counter = 0
+            update_tag = False
             if selected:
                 init_corners = utils.calc_selected_uv_vert_corners(umesh)
             else:
@@ -2935,37 +2899,31 @@ class UNIV_OT_Weld(Operator):
                 corners = (crn for crn in init_corners if crn.tag)
                 for crn in corners:
                     crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
-                    local_counter += self.weld_corners_in_vert(crn_in_vert, uv)
+                    self.weld_corners_in_vert(crn_in_vert, uv)  # update_tag |=
 
-            if local_counter:
+            if init_corners:  # TODO: Count deleted seams and weld_corners_in_vert
                 umesh.tag_visible_faces()
                 umesh.mark_seam_tagged_faces()
 
-            umesh.update_tag = bool(init_corners)
-            self.global_counter += local_counter
+            umesh.update_tag = update_tag
 
-        if self.umeshes.final() and self.global_counter == 0:
+        if not self.umeshes.update_tag:
             self.umeshes.cancel_with_report(info='Not found verts for weld')
-
-        if self.global_counter:
-            self.report({'INFO'}, f"Found {self.global_counter} vertices for weld")
 
     def weld_corners_in_vert(self, crn_in_vert, uv):
         if utils.all_equal(_crn[uv].uv for _crn in crn_in_vert):
             for crn_t in crn_in_vert:
                 crn_t.tag = False
-            return 0
-        sub_local_counter = 0
+            return False
+
         for group in self.calc_distance_groups(crn_in_vert, uv):
             value = Vector((0, 0))
             for c in group:
                 value += c[uv].uv
-            size = len(group)
-            avg = value / size
+            avg = value / len(group)
             for c in group:
                 c[uv].uv = avg
-            sub_local_counter += size
-        return sub_local_counter
+        return True
 
     def calc_distance_groups(self, crn_in_vert: list[BMLoop], uv) -> list[list[BMLoop]]:
         corners_groups = []
@@ -3132,7 +3090,6 @@ class UNIV_OT_Stitch(Operator):
         self.global_counter = 0
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
-        self.stitched_islands = 0
         self.save_seams = False
 
     def execute(self, context):
@@ -3145,7 +3102,6 @@ class UNIV_OT_Stitch(Operator):
             umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
         self.global_counter = 0
-        self.stitched_islands = 0
 
         if self.between:
             if not selected_umeshes:
@@ -3161,12 +3117,11 @@ class UNIV_OT_Stitch(Operator):
                 return {'FINISHED'}
 
             self.stitch()
-            if self.stitched_islands:
-                self.report({'INFO'}, f"Stitched {self.stitched_islands} ")
 
         UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
         bpy.context.area.tag_redraw()
-        # TODO: Remove edges from selected edges (self.stitch and self.stitch_between)
+
+        # TODO: Remove seams from selected edges (self.stitch and self.stitch_between)
         self.umeshes.update(info='Not found edges for stitch')
         return {'FINISHED'}
 
@@ -3247,7 +3202,6 @@ class UNIV_OT_Stitch(Operator):
                 for adv in adv_islands:
                     if adv:
                         adv.mark_seam()
-            self.stitched_islands += len(adv_islands) - sum(bool(isl) for isl in adv_islands)
             umesh.update_tag = update_tag
 
     def stitch_between(self):
