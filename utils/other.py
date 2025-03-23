@@ -45,6 +45,13 @@ def get_aspect_ratio(umesh=None):
                     return image_width / image_height
     return 1.0
 
+def get_active_image_size():
+    if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+        space_data = area.spaces.active
+        if space_data and space_data.image:
+            image_width, image_height = space_data.image.size
+            if image_height:
+                return image_width, image_height
 
 def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):
     if obj_.type != 'MESH':

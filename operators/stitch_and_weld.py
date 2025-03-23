@@ -24,7 +24,7 @@ from ..types import (
     AdvIsland,
     LoopGroup
 )
-from ..preferences import prefs
+from ..preferences import prefs, univ_settings
 
 
 class UNIV_OT_Weld(Operator):
@@ -429,11 +429,27 @@ class UNIV_OT_Stitch(Operator):
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
     flip: BoolProperty(name='Flip', default=False)
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0.0, min=0, soft_max=1, max=4)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "between")
+        layout.prop(self, "update_seams")
+        layout.prop(self, "flip")
+        layout.prop(self, "use_aspect")
+
+        if self.padding_multiplayer:
+            layout.separator(factor=0.35)
+            settings = univ_settings()
+            layout.label(text=f"Global Texture Size = {settings.size_x}x{settings.size_y}")
+            layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
+        layout.prop(self, "padding_multiplayer", slider=True)
+
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -450,11 +466,15 @@ class UNIV_OT_Stitch(Operator):
         self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
+        self.padding = 0.0
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        settings = univ_settings()
+        self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
 
         from .. import draw
         for umesh in chain(selected_umeshes, visible_umeshes):
@@ -469,6 +489,11 @@ class UNIV_OT_Stitch(Operator):
             if not self.umeshes:
                 return self.umeshes.update()
             if not selected_umeshes and self.mouse_position:
+                if self.padding and (img_size := utils.get_active_image_size()):
+                    if (int(settings.size_x), int(settings.size_y)) != img_size:
+                        self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
+                                                 'which will result in incorrect padding.')
+
                 self.pick_stitch()
                 UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
                 bpy.context.area.tag_redraw()
@@ -735,7 +760,12 @@ class UNIV_OT_Stitch(Operator):
         return True
 
     @staticmethod
-    def stitch_pick_ex(ref_isl: AdvIsland, trans: AdvIsland, ref_crn: BMLoop, trans_crn: BMLoop, update_seams=True):
+    def stitch_pick_ex(ref_isl: AdvIsland,
+                       trans: AdvIsland,
+                       ref_crn: BMLoop,
+                       trans_crn: BMLoop,
+                       update_seams=True,
+                       pad=0.0):
         uv = ref_isl.umesh.uv
 
         if utils.is_flipped_uv(ref_crn.face, uv) != utils.is_flipped_uv(trans_crn.face, uv):
@@ -756,23 +786,37 @@ class UNIV_OT_Stitch(Operator):
         normal_b = pt_b1 - pt_b2
         length_a = normal_a.length
         length_b = normal_b.length
+
         if not (length_a < 1e-06 or length_b < 1e-06):
             scale = length_a / length_b
             trans.scale_simple(Vector((scale, scale)))
 
-        trans.move(pt_a1 - pt_b1)
+        # Move
+        if pad:
+            aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
+            orto = normal_a.orthogonal().normalized() * pad
+            if orto == Vector((0, 0)):  # TODO: Convert static to default method and report zero length
+                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
+                orto = orto.normalized() * pad
+            if orto == Vector((0, 0)):
+                orto = Vector((pad, 0))
+            orto *= aspect_vec
+            delta = (pt_a1 - pt_b1) + orto
+            trans.move(delta)
+        else:
+            trans.move(pt_a1 - pt_b1)
 
-        trans_a = [trans_crn] + utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, ref_isl.umesh.sync)
-        for crn in trans_a:
-            crn[uv].uv = ref_crn.link_loop_next[uv].uv
+            trans_a = [trans_crn] + utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, ref_isl.umesh.sync)
+            for crn in trans_a:
+                crn[uv].uv = ref_crn.link_loop_next[uv].uv
 
-        trans_next = trans_crn.link_loop_next
-        trans_b = [trans_next] + utils.linked_crn_to_vert_pair_with_seam(trans_next, uv, ref_isl.umesh.sync)
-        for crn in trans_b:
-            crn[uv].uv = ref_crn[uv].uv
+            trans_next = trans_crn.link_loop_next
+            trans_b = [trans_next] + utils.linked_crn_to_vert_pair_with_seam(trans_next, uv, ref_isl.umesh.sync)
+            for crn in trans_b:
+                crn[uv].uv = ref_crn[uv].uv
 
-        if update_seams:
-            ref_crn.edge.seam = False
+            if update_seams:
+                ref_crn.edge.seam = False
 
     def pick_stitch(self):
         hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
@@ -797,12 +841,12 @@ class UNIV_OT_Stitch(Operator):
 
         uv = hit.umesh.uv
         e = ref_crn.edge
-        if utils.is_pair(ref_crn, shared, uv):
+        if not self.padding and utils.is_pair(ref_crn, shared, uv):
             if e.seam:
                 e.seam = False
                 hit.umesh.update()
-                return
-            self.report({'INFO'}, 'The edge was already stitched, no action was taken')
+            else:
+                self.report({'INFO'}, 'The edge was already stitched, no action was taken')
             return
 
         ref_isl, isl_set = hit.calc_island_with_seam()
@@ -812,5 +856,5 @@ class UNIV_OT_Stitch(Operator):
         else:
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared, self.update_seams)
+            self.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared, self.update_seams, self.padding)
             hit.umesh.update()
