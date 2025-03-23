@@ -6,7 +6,6 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
-import math
 from itertools import chain
 from mathutils import Vector
 
@@ -304,13 +303,13 @@ class UNIV_OT_Weld(Operator):
                     union_corners = []
                     break
 
-                for isl in crn_in_vert:
-                    if not isl.tag:
+                for crn in crn_in_vert:
+                    if not crn.tag:
                         continue
 
-                    if (union_corners[compare_index][uv].uv - isl[uv].uv).length <= self.distance:
-                        isl.tag = False
-                        union_corners.append(isl)
+                    if (union_corners[compare_index][uv].uv - crn[uv].uv).length <= self.distance:
+                        crn.tag = False
+                        union_corners.append(crn)
                 compare_index += 1
         return corners_groups
 
@@ -462,7 +461,6 @@ class UNIV_OT_Stitch(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sync = utils.sync()
         self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
@@ -484,13 +482,15 @@ class UNIV_OT_Stitch(Operator):
         if self.between:
             if not selected_umeshes:
                 self.umeshes.umeshes = []
+            # TODO: Reduce filtering
+            self.umeshes.filtered_by_selected_uv_faces()
             self.stitch_between()
         else:
             if not self.umeshes:
                 return self.umeshes.update()
             if not selected_umeshes and self.mouse_position:
                 if self.padding and (img_size := utils.get_active_image_size()):
-                    if (int(settings.size_x), int(settings.size_y)) != img_size:
+                    if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
                         self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
                                                  'which will result in incorrect padding.')
 
@@ -510,52 +510,25 @@ class UNIV_OT_Stitch(Operator):
 
     def stitch(self):
         for umesh in self.umeshes:
-            if self.sync and umesh.is_full_edge_deselected or (not self.sync and umesh.is_full_face_deselected):
-                umesh.update_tag = False
-                continue
-
-            uv = umesh.uv
-            adv_islands = AdvIslands.calc_extended_or_visible(umesh, extended=False)
-            if len(adv_islands) < 2:
+            adv_islands = AdvIslands.calc_visible(umesh)  # TODO: Replace with calc_visible_with_seams (need rewrite LoopGroup)
+            if len(adv_islands) <= 1:
                 umesh.update_tag = False
                 continue
 
             adv_islands.indexing()
+            umesh.set_corners_tag(False)
+            target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
 
-            for f in umesh.bm.faces:
-                for crn in f.loops:
-                    crn.tag = False
-
-            if self.sync:
-                target_islands = [isl for isl in adv_islands if any(crn.edge.select for f in isl for crn in f.loops)]
+            if umesh.sync and self.mouse_position:
+                for isl in target_islands:
+                    isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position)
+                target_islands.sort(key=lambda isl_: isl_.value)
             else:
-                target_islands = [isl for isl in adv_islands if any(crn[uv].select_edge for f in isl for crn in f.loops)]
-
-            if self.sync and self.mouse_position:
-                def sort_by_nearest_to_mouse(__island: AdvIsland) -> float:
-                    nonlocal uv
-                    nonlocal mouse_position
-
-                    min_dist = math.inf
-                    for _ff in __island:
-                        for crn_ in _ff.loops:
-                            if crn_.edge.select:
-                                closest_pt = utils.closest_pt_to_line(mouse_position, crn_[uv].uv, crn_.link_loop_next[uv].uv)
-                                min_dist = min(min_dist, (closest_pt-mouse_position).length_squared)
-                    return min_dist
-
-                mouse_position = self.mouse_position
-                target_islands.sort(key=sort_by_nearest_to_mouse)
-
-            else:
-                for _isl in target_islands:
-                    _isl.calc_selected_edge_length()
-
-                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)  # TODO: Replace info
-
-                for _isl in reversed(target_islands):
-                    if _isl.info.edge_length < 1e-06:
-                        target_islands.remove(_isl)
+                for isl in reversed(target_islands):
+                    isl.value = isl.calc_edge_length(selected=False)
+                    if isl.value < 1e-06:
+                        target_islands.remove(isl)
+                target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
 
             if not target_islands:
                 umesh.update_tag = False
@@ -589,53 +562,25 @@ class UNIV_OT_Stitch(Operator):
 
     def stitch_between(self):
         for umesh in self.umeshes:
-            if umesh.is_full_face_deselected:
-                umesh.update_tag = False
-                continue
-            uv = umesh.uv
-            _islands = AdvIslands.calc_extended_or_visible(umesh, extended=True)
-            if len(_islands) < 2:
+            _islands = AdvIslands.calc_extended(umesh)
+            if len(_islands) <= 1:
                 umesh.update_tag = False
                 continue
 
             _islands.indexing()
+            umesh.set_corners_tag(False)
+            target_islands = _islands.islands.copy()
 
-            for f in umesh.bm.faces:
-                for crn in f.loops:
-                    crn.tag = False
-
-            target_islands = _islands.islands[:]
-            if self.sync and self.mouse_position:
-                def sort_by_nearest_to_mouse(__island: AdvIsland) -> float:
-                    from mathutils.geometry import intersect_point_line
-                    nonlocal uv
-                    nonlocal mouse_position
-
-                    min_dist = math.inf
-                    for _ff in __island:
-                        for __crn_sort in _ff.loops:
-                            intersect = intersect_point_line(mouse_position, __crn_sort[uv].uv, __crn_sort.link_loop_next[uv].uv)
-                            dist = (mouse_position - intersect[0]).length
-                            if min_dist > dist:
-                                min_dist = dist
-                    return min_dist
-
-                mouse_position = self.mouse_position
-                target_islands.sort(key=sort_by_nearest_to_mouse)
-
+            if umesh.sync and self.mouse_position:
+                for isl in target_islands:
+                    isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position)
+                target_islands.sort(key=lambda isl_: isl_.value)
             else:
-                for _isl in target_islands:
-                    _isl.calc_selected_edge_length(selected=False)
-
-                target_islands.sort(key=lambda a: a.info.edge_length, reverse=True)
-
-                for _isl in reversed(target_islands):
-                    if _isl.info.edge_length < 1e-06:
-                        target_islands.remove(_isl)
-
-            if not target_islands:
-                umesh.update_tag = False
-                continue
+                for isl in reversed(target_islands):
+                    isl.value = isl.calc_edge_length(selected=False)
+                    if isl.value < 1e-06:  # TODO: Allow zero length islands
+                        target_islands.remove(isl)
+                target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
 
             update_tag = False
             while True:
