@@ -26,6 +26,19 @@ from ..types import (
 from ..preferences import prefs, univ_settings
 
 
+def sort_by_dist_to_mouse_or_sel_edge_length(mouse_position, target_islands, umesh):
+    if umesh.sync and mouse_position:
+        for isl in target_islands:
+            isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, mouse_position)
+        target_islands.sort(key=lambda isl_: isl_.value)
+    else:
+        for isl in reversed(target_islands):
+            isl.value = isl.calc_edge_length(selected=False)
+            if isl.value < 1e-06:  # TODO: Allow zero length islands
+                target_islands.remove(isl)
+        target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
+
+
 class UNIV_OT_Weld(Operator):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
@@ -232,18 +245,12 @@ class UNIV_OT_Weld(Operator):
         for umesh in self.umeshes:
             umesh.tag_visible_corners()
             uv = umesh.uv
-            update_tag = False
-            if selected:
-                init_corners = utils.calc_selected_uv_vert_corners(umesh)
-            else:
-                init_corners = utils.calc_visible_uv_corners(umesh)
-            if init_corners:
+
+            if init_corners := utils.calc_selected_uv_vert_corners(umesh) if selected else utils.calc_visible_uv_corners(umesh):
                 # Tagging
                 is_face_mesh_mode = (self.sync and utils.get_select_mode_mesh() == 'FACE')
                 if not is_face_mesh_mode:
-                    for f in umesh.bm.faces:
-                        for crn in f.loops:
-                            crn.tag = False
+                    umesh.set_corners_tag(False)
 
                 for crn in init_corners:
                     crn.tag = True
@@ -260,14 +267,10 @@ class UNIV_OT_Weld(Operator):
                     crn_in_vert = [crn_v for crn_v in crn.vert.link_loops if crn_v.tag]
                     self.weld_corners_in_vert(crn_in_vert, uv)  # update_tag |=
 
-            if init_corners:  # TODO: Count deleted seams and weld_corners_in_vert
+                # TODO: Count deleted seams and weld_corners_in_vert for update tag
                 umesh.tag_visible_faces()
                 umesh.mark_seam_tagged_faces()
-
-            umesh.update_tag = update_tag
-
-        if not self.umeshes.update_tag:
-            self.umeshes.cancel_with_report(info='Not found verts for weld')
+                umesh.update_tag = True
 
     def weld_corners_in_vert(self, crn_in_vert, uv):
         if utils.all_equal(_crn[uv].uv for _crn in crn_in_vert):
@@ -468,6 +471,7 @@ class UNIV_OT_Stitch(Operator):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
+        self.umeshes.update_tag = False
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -512,29 +516,16 @@ class UNIV_OT_Stitch(Operator):
         for umesh in self.umeshes:
             adv_islands = AdvIslands.calc_visible(umesh)  # TODO: Replace with calc_visible_with_seams (need rewrite LoopGroup)
             if len(adv_islands) <= 1:
-                umesh.update_tag = False
                 continue
 
             adv_islands.indexing()
             umesh.set_corners_tag(False)
             target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
-
-            if umesh.sync and self.mouse_position:
-                for isl in target_islands:
-                    isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position)
-                target_islands.sort(key=lambda isl_: isl_.value)
-            else:
-                for isl in reversed(target_islands):
-                    isl.value = isl.calc_edge_length(selected=False)
-                    if isl.value < 1e-06:
-                        target_islands.remove(isl)
-                target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
+            sort_by_dist_to_mouse_or_sel_edge_length(self.mouse_position, target_islands, umesh)
 
             if not target_islands:
-                umesh.update_tag = False
                 continue
 
-            update_tag = False
             while True:
                 stitched = False
                 for target_isl in target_islands:
@@ -550,39 +541,27 @@ class UNIV_OT_Stitch(Operator):
                         stitched |= local_stitched
                         if not local_stitched:
                             break
-                update_tag |= stitched
+                umesh.update_tag |= stitched
                 if not stitched:
                     break
 
-            if update_tag and self.update_seams:
+            if umesh.update_tag and self.update_seams:
                 for adv in adv_islands:
                     if adv:
                         adv.mark_seam()
-            umesh.update_tag = update_tag
+
 
     def stitch_between(self):
         for umesh in self.umeshes:
             _islands = AdvIslands.calc_extended(umesh)
             if len(_islands) <= 1:
-                umesh.update_tag = False
                 continue
 
             _islands.indexing()
             umesh.set_corners_tag(False)
             target_islands = _islands.islands.copy()
+            sort_by_dist_to_mouse_or_sel_edge_length(self.mouse_position, target_islands, umesh)
 
-            if umesh.sync and self.mouse_position:
-                for isl in target_islands:
-                    isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position)
-                target_islands.sort(key=lambda isl_: isl_.value)
-            else:
-                for isl in reversed(target_islands):
-                    isl.value = isl.calc_edge_length(selected=False)
-                    if isl.value < 1e-06:  # TODO: Allow zero length islands
-                        target_islands.remove(isl)
-                target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
-
-            update_tag = False
             while True:
                 stitched = False
                 for target_isl in target_islands:
@@ -597,14 +576,13 @@ class UNIV_OT_Stitch(Operator):
                         stitched |= local_stitched
                         if not local_stitched:
                             break
-                update_tag |= stitched
+                umesh.update_tag |= stitched
                 if not stitched:
                     break
-            if update_tag and self.update_seams:
+            if umesh.update_tag and self.update_seams:
                 for adv in target_islands:
                     if adv:
                         adv.mark_seam()
-            umesh.update_tag = update_tag
 
     @staticmethod
     def has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
