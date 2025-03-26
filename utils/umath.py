@@ -2,16 +2,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
+import typing
 import numpy as np
 from bl_math import lerp
 from mathutils import Vector
 
-def all_equal(sequence):
-    sequence_iter = iter(sequence)
-    first = next(sequence_iter)
-    for i in sequence_iter:
-        if i != first:
-            return False
+def all_equal(sequence, key: typing.Callable | None=None):
+    if key is None:
+        sequence_iter = iter(sequence)
+        first = next(sequence_iter)
+        for i in sequence_iter:
+            if i != first:
+                return False
+    else:
+        sequence_iter = iter(sequence)
+        first = key(next(sequence_iter))
+        for i in sequence_iter:
+            if key(i) != first:
+                return False
     return True
 
 def vec_isclose(a, b, abs_tol: float = 0.00001):

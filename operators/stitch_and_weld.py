@@ -6,6 +6,7 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import bl_math
 from itertools import chain
 from mathutils import Vector
 
@@ -89,7 +90,6 @@ class UNIV_OT_Weld(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
@@ -248,7 +248,7 @@ class UNIV_OT_Weld(Operator):
 
             if init_corners := utils.calc_selected_uv_vert_corners(umesh) if selected else utils.calc_visible_uv_corners(umesh):
                 # Tagging
-                is_face_mesh_mode = (self.sync and utils.get_select_mode_mesh() == 'FACE')
+                is_face_mesh_mode = (umesh.sync and utils.get_select_mode_mesh() == 'FACE')
                 if not is_face_mesh_mode:
                     umesh.set_corners_tag(False)
 
@@ -430,8 +430,7 @@ class UNIV_OT_Stitch(Operator):
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
-    flip: BoolProperty(name='Flip', default=False)
-    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0.0, min=0, soft_max=1, max=4)
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-16, soft_min=0, soft_max=2, max=16)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -442,15 +441,15 @@ class UNIV_OT_Stitch(Operator):
         layout = self.layout
         layout.prop(self, "between")
         layout.prop(self, "update_seams")
-        layout.prop(self, "flip")
         layout.prop(self, "use_aspect")
+        if not self.between:
+            if self.padding_multiplayer:
+                layout.separator(factor=0.35)
+                settings = univ_settings()
+                layout.label(text=f"Global Texture Size = {min(int(settings.size_x), int(settings.size_y))}")
+                layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
 
-        if self.padding_multiplayer:
-            layout.separator(factor=0.35)
-            settings = univ_settings()
-            layout.label(text=f"Global Texture Size = {settings.size_x}x{settings.size_y}")
-            layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
-        layout.prop(self, "padding_multiplayer", slider=True)
+            layout.prop(self, "padding_multiplayer", slider=True)
 
 
     def invoke(self, context, event):
@@ -503,7 +502,10 @@ class UNIV_OT_Stitch(Operator):
                 bpy.context.area.tag_redraw()
                 return {'FINISHED'}
 
-            self.stitch()
+            if self.padding:
+                self.stitch_with_padding()
+            else:
+                self.stitch()
 
         UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
         bpy.context.area.tag_redraw()
@@ -536,7 +538,7 @@ class UNIV_OT_Stitch(Operator):
                         if target_isl:  # TODO: Stitch_ex remove faces and other attrs, change logic
                             for _ in tar.calc_first(target_isl):
                                 source = tar.calc_shared_group()
-                                res = UNIV_OT_Stitch.stitch_ex(self, tar, source, adv_islands)
+                                res = UNIV_OT_Stitch.stitch_ex(tar, source, adv_islands)
                                 local_stitched |= res
                         stitched |= local_stitched
                         if not local_stitched:
@@ -550,6 +552,224 @@ class UNIV_OT_Stitch(Operator):
                     if adv:
                         adv.mark_seam()
 
+    def stitch_with_padding_ex(self, ref_isl: AdvIsland,
+                       trans: AdvIsland,
+                       ref_lg: types.LoopGroup,
+                       trans_lg: types.LoopGroup):
+        uv = ref_isl.umesh.uv
+
+        if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):
+            trans_is_flipped ^= 1
+            trans.scale_simple(Vector((1, -1)))
+
+        if ref_lg.is_cyclic:
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(ref_lg, uv)
+            xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
+
+            if bbox.width > bbox.height:
+                pt_a1 = xmin_crn[uv].uv
+                pt_a2 = xmax_crn[uv].uv
+
+                pt_b1 = utils.shared_crn(xmin_crn).link_loop_next[uv].uv
+                pt_b2 = utils.shared_crn(xmax_crn).link_loop_next[uv].uv
+            else:
+                pt_a1 = ymin_crn[uv].uv
+                pt_a2 = ymax_crn[uv].uv
+
+                pt_b1 = utils.shared_crn(ymin_crn).link_loop_next[uv].uv
+                pt_b2 = utils.shared_crn(ymax_crn).link_loop_next[uv].uv
+
+            # Rotate
+            normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
+            normal_b_with_aspect = (pt_b1 - pt_b2) * Vector((ref_isl.umesh.aspect, 1.0))
+
+            rotate_angle = normal_a_with_aspect.angle_signed(normal_b_with_aspect, 0)
+            trans.rotate_simple(rotate_angle, ref_isl.umesh.aspect)
+
+            # Move
+            center_ref = ref_lg.calc_bbox().center
+            center_trans = trans_lg.calc_bbox().center
+            trans.set_position(center_ref, center_trans)
+
+            # Scale
+            normal_a = pt_a1 - pt_a2
+            normal_b = pt_b1 - pt_b2
+            length_a = normal_a.length
+            length_b = normal_b.length
+
+            if not (length_a < 1e-06 or length_b < 1e-06):
+                scale = length_a / length_b
+                bbox.scale(Vector((ref_isl.umesh.aspect, 1.0)))
+
+                # Add padding scale
+                min_length = bbox.min_length
+                if min_length < 1e-06:
+                    min_length = length_a
+                pad_scale = bl_math.clamp((min_length-self.padding * 2) / min_length, 0.5, 1.5)
+
+                # Change inner scale to outer, if ref is inner-island
+                if ref_is_flipped and trans_is_flipped:
+                    # If ref has signed area and flipped -> need unsigned trans
+                    if ref_lg.calc_signed_corners_area() < 0:
+                        if trans_lg.calc_signed_corners_area() >= 0:
+                            pad_scale = 1 / pad_scale
+                else:
+                    # If ref has unsigned area and not flipped -> need signed trans
+                    if ref_lg.calc_signed_corners_area() >= 0:
+                        if trans_lg.calc_signed_corners_area() < 0:
+                            pad_scale = 1 / pad_scale
+
+                scale *= pad_scale
+                trans.scale(Vector((scale, scale)), center_ref)
+
+        else:
+            pt_a1, pt_a2 = ref_lg[0][uv].uv, ref_lg[-1].link_loop_next[uv].uv
+            pt_b1, pt_b2 = trans_lg[-1].link_loop_next[uv].uv, trans_lg[0][uv].uv
+
+            # Rotate
+            normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
+            normal_b_with_aspect = (pt_b1 - pt_b2) * Vector((ref_isl.umesh.aspect, 1.0))
+
+            rotate_angle = normal_a_with_aspect.angle_signed(normal_b_with_aspect, 0)
+            trans.rotate_simple(rotate_angle, ref_isl.umesh.aspect)
+
+            # Scale
+            normal_a = pt_a1 - pt_a2
+            normal_b = pt_b1 - pt_b2
+            length_a = normal_a.length
+            length_b = normal_b.length
+
+            if not (length_a < 1e-06 or length_b < 1e-06):
+                scale = length_a / length_b
+                trans.scale_simple(Vector((scale, scale)))
+
+            # Move
+            aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
+            orto = normal_a.orthogonal().normalized() * self.padding
+            if orto == Vector((0, 0)):  # TODO: Report zero length
+                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
+                orto = orto.normalized() * self.padding
+            if orto == Vector((0, 0)):
+                orto = Vector((self.padding, 0))
+            orto *= aspect_vec
+            delta = (pt_a1 - pt_b1) + orto
+            trans.move(delta)
+
+    def stitch_with_padding(self):
+        for umesh in self.umeshes:
+            adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)  # TODO: Replace with calc_visible_with_seams (need rewrite LoopGroup)
+            if len(adv_islands) <= 1:
+                continue
+
+            adv_islands.indexing()
+            umesh.set_corners_tag(False)
+            target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+            sort_by_dist_to_mouse_or_sel_edge_length(self.mouse_position, target_islands, umesh)
+
+            if not target_islands:
+                continue
+
+            target_islands.reverse()
+            for t_isl in target_islands:
+                t_isl.select_state = True
+
+            exclude_indexes = {-1}
+            while target_islands:
+                ref_isl = target_islands.pop()
+                if not ref_isl.tag:
+                    continue
+                ref_isl.tag = False
+
+                exclude_indexes.add(ref_isl[0].index)
+
+                self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, exclude_indexes)
+                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl):
+                    filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+
+                    for ref_lg in filtered:
+                        trans_lg = ref_lg.calc_shared_group()
+                        trans_isl_index = trans_lg[0].face.index
+                        exclude_indexes.add(trans_isl_index)
+
+                        trans_isl = adv_islands[trans_isl_index]
+                        if trans_isl.select_state:
+                            # TODO: Implement grow by length, and only first (exclude first island)
+                            target_islands.append(trans_isl)
+
+                        self.stitch_with_padding_ex(ref_isl, trans_isl, ref_lg, trans_lg)
+                        umesh.update_tag = True
+
+    @staticmethod
+    def split_lg_for_stitch_with_padding(lgs: types.LoopGroups) -> list[types.LoopGroup]:
+        filtered_lg = []
+        uv = lgs.umesh.uv
+        key = lambda crn_: crn_.link_loop_radial_prev.face.index
+        for lg in lgs:
+            if utils.all_equal(lg, key=key):
+                filtered_lg.append(lg)
+            else:
+                split_lg_groups: list[list[BMLoop]] = utils.split_by_similarity(lg, key)
+
+                # # Join same index LG, case when border loop circular but with different indexes
+                a_crn = split_lg_groups[0][0]
+                b_crn = split_lg_groups[-1][-1].link_loop_next
+                if a_crn.vert == b_crn.vert and a_crn[uv].uv  == b_crn[uv].uv and key(a_crn) == key(split_lg_groups[-1][-1]):
+                    lg_start = split_lg_groups.pop()
+                    lg_end = split_lg_groups[0]
+                    del split_lg_groups[0]
+
+                    lg_start.extend(lg_end)
+                    lg_combined = types.LoopGroup(lgs.umesh)
+                    lg_combined.corners = lg_start
+                    filtered_lg.append(lg_combined)
+
+                for lg_ in split_lg_groups:
+                    lg_combined = types.LoopGroup(lgs.umesh)
+                    lg_combined.corners = lg_
+                    filtered_lg.append(lg_combined)
+
+        # Remove duplicates by length 3D
+        # TODO: Replace length 3d by length uv with aspect
+        import collections
+        groups = collections.defaultdict(list)
+        for lg in filtered_lg:
+            groups[key(lg[0])].append(lg)
+        end_filtered = []
+        for g in groups.values():
+            if len(g) == 1:
+                end_filtered.append(g[0])
+            else:
+                end_filtered.append(max(g, key=lambda lg__: lg__.length_3d))
+        return end_filtered
+
+    @staticmethod
+    def set_boundary_tag_with_exclude_face_idx(isl, exclude_idx: set):
+        uv = isl.umesh.uv
+        is_boundary = utils.is_boundary_sync if isl.umesh.sync else utils.is_boundary_non_sync
+        for f in isl:
+            for crn in f.loops:
+                if crn.link_loop_radial_prev.face.index in exclude_idx:
+                    crn.tag = False
+                    continue
+                crn.tag = crn.edge.seam or is_boundary(crn, uv)
+
+    @staticmethod
+    def set_selected_boundary_tag_with_exclude_face_idx(isl, exclude_idx: set):
+        uv = isl.umesh.uv
+        if isl.umesh.sync:
+            for f in isl:
+                for crn in f.loops:
+                    if not crn.edge.select or crn.link_loop_radial_prev.face.index in exclude_idx:
+                        crn.tag = False
+                        continue
+                    crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
+        else:
+            for f in isl:
+                for crn in f.loops:
+                    if not crn[uv].select_edge or crn.link_loop_radial_prev.face.index in exclude_idx:
+                        crn.tag = False
+                        continue
+                    crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
 
     def stitch_between(self):
         for umesh in self.umeshes:
@@ -639,7 +859,8 @@ class UNIV_OT_Stitch(Operator):
         for _crn in source_corners:
             _crn[uv].uv = co_b
 
-    def stitch_ex(self, ref_lg: LoopGroup, trans_lg: LoopGroup, adv_islands: AdvIslands, selected=True):
+    @staticmethod
+    def stitch_ex(ref_lg: LoopGroup, trans_lg: LoopGroup, adv_islands: AdvIslands, selected=True):
         uv = ref_lg.umesh.uv
         # Equal indices occur after merging on non-stitch edges
         # TODO: Disable?
@@ -655,11 +876,9 @@ class UNIV_OT_Stitch(Operator):
         ref_isl = adv_islands[corners[0].face.index]
         trans_isl = adv_islands[corners[2].face.index]
 
-        # if not (ref_isl.is_full_flipped != trans_isl.is_full_flipped):  # TODO: Implement auto flip (reverse LoopGroup?)
-        #     trans_isl.scale_simple(Vector((1, -1)))
-
-        if self.flip:
+        if (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
             trans_isl.scale_simple(Vector((1, -1)))
+
         pt_a1, pt_a2, pt_b1, pt_b2 = [c[uv].uv for c in corners]
 
         # Rotate
@@ -751,6 +970,7 @@ class UNIV_OT_Stitch(Operator):
             return
 
         sync = hit.umesh.sync
+        hit.umesh.update_tag = True
         ref_crn = hit.crn
         shared = ref_crn.link_loop_radial_prev
         is_visible = utils.is_visible_func(sync)

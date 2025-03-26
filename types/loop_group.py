@@ -35,6 +35,12 @@ class LoopGroup:
         if len(self.corners) > 1:
             return self.corners[-1].link_loop_next == self.corners[0]
 
+    @property
+    def is_cyclic(self):
+        crn_a = self.corners[0]
+        crn_b = self.corners[-1].link_loop_next
+        return crn_a.vert == crn_b.vert and crn_a[self.umesh.uv].uv == crn_b[self.umesh.uv].uv
+
     def calc_loop_group(self, crn):
         crn.tag = False
         group = [crn]
@@ -159,6 +165,20 @@ class LoopGroup:
                     shared_crn = crn.link_loop_radial_prev
                     islands_for_stitch[shared_crn.face.index].append(crn)
         return islands_for_stitch
+
+    def calc_signed_face_area(self):
+        uv = self.umesh.uv
+        return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
+
+    def calc_signed_corners_area(self):
+        uv = self.umesh.uv
+        area = 0.0
+        first_crn_co = self.corners[-1][uv].uv
+        for crn in self.corners:
+            next_crn_co = crn[uv].uv
+            area += first_crn_co.cross(next_crn_co)
+            first_crn_co = next_crn_co
+        return area * 0.5
 
     def tagging(self, island):
         func: typing.Callable = self.boundary_tag_sync if island.umesh.sync else self.boundary_tag
@@ -418,7 +438,7 @@ class LoopGroups:
 
     @classmethod
     def calc_by_boundary_crn_tags(cls, isl):
-        """Warning: Need indexing and tags by boundary"""
+        """Warning: Need uninterrupted tagging by boundary loops"""
         uv = isl.umesh.uv
         loop_groups = []
         for crn in isl.iter_corners_by_tag():
@@ -437,6 +457,56 @@ class LoopGroups:
                         linked_crn.tag = False
                         temp_crn = linked_crn
                         group.append(linked_crn)
+                        break
+                else:
+                    temp_crn = None
+
+            lg = LoopGroup(isl.umesh)
+            lg.corners = group
+            loop_groups.append(lg)
+        return cls(loop_groups, isl.umesh)
+
+    @classmethod
+    def calc_by_boundary_crn_tags_v2(cls, isl):
+        """Warning: Need tagging by boundary loops"""
+        uv = isl.umesh.uv
+        loop_groups = []
+        for crn in isl.iter_corners_by_tag():
+            crn.tag = False
+            group = [crn]
+            temp_crn: BMLoop | None = crn
+            while temp_crn:  # forward
+                next_crn = temp_crn.link_loop_next
+                if next_crn.tag:
+                    next_crn.tag = False
+                    temp_crn = next_crn
+                    group.append(next_crn)
+                    continue
+
+                # TODO: Replace linked_crn_uv with linked_crn_to_vert_pair_iter to avoid non-manifold uv vert links
+                for linked_crn in reversed(linked_crn_uv(next_crn, uv)):
+                    if linked_crn.tag:
+                        linked_crn.tag = False
+                        temp_crn = linked_crn
+                        group.append(linked_crn)
+                        break
+                else:
+                    temp_crn = None
+
+            temp_crn = crn
+            while temp_crn:  # backward
+                if temp_crn.link_loop_prev.tag:
+                    temp_crn = temp_crn.link_loop_prev
+                    temp_crn.tag = False
+                    group.insert(0, temp_crn)
+                    continue
+
+                for linked_crn in reversed(linked_crn_uv(temp_crn, uv)):
+                    linked_crn_prev = linked_crn.link_loop_prev
+                    if linked_crn_prev.tag:
+                        temp_crn = linked_crn_prev
+                        temp_crn.tag = False
+                        group.insert(0, temp_crn)
                         break
                 else:
                     temp_crn = None

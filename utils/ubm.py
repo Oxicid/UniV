@@ -81,6 +81,16 @@ def calc_face_area_uv(f, uv) -> float:
             first_crn_co = next_crn_co
         return abs(area) * 0.5
 
+def calc_signed_face_area_uv(f, uv) -> float:
+    area = 0.0
+    corners = f.loops
+    first_crn_co = corners[-1][uv].uv
+    for crn in corners:
+        next_crn_co = crn[uv].uv
+        area += first_crn_co.cross(next_crn_co)
+        first_crn_co = next_crn_co
+    return area * 0.5
+
 def calc_total_area_uv(faces, uv):
     return sum(calc_face_area_uv(f, uv) for f in faces)
 

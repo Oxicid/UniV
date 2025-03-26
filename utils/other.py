@@ -6,6 +6,7 @@ import typing
 import bpy
 import blf
 from mathutils import Vector
+from itertools import groupby
 
 def get_aspect_ratio(umesh=None):
     """Aspect Y"""
@@ -185,3 +186,13 @@ def true_groupby(seq):
             sorted_groups.append(groups)
 
     return sorted_groups
+
+
+def split_by_similarity(lst, key=None):
+    """It differs from Group By in that groups are strictly separated and not reversed.
+        true_groupby:        1,0,1,1 -> [1,1,1],[0]
+        split_by_similarity: 1,0,1,1 -> [1],[0],[1,1]"""
+    if key:
+        return [list(group) for _, group in groupby(lst, key=key)]
+    else:
+        return [list(group) for _, group in groupby(lst)]

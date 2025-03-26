@@ -842,7 +842,7 @@ class AdvIsland(FaceIsland):
         self.convex_coords = []
         self._bbox: BBox | None = None
         self.tag = True
-        self._select_state = None
+        self.select_state = None
         self.area_3d: float = -1.0
         self.area_uv: float = -1.0
         self.info: AdvIslandInfo | None = None
@@ -964,13 +964,6 @@ class AdvIsland(FaceIsland):
         if self._bbox is None:
             self.calc_bbox()
         return self._bbox
-
-    @property
-    def select_state(self):
-        if self._select_state is None:
-            self._select_state = self.info_select()
-        else:
-            return self._select_state
 
     def calc_convex_points(self):
         if self.flat_coords:
