@@ -262,11 +262,17 @@ class LoopGroup:
     def calc_bbox(self):
         return bbox.BBox.calc_bbox_uv_corners(self.corners, self.umesh.uv)
 
-    def calc_length_uv(self):
+    def calc_length_uv(self, aspect: float = 1.0):
         uv = self.umesh.uv
         length = 0.0
-        for crn in self:
-            length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
+        if aspect == 1.0:
+            for crn in self:
+                length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
+        else:
+            for crn in self:
+                vec = crn[uv].uv - crn.link_loop_next[uv].uv
+                vec.x *= aspect
+                length += vec.length
         self._length_uv = length
         return length
 

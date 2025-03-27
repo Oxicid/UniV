@@ -845,6 +845,7 @@ class AdvIsland(FaceIsland):
         self.select_state = None
         self.area_3d: float = -1.0
         self.area_uv: float = -1.0
+        self.sequence = []
         self.info: AdvIslandInfo | None = None
 
     def move(self, delta: Vector) -> bool:

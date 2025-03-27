@@ -503,7 +503,7 @@ class UNIV_OT_Stitch(Operator):
                 return {'FINISHED'}
 
             if self.padding:
-                self.stitch_with_padding()
+                self.stitch_with_padding_balanced()
             else:
                 self.stitch()
 
@@ -655,7 +655,7 @@ class UNIV_OT_Stitch(Operator):
             delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
 
-    def stitch_with_padding(self):
+    def stitch_with_padding_balanced(self):
         for umesh in self.umeshes:
             adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)  # TODO: Replace with calc_visible_with_seams (need rewrite LoopGroup)
             if len(adv_islands) <= 1:
@@ -669,19 +669,19 @@ class UNIV_OT_Stitch(Operator):
             if not target_islands:
                 continue
 
-            target_islands.reverse()
             for t_isl in target_islands:
                 t_isl.select_state = True
 
             exclude_indexes = {-1}
-            while target_islands:
-                ref_isl = target_islands.pop()
+
+            for ref_isl in target_islands:
                 if not ref_isl.tag:
                     continue
                 ref_isl.tag = False
 
                 exclude_indexes.add(ref_isl[0].index)
 
+                balanced_target_islands = []
                 self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, exclude_indexes)
                 if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl):
                     filtered = self.split_lg_for_stitch_with_padding(loop_groups)
@@ -693,11 +693,59 @@ class UNIV_OT_Stitch(Operator):
 
                         trans_isl = adv_islands[trans_isl_index]
                         if trans_isl.select_state:
-                            # TODO: Implement grow by length, and only first (exclude first island)
-                            target_islands.append(trans_isl)
+                            trans_isl.area_3d = ref_lg.length_3d
+                            balanced_target_islands.append(trans_isl)
 
                         self.stitch_with_padding_ex(ref_isl, trans_isl, ref_lg, trans_lg)
                         umesh.update_tag = True
+
+                while True:
+                    stack = []
+                    for balance_isl in balanced_target_islands:
+                        if balance_isl.tag:
+                            if lg := self.balanced_filter_lg(balance_isl, exclude_indexes):
+                                trans_lg = lg.calc_shared_group()
+                                trans_isl_index = trans_lg[0].face.index
+                                exclude_indexes.add(trans_isl_index)
+
+                                trans_isl = adv_islands[trans_isl_index]
+                                if trans_isl.select_state:
+                                    trans_isl.area_3d = lg.length_3d
+                                    stack.append(trans_isl)
+
+                                self.stitch_with_padding_ex(ref_isl, trans_isl, lg, trans_lg)
+
+                    balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
+                    balanced_target_islands.extend(stack)
+
+                    if not balanced_target_islands:
+                        break
+
+    def balanced_filter_lg(self, balance_isl, exclude_indexes):
+        if not balance_isl.sequence:
+            self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
+            if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl):
+                filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+                if len(filtered) == 1:
+                    balance_isl.tag = False
+                    return filtered[0]
+                balance_isl.sequence = filtered
+            else:
+                balance_isl.tag = False
+                return None
+
+        min_diff = float('inf')
+        min_lg = None
+        for lg in balance_isl.sequence:
+            idx = lg[0].link_loop_radial_prev.face.index
+            if idx not in exclude_indexes:
+                diff = abs(lg.length_3d - balance_isl.area_3d)
+                if diff < min_diff:
+                    min_lg = lg
+                    min_diff = diff
+        if not min_lg:
+            balance_isl.tag = False
+        return min_lg
 
     @staticmethod
     def split_lg_for_stitch_with_padding(lgs: types.LoopGroups) -> list[types.LoopGroup]:
