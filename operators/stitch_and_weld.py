@@ -68,29 +68,34 @@ class Stitch:
                 if not ref_isl.tag:
                     continue
                 ref_isl.tag = False
-                # TODO: First Island has not selected edge loops but stitched
-                exclude_indexes.add(ref_isl[0].index)
-
                 balanced_target_islands = []
-                self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, exclude_indexes)
-                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl):
-                    filtered = self.split_lg_for_stitch_with_padding(loop_groups)
 
-                    for ref_lg in filtered:
-                        trans_lg = ref_lg.calc_shared_group()
-                        trans_isl_index = trans_lg[0].face.index
-                        exclude_indexes.add(trans_isl_index)
+                temp_exclude_indexes = exclude_indexes.copy()
+                temp_exclude_indexes.add(ref_isl[0].index)
+                self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, temp_exclude_indexes)
 
-                        trans_isl = adv_islands[trans_isl_index]
-                        if trans_isl.select_state:
-                            trans_isl.area_3d = ref_lg.length_3d
-                            balanced_target_islands.append(trans_isl)
+                loop_groups = types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
+                filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+                if filtered:
+                    # An island may not have any selected edges, but it can still be a reoriented island.
+                    # Therefore, we add it to the exclude list, making sure an LG exists.
+                    exclude_indexes.add(ref_isl[0].index)
 
-                        if self.padding:
-                            self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg)
-                        else:
-                            self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg)
-                        umesh.update_tag = True
+                for ref_lg in filtered:
+                    trans_lg = ref_lg.calc_shared_group()
+                    trans_isl_index = trans_lg[0].face.index
+                    exclude_indexes.add(trans_isl_index)
+
+                    trans_isl = adv_islands[trans_isl_index]
+                    if trans_isl.select_state:
+                        trans_isl.area_3d = ref_lg.length_3d
+                        balanced_target_islands.append(trans_isl)
+
+                    if self.padding:
+                        self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg)
+                    else:
+                        self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg)
+                    umesh.update_tag = True
 
                 while True:
                     stack = []
@@ -120,7 +125,7 @@ class Stitch:
 
     def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
-
+        has_report = False
         if (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
             trans.scale_simple(Vector((1, -1)))
 
@@ -157,9 +162,12 @@ class Stitch:
             length_a = (pt_a1 - pt_a2).length
             length_b = (pt_b1 - pt_b2).length
 
-            if not (length_a < 1e-06 or length_b < 1e-06):
+            if length_a < 1e-06 or length_b < 1e-06:
+                has_report = True
+            else:
                 scale = length_a / length_b
                 trans.scale(Vector((scale, scale)), center_ref)
+
             for ref_crn in ref_lg:
                 self.copy_pos(ref_crn, uv)
 
@@ -180,7 +188,9 @@ class Stitch:
             length_a = normal_a.length
             length_b = normal_b.length
 
-            if not (length_a < 1e-06 or length_b < 1e-06):
+            if length_a < 1e-06 or length_b < 1e-06:
+                has_report = True
+            else:
                 scale = length_a / length_b
                 trans.scale_simple(Vector((scale, scale)))
 
@@ -189,9 +199,12 @@ class Stitch:
             for ref_crn in ref_lg:
                 self.copy_pos(ref_crn, uv)
 
+        if has_report:
+            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
+
     def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
-
+        has_report = False
         if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):
             trans_is_flipped ^= 1
             trans.scale_simple(Vector((1, -1)))
@@ -231,7 +244,9 @@ class Stitch:
             length_a = normal_a.length
             length_b = normal_b.length
 
-            if not (length_a < 1e-06 or length_b < 1e-06):
+            if length_a < 1e-06 or length_b < 1e-06:
+                has_report = True
+            else:
                 scale = length_a / length_b
                 bbox.scale(Vector((ref_isl.umesh.aspect, 1.0)))
 
@@ -273,27 +288,26 @@ class Stitch:
             length_a = normal_a.length
             length_b = normal_b.length
 
-            if not (length_a < 1e-06 or length_b < 1e-06):
+            if length_a < 1e-06 or length_b < 1e-06:
+                has_report = True
+            else:
                 scale = length_a / length_b
                 trans.scale_simple(Vector((scale, scale)))
 
             # Move
             aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
             orto = normal_a.orthogonal().normalized() * self.padding
-            report_info = ''
-            if orto == Vector((0, 0)):  # TODO: Report zero length
+            if orto == Vector((0, 0)):
                 orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
                 orto = orto.normalized() * self.padding
-                report_info = 'Found zero length edge loop. Use inspect tools'
             if orto == Vector((0, 0)):
                 orto = Vector((self.padding, 0))
-                report_info = 'Found zero area island. Use inspect tools'
-            if report_info:
-                self.report({'WARNING'}, report_info)  # noqa
-
             orto *= aspect_vec
             delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
+
+        if has_report:
+            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
 
     def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
         """Enhances multi-stitching steps for a more even distribution"""
@@ -433,7 +447,9 @@ class Stitch:
         length_a = normal_a.length
         length_b = normal_b.length
 
-        if not (length_a < 1e-06 or length_b < 1e-06):
+        if length_a < 1e-06 or length_b < 1e-06:
+            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
+        else:
             scale = length_a / length_b
             trans.scale_simple(Vector((scale, scale)))
 
@@ -441,7 +457,7 @@ class Stitch:
         if self.padding:
             aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
             orto = normal_a.orthogonal().normalized() * self.padding
-            if orto == Vector((0, 0)):  # TODO: Convert static to default method and report zero length
+            if orto == Vector((0, 0)):
                 orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
                 orto = orto.normalized() * self.padding
             if orto == Vector((0, 0)):
@@ -482,15 +498,9 @@ class Stitch:
 
     def sort_by_dist_to_mouse_or_sel_edge_length(self, target_islands, umesh):
         if umesh.sync and self.mouse_position:
-            for isl in target_islands:
-                isl.value = types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position)
-            target_islands.sort(key=lambda isl_: isl_.value)
+            target_islands.sort(key=lambda isl: types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
         else:
-            for isl in reversed(target_islands):
-                isl.value = isl.calc_edge_length(selected=False)
-                if isl.value < 1e-06:  # TODO: Allow zero length islands
-                    target_islands.remove(isl)
-            target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
+            target_islands.sort(key=lambda isl: isl.calc_edge_length(selected=False), reverse=True)
 
     @staticmethod
     def filter_and_draw_lines(umeshes_a, umeshes_b):
