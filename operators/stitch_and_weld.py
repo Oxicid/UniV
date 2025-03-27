@@ -14,6 +14,7 @@ from bmesh.types import BMLoop
 from bpy.types import Operator
 from bpy.props import *
 
+from .. import draw
 from .. import utils
 from .. import types
 from ..types import (
@@ -35,9 +36,89 @@ class Stitch:
         self.padding = 0.0
         if not hasattr(self, 'update_seams'):
             self.update_seams = True
+        if not hasattr(self, 'between'):
+            self.between = False
+
+    def stitch(self):
+        for umesh in self.umeshes:
+            if self.between:
+                adv_islands = AdvIslands.calc_extended_with_mark_seam(umesh)
+            else:
+                adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            if len(adv_islands) <= 1:
+                continue
+
+            adv_islands.indexing()
+            umesh.set_corners_tag(False)
+            if self.between:
+                target_islands = adv_islands.islands.copy()
+            else:
+                target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+            self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
+
+            if not target_islands:
+                continue
+
+            for t_isl in target_islands:
+                t_isl.select_state = True
+
+            exclude_indexes = {-1}
+
+            for ref_isl in target_islands:
+                if not ref_isl.tag:
+                    continue
+                ref_isl.tag = False
+                # TODO: First Island has not selected edge loops but stitched
+                exclude_indexes.add(ref_isl[0].index)
+
+                balanced_target_islands = []
+                self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, exclude_indexes)
+                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl):
+                    filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+
+                    for ref_lg in filtered:
+                        trans_lg = ref_lg.calc_shared_group()
+                        trans_isl_index = trans_lg[0].face.index
+                        exclude_indexes.add(trans_isl_index)
+
+                        trans_isl = adv_islands[trans_isl_index]
+                        if trans_isl.select_state:
+                            trans_isl.area_3d = ref_lg.length_3d
+                            balanced_target_islands.append(trans_isl)
+
+                        if self.padding:
+                            self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg)
+                        else:
+                            self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg)
+                        umesh.update_tag = True
+
+                while True:
+                    stack = []
+                    for balance_isl in balanced_target_islands:
+                        if balance_isl.tag:
+                            if lg := self.balancing_filter_for_lgs(balance_isl, exclude_indexes):
+                                trans_lg = lg.calc_shared_group()
+                                trans_isl_index = trans_lg[0].face.index
+                                exclude_indexes.add(trans_isl_index)
+
+                                trans_isl = adv_islands[trans_isl_index]
+                                if trans_isl.select_state:
+                                    trans_isl.area_3d = lg.length_3d
+                                    stack.append(trans_isl)
+
+                                if self.padding:
+                                    self.reorient_to_target_with_padding(ref_isl, trans_isl, lg, trans_lg)
+                                else:
+                                    self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg)
 
 
-    def stitch_balanced_ex(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
+                    balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
+                    balanced_target_islands.extend(stack)
+
+                    if not balanced_target_islands:
+                        break
+
+    def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
 
         if (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
@@ -108,7 +189,7 @@ class Stitch:
             for ref_crn in ref_lg:
                 self.copy_pos(ref_crn, uv)
 
-    def stitch_with_padding_ex(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
+    def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
 
         if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):
@@ -199,89 +280,23 @@ class Stitch:
             # Move
             aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
             orto = normal_a.orthogonal().normalized() * self.padding
+            report_info = ''
             if orto == Vector((0, 0)):  # TODO: Report zero length
                 orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
                 orto = orto.normalized() * self.padding
+                report_info = 'Found zero length edge loop. Use inspect tools'
             if orto == Vector((0, 0)):
                 orto = Vector((self.padding, 0))
+                report_info = 'Found zero area island. Use inspect tools'
+            if report_info:
+                self.report({'WARNING'}, report_info)  # noqa
+
             orto *= aspect_vec
             delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
 
-    def stitch_with_padding_balanced(self):
-        for umesh in self.umeshes:
-            adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)  # TODO: Replace with calc_visible_with_seams (need rewrite LoopGroup)
-            if len(adv_islands) <= 1:
-                continue
-
-            adv_islands.indexing()
-            umesh.set_corners_tag(False)
-            target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
-            self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
-
-            if not target_islands:
-                continue
-
-            for t_isl in target_islands:
-                t_isl.select_state = True
-
-            exclude_indexes = {-1}
-
-            for ref_isl in target_islands:
-                if not ref_isl.tag:
-                    continue
-                ref_isl.tag = False
-
-                exclude_indexes.add(ref_isl[0].index)
-
-                balanced_target_islands = []
-                self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, exclude_indexes)
-                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl):
-                    filtered = self.split_lg_for_stitch_with_padding(loop_groups)
-
-                    for ref_lg in filtered:
-                        trans_lg = ref_lg.calc_shared_group()
-                        trans_isl_index = trans_lg[0].face.index
-                        exclude_indexes.add(trans_isl_index)
-
-                        trans_isl = adv_islands[trans_isl_index]
-                        if trans_isl.select_state:
-                            trans_isl.area_3d = ref_lg.length_3d
-                            balanced_target_islands.append(trans_isl)
-
-                        if self.padding:
-                            self.stitch_with_padding_ex(ref_isl, trans_isl, ref_lg, trans_lg)
-                        else:
-                            self.stitch_balanced_ex(ref_isl, trans_isl, ref_lg, trans_lg)
-                        umesh.update_tag = True
-
-                while True:
-                    stack = []
-                    for balance_isl in balanced_target_islands:
-                        if balance_isl.tag:
-                            if lg := self.balanced_filter_lg(balance_isl, exclude_indexes):
-                                trans_lg = lg.calc_shared_group()
-                                trans_isl_index = trans_lg[0].face.index
-                                exclude_indexes.add(trans_isl_index)
-
-                                trans_isl = adv_islands[trans_isl_index]
-                                if trans_isl.select_state:
-                                    trans_isl.area_3d = lg.length_3d
-                                    stack.append(trans_isl)
-
-                                if self.padding:
-                                    self.stitch_with_padding_ex(ref_isl, trans_isl, lg, trans_lg)
-                                else:
-                                    self.stitch_balanced_ex(ref_isl, trans_isl, lg, trans_lg)
-
-
-                    balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
-                    balanced_target_islands.extend(stack)
-
-                    if not balanced_target_islands:
-                        break
-
-    def balanced_filter_lg(self, balance_isl, exclude_indexes):
+    def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
+        """Enhances multi-stitching steps for a more even distribution"""
         if not balance_isl.sequence:
             self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
             if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl):
@@ -294,6 +309,7 @@ class Stitch:
                 balance_isl.tag = False
                 return None
 
+        # Selects an island for stitching based on a similar length to the one that was reoriented
         min_diff = float('inf')
         min_lg = None
         for lg in balance_isl.sequence:
@@ -361,25 +377,41 @@ class Stitch:
                     continue
                 crn.tag = crn.edge.seam or is_boundary(crn, uv)
 
-    @staticmethod
-    def set_selected_boundary_tag_with_exclude_face_idx(isl, exclude_idx: set):
+    def set_selected_boundary_tag_with_exclude_face_idx(self, isl, exclude_idx: set):
         uv = isl.umesh.uv
-        if isl.umesh.sync:
-            for f in isl:
-                for crn in f.loops:
-                    if not crn.edge.select or crn.link_loop_radial_prev.face.index in exclude_idx:
-                        crn.tag = False
-                        continue
-                    crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
+        if self.between:
+            if isl.umesh.sync:
+                for f in isl:
+                    for crn in f.loops:
+                        pair = crn.link_loop_radial_prev
+                        if pair.face.index in exclude_idx:
+                            crn.tag = False
+                            continue
+                        crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
+            else:
+                for f in isl:
+                    for crn in f.loops:
+                        if crn.link_loop_radial_prev.face.index in exclude_idx:
+                            crn.tag = False
+                            continue
+                        crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
         else:
-            for f in isl:
-                for crn in f.loops:
-                    if not crn[uv].select_edge or crn.link_loop_radial_prev.face.index in exclude_idx:
-                        crn.tag = False
-                        continue
-                    crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
+            if isl.umesh.sync:
+                for f in isl:
+                    for crn in f.loops:
+                        if not crn.edge.select or crn.link_loop_radial_prev.face.index in exclude_idx:
+                            crn.tag = False
+                            continue
+                        crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
+            else:
+                for f in isl:
+                    for crn in f.loops:
+                        if not crn[uv].select_edge or crn.link_loop_radial_prev.face.index in exclude_idx:
+                            crn.tag = False
+                            continue
+                        crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
 
-    def stitch_pick_ex(self, ref_isl: AdvIsland, trans: AdvIsland, ref_crn: BMLoop, trans_crn: BMLoop):
+    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_crn: BMLoop, trans_crn: BMLoop):
         uv = ref_isl.umesh.uv
 
         if utils.is_flipped_uv(ref_crn.face, uv) != utils.is_flipped_uv(trans_crn.face, uv):
@@ -432,46 +464,6 @@ class Stitch:
             if self.update_seams:
                 ref_crn.edge.seam = False
 
-    @staticmethod
-    def has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
-        return (crn_a1[uv].uv - crn_a2[uv].uv).length < 1e-06 or \
-            (crn_b1[uv].uv - crn_b2[uv].uv).length < 1e-06
-
-    def calc_begin_end_points(self, tar: LoopGroup, source: LoopGroup):
-        if not tar or not source:
-            return False
-        uv = tar.umesh.uv
-
-        crn_a1 = tar[0]
-        crn_a2 = tar[-1].link_loop_next
-        crn_b1 = source[-1].link_loop_next
-        crn_b2 = source[0]
-
-        # If zero length LoopGroup might be circular
-        if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(tar, tar.umesh.uv)
-            xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
-            if bbox.max_length < 1e-06:
-                return False
-
-            if bbox.width > bbox.height:
-                crn_a1 = xmin_crn
-                crn_a2 = xmax_crn
-
-                crn_b1 = utils.shared_crn(xmin_crn).link_loop_next
-                crn_b2 = utils.shared_crn(xmax_crn).link_loop_next
-            else:
-                crn_a1 = ymin_crn
-                crn_a2 = ymax_crn
-
-                crn_b1 = utils.shared_crn(ymin_crn).link_loop_next
-                crn_b2 = utils.shared_crn(ymax_crn).link_loop_next
-
-            if self.has_zero_length(crn_a1, crn_a2, crn_b1, crn_b2, uv):
-                return False
-
-        return crn_a1, crn_a2, crn_b1, crn_b2
-
     def copy_pos(self, crn, uv):
         if self.update_seams:
             crn.edge.seam = False
@@ -499,6 +491,43 @@ class Stitch:
                 if isl.value < 1e-06:  # TODO: Allow zero length islands
                     target_islands.remove(isl)
             target_islands.sort(key=lambda isl_: isl_.value, reverse=True)
+
+    @staticmethod
+    def filter_and_draw_lines(umeshes_a, umeshes_b):
+        welded = []
+        with_seam = []
+        welded_append = welded.append
+        with_seam_append = with_seam.append
+
+        is_visible = utils.is_visible_func(umeshes_a.sync)
+
+        # TODO: Optimize by update tag umesh (if umesh without tag_update -> not welded edges)
+        for umesh in chain(umeshes_a, umeshes_b):
+            uv = umesh.uv
+            for e in umesh.sequence:
+                if e.seam:
+                    for crn in e.link_loops:
+                        if is_visible(crn.face):
+                            with_seam_append(crn[uv].uv)
+                            with_seam_append(crn.link_loop_next[uv].uv)
+                else:
+                    toggle = False
+                    for crn in e.link_loops:
+                        if is_visible(crn.face):
+                            if toggle:
+                                welded_append(crn[uv].uv)
+                                welded_append(crn.link_loop_next[uv].uv)
+                            else:
+                                welded_append(crn.link_loop_next[uv].uv)
+                                welded_append(crn[uv].uv)
+                                toggle = True
+
+        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+        draw.LinesDrawSimple.draw_register(with_seam, seam_color)
+
+        welded_color = (0.1, 0.1, 1.0, 1.0)
+        draw.DotLinesDrawSimple.draw_register(welded, welded_color)
+
 
 
 class UNIV_OT_Weld(Operator, Stitch):
@@ -577,7 +606,6 @@ class UNIV_OT_Weld(Operator, Stitch):
             if not self.umeshes:
                 return self.umeshes.update()
 
-            from .. import draw
             for umesh in chain(selected_umeshes, visible_umeshes):
                 umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
@@ -670,7 +698,7 @@ class UNIV_OT_Weld(Operator, Stitch):
             if self.umeshes.update_tag:
                 return
 
-        self.stitch_with_padding_balanced()
+        self.stitch()
 
     def weld_by_distance_island(self, extended):
         for umesh in self.umeshes:
@@ -834,46 +862,9 @@ class UNIV_OT_Weld(Operator, Stitch):
         else:
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared)
+            self.pick_reorient(ref_isl, trans_isl, ref_crn, shared)
             hit.umesh.update()
         return
-
-    @staticmethod
-    def filter_and_draw_lines(umeshes_a, umeshes_b):
-        welded = []
-        with_seam = []
-        welded_append = welded.append
-        with_seam_append = with_seam.append
-
-        is_visible = utils.is_visible_func(umeshes_a.sync)
-
-        # TODO: Optimize by update tag umesh (if umesh without tag_update -> not welded edges)
-        for umesh in chain(umeshes_a, umeshes_b):
-            uv = umesh.uv
-            for e in umesh.sequence:
-                if e.seam:
-                    for crn in e.link_loops:
-                        if is_visible(crn.face):
-                            with_seam_append(crn[uv].uv)
-                            with_seam_append(crn.link_loop_next[uv].uv)
-                else:
-                    toggle = False
-                    for crn in e.link_loops:
-                        if is_visible(crn.face):
-                            if toggle:
-                                welded_append(crn[uv].uv)
-                                welded_append(crn.link_loop_next[uv].uv)
-                            else:
-                                welded_append(crn.link_loop_next[uv].uv)
-                                welded_append(crn[uv].uv)
-                                toggle = True
-
-        from .. import draw
-        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
-        draw.LinesDrawSimple.draw_register(with_seam, seam_color)
-
-        welded_color = (0.1, 0.1, 1.0, 1.0)
-        draw.DotLinesDrawSimple.draw_register(welded, welded_color)
 
 
 class UNIV_OT_Stitch(Operator, Stitch):
@@ -910,7 +901,6 @@ class UNIV_OT_Stitch(Operator, Stitch):
 
             layout.prop(self, "padding_multiplayer", slider=True)
 
-
     def invoke(self, context, event):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
@@ -927,23 +917,23 @@ class UNIV_OT_Stitch(Operator, Stitch):
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        if self.between:
+            visible_umeshes = self.umeshes.filtered_by_selected_uv_faces()
+            selected_umeshes = self.umeshes
+        else:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         settings = univ_settings()
         self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
 
-        from .. import draw
+
         for umesh in chain(selected_umeshes, visible_umeshes):
             umesh.aspect = utils.get_aspect_ratio() if self.use_aspect else 1.0
             umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
         if self.between:
-            if not selected_umeshes:
-                self.umeshes.umeshes = []
-            # TODO: Reduce filtering
-            self.umeshes.filtered_by_selected_uv_faces()
-            self.stitch_between()
+            self.stitch()
         else:
             if not self.umeshes:
                 return self.umeshes.update()
@@ -954,92 +944,17 @@ class UNIV_OT_Stitch(Operator, Stitch):
                                                  'which will result in incorrect padding.')
 
                 self.pick_stitch()
-                UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+                self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
                 bpy.context.area.tag_redraw()
                 return {'FINISHED'}
 
-            self.stitch_with_padding_balanced()
+            self.stitch()
 
-        UNIV_OT_Weld.filter_and_draw_lines(selected_umeshes, visible_umeshes)
+        self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
         bpy.context.area.tag_redraw()
 
-        # TODO: Remove seams from selected edges (self.stitch and self.stitch_between)
-        self.umeshes.update(info='Not found edges for stitch')
+        self.umeshes.update(info='Not found islands for stitch')
         return {'FINISHED'}
-
-    def stitch_between(self):
-        for umesh in self.umeshes:
-            _islands = AdvIslands.calc_extended(umesh)
-            if len(_islands) <= 1:
-                continue
-
-            _islands.indexing()
-            umesh.set_corners_tag(False)
-            target_islands = _islands.islands.copy()
-            self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
-
-            while True:
-                stitched = False
-                for target_isl in target_islands:
-                    tar = LoopGroup(umesh)
-
-                    while True:
-                        local_stitched = False
-                        for _ in tar.calc_first(target_isl, selected=False):
-                            source = tar.calc_shared_group()
-                            res = self.stitch_ex(tar, source, _islands, selected=False)
-                            local_stitched |= res
-                        stitched |= local_stitched
-                        if not local_stitched:
-                            break
-                umesh.update_tag |= stitched
-                if not stitched:
-                    break
-            if umesh.update_tag and self.update_seams:
-                for adv in target_islands:
-                    if adv:
-                        adv.mark_seam()
-
-    def stitch_ex(self, ref_lg: LoopGroup, trans_lg: LoopGroup, adv_islands: AdvIslands, selected=True):
-        uv = ref_lg.umesh.uv
-        # Equal indices occur after merging on non-stitch edges
-        # TODO: Disable?
-        if ref_lg[0].face.index == trans_lg[0].face.index:
-            for target_crn in ref_lg:
-                self.copy_pos(target_crn, uv)
-            return True
-
-        if (corners := self.calc_begin_end_points(ref_lg, trans_lg)) is False:
-            ref_lg.tag = False
-            return False
-
-        ref_isl = adv_islands[corners[0].face.index]
-        trans_isl = adv_islands[corners[2].face.index]
-
-        if (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
-            trans_isl.scale_simple(Vector((1, -1)))
-
-        pt_a1, pt_a2, pt_b1, pt_b2 = [c[uv].uv for c in corners]
-
-        # Rotate
-        normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_lg.umesh.aspect, 1.0))
-        normal_b_with_aspect = (pt_b1 - pt_b2) * Vector((ref_lg.umesh.aspect, 1.0))
-
-        rotate_angle = normal_a_with_aspect.angle_signed(normal_b_with_aspect, 0)
-        trans_isl.rotate_simple(rotate_angle, ref_lg.umesh.aspect)
-
-        # Scale
-        normal_a = pt_a1 - pt_a2
-        normal_b = pt_b1 - pt_b2
-
-        scale = normal_a.length / normal_b.length
-        trans_isl.scale_simple(Vector((scale, scale)))
-
-        # Move
-        trans_isl.move(pt_a1 - pt_b1)
-
-        adv_islands.weld_selected(ref_isl, trans_isl, selected=selected)
-        return True
 
     def pick_stitch(self):
         hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
@@ -1080,5 +995,5 @@ class UNIV_OT_Stitch(Operator, Stitch):
         else:
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.stitch_pick_ex(ref_isl, trans_isl, ref_crn, shared)
+            self.pick_reorient(ref_isl, trans_isl, ref_crn, shared)
             hit.umesh.update()

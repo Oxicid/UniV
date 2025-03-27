@@ -878,7 +878,15 @@ class UMeshes:
         return u1, u2
 
     def filtered_by_selected_uv_faces(self):
-        self.umeshes = [umesh for umesh in self if umesh.has_selected_uv_faces()]
+        selected = []
+        unselect_or_invisible = []
+        for umesh in self:
+            if umesh.has_selected_uv_faces():
+                selected.append(umesh)
+            else:
+                unselect_or_invisible.append(umesh)
+        self.umeshes = selected
+        return unselect_or_invisible
 
     def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
         """Filter full selected and visible with not full selected"""
