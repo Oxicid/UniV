@@ -23,11 +23,24 @@ def shared_crn(crn: BMLoop) -> BMLoop | None:
     if shared != crn:
         return shared
 
+def is_flipped_3d(crn):
+    pair = crn.link_loop_radial_prev
+    if pair == crn:
+        return False
+    return pair.vert == crn.vert
+
 def shared_is_linked(crn: BMLoop, _shared_crn: BMLoop, uv: BMLayerItem):
     return crn.link_loop_next[uv].uv == _shared_crn[uv].uv and \
            crn[uv].uv == _shared_crn.link_loop_next[uv].uv
 
 def is_pair(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
+    return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
+           crn[uv].uv == _rad_prev.link_loop_next[uv].uv
+
+def is_pair_with_flip(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
+    if crn.vert == _rad_prev.vert:  # is flipped
+        return crn[uv].uv == _rad_prev[uv].uv and \
+            crn.link_loop_next[uv].uv == _rad_prev.link_loop_next[uv].uv
     return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
            crn[uv].uv == _rad_prev.link_loop_next[uv].uv
 
@@ -426,6 +439,7 @@ def linked_crn_uv_by_face_tag_unordered_included(crn, uv) -> list[BMLoop]:
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.tag and l_crn[uv].uv == first_co]
 
 def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
+    """Included Unordered"""
     face_index = first.face.index
     linked = [first]
     bm_iter = first

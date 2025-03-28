@@ -21,6 +21,8 @@ class LoopGroup:
         self.corners: list[BMLoop] = []
         self.tag = True
         self.dirt = False
+        self.is_shared = False
+        self.is_flipped_3d = False
         self._length_uv: float | None = None
         self._length_3d: float | None = None
         self.weights: list[float] | None = None
@@ -112,6 +114,55 @@ class LoopGroup:
         lg = LoopGroup(self.umesh)
         lg.corners = shared_group
         return lg
+
+    def calc_shared_group_for_stitch(self) -> 'typing.Self':
+        shared_group = []
+        is_flipped = self._is_flipped_3d
+        if is_flipped:
+            for crn in self.corners:
+                shared_group.append(crn.link_loop_radial_prev)
+        else:
+            for crn in self.corners:
+                shared_group.append(crn.link_loop_radial_prev.link_loop_next)
+        lg = LoopGroup(self.umesh)
+        lg.is_shared = True
+        lg.is_flipped_3d = is_flipped
+        lg.corners = shared_group
+        return lg
+
+    def calc_begin_end_pt(self):
+        uv = self.umesh.uv
+        if self.is_shared:
+            if self.is_flipped_3d:
+                return self[0][uv].uv, self[-1].link_loop_next[uv].uv
+            else:
+                return self[0][uv].uv, self[-1].link_loop_prev[uv].uv
+        else:
+            return self[0][uv].uv, self[-1].link_loop_next[uv].uv
+
+    @property
+    def _is_flipped_3d(self):
+        assert not self.is_shared
+        pair = self[0].link_loop_radial_prev
+        return pair.vert == self[0].vert
+
+    def copy_coords_from_ref(self, ref, clean_seams):
+        uv = self.umesh.uv
+        for ref_crn, trans_crn in zip(ref, self):
+            if clean_seams:
+                ref_crn.edge.seam = False
+            ref_co = ref_crn[uv].uv
+            # TODO: Implement linked_crn_to_vert_by_idx_pair_with_seam
+            for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, self.umesh.sync):
+                trans_crn_linked[uv].uv = ref_co
+            trans_crn[uv].uv = ref_co
+
+        ref_co = ref[-1].link_loop_next[uv].uv
+        end_crn = self[-1].link_loop_next if self.is_flipped_3d else self[-1].link_loop_prev
+
+        for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(end_crn, uv, self.umesh.sync):
+            trans_crn_linked[uv].uv = ref_co
+        end_crn[uv].uv = ref_co
 
     def boundary_tag_by_face_index(self, crn: BMLoop):
         uv = self.umesh.uv

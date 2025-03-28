@@ -529,16 +529,48 @@ class CrnEdgeHit:
         parts_of_island = [self.crn.face]
         while parts_of_island:
             for f in parts_of_island:
-                for l in f.loops:
-                    pair_crn = l.link_loop_radial_prev
+                for crn in f.loops:
+                    pair_crn = crn.link_loop_radial_prev
                     ff = pair_crn.face
                     if ff in island or not is_visible(ff):
                         continue
 
-                    if (l[uv].uv == pair_crn.link_loop_next[uv].uv or
-                            l.link_loop_next[uv].uv == pair_crn[uv].uv):
+                    if (crn[uv].uv == pair_crn.link_loop_next[uv].uv or
+                            crn.link_loop_next[uv].uv == pair_crn[uv].uv):
                         island.add(ff)
                         stack.append(ff)
+            parts_of_island = stack
+            stack = []
+
+        return AdvIsland(list(island), self.umesh), island
+
+    def calc_island_non_manifold_with_flip(self) -> tuple[AdvIsland, set[BMFace]]:
+        assert self.crn, 'Not found picked corner'
+
+        uv = self.umesh.uv
+        island: set[BMFace] = {self.crn.face}
+        is_visible = utils.is_visible_func(self.umesh.sync)
+
+        stack = []
+        parts_of_island = [self.crn.face]
+        while parts_of_island:
+            for f in parts_of_island:
+                for crn in f.loops:
+                    pair_crn = crn.link_loop_radial_prev
+                    ff = pair_crn.face
+                    if ff in island or not is_visible(ff):
+                        continue
+
+                    if crn.vert == pair_crn.vert:
+                        if (crn[uv].uv == pair_crn[uv].uv or
+                                crn.link_loop_next[uv].uv == pair_crn.link_loop_next[uv].uv):
+                            island.add(ff)
+                            stack.append(ff)
+                    else:
+                        if (crn[uv].uv == pair_crn.link_loop_next[uv].uv or
+                                crn.link_loop_next[uv].uv == pair_crn[uv].uv):
+                            island.add(ff)
+                            stack.append(ff)
             parts_of_island = stack
             stack = []
 

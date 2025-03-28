@@ -34,12 +34,16 @@ class Stitch:
         self.max_distance: float = 0.0
         self.mouse_position: Vector | None = None
         self.padding = 0.0
+        self.zero_area_count = 0
+        self.flipped_3d_count = 0
         if not hasattr(self, 'update_seams'):
             self.update_seams = True
         if not hasattr(self, 'between'):
             self.between = False
 
     def stitch(self):
+        self.zero_area_count = 0
+        self.flipped_3d_count = 0
         for umesh in self.umeshes:
             if self.between:
                 adv_islands = AdvIslands.calc_extended_with_mark_seam(umesh)
@@ -72,6 +76,7 @@ class Stitch:
 
                 temp_exclude_indexes = exclude_indexes.copy()
                 temp_exclude_indexes.add(ref_isl[0].index)
+                # TODO: Need adapt to flipped
                 self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, temp_exclude_indexes)
 
                 loop_groups = types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
@@ -82,7 +87,7 @@ class Stitch:
                     exclude_indexes.add(ref_isl[0].index)
 
                 for ref_lg in filtered:
-                    trans_lg = ref_lg.calc_shared_group()
+                    trans_lg = ref_lg.calc_shared_group_for_stitch()
                     trans_isl_index = trans_lg[0].face.index
                     exclude_indexes.add(trans_isl_index)
 
@@ -102,7 +107,7 @@ class Stitch:
                     for balance_isl in balanced_target_islands:
                         if balance_isl.tag:
                             if lg := self.balancing_filter_for_lgs(balance_isl, exclude_indexes):
-                                trans_lg = lg.calc_shared_group()
+                                trans_lg = lg.calc_shared_group_for_stitch()
                                 trans_isl_index = trans_lg[0].face.index
                                 exclude_indexes.add(trans_isl_index)
 
@@ -122,11 +127,22 @@ class Stitch:
 
                     if not balanced_target_islands:
                         break
+        if self.zero_area_count:
+            self.report({'WARNING'}, f'Found {self.zero_area_count} zero length edge loop. Use inspect tools to find the problem')  # noqa
+        if self.flipped_3d_count:
+            self.report({'WARNING'}, f'Found {self.flipped_3d_count} loops with 3D flipped faces. '  # noqa
+                                     f'For correct result need recalculate normals')
+
 
     def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
-        has_report = False
-        if (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
+
+        is_flipped_3d = trans_lg.is_flipped_3d
+        self.flipped_3d_count += is_flipped_3d
+        if is_flipped_3d:
+            if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                trans.scale_simple(Vector((1, -1)))
+        elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
             trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
@@ -137,14 +153,22 @@ class Stitch:
                 pt_a1 = xmin_crn[uv].uv
                 pt_a2 = xmax_crn[uv].uv
 
-                pt_b1 = utils.shared_crn(xmin_crn).link_loop_next[uv].uv
-                pt_b2 = utils.shared_crn(xmax_crn).link_loop_next[uv].uv
+                if is_flipped_3d:
+                    pt_b1 = utils.shared_crn(xmin_crn)[uv].uv
+                    pt_b2 = utils.shared_crn(xmax_crn)[uv].uv
+                else:
+                    pt_b1 = utils.shared_crn(xmin_crn).link_loop_next[uv].uv
+                    pt_b2 = utils.shared_crn(xmax_crn).link_loop_next[uv].uv
             else:
                 pt_a1 = ymin_crn[uv].uv
                 pt_a2 = ymax_crn[uv].uv
 
-                pt_b1 = utils.shared_crn(ymin_crn).link_loop_next[uv].uv
-                pt_b2 = utils.shared_crn(ymax_crn).link_loop_next[uv].uv
+                if is_flipped_3d:
+                    pt_b1 = utils.shared_crn(ymin_crn)[uv].uv
+                    pt_b2 = utils.shared_crn(ymax_crn)[uv].uv
+                else:
+                    pt_b1 = utils.shared_crn(ymin_crn).link_loop_next[uv].uv
+                    pt_b2 = utils.shared_crn(ymax_crn).link_loop_next[uv].uv
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -163,17 +187,16 @@ class Stitch:
             length_b = (pt_b1 - pt_b2).length
 
             if length_a < 1e-06 or length_b < 1e-06:
-                has_report = True
+                self.zero_area_count += 1
             else:
                 scale = length_a / length_b
                 trans.scale(Vector((scale, scale)), center_ref)
 
-            for ref_crn in ref_lg:
-                self.copy_pos(ref_crn, uv)
+            trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
 
         else:
-            pt_a1, pt_a2 = ref_lg[0][uv].uv, ref_lg[-1].link_loop_next[uv].uv
-            pt_b1, pt_b2 = trans_lg[-1].link_loop_next[uv].uv, trans_lg[0][uv].uv
+            pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
+            pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -189,25 +212,35 @@ class Stitch:
             length_b = normal_b.length
 
             if length_a < 1e-06 or length_b < 1e-06:
-                has_report = True
+                self.zero_area_count += 1
             else:
                 scale = length_a / length_b
                 trans.scale_simple(Vector((scale, scale)))
 
             # Move
             trans.set_position(pt_a1, pt_b1)
-            for ref_crn in ref_lg:
-                self.copy_pos(ref_crn, uv)
+            trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
 
-        if has_report:
-            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
 
     def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
-        has_report = False
-        if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):
+
+        # print()
+        # print(f'{trans_lg.is_flipped_3d = }')
+        # print(f'{ref_lg.calc_signed_face_area() = }')
+        # print(f'{trans_lg.calc_signed_face_area() = }')
+        is_flipped_3d = trans_lg.is_flipped_3d
+        if trans_lg.is_flipped_3d:
+            if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) == (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
+                # trans_is_flipped ^= 1
+                trans.scale_simple(Vector((1, -1)))
+
+        elif (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
             trans_is_flipped ^= 1
             trans.scale_simple(Vector((1, -1)))
+
+        # print(f'{ref_is_flipped = }')
+        # print(f'{trans_is_flipped = }')
 
         if ref_lg.is_cyclic:
             bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(ref_lg, uv)
@@ -217,14 +250,22 @@ class Stitch:
                 pt_a1 = xmin_crn[uv].uv
                 pt_a2 = xmax_crn[uv].uv
 
-                pt_b1 = utils.shared_crn(xmin_crn).link_loop_next[uv].uv
-                pt_b2 = utils.shared_crn(xmax_crn).link_loop_next[uv].uv
+                if is_flipped_3d:
+                    pt_b1 = utils.shared_crn(xmin_crn)[uv].uv
+                    pt_b2 = utils.shared_crn(xmax_crn)[uv].uv
+                else:
+                    pt_b1 = utils.shared_crn(xmin_crn).link_loop_next[uv].uv
+                    pt_b2 = utils.shared_crn(xmax_crn).link_loop_next[uv].uv
             else:
                 pt_a1 = ymin_crn[uv].uv
                 pt_a2 = ymax_crn[uv].uv
 
-                pt_b1 = utils.shared_crn(ymin_crn).link_loop_next[uv].uv
-                pt_b2 = utils.shared_crn(ymax_crn).link_loop_next[uv].uv
+                if is_flipped_3d:
+                    pt_b1 = utils.shared_crn(ymin_crn)[uv].uv
+                    pt_b2 = utils.shared_crn(ymax_crn)[uv].uv
+                else:
+                    pt_b1 = utils.shared_crn(ymin_crn).link_loop_next[uv].uv
+                    pt_b2 = utils.shared_crn(ymax_crn).link_loop_next[uv].uv
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -245,7 +286,7 @@ class Stitch:
             length_b = normal_b.length
 
             if length_a < 1e-06 or length_b < 1e-06:
-                has_report = True
+                self.zero_area_count += 1
             else:
                 scale = length_a / length_b
                 bbox.scale(Vector((ref_isl.umesh.aspect, 1.0)))
@@ -257,23 +298,37 @@ class Stitch:
                 pad_scale = bl_math.clamp((min_length-self.padding * 2) / min_length, 0.5, 1.5)
 
                 # Change inner scale to outer, if ref is inner-island
-                if ref_is_flipped and trans_is_flipped:
-                    # If ref has signed area and flipped -> need unsigned trans
-                    if ref_lg.calc_signed_corners_area() < 0:
-                        if trans_lg.calc_signed_corners_area() >= 0:
-                            pad_scale = 1 / pad_scale
-                else:
-                    # If ref has unsigned area and not flipped -> need signed trans
-                    if ref_lg.calc_signed_corners_area() >= 0:
-                        if trans_lg.calc_signed_corners_area() < 0:
-                            pad_scale = 1 / pad_scale
+                # TODO: We need to calculate all LGs in order to determine Outer and Inner LGs.
+                #  And then work backwards from there.
+                #  ??? Need calc LG (loops) area for diff inner - outer LG
+                # Incorrect Code
+                # if trans_lg.is_flipped_3d:
+                #     if not ref_is_flipped and trans_is_flipped:
+                #         if ref_lg.calc_signed_face_area() >= 0:
+                #             if trans_lg.calc_signed_face_area() < 0:
+                #                 pad_scale = 1 / pad_scale
+                #     elif ref_is_flipped and not trans_is_flipped:
+                #         if ref_lg.calc_signed_face_area() < 0:
+                #             if trans_lg.calc_signed_face_area() >= 0:
+                #                 pad_scale = 1 / pad_scale
+                # else:
+                #     if ref_is_flipped and trans_is_flipped:
+                #         # If ref has signed area and flipped -> need unsigned trans
+                #         if ref_lg.calc_signed_corners_area() < 0:
+                #             if trans_lg.calc_signed_corners_area() >= 0:
+                #                 pad_scale = 1 / pad_scale
+                #     else:
+                #         # If ref has unsigned area and not flipped -> need signed trans
+                #         if ref_lg.calc_signed_corners_area() >= 0:
+                #             if trans_lg.calc_signed_corners_area() < 0:
+                #                 pad_scale = 1 / pad_scale
 
                 scale *= pad_scale
                 trans.scale(Vector((scale, scale)), center_ref)
 
         else:
-            pt_a1, pt_a2 = ref_lg[0][uv].uv, ref_lg[-1].link_loop_next[uv].uv
-            pt_b1, pt_b2 = trans_lg[-1].link_loop_next[uv].uv, trans_lg[0][uv].uv
+            pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
+            pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -289,7 +344,7 @@ class Stitch:
             length_b = normal_b.length
 
             if length_a < 1e-06 or length_b < 1e-06:
-                has_report = True
+                self.zero_area_count += 1
             else:
                 scale = length_a / length_b
                 trans.scale_simple(Vector((scale, scale)))
@@ -306,8 +361,6 @@ class Stitch:
             delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
 
-        if has_report:
-            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
 
     def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
         """Enhances multi-stitching steps for a more even distribution"""
@@ -425,14 +478,16 @@ class Stitch:
                             continue
                         crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
 
-    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_crn: BMLoop, trans_crn: BMLoop):
-        uv = ref_isl.umesh.uv
-
-        if utils.is_flipped_uv(ref_crn.face, uv) != utils.is_flipped_uv(trans_crn.face, uv):
+    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
+        is_flipped = trans_lg.is_flipped_3d
+        if is_flipped:
+            if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                trans.scale_simple(Vector((1, -1)))
+        elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
             trans.scale_simple(Vector((1, -1)))
 
-        pt_a1, pt_a2 = ref_crn[uv].uv, ref_crn.link_loop_next[uv].uv
-        pt_b1, pt_b2 = trans_crn.link_loop_next[uv].uv, trans_crn[uv].uv
+        pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
+        pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
 
         # Rotate
         normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -467,18 +522,7 @@ class Stitch:
             trans.move(delta)
         else:
             trans.move(pt_a1 - pt_b1)
-
-            trans_a = [trans_crn] + utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, ref_isl.umesh.sync)
-            for crn in trans_a:
-                crn[uv].uv = ref_crn.link_loop_next[uv].uv
-
-            trans_next = trans_crn.link_loop_next
-            trans_b = [trans_next] + utils.linked_crn_to_vert_pair_with_seam(trans_next, uv, ref_isl.umesh.sync)
-            for crn in trans_b:
-                crn[uv].uv = ref_crn[uv].uv
-
-            if self.update_seams:
-                ref_crn.edge.seam = False
+            trans_lg.copy_coords_from_ref(ref_lg, self.update_seams)
 
     def copy_pos(self, crn, uv):
         if self.update_seams:
@@ -830,49 +874,81 @@ class UNIV_OT_Weld(Operator, Stitch):
             self.report({'INFO'}, 'Edge is boundary')
             return
 
-        if ref_crn.link_loop_next.vert != shared.vert:
-            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
-            return
-
         uv = hit.umesh.uv
         e = ref_crn.edge
-        if utils.is_pair(ref_crn, shared, uv):
+        if utils.is_pair_with_flip(ref_crn, shared, uv):
             if e.seam:
                 e.seam = False
                 hit.umesh.update()
                 return
             return
 
-        # fast calculate, if edge has non-manifold links
-        if ref_crn[uv].uv == shared.link_loop_next[uv].uv:  # check a
-            for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
-                crn[uv].uv = ref_crn.link_loop_next[uv].uv  # link b
-            e.seam = False
-            hit.umesh.update()
-            return
-        elif ref_crn.link_loop_next[uv].uv == shared[uv].uv:  # check b
-            shared_next_crn = shared.link_loop_next
-            for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
-                crn[uv].uv = ref_crn[uv].uv  # link a
-            e.seam = False
-            hit.umesh.update()
-            return
 
-        ref_isl, isl_set = hit.calc_island_non_manifold()
+        # Fast calculate, if edge has non-manifold links
+        if utils.is_flipped_3d(ref_crn):
+            if ref_crn[uv].uv == shared[uv].uv:  # check a
+                shared_next = shared.link_loop_next
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                    crn[uv].uv = ref_crn.link_loop_next[uv].uv  # join b
+                e.seam = False
+                hit.umesh.update()
+                return
+            elif ref_crn.link_loop_next[uv].uv == shared.link_loop_next[uv].uv:  # check b
+                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                    crn[uv].uv = ref_crn[uv].uv  # join a
+                e.seam = False
+                hit.umesh.update()
+                return
+        else:
+            if ref_crn[uv].uv == shared.link_loop_next[uv].uv:  # check a
+                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                    crn[uv].uv = ref_crn.link_loop_next[uv].uv  # join b
+                e.seam = False
+                hit.umesh.update()
+                return
+            elif ref_crn.link_loop_next[uv].uv == shared[uv].uv:  # check b
+                shared_next = shared.link_loop_next
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                    crn[uv].uv = ref_crn[uv].uv  # join a
+                e.seam = False
+                hit.umesh.update()
+                return
+
+        if utils.is_flipped_3d(ref_crn):
+            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
+
+        if utils.is_flipped_3d(ref_crn):
+            ref_isl, isl_set = hit.calc_island_non_manifold_with_flip()
+        else:
+            ref_isl, isl_set = hit.calc_island_non_manifold()
 
         if shared.face in isl_set:
-            shared_next_crn = shared.link_loop_next
-            for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
-                crn[uv].uv = ref_crn[uv].uv
+            if utils.is_flipped_3d(ref_crn):
+                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                    crn[uv].uv = ref_crn[uv].uv
 
-            for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
-                crn[uv].uv = ref_crn.link_loop_next[uv].uv
-            e.seam = False
-            hit.umesh.update()
+                shared_next = shared.link_loop_next
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                    crn[uv].uv = ref_crn.link_loop_next[uv].uv
+                e.seam = False
+                hit.umesh.update()
+            else:
+                shared_next_crn = shared.link_loop_next
+                for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
+                    crn[uv].uv = ref_crn[uv].uv
+
+                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                    crn[uv].uv = ref_crn.link_loop_next[uv].uv
+                e.seam = False
+                hit.umesh.update()
         else:
+            ref_lg = LoopGroup(hit.umesh)
+            ref_lg.corners = [hit.crn]
+            trans_lg = ref_lg.calc_shared_group_for_stitch()
+
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.pick_reorient(ref_isl, trans_isl, ref_crn, shared)
+            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg)
             hit.umesh.update()
         return
 
@@ -890,7 +966,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
-    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-16, soft_min=0, soft_max=2, max=16)
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=-4, soft_max=4, max=32)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -985,12 +1061,11 @@ class UNIV_OT_Stitch(Operator, Stitch):
             return
 
         if ref_crn.link_loop_next.vert != shared.vert:
-            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
-            return
+            self.report({'WARNING'}, 'Edge has 3D flipped face, for correct result need recalculate normals')
 
         uv = hit.umesh.uv
         e = ref_crn.edge
-        if not self.padding and utils.is_pair(ref_crn, shared, uv):
+        if not self.padding and utils.is_pair_with_flip(ref_crn, shared, uv):
             if e.seam:
                 e.seam = False
                 hit.umesh.update()
@@ -1003,7 +1078,11 @@ class UNIV_OT_Stitch(Operator, Stitch):
         if shared.face in isl_set:
             self.report({'WARNING'}, 'It is not possible to use Stitch on itself, use Weld operator')
         else:
+            ref_lg = LoopGroup(hit.umesh)
+            ref_lg.corners = [hit.crn]
+            trans_lg = ref_lg.calc_shared_group_for_stitch()
+
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.pick_reorient(ref_isl, trans_isl, ref_crn, shared)
+            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg)
             hit.umesh.update()
