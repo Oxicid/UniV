@@ -284,6 +284,9 @@ class UNIV_OT_Align(Operator):
         self.layout.column(align=True).prop(self, 'mode', expand=True)
 
     def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
         match event.ctrl, event.shift, event.alt:
             case False, False, False:
                 self.mode = 'ALIGN'
