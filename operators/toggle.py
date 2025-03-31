@@ -572,3 +572,26 @@ class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
             return {'CANCELLED'}
         context.space_data.uv_editor.show_modified_edges ^= 1
         return {'FINISHED'}
+
+class UNIV_OT_ModifiersToggle(Operator):
+    bl_idname = 'view3d.univ_modifiers_toggle'
+    bl_label = 'Toggle Modifiers'
+
+    def execute(self, context):
+        active_obj = context.active_object
+        selected_objects = context.selected_objects.copy()
+
+        if active_obj and active_obj not in selected_objects:
+            selected_objects.append(active_obj)
+
+        modifier_status = [mod for obj in selected_objects if obj.type != 'EMPTY'
+                           for mod in obj.modifiers if mod.type != 'COLLISION']
+        if not modifier_status:
+            self.report({'INFO'}, 'Not found modifiers')
+            return {'FINISHED'}
+        show_status = not all(mod.show_viewport for mod in modifier_status)
+        for mod in modifier_status:
+            if mod.show_viewport != show_status:
+                mod.show_viewport = show_status
+        return {'FINISHED'}
+

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 5, 0),
+    "version": (3, 5, 1),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -105,6 +105,9 @@ def load_register_types():
             toggle.UNIV_OT_SyncUVToggle,
             toggle.UNIV_OT_StretchUVToggle,
             toggle.UNIV_OT_ShowModifiedUVEdgeToggle,
+            # Modifier Toggle
+            toggle.UNIV_OT_ModifiersToggle,
+
             # Selects
             select.UNIV_OT_SelectLinked,
             select.UNIV_OT_Select_By_Cursor,
@@ -131,6 +134,10 @@ def load_register_types():
             ui.UNIV_PT_General,
             ui.UNIV_PT_GlobalSettings,
             ui.UNIV_PT_PackSettings,
+            # Pie Menus
+            ui.IMAGE_MT_PIE_univ_edit,
+            ui.VIEW3D_MT_PIE_univ_obj,
+            ui.VIEW3D_MT_PIE_univ_edit,
             # Seam
             seam.UNIV_OT_Cut_VIEW2D,
             seam.UNIV_OT_Cut_VIEW3D,
@@ -176,6 +183,7 @@ def load_register_types():
             ))
             for idx, opt in enumerate(classes):
                 if opt is select.UNIV_OT_Select_Edge_Grow_VIEW2D:
+                    # TODO: Create base class to avoid this problem
                     classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW3D)
                     classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW2D)
                     break

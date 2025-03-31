@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
-from bpy.types import Panel
+from bpy.types import Panel, Menu
 
 from .icons import icons
 from .preferences import univ_settings, prefs
@@ -82,7 +82,7 @@ class UNIV_PT_General(Panel):
         if not settings.uv_layers_show:
             return
         global REDRAW_UV_LAYERS
-        # print(f'{REDRAW_UV_LAYERS=}')
+
         if REDRAW_UV_LAYERS:
             from .operators.misc import UNIV_OT_UV_Layers_Manager
             bpy.app.timers.register(UNIV_OT_UV_Layers_Manager.update_uv_layers_props, first_interval=0.1)
@@ -479,3 +479,142 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
         col.separator()
         col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+
+
+class IMAGE_MT_PIE_univ_edit(Menu):
+    bl_label = 'UniV Pie'
+
+    # @classmethod
+    # def poll(cls, context):
+    #     return context.mode == 'EDIT'
+
+    def draw(self, _context):
+        # Angle
+        pie = self.layout.menu_pie()
+        pie.scale_x = 1.25
+        pie.scale_y = 2.0
+        split = pie.split()
+
+        col = split.column(align=True)
+
+        split = pie.split()
+        col = split.column(align=True)
+        row = col.row(align=True)
+        row.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
+
+        # MultiLoop
+        split = pie.split()
+        col = split.column(align=True)
+
+        # Boundary loop
+        split = pie.split()
+        col = split.column(align=True)
+        row = col.row()
+
+        # Toggle
+        split = pie.split()
+        col = split.column(align=True)
+
+        # View
+        split = pie.split()
+        col = split.column(align=True)
+
+class VIEW3D_MT_PIE_univ_obj(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        # Angle
+        pie = self.layout.menu_pie()
+        # pie.scale_x = 1.25
+        # pie.scale_y = 2.0
+        split = pie.split()
+
+        col = split.column(align=True)
+        row = col.row(align=True)
+
+        split = pie.split()
+        col = split.column(align=False)
+        # col.scale_x = 1.25
+        col.scale_y = 2.0
+        col.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
+
+        # MultiLoop
+        split = pie.split()
+        col = split.column(align=False)
+        col.alignment = 'CENTER'
+        UNIV_PT_General.draw_uv_layers(col)
+
+        # Boundary loop
+        split = pie.split()
+        col = split.column(align=True)
+        # row = col.row()
+
+        # Toggle
+        split = pie.split()
+        col = split.column(align=True)
+
+        # View
+        split = pie.split()
+        col = split.column(align=True)
+
+class VIEW3D_MT_PIE_univ_edit(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        pie = self.layout.menu_pie()
+        # pie.scale_x = 1.25
+        # pie.scale_y = 2.0
+        split = pie.split()
+
+        # Angle
+        col = split.column(align=True)
+        row = col.row(align=True)
+        row.scale_x = 1.2
+        row.scale_y = 2.0
+        row.operator("mesh.univ_select_flat", icon_value=icons.flat)
+
+        split = pie.split()
+        col = split.column(align=True)
+        col.scale_x = 1.2
+        col.scale_y = 2.0
+        col.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
+
+        # MultiLoop
+        split = pie.split()
+        col = split.column(align=True)
+        row = col.row(align=True)
+        row.scale_x = 1.2
+        row.scale_y = 1.75
+        if univ_pro:
+            row.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
+        else:
+            row.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
+        row.operator("mesh.loop_multi_select", text='Ring').ring=True
+        row.operator("mesh.region_to_loop", text='Select to Loop', icon="SELECT_SET")
+
+        col = col.column()
+        col.separator()
+        UNIV_PT_General.draw_uv_layers(col)
+        # Boundary loop
+        split = pie.split()
+        col = split.column(align=True)
+        row = col.row()
+
+        # Toggle
+        split = pie.split()
+        col = split.column(align=True)
+
+        # View
+        split = pie.split()
+        col = split.column(align=True)
+        col.scale_x = 1.2
+        col.scale_y = 2.0
+        col.operator("mesh.univ_checker", icon_value=icons.checker)
+
+        split = pie.split()
+
+        col = split.column(align=True)
+
+        split = pie.split()
+        col = split.column(align=True)
+

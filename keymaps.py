@@ -28,8 +28,18 @@ def add_keymaps():
     kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
     keys.append((km, kmi))
 
+    # Pie Menu
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
+    kmi.properties.name = "VIEW3D_MT_PIE_univ_obj"
+    keys.append((km, kmi))
+
     ### Mesh
     km = kc.keymaps.new(name='Mesh')
+
+    # Pie Menu
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
+    kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
+    keys.append((km, kmi))
 
     # Grow
     kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
@@ -62,7 +72,9 @@ def add_keymaps():
     ### UV Editor
     km = kc.keymaps.new(name='UV Editor')
 
-    kmi = km.keymap_items.new('uv.univ_sync_uv_toggle', 'ACCENT_GRAVE', 'PRESS')
+    # Pie Menu
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
+    kmi.properties.name = "IMAGE_MT_PIE_univ_edit"
     keys.append((km, kmi))
 
     # Select
@@ -399,7 +411,8 @@ class ConflictFilter:
 
             conflict_filter = defaultdict(ConflictFilter)
             for kmi in km.keymap_items:
-                if '.univ_' in kmi.idname:
+                if ('.univ_' in kmi.idname or
+                        'wm.call_menu_pie' == kmi.idname and kmi.name == 'UniV Pie'):
                     keymap_name = kmi.to_string()
                     conflict_filter[keymap_name].univ_keys.append(kmi)
 
@@ -410,7 +423,8 @@ class ConflictFilter:
             for area1 in areas_:
                 km = kc.keymaps[area1]
                 for kmi in km.keymap_items:
-                    if ((keymap_name := kmi.to_string()) in conflict_filter) and ('.univ_' not in kmi.idname):
+                    keymap_name = kmi.to_string()
+                    if keymap_name in conflict_filter and '.univ_' not in kmi.idname and kmi.name != 'UniV Pie':
                         if kmi.is_user_defined:
                             conflict_filter[keymap_name].user_defined.append((km, kmi))
                         else:
@@ -444,6 +458,8 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                 _km = kc.keymaps[_area]
                 for _kmi in _km.keymap_items:
                     if '.univ_' in _kmi.idname:
+                        yield _km, _kmi
+                    elif 'wm.call_menu_pie' == _kmi.idname and _kmi.name == 'UniV Pie':
                         yield _km, _kmi
 
         if self.mode == 'DEFAULT':
