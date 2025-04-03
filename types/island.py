@@ -349,6 +349,9 @@ class FaceIsland:
     def iter_corners_by_tag(self):
         return (crn for f in self for crn in f.loops if crn.tag)
 
+    def corners_iter(self):
+        return (crn for f in self for crn in f.loops)
+
     def set_pins(self, state=True, with_pinned=False) -> list[bmesh.types.BMLoopUV] | None:
         if with_pinned:
             assert state

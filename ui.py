@@ -519,6 +519,25 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         split = pie.split()
         col = split.column(align=True)
 
+class IMAGE_MT_PIE_univ_align(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        pie = self.layout.menu_pie()
+
+        pie.operator('uv.univ_align_pie', text='Left', icon_value=icons.arrow_left).direction = 'LEFT'
+        pie.operator('uv.univ_align_pie', text='Right', icon_value=icons.arrow_right).direction = 'RIGHT'
+        pie.operator('uv.univ_align_pie', text='Bottom', icon_value=icons.arrow_bottom).direction = 'BOTTOM'
+        pie.operator('uv.univ_align_pie', text='Upper', icon_value=icons.arrow_top).direction = 'UPPER'
+
+        row = pie.row(align=True)
+        row.prop(univ_settings(), 'align_island_mode', expand=True, icon_only=True)
+        row.separator()
+        row.prop(univ_settings(), 'align_mode', expand=True, icon_only=True)
+        pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
+        pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
+        pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
+
 class VIEW3D_MT_PIE_univ_obj(Menu):
     bl_label = 'UniV Pie'
 
@@ -583,14 +602,14 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         split = pie.split()
         col = split.column(align=True)
         row = col.row(align=True)
-        row.scale_x = 1.2
+        # row.scale_x = 1.2
         row.scale_y = 1.75
         if univ_pro:
             row.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
             row.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
         row.operator("mesh.loop_multi_select", text='Ring').ring=True
-        row.operator("mesh.region_to_loop", text='Select to Loop', icon="SELECT_SET")
+        row.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
 
         col = col.column()
         col.separator()
@@ -617,4 +636,3 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         split = pie.split()
         col = split.column(align=True)
-

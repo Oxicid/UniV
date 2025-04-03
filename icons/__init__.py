@@ -127,6 +127,9 @@ class icons:
         Pip.install('reportlab[renderPM]')
         Pip.install('reportlab')
         Pip.install('libpng')  # noqa
+        Pip.install('pymupdf')  # noqa
+        Pip.install('svglib')  # noqa
+        Pip.install('frontend')  # noqa
 
     @classmethod
     def convert_svg_to_png_(cls, texture_size=32):

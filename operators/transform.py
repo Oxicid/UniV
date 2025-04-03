@@ -257,21 +257,11 @@ align_align_direction_items = (
     ('LEFT_BOTTOM', 'Left bottom', ''),
     ('RIGHT_BOTTOM', 'Right bottom', ''),
 )
-class UNIV_OT_Align(Operator):
-    bl_idname = 'uv.univ_align'
+class UNIV_OT_Align_pie(Operator):
+    bl_idname = 'uv.univ_align_pie'
     bl_label = 'Align'
-    bl_description = info.operator.align_info
+    bl_description = "Align verts, edges, faces, islands and cursor"
     bl_options = {'REGISTER', 'UNDO'}
-
-    mode: EnumProperty(name="Mode", default='ALIGN', items=(
-        ('ALIGN', 'Align', ''),
-        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', ''),
-        ('ALIGN_CURSOR', 'Move cursor to selected', ''),
-        ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
-        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
-        ('CURSOR_TO_TILE', 'Align cursor to tile', ''),
-        # ('MOVE_COLLISION', 'Collision move', '')
-    ))
 
     direction: EnumProperty(name="Direction", default='UPPER', items=align_align_direction_items)
 
@@ -279,39 +269,20 @@ class UNIV_OT_Align(Operator):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
-    def draw(self, context):
-        self.layout.prop(self, 'direction')
-        self.layout.column(align=True).prop(self, 'mode', expand=True)
-
-    def invoke(self, context, event):
-        if event.value == 'PRESS':
-            return self.execute(context)
-
-        match event.ctrl, event.shift, event.alt:
-            case False, False, False:
-                self.mode = 'ALIGN'
-            case True, False, False:
-                self.mode = 'ALIGN_TO_CURSOR'
-            case True, True, True:
-                self.mode = 'ALIGN_TO_CURSOR_UNION'
-            case False, False, True:
-                self.mode = 'ALIGN_CURSOR'
-            case True, False, True:
-                self.mode = 'CURSOR_TO_TILE'
-            case False, True, False:
-                self.mode = 'INDIVIDUAL_OR_MOVE'
-            case _:
-                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n{info.operator.align_event_info_ex}")
-                return {'CANCELLED'}
-        return self.execute(context)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.umeshes = None
+        self.mode = 'ALIGN'
+        self.is_island_mode = False
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
+        settings = univ_settings()
+        self.mode = settings.align_mode
+        if settings.align_island_mode == 'FOLLOW':
+            self.is_island_mode = utils.is_island_mode()
+        else:
+            self.is_island_mode = settings.align_island_mode == 'ISLAND'
         return self.align()
 
     def align(self):
@@ -350,18 +321,11 @@ class UNIV_OT_Align(Operator):
                 self.align_cursor(general_bbox, cursor_loc)
                 return {'FINISHED'}
 
-            case 'CURSOR_TO_TILE':
-                if not (cursor_loc := utils.get_cursor_location()):
-                    self.umeshes.report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                self.align_cursor_to_tile(cursor_loc)
-                return {'FINISHED'}
-
             case 'INDIVIDUAL_OR_MOVE':  # OR INDIVIDUAL
-                if not utils.is_island_mode():
-                    self.individual_scale_zero()
-                else:
+                if self.is_island_mode:
                     self.move_ex(selected=True)
+                else:
+                    self.individual_scale_zero()
                 if not self.umeshes.final():
                     if self.direction in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:
                         self.align_ex(selected=False)
@@ -376,7 +340,7 @@ class UNIV_OT_Align(Operator):
     def move_to_cursor_ex(self, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
-        if utils.is_island_mode() or (not selected and self.direction not in {'LEFT', 'RIGHT', 'BOTTOM', 'UPPER'}):
+        if self.is_island_mode or (not selected and self.direction not in {'LEFT', 'RIGHT', 'BOTTOM', 'UPPER'}):
             for umesh in self.umeshes:
                 if islands := Islands.calc(umesh, selected=selected):
                     for island in islands:
@@ -419,7 +383,7 @@ class UNIV_OT_Align(Operator):
     def align_ex(self, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
-        if utils.is_island_mode() or not selected:
+        if self.is_island_mode or not selected:
             for umesh in self.umeshes:
                 if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     for island in islands:
@@ -440,7 +404,7 @@ class UNIV_OT_Align(Operator):
             self.align_corners(all_groups, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
 
     def move_ex(self, selected=True):
-        if utils.is_island_mode():
+        if self.is_island_mode:
             for umesh in self.umeshes:
                 if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     match self.direction:
@@ -485,14 +449,22 @@ class UNIV_OT_Align(Operator):
                 umesh.update_tag = bool(corners)
 
     def individual_scale_zero(self):
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            if lgs := types.LoopGroup.calc_dirt_loop_groups(umesh):
-                umesh.tag_visible_corners()
-                for lg in lgs:
-                    lg.extend_from_linked()
-                    self.align_corners(((lg, uv),), lg.calc_bbox())
-            umesh.update_tag = bool(lgs)
+        if self.umeshes.elem_mode == 'FACE':
+            for umesh in self.umeshes:
+                uv = umesh.uv
+                if islands := Islands.calc_selected_with_mark_seam(umesh):
+                    for isl in islands:
+                        self.align_corners(((isl.corners_iter(), uv),), isl.calc_bbox())
+                umesh.update_tag = bool(islands)
+        else:
+            for umesh in self.umeshes:
+                uv = umesh.uv
+                if lgs := types.LoopGroup.calc_dirt_loop_groups(umesh):
+                    umesh.tag_visible_corners()
+                    for lg in lgs:
+                        lg.extend_from_linked()
+                        self.align_corners(((lg, uv),), lg.calc_bbox())
+                umesh.update_tag = bool(lgs)
 
     def align_islands(self, groups, general_bbox, invert=False):
         for island, bounds, _ in groups:
@@ -590,48 +562,6 @@ class UNIV_OT_Align(Operator):
         else:
             raise NotImplementedError(self.direction)
 
-    def align_cursor_to_tile(self, cursor_loc):
-        def pad_floor(value):
-            f = np.floor(np.float16(value))
-            return np.nextafter(f, f + np.float16(1.0))
-
-        def pad_ceil(value):
-            f = np.floor(np.float16(value))
-            return np.nextafter(f + np.float16(1.0), f)
-
-        x, y = cursor_loc
-        match self.direction:
-            case 'UPPER':
-                y = pad_ceil(y)
-            case 'BOTTOM':
-                y = pad_floor(y)
-            case 'LEFT':
-                x = pad_floor(x)
-            case 'RIGHT':
-                x = pad_ceil(x)
-            case 'RIGHT_UPPER':
-                x = pad_ceil(x)
-                y = pad_ceil(y)
-            case 'LEFT_UPPER':
-                x = pad_floor(x)
-                y = pad_ceil(y)
-            case 'LEFT_BOTTOM':
-                x = pad_floor(x)
-                y = pad_floor(y)
-            case 'RIGHT_BOTTOM':
-                x = pad_ceil(x)
-                y = pad_floor(y)
-            case 'CENTER':
-                x = np.floor(x) + 0.5
-                y = np.floor(y) + 0.5
-            case 'HORIZONTAL':
-                y = np.floor(y) + 0.5
-            case 'VERTICAL':
-                x = np.floor(x) + 0.5
-            case _:
-                raise NotImplementedError(self.direction)
-        utils.set_cursor_location((x, y))
-
     @staticmethod
     def get_move_value(direction):
         match direction:
@@ -653,6 +583,51 @@ class UNIV_OT_Align(Operator):
                 return 1, -1
             case _:
                 raise NotImplementedError(direction)
+
+
+class UNIV_OT_Align(UNIV_OT_Align_pie):
+    bl_idname = 'uv.univ_align'
+    bl_description = info.operator.align_info
+
+    mode: EnumProperty(name="Mode", default='ALIGN', items=(
+        ('ALIGN', 'Align', ''),
+        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', ''),
+        ('ALIGN_CURSOR', 'Move cursor to selected', ''),
+        ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
+        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
+        # ('MOVE_COLLISION', 'Collision move', '')
+    ))
+
+    def draw(self, context):
+        self.layout.prop(self, 'direction')
+        self.layout.column(align=True).prop(self, 'mode', expand=True)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        match event.ctrl, event.shift, event.alt:
+            case False, False, False:
+                self.mode = 'ALIGN'
+            case True, False, False:
+                self.mode = 'ALIGN_TO_CURSOR'
+            case True, True, True:
+                self.mode = 'ALIGN_TO_CURSOR_UNION'
+            case False, False, True:
+                self.mode = 'ALIGN_CURSOR'
+            case False, True, False:
+                self.mode = 'INDIVIDUAL_OR_MOVE'
+            case _:
+                self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
+                                      f"See all variations:\n\n{info.operator.align_event_info_ex}")
+                return {'CANCELLED'}
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes = None
+        self.is_island_mode = False
+
 
 class UNIV_OT_Flip(Operator):
     bl_idname = 'uv.univ_flip'

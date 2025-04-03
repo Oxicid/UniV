@@ -163,6 +163,20 @@ class UNIV_Settings(bpy.types.PropertyGroup):
                                                       "4096 = 16-20 px\n"
                                                       "8192 = 32-40 px\t")
 
+    align_mode: EnumProperty(name="Align Mode", default='ALIGN', items=(
+        ('ALIGN', 'Align', '', 'EMPTY_SINGLE_ARROW', 0),
+        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', '', 'PIVOT_INDIVIDUAL', 1),
+        ('ALIGN_CURSOR', 'Move cursor to selected', '', 'ORIENTATION_CURSOR', 2),
+        ('ALIGN_TO_CURSOR', 'Align to cursor', '', 'PIVOT_CURSOR', 3),
+        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', '', 'EVENT_U', 4)
+    ))
+
+    align_island_mode: EnumProperty(name="Island Mode", default='FOLLOW', items=(
+        ('FOLLOW', 'Follow', '', 'EVENT_F', 0),
+        ('ISLAND', 'Island', '', 'UV_ISLANDSEL', 1),
+        ('VERTEX', 'Vertex', '', 'VERTEXSEL', 2)
+    ))
+
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -258,6 +272,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                       icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
                             for (user_km, user_kmi) in config_filtered.user_defined:
                                 rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
+                layout.separator()
 
         # elif self.tab == 'INFO':
         else:
