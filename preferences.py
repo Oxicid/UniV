@@ -183,13 +183,13 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     tab: EnumProperty(
         items=(
             ('GENERAL', 'General', ''),
+            ('UI', 'UI', ''),
             ('KEYMAPS', 'Keymaps', ''),
             ('INFO', 'Info', ''),
         ),
         default='KEYMAPS')
         # default='INFO')  # noqa
 
-            # ('UI', 'UI', ''),  # noqa
 
     debug: EnumProperty(name='Debug',
         items=(
@@ -215,6 +215,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         default='FOLLOW_MODE',
         description='Default Snap Points for QuickSnap')
 
+    color_mode: EnumProperty(name='Color Mode',
+        items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
+        default='COLOR',
+        update=lambda self, _:__import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
+
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
@@ -233,13 +238,17 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, 'debug')
             layout.prop(self, 'mode')
             layout.separator()
+
             layout.label(text='QuickSnap:')
             layout.prop(self, 'snap_points_default')
             layout.separator()
-            layout.prop(self, 'show_split_toggle_uv_button')
 
             layout.prop(self, 'max_pick_distance')
             layout.prop(self, 'enable_uv_layers_sync_borders_seam')
+
+        elif self.tab == 'UI':
+            layout.prop(self, 'color_mode')
+            layout.prop(self, 'show_split_toggle_uv_button')
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()

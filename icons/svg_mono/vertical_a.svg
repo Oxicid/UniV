@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 8 8"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg3"
+   sodipodi:docname="vertical_a.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:serif="http://www.serif.com/"><defs
+   id="defs3" /><sodipodi:namedview
+   id="namedview3"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="106.875"
+   inkscape:cx="4"
+   inkscape:cy="4.2994152"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg3" />
+    <g
+   transform="matrix(0.24,0,0,0.24,-50.4,-71.04)"
+   id="g3">
+        <g
+   id="Horizontal-B"
+   serif:id="Horizontal B"
+   transform="matrix(0.914286,0,0,0.914286,248.4,260.343)">
+            <path
+   id="rect1"
+   style="fill:none"
+   d="M -42,39 H -7 V 74 H -42 Z" />
+            <g
+   transform="matrix(0.368983,0,0,0.368983,-37.7727,42.3035)"
+   id="g2">
+                <g
+   transform="matrix(57.2199,0,0,57.2199,59.374,58.5017)"
+   id="g1">
+                </g>
+                <path
+   d="m 42.49406,58.501999 c 1.029961,0 1.544941,-0.40054 1.831041,-1.20162 l 14.81998,-37.536321 c 0.2861,-0.74386 -0.05722,-1.31606 -0.80108,-1.31606 h -9.4413 c -1.02996,0 -1.54494,0.40054 -1.83104,1.20162 L 36.19986,49.461239 25.38528,19.649618 c -0.2861,-0.80108 -0.8583,-1.20162 -1.88826,-1.20162 h -9.89906 c -0.74386,0 -1.08718,0.5722 -0.80108,1.31606 l 14.76276,37.536321 c 0.34332,0.80108 0.8583,1.20162 1.88826,1.20162 z"
+   id="text1"
+   style="font-weight:700;font-size:57.22px;font-family:GeomGraphic-Bold, 'Geom Graphic', fantasy;fill:#8bc6a1"
+   aria-label="V" />
+            </g>
+        </g>
+    </g>
+</svg>

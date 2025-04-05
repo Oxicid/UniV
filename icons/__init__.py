@@ -83,11 +83,13 @@ class icons:
     @classmethod
     def register_icons_(cls):
         from bpy.utils import previews
-        if cls._icons_ is None:
-            cls._icons_ = previews.new()
-        else:
-            cls.reset_icon_value_()
-        png_file_path = __file__.replace('__init__.py', 'png/')
+        if cls._icons_:
+            cls.unregister_icons_()
+        cls._icons_ = previews.new()
+
+        from ..preferences import prefs
+        png_folder_name = 'png_mono/' if prefs().color_mode == 'MONO' else 'png/'
+        png_file_path = __file__.replace('__init__.py', png_folder_name)
 
         for attr in dir(cls):
             if not attr.endswith('_'):
@@ -132,7 +134,7 @@ class icons:
         Pip.install('frontend')  # noqa
 
     @classmethod
-    def convert_svg_to_png_(cls, texture_size=32):
+    def convert_svg_to_png_(cls, texture_size=32, mono=False):
         try:
             import fitz
             from svglib import svglib
@@ -141,14 +143,19 @@ class icons:
             print('UniV: No install dependencies (fitz, svglib or reportlab)')
             return
 
-        svg_file_path = __file__.replace('__init__.py', 'svg/').replace('\\', '/')
-        png_file_path = __file__.replace('__init__.py', 'png/').replace('\\', '/')
+        svg_folder_name = 'svg/'
+        png_folder_name = 'png/'
+        if mono:
+            svg_folder_name = 'svg_mono/'
+            png_folder_name = 'png_mono/'
+        svg_file_path = __file__.replace('__init__.py', svg_folder_name).replace('\\', '/')
+        png_file_path = __file__.replace('__init__.py', png_folder_name).replace('\\', '/')
 
         for attr in dir(cls):
             if not attr.endswith('_'):
                 assert isinstance(getattr(cls, attr), int)
 
-                svg_file = svg_file_path + 'univ_icon_' + attr + ".svg"
+                svg_file = svg_file_path + attr + ".svg"
                 if not os.path.exists(svg_file):
                     print(f'UniV: File {svg_file} not found')
                     continue

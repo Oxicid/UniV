@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(0.24,0,0,0.24,-30.24,-40.56)">
+        <g id="Overlap" transform="matrix(1,0,0,1,73.5362,169)">
+            <rect x="52.464" y="0" width="32" height="32" style="fill:none;"/>
+            <g transform="matrix(1,0,0,1,0.301871,-0.199541)">
+                <g transform="matrix(0.866884,0,0,0.866884,-1065.46,4.62821)">
+                    <path d="M1312.19,21.339C1310.71,24.672 1307.38,27 1303.5,27C1298.26,27 1294,22.743 1294,17.5C1294,13.623 1296.33,10.285 1299.66,8.809C1299.66,8.906 1299.66,9.004 1299.66,9.103C1299.66,15.858 1305.14,21.342 1311.9,21.342C1312,21.342 1312.09,21.341 1312.19,21.339ZM1302.45,8.057C1302.8,8.019 1303.15,8 1303.5,8C1308.74,8 1313,12.257 1313,17.5C1313,17.853 1312.98,18.202 1312.94,18.546C1312.6,18.583 1312.25,18.603 1311.9,18.603C1306.65,18.603 1302.4,14.346 1302.4,9.103C1302.4,8.749 1302.42,8.4 1302.45,8.057Z" style="fill:rgb(199,199,199);"/>
+                </g>
+                <g transform="matrix(0.866884,0,0,0.866884,-1058.18,-2.65139)">
+                    <circle cx="1303.5" cy="17.5" r="9.5" style="fill:rgb(139,198,161);"/>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

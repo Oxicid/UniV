@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(0.24,0,0,0.24,-114.96,-60.96)">
+        <rect id="Reset" x="479" y="254" width="32" height="32" style="fill:none;"/>
+        <g id="Reset1" serif:id="Reset">
+            <g transform="matrix(1.14286,0,2.46519e-32,1.14286,-71.2857,-35.7254)">
+                <path d="M489.861,263.875L490,260L498,260C502.418,260 506,263.582 506,268C506,272.418 502.418,276 498,276L486.75,276L486.75,272.625L497.639,272.625C500.324,272.625 502.5,270.666 502.5,268.25C502.5,265.834 500.324,263.875 497.639,263.875L489.861,263.875Z" style="fill:rgb(139,198,161);"/>
+            </g>
+            <g transform="matrix(-1.02421,-1.72308e-16,3.62282e-16,-2.15344,516.15,406.175)">
+                <path d="M23.579,69.135L23.579,63.297L32.506,66.216L23.579,69.135Z" style="fill:rgb(139,198,161);"/>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 8 8"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg4"
+   sodipodi:docname="large.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs4" /><sodipodi:namedview
+   id="namedview4"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showguides="true"
+   inkscape:zoom="106.875"
+   inkscape:cx="4"
+   inkscape:cy="4.3836257"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg4" />
+    <g
+   transform="matrix(0.24,0,0,0.24,-50.4,-50.88)"
+   id="g4">
+        <g
+   id="Large"
+   transform="matrix(1,0,0,1,26,212)">
+            <path
+   id="rect1"
+   style="fill:none"
+   d="m 184,0 h 32 v 32 h -32 z" />
+            <g
+   transform="matrix(1.25674,0,0,1.25674,-307.095,-83.9109)"
+   id="g1">
+                <path
+   d="M413,70L413,89L394,89L394,70L413,70ZM411.5,71.5L395.5,71.5L395.5,87.5L411.5,87.5L411.5,71.5Z"
+   style="fill:rgb(139,198,161);"
+   id="path1" />
+            </g>
+            <g
+   transform="matrix(1.24658,0,0,1.44721,-306.801,-95.4126)"
+   id="g3">
+                <g
+   transform="matrix(10.4167,0,0,10.4167,410.148,80.6835)"
+   id="g2">
+                </g>
+                <path
+   d="m 405.20992,73.621272 c 0,-0.145838 -0.0938,-0.229174 -0.25001,-0.229174 h -1.61464 c -0.15625,0 -0.23959,0.08334 -0.23959,0.229174 v 6.833552 c 0,0.145838 0.0833,0.229174 0.23959,0.229174 h 6.41688 c 0.15625,0 0.23959,-0.08334 0.23959,-0.229174 v -1.218789 c 0,-0.145838 -0.0833,-0.229174 -0.23959,-0.229174 h -4.55223 z"
+   id="text2"
+   style="font-weight:700;font-size:10.417px;font-family:GeomGraphic-Bold, 'Geom Graphic', fantasy;fill:#8bc6a1"
+   aria-label="L" />
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="100%"
+   height="100%"
+   viewBox="0 0 8 8"
+   version="1.1"
+   xml:space="preserve"
+   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
+   id="svg3"
+   sodipodi:docname="horizontal_a.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:serif="http://www.serif.com/"><defs
+   id="defs3" /><sodipodi:namedview
+   id="namedview3"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   showgrid="false"
+   inkscape:zoom="75.572037"
+   inkscape:cx="2.758957"
+   inkscape:cy="2.3090551"
+   inkscape:window-width="1920"
+   inkscape:window-height="1057"
+   inkscape:window-x="-8"
+   inkscape:window-y="-8"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="svg3" />
+    <g
+   transform="matrix(0.24,0,0,0.24,-20.16,-71.04)"
+   id="g3">
+        <g
+   id="Horizontal-B"
+   serif:id="Horizontal B"
+   transform="matrix(0.914286,0,0,0.914286,122.4,260.343)">
+            <path
+   id="rect1"
+   style="fill:none"
+   d="M -42,39 H -7 V 74 H -42 Z" />
+            <g
+   transform="matrix(0.36472,0,0,0.36472,-38.1933,42.4675)"
+   id="g2">
+                <g
+   transform="matrix(57.2199,0,0,57.2199,62.5211,58.5017)"
+   id="g1">
+                </g>
+                <path
+   d="m 58.858981,19.706838 c 0,-0.80108 -0.45776,-1.25884 -1.31606,-1.25884 h -8.92632 c -0.8583,0 -1.31606,0.45776 -1.31606,1.25884 v 13.96168 H 27.78852 v -13.96168 c 0,-0.80108 -0.51498,-1.25884 -1.37328,-1.25884 h -8.8691 c -0.8583,0 -1.31606,0.45776 -1.31606,1.25884 v 37.536321 c 0,0.80108 0.45776,1.25884 1.31606,1.25884 h 8.8691 c 0.8583,0 1.37328,-0.45776 1.37328,-1.25884 v -14.36222 h 19.512021 v 14.36222 c 0,0.80108 0.45776,1.25884 1.31606,1.25884 h 8.92632 c 0.8583,0 1.31606,-0.45776 1.31606,-1.25884 z"
+   id="text1"
+   style="font-weight:700;font-size:57.22px;font-family:GeomGraphic-Bold, 'Geom Graphic', fantasy;fill:#8bc6a1"
+   aria-label="H" />
+            </g>
+        </g>
+    </g>
+</svg>
