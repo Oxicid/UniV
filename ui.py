@@ -77,7 +77,7 @@ class UNIV_PT_General(Panel):
             row.operator(set_idname, text=preset.name).custom_texel = preset.texel
 
     @staticmethod
-    def draw_uv_layers(layout):
+    def draw_uv_layers(layout, ui_list='UNIV_UL_UV_LayersManager'):
         settings = univ_settings()
         if not settings.uv_layers_show:
             return
@@ -92,7 +92,7 @@ class UNIV_PT_General(Panel):
         row = layout.row()
         col = row.column()
         col.template_list(
-            listtype_name="UNIV_UL_UV_LayersManager",
+            listtype_name=ui_list,
             list_id="",
             dataptr=settings,
             propname="uv_layers_presets",
@@ -432,15 +432,28 @@ class UNIV_UL_UV_LayersManager(bpy.types.UIList):
         settings = univ_settings()
         if index >= settings.uv_layers_size:
             return
-        row = layout.row(align=0)
         if flag := item.flag:  # noqa
             if flag == 2:
-                row.alert = True
+                layout.alert = True
             else:
-                row.active = False
-        row.prop(item, 'name', text='', emboss=False, icon='GROUP_UVS')  # noqa
+                layout.active = False
+        layout.prop(item, 'name', text='', emboss=False, icon='GROUP_UVS')  # noqa
         icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
-        row.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
+        layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
+
+class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+        settings = univ_settings()
+        if index >= settings.uv_layers_size:
+            return
+        if flag := item.flag:  # noqa
+            if flag == 2:
+                layout.alert = True
+            else:
+                layout.active = False
+        layout.prop(item, 'name', text='', emboss=False)  # noqa
+        icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
+        layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
 
 
 class UNIV_PT_TD_PresetsManager(Panel):
@@ -491,33 +504,27 @@ class IMAGE_MT_PIE_univ_edit(Menu):
     def draw(self, _context):
         # Angle
         pie = self.layout.menu_pie()
-        pie.scale_x = 1.25
-        pie.scale_y = 2.0
+
         split = pie.split()
+        pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
 
-        col = split.column(align=True)
-
+        # Bottom
         split = pie.split()
         col = split.column(align=True)
         row = col.row(align=True)
-        row.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
+        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('uv.univ_normalize', icon_value=icons.normalize)
+        UNIV_PT_General.draw_texel_density(col, 'uv')
+        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
-        # MultiLoop
+        # Upper
         split = pie.split()
-        col = split.column(align=True)
-
-        # Boundary loop
+        # Left Upper
         split = pie.split()
-        col = split.column(align=True)
-        row = col.row()
-
-        # Toggle
+        # Right Upper
+        pie.operator("mesh.univ_checker", icon_value=icons.checker)
+        # Left Bottom
         split = pie.split()
-        col = split.column(align=True)
-
-        # View
-        split = pie.split()
-        col = split.column(align=True)
 
 class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
@@ -544,95 +551,74 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
     def draw(self, _context):
         # Angle
         pie = self.layout.menu_pie()
-        # pie.scale_x = 1.25
-        # pie.scale_y = 2.0
+
+        # Left
         split = pie.split()
 
+        # Right
+        pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
+
+        # Bottom
+        split = pie.split()
         col = split.column(align=True)
         row = col.row(align=True)
+        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('uv.univ_normalize', icon_value=icons.normalize)
+        UNIV_PT_General.draw_texel_density(col, 'mesh')
+        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
+        # Upper
         split = pie.split()
-        col = split.column(align=False)
-        # col.scale_x = 1.25
-        col.scale_y = 2.0
-        col.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
 
-        # MultiLoop
+        # Left Upper
         split = pie.split()
-        col = split.column(align=False)
-        col.alignment = 'CENTER'
-        UNIV_PT_General.draw_uv_layers(col)
 
-        # Boundary loop
-        split = pie.split()
-        col = split.column(align=True)
-        # row = col.row()
+        # Right Upper
+        pie.operator("mesh.univ_checker", icon_value=icons.checker)
 
-        # Toggle
+        # Left Bottom
         split = pie.split()
-        col = split.column(align=True)
 
-        # View
-        split = pie.split()
-        col = split.column(align=True)
 
 class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
 
     def draw(self, _context):
         pie = self.layout.menu_pie()
-        # pie.scale_x = 1.25
-        # pie.scale_y = 2.0
-        split = pie.split()
+        # Left
+        pie.operator("mesh.univ_select_flat", icon_value=icons.flat)
+        # Right
+        pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
 
-        # Angle
-        col = split.column(align=True)
-        row = col.row(align=True)
-        row.scale_x = 1.2
-        row.scale_y = 2.0
-        row.operator("mesh.univ_select_flat", icon_value=icons.flat)
-
-        split = pie.split()
-        col = split.column(align=True)
-        col.scale_x = 1.2
-        col.scale_y = 2.0
-        col.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
-
-        # MultiLoop
+        # Bottom
         split = pie.split()
         col = split.column(align=True)
         row = col.row(align=True)
-        # row.scale_x = 1.2
-        row.scale_y = 1.75
+        row.scale_y = 1.5
         if univ_pro:
             row.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
             row.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
         row.operator("mesh.loop_multi_select", text='Ring').ring=True
         row.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
+        row.operator("mesh.select_linked", text='Linked', icon_value=icons.linked)
 
-        col = col.column()
+        col = col.column(align=True)
         col.separator()
-        UNIV_PT_General.draw_uv_layers(col)
-        # Boundary loop
-        split = pie.split()
-        col = split.column(align=True)
-        row = col.row()
+        row = col.row(align=True)
+        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('uv.univ_normalize', icon_value=icons.normalize)
+        UNIV_PT_General.draw_texel_density(col, 'mesh')
+        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
-        # Toggle
-        split = pie.split()
-        col = split.column(align=True)
+        # Upper
+        pie.split()
 
-        # View
-        split = pie.split()
-        col = split.column(align=True)
-        col.scale_x = 1.2
-        col.scale_y = 2.0
-        col.operator("mesh.univ_checker", icon_value=icons.checker)
+        # Left Upper
+        pie.operator("mesh.select_nth", icon_value=icons.checker).offset = 1
+        # Right Upper
+        pie.operator("mesh.univ_checker", icon_value=icons.checker)
+        # Left Bottom
+        # pie.operator("mesh.select_nth", text='3', icon_value=icons.checker).offset = 1
 
-        split = pie.split()
 
-        col = split.column(align=True)
-
-        split = pie.split()
-        col = split.column(align=True)
