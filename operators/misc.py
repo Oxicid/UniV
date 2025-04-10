@@ -968,6 +968,7 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
 class UNIV_OT_Add(Operator):
     bl_idname = 'mesh.univ_add'
     bl_label = 'Add'
+    bl_options = {'REGISTER', 'UNDO'}
 
     add_missed: BoolProperty(name='Add with Missed', default=False)
 
@@ -1029,7 +1030,7 @@ class UNIV_OT_Add(Operator):
         coords = [crn[uv].uv.copy() for f in bm.faces for crn in f.loops]
 
         while (len(bm.loops.layers.uv)) < target_size:
-            bm.loops.layers.uv.new('UVMap')
+            uv = bm.loops.layers.uv.new('UVMap')
             obj.data.uv_layers.active_index = len(mesh.uv_layers)-1
             corners = (crn for f in bm.faces for crn in f.loops)
             for crn, uv_co in zip(corners, coords):
@@ -1041,6 +1042,7 @@ class UNIV_OT_Add(Operator):
 class UNIV_OT_Remove(Operator):
     bl_idname = 'mesh.univ_remove'
     bl_label = 'Remove'
+    bl_options = {'REGISTER', 'UNDO'}
 
     remove_all: BoolProperty(name='Remove All', default=False)
 
