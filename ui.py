@@ -291,6 +291,12 @@ class UNIV_PT_General_VIEW_3D(Panel):
     bl_region_type = 'UI'
     bl_category = "UniV"
 
+    def draw_header(self, context):
+        layout = self.layout
+        row = layout.split(factor=.5)
+        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
+        row.label(text='UniV')
+
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_DEFAULT'
@@ -591,34 +597,31 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
 
         # Bottom
-        split = pie.split()
-        col = split.column(align=True)
-        row = col.row(align=True)
-        row.scale_y = 1.5
-        if univ_pro:
-            row.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
-        else:
-            row.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
-        row.operator("mesh.loop_multi_select", text='Ring').ring=True
-        row.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
-        row.operator("mesh.select_linked", text='Linked', icon_value=icons.linked)
 
-        col = col.column(align=True)
-        col.separator()
+        col = pie.column(align=True)
+        col.separator(factor=18)
+        col.scale_x = 0.8
+
         row = col.row(align=True)
+        row.scale_y = 1.35
         row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
         row.operator('uv.univ_normalize', icon_value=icons.normalize)
+
         UNIV_PT_General.draw_texel_density(col, 'mesh')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        pie.split()
+        pie.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
 
         # Left Upper
         pie.operator("mesh.select_nth", icon_value=icons.checker).offset = 1
         # Right Upper
         pie.operator("mesh.univ_checker", icon_value=icons.checker)
         # Left Bottom
-        # pie.operator("mesh.select_nth", text='3', icon_value=icons.checker).offset = 1
-
+        if univ_pro:
+            pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
+        else:
+            pie.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
+        # Right Bottom
+        pie.operator("mesh.loop_multi_select", text='Ring').ring = True
 
