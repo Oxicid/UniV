@@ -45,6 +45,18 @@ def _update_lock_size(_self, _context):
     if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
         univ_settings().size_y = univ_settings().size_x
 
+def update_panel(_self, _context):
+    from .ui import UNIV_PT_General_VIEW_3D as Panel
+    if Panel.bl_category != prefs().panel_3d_view_category:
+        try:
+            if "bl_rna" in Panel.__dict__:
+                bpy.utils.unregister_class(Panel)
+
+            Panel.bl_category = prefs().panel_3d_view_category
+            bpy.utils.register_class(Panel)
+        except Exception as e:
+            print(f'UniV: Updating Panel View 3D category has failed:\n{e}')
+
 def _update_uv_layers_show(_self, _context):
     from .operators.misc import UNIV_OT_UV_Layers_Manager
     if _self.uv_layers_show:
@@ -222,6 +234,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
+    panel_3d_view_category: StringProperty(name="Panel 3D View Category", description="Enter a name for the panel category",
+                             default='UniV', update=update_panel)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
 
@@ -250,6 +264,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         elif self.tab == 'UI':
             layout.prop(self, 'color_mode')
             layout.prop(self, 'show_view_3d_panel')
+            layout.prop(self, 'panel_3d_view_category')
             layout.prop(self, 'show_split_toggle_uv_button')
 
         elif self.tab == 'KEYMAPS':

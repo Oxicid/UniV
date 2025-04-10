@@ -244,6 +244,7 @@ def register():
         keymaps.add_keymaps()
     except AttributeError:
         traceback.print_exc()
+    preferences.update_panel(None, None)
 
 
 def unregister():
