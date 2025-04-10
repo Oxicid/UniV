@@ -604,8 +604,8 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
-        row.operator('uv.univ_normalize', icon_value=icons.normalize)
+        row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
+        row.operator('mesh.univ_normalize', icon_value=icons.normalize)
 
         UNIV_PT_General.draw_texel_density(col, 'mesh')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
