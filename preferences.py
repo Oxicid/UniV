@@ -221,6 +221,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         update=lambda self, _:__import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
+    show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
 
@@ -248,6 +249,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
         elif self.tab == 'UI':
             layout.prop(self, 'color_mode')
+            layout.prop(self, 'show_view_3d_panel')
             layout.prop(self, 'show_split_toggle_uv_button')
 
         elif self.tab == 'KEYMAPS':

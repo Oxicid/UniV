@@ -291,6 +291,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
     bl_region_type = 'UI'
     bl_category = "UniV"
 
+    @classmethod
+    def poll(cls, context):
+        return prefs().show_view_3d_panel
+
     def draw_header(self, context):
         layout = self.layout
         row = layout.split(factor=.5)
@@ -515,11 +519,15 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
 
         # Bottom
-        split = pie.split()
-        col = split.column(align=True)
+        col = pie.column(align=True)
+        col.separator(factor=18)
+        col.scale_x = 0.8
+
         row = col.row(align=True)
+        row.scale_y = 1.35
         row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
         row.operator('uv.univ_normalize', icon_value=icons.normalize)
+
         UNIV_PT_General.draw_texel_density(col, 'uv')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
