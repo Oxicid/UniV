@@ -2665,3 +2665,136 @@ class UNIV_OT_Stacked(Operator):
                 self.report({'WARNING'}, f'No found stacked islands')
         umeshes.silent_update()
         return {'FINISHED'}
+
+class UNIV_OT_SelectByVertexCount(Operator):
+    bl_idname = "mesh.univ_select_by_vertex_count"
+    bl_label = 'Select by Vertex Count'
+    bl_description = "Select by Vertex Count"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode: EnumProperty(name='Select Mode', default='SELECT', items=(
+        ('SELECT', 'Select', ''),
+        ('ADDITION', 'Addition', ''),
+        ('DESELECT', 'Deselect', ''),
+    ))
+    polygone_type: EnumProperty(name='Polygone Type', default='TRIS', items=(
+        ('TRIS', 'Tris', ''),
+        ('QUAD', 'Quad', ''),
+        ('NGONE', 'N-Gone', ''),
+    ))
+    use_face_target_size: BoolProperty(name='Use target face size', default=False)
+    face_target_size: IntProperty(name='Face Size', min=3, soft_max=32, default=4)
+
+
+    def draw(self, context):
+        layout = self.layout
+        layout.row(align=True).prop(self, 'mode', expand=True)
+        row = layout.row(align=True)
+        row.active = not self.use_face_target_size
+        row.prop(self, 'polygone_type', expand=True)
+
+        row = layout.row(align=True)
+        row.prop(self, "use_face_target_size", text="")
+        row.active = self.use_face_target_size
+        row.prop(self, 'face_target_size')
+
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.ctrl:
+            self.mode = 'DESELECT'
+        elif event.shift:
+            self.mode = 'ADDITION'
+        else:
+            self.mode = 'SELECT'
+        return self.execute(context)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def execute(self, context):
+        umeshes = types.UMeshes.calc_any_unique(verify_uv=False)
+        umeshes.set_sync()
+
+        if utils.get_select_mode_mesh_reversed() != 'FACE':
+            utils.set_select_mode_mesh('FACE')
+            for u in umeshes:
+                u.bm.select_mode = {'FACE'}
+            umeshes.elem_mode = 'FACE'
+
+        counter = 0
+        counter_without_effect = 0
+        if self.polygone_type == 'TRIS':
+            is_target_polygon = lambda f_: len(f.loops) == 3
+        elif self.polygone_type == 'QUAD':
+            is_target_polygon = lambda f_: len(f.loops) == 4
+        else:
+            is_target_polygon = lambda f_: len(f.loops) >= 5
+
+        if self.use_face_target_size:
+            is_target_polygon = lambda f_: len(f.loops) == self.face_target_size
+
+        for umesh in umeshes:
+            local_counter = 0
+            if self.mode == 'SELECT':
+                has_update = False
+                for f in utils.calc_visible_uv_faces_iter(umesh):
+                    if is_target_polygon(f):
+                        if f.select:
+                            counter_without_effect += 1
+                        else:
+                            local_counter += 1
+                            f.select = True
+                    elif f.select:
+                        has_update = True
+                        f.select = False
+
+                if has_update or local_counter:
+                    umesh.update()
+                counter += local_counter
+                continue
+
+            elif self.mode == 'DESELECT':
+                for f in utils.calc_selected_uv_faces_iter(umesh):
+                    if is_target_polygon(f):
+                        local_counter += 1
+                        f.select = False
+            else:  # self.mode == 'ADDITION':
+                for f in utils.calc_unselected_uv_faces_iter(umesh):
+                    if is_target_polygon(f):
+                        local_counter += 1
+                        f.select = True
+
+            if local_counter:
+                umesh.update()
+                counter += local_counter
+
+        if self.mode == 'SELECT':
+            if counter and counter_without_effect:
+                print(f"UniV: Select by Vertex Count: "
+                      f"Found {counter+counter_without_effect} faces for select, {counter_without_effect} of them were already selected")
+            elif counter and not counter_without_effect:
+                print(f"UniV: Select by Vertex Count: Found {counter} faces for select")
+            elif not counter and counter_without_effect:
+                self.report({'INFO'}, f"Found {counter_without_effect} faces for select, that were all initially selected")
+            else:
+                self.report({'WARNING'}, f"Not found faces for select")
+
+        elif self.mode == 'DESELECT':
+            if counter:
+                print(f"UniV: Select by Vertex Count: Found {counter} faces for deselect")
+            else:
+                self.report({'WARNING'}, "No faces found to deselect — they may have been unselected initially")
+        else:  # self.mode == 'ADDITION':
+            if counter:
+                print(f"UniV: Select by Vertex Count: Found {counter} faces for additional select")
+            else:
+                self.report({'WARNING'}, "No faces found to additional select — they may have been selected initially")
+
+        for umesh in umeshes:
+            umesh.check_faces_exist(self.report)
+        return {'FINISHED'}
+

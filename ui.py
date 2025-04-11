@@ -593,7 +593,6 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         # Left Bottom
         split = pie.split()
 
-
 class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
 
@@ -609,6 +608,14 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         col = pie.column(align=True)
         col.separator(factor=18)
         col.scale_x = 0.8
+
+        row = col.row(align=True)
+        row.scale_y = 1.35
+        row.operator('mesh.univ_select_by_vertex_count', text='Tris').polygone_type = 'TRIS'
+        row.operator('mesh.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
+        row.operator('mesh.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
+
+        col.separator(factor=0.35)
 
         row = col.row(align=True)
         row.scale_y = 1.35

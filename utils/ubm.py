@@ -821,6 +821,16 @@ def calc_selected_edges(umesh: 'types.UMesh') -> list[BMEdge] | typing.Any:  # n
         return umesh.bm.edges
     return [e for e in umesh.bm.edges if e.select]
 
+def calc_visible_uv_faces_iter(umesh: 'types.UMesh') -> typing.Iterable[BMFace]:
+    if umesh.is_full_face_selected:
+        return umesh.bm.faces
+    if umesh.sync:
+        return (f for f in umesh.bm.faces if not f.hide)
+
+    if umesh.is_full_face_deselected:
+        return []
+    return (f for f in umesh.bm.faces if f.select)
+
 def calc_visible_uv_faces(umesh) -> typing.Iterable[BMFace]:
     if umesh.is_full_face_selected:
         return umesh.bm.faces

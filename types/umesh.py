@@ -80,6 +80,13 @@ class UMesh:
             return scale
         return None
 
+    def check_faces_exist(self, report=None):
+        if not self.bm.faces:
+            if report:
+                report({'WARNING'}, f"Object {self.obj.name} has no faces")
+            return False
+        return True
+
     @property
     def is_full_face_selected(self):
         return PyBMesh.is_full_face_selected(self.bm)
