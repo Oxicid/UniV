@@ -229,7 +229,8 @@ def register():
     # Perhaps it does not allow to reload operators in a normal way.
     bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
-    bpy.app.timers.register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1)
+    bpy.app.timers.register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay,
+                            first_interval=0.1, persistent=True)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
