@@ -103,6 +103,7 @@ class icons:
                     continue
 
                 icon = cls._icons_.load(attr, full_path, 'IMAGE')
+                _ = icon.icon_pixels[0]  # Need to force load icons, bugreport?
                 setattr(cls, attr, icon.icon_id)
 
     @classmethod
@@ -117,7 +118,10 @@ class icons:
         try:
             previews.remove(cls._icons_)
         except KeyError:
-            pass
+            from ..preferences import debug
+            if debug():
+                import traceback
+                traceback.print_exc()
 
         cls.reset_icon_value_()
 
