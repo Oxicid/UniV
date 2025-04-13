@@ -559,6 +559,32 @@ class IMAGE_MT_PIE_univ_align(Menu):
         pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
         pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
 
+class IMAGE_MT_PIE_univ_misc(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        pie = self.layout.menu_pie()
+        # Left
+        pie.operator('uv.univ_relax', icon_value=icons.relax)
+        # Right
+        pie.operator('uv.univ_unwrap', icon_value=icons.unwrap)
+        # Bottom
+        pie.operator('uv.univ_stack', icon_value=icons.stack)
+        # Upper
+        if univ_pro:
+            pie.operator('uv.univ_rectify', icon_value=icons.rectify)
+        else:
+            pie.split()
+
+        # Left Upper
+        pie.operator('uv.univ_quadrify', icon_value=icons.quadrify)
+        # Right Upper
+        pie.operator('uv.univ_straight', icon_value=icons.straight)
+        # Left Bottom
+        pie.operator('uv.univ_weld', icon_value=icons.weld)
+        # Right Bottom
+        pie.operator('uv.univ_stitch', icon_value=icons.stitch)
+
 class VIEW3D_MT_PIE_univ_obj(Menu):
     bl_label = 'UniV Pie'
 
@@ -639,4 +665,3 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
         # Right Bottom
         pie.operator("mesh.loop_multi_select", text='Ring').ring = True
-
