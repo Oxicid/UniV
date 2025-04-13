@@ -3605,6 +3605,7 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
             return {'CANCELLED'}
         texel = area_uv / area_3d
         univ_settings().texel_density = bl_math.clamp(texel, 1.0, 10_000.0)
+        utils.update_univ_panels()
         return {'FINISHED'}
 
 class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):
