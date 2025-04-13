@@ -1987,7 +1987,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = 'mesh.univ_select_edge_grow'
 
-    max_angle: FloatProperty(name='Angle', default=math.radians(30), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
+    max_angle: FloatProperty(name='Angle', default=math.radians(40), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
                              description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
 
     def execute(self, context):

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 5, 6),
+    "version": (3, 5, 7),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -190,6 +190,7 @@ def load_register_types():
                     # TODO: Create base class to avoid this problem
                     classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW3D)
                     classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW2D)
+                    classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_Pick_VIEW3D)
                     break
         else:
             classes.extend((

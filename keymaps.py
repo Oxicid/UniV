@@ -59,8 +59,16 @@ def add_keymaps():
     kmi.properties.grow = False
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
-    keys.append((km, kmi))
+    if univ_pro:
+        # Select loop
+        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
+        keys.append((km, kmi))
 
     ### Window
     km = kc.keymaps.new(name='Window')
