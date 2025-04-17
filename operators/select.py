@@ -1486,6 +1486,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
         self.umeshes = UMeshes.calc(verify_uv=False)
 
         self.umeshes.set_sync()
+        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         self.calc_islands = MeshIslands.calc_visible_with_mark_seam if self.clamp_on_seam else MeshIslands.calc_visible
 
         if self.grow:
@@ -1494,146 +1495,274 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
             return self.shrink()
 
     def grow_select(self):
-        for umesh in self.umeshes:
-            if umesh.is_full_face_selected:
-                continue
-            if utils.get_select_mode_mesh() == 'FACE' and umesh.is_full_face_deselected:
-                continue
+        has_updates = False
+        linked_crn_to_vert = utils.linked_crn_to_vert_with_seam_3d_iter if self.clamp_on_seam else utils.linked_crn_to_vert_3d_iter
+        if self.umeshes.elem_mode == 'VERTEX':
+            self.umeshes.filter_by_selected_mesh_verts()
 
-            # TODO: Add support edges without faces
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                for idx, isl in enumerate(islands):
-                    if self.umeshes.elem_mode == 'FACE':
-                        for f in isl:
-                            if not f.select:
-                                f.tag = any(l_crn.face.select for crn in f.loops for l_crn in utils.linked_crn_to_vert_by_island_index_unordered(crn))
+            for umesh in self.umeshes:
+                if umesh.is_full_vert_selected:
+                    continue
+
+                to_select = set()
+                for v in umesh.bm.verts:
+                    if not v.select:
+                        continue
+                    if v.is_wire:
+                        to_select.update(ee
+                                         for ee in v.link_edges
+                                         if ee.is_wire and not ee.select and not ee.hide)
                     else:
-                        if umesh.is_full_face_deselected:
-                            # TODO: Improve behavior when linked edge selected
-                            if self.umeshes.elem_mode == 'VERTEX':
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = any(v.select for v in f.verts)
+                        selection_states_from_linked_faces = [f.select for f in v.link_faces]
+                        if all(selection_states_from_linked_faces):
+                            continue
+
+                        elif any(selection_states_from_linked_faces):
+                            all_linked_faces_with_select = []
+                            all_linked_faces_without_select = []
+
+                            link_corners_to_vert = {crn for crn in v.link_loops if not crn.face.hide}
+                            while link_corners_to_vert:
+                                crn = link_corners_to_vert.pop()
+
+                                linked_corners = set(crn_ for crn_ in linked_crn_to_vert(crn))
+                                link_corners_to_vert -= linked_corners
+
+                                faces = [crn_.face for crn_ in linked_corners]
+                                faces.append(crn.face)
+
+                                if any(f.select for f in faces):
+                                    all_linked_faces_with_select.append(faces)
+                                else:
+                                    all_linked_faces_without_select.append(faces)
+
+                            if all_linked_faces_with_select:
+                                for faces in all_linked_faces_with_select:
+                                    to_select.update(f for f in faces if not f.select)
                             else:
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = any(e.select for e in f.edges)
-                        else:
-                            for f in isl:
-                                if not f.select:
-                                    f.tag = self.is_grow_face(f)
-                for isl in islands:
-                    for f in isl:
-                        if f.tag:
-                            f.select = True
+                                for faces in all_linked_faces_without_select:
+                                    to_select.update(faces)
 
-                umesh.update()
+                        else:  # extend all visible unselected
+                            for f in v.link_faces:
+                                if not f.hide:
+                                    to_select.add(f)
+                for f in to_select:
+                    f.select = True
 
-        return {'FINISHED'}
+                if to_select:
+                    has_updates = True
+                    umesh.update()
 
-    def shrink(self):
-        sync = self.umeshes.sync
-        is_sync_face_mode = utils.get_select_mode_mesh() == 'FACE' and sync
+        elif self.umeshes.elem_mode == 'EDGE':
+            self.umeshes.filter_by_selected_mesh_edges()
 
-        for umesh in self.umeshes:
-            if sync:
-                if (is_sync_face_mode and umesh.is_full_face_deselected) or \
-                        (not is_sync_face_mode and umesh.is_full_vert_deselected):
-                    continue
-            else:
-                if umesh.is_full_face_deselected:
+            for umesh in self.umeshes:
+                if umesh.is_full_edge_selected:
                     continue
 
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                for idx, isl in enumerate(islands):
-                    if self.umeshes.elem_mode == 'FACE':
-                        for f in isl:
-                            if f.select:
-                                f.tag = any(not l_crn.face.select for crn in f.loops for l_crn in utils.linked_crn_to_vert_by_island_index_unordered(crn))
+                to_select = set()
+                for e in umesh.bm.edges:
+                    if not e.select:
+                        continue
+                    if e.is_wire:
+                        to_select.update(ee
+                                         for v in e.verts for ee in v.link_edges
+                                         if ee.is_wire and not ee.select and not ee.hide)
                     else:
-                        if umesh.is_full_face_deselected:
-                            for f in isl:
-                                if not f.select:
-                                    f.tag = any(v.select for v in f.verts)
-                        else:
-                            for f in isl:
-                                if not f.select:
-                                    f.tag = self.is_shrink_face(f, idx)
+                        selection_states_from_linked_faces = [f.select for v in e.verts for f in v.link_faces]
+                        if all(selection_states_from_linked_faces):
+                            continue
+                        elif any(selection_states_from_linked_faces):
+                            all_linked_faces_with_select = []
+                            all_linked_faces_without_select = []
 
-                if self.umeshes.elem_mode == 'FACE':
-                    for isl in islands:
-                        for f in isl:
-                            if f.tag:
-                                f.select = False
-                else:
-                    for isl in islands:
-                        for f in isl:
-                            if f.tag:
-                                f.select = False
-                                for v in f.verts:
-                                    v.select = False
-                umesh.bm.select_flush(False)
+                            for crn in e.link_loops:
+                                if crn.face.hide:
+                                    continue
+                                faces = list(crn_.face for crn_ in linked_crn_to_vert(crn))
+                                faces.append(crn.face)
 
-            umesh.update()
+                                if any(f.select for f in faces):
+                                    all_linked_faces_with_select.append(faces)
+                                else:
+                                    all_linked_faces_without_select.append(faces)
 
+                                # Do not combine crn and crn.next in "faces", otherwise grow becomes redundant
+                                faces = [crn_.face for crn_ in linked_crn_to_vert(crn.link_loop_next)]
+                                if any(f.select for f in faces):
+                                    all_linked_faces_with_select.append(faces)
+                                else:
+                                    all_linked_faces_without_select.append(faces)
+
+                            if all_linked_faces_with_select:
+                                for faces in all_linked_faces_with_select:
+                                    to_select.update(f for f in faces if not f.select)
+                            else:
+                                for faces in all_linked_faces_without_select:
+                                    to_select.update(faces)
+
+                        else:  # extend all visible unselected
+                            for crn in e.link_loops:
+                                to_select.update(crn_.face for crn_ in linked_crn_to_vert(crn))
+                                to_select.update(crn_.face for crn_ in linked_crn_to_vert(crn.link_loop_next))
+                                if not crn.face.hide:
+                                    to_select.add(crn.face)
+                for f in to_select:
+                    f.select = True
+
+                if to_select:
+                    has_updates = True
+                    umesh.update()
+        else:
+            self.umeshes.filter_by_selected_mesh_faces()
+
+            for umesh in self.umeshes:
+                if umesh.is_full_face_selected:
+                    continue
+
+                to_select = set()
+                for f in utils.calc_selected_uv_faces(umesh):
+                    for crn in f.loops:
+                        if all(ff.select for ff in crn.vert.link_faces):  # x2.5 performance
+                            continue
+                        to_select.update(crn_.face
+                                         for crn_ in linked_crn_to_vert(crn)
+                                         if not crn_.face.select)
+
+                for f in to_select:
+                    f.select = True
+
+                if to_select:
+                    has_updates = True
+                    umesh.update()
+
+        if not has_updates:
+            self.report({'INFO'}, 'Not found faces for grow select')
         return {'FINISHED'}
 
-    @staticmethod
-    def is_grow_face(face: BMFace):
-        for crn in face.loops:
-            crn_vert = crn.vert
-            if not crn_vert.select:
-                continue
+    @utils.timer()
+    def shrink(self):
+        has_updates = False
 
-            if len(utils.linked_crn_to_vert_by_island_index_unordered(crn)) + 1 == len(crn_vert.link_loops):
-                return True
+        linked_crn_to_vert = utils.linked_crn_to_vert_with_seam_3d_iter if self.clamp_on_seam else utils.linked_crn_to_vert_3d_iter
+        if self.umeshes.elem_mode == 'VERTEX':
+            self.umeshes.filter_by_selected_mesh_verts()
 
-            crn_edge = crn.edge
+            for umesh in self.umeshes:
+                if umesh.is_full_vert_selected:
+                    continue
 
-            if crn_edge.is_boundary and crn_edge.select:
-                return True
+                to_deselect = set()
+                for v in umesh.bm.verts:
+                    if not v.select:
+                        continue
+                    if v.is_wire:
+                        if any(ee.is_wire and not ee.select and not ee.hide for ee in v.link_edges):
+                            to_deselect.add(v)
+                    else:
+                        selection_states_from_linked_faces = [f.select for f in v.link_faces]
+                        if all(selection_states_from_linked_faces):
+                            continue
 
-            if crn_vert.select and crn.link_loop_next.vert.select and not (crn_edge.seam or crn.edge.is_boundary):
-                return True
+                        elif any(selection_states_from_linked_faces):
+                            link_corners_to_vert = {crn for crn in v.link_loops if not crn.face.hide}
+                            while link_corners_to_vert:
+                                crn = link_corners_to_vert.pop()
 
-        return False
+                                linked_corners = set(crn_ for crn_ in linked_crn_to_vert(crn))
+                                link_corners_to_vert -= linked_corners
 
-    @staticmethod
-    def handle_deselect_vertex(face: BMFace, idx):
-        for v in face.verts:
-            if v.select:
-                for ff in v.link_faces:
-                    if ff.index not in (idx, -1):
-                        if ff.select:
-                            break
-                else:
+                                if crn.face.select and all(crn_.face.select for crn_ in linked_corners):
+                                    break
+                            else:  # not break
+                                to_deselect.add(v)
+
+                        else:  # shrink all visible unselected
+                            to_deselect.add(v)
+                for v in to_deselect:
                     v.select = False
 
-    def is_shrink_face(self, face: BMFace, idx):
-        has_selected_verts = False  # noqa
-        for v in face.verts:
-            if v.select:
-                has_selected_verts = True
-                if not v.is_boundary:
-                    break
-                for ff in v.link_faces:
-                    if ff.index not in (idx, -1):
-                        break
-        else:
-            return True
+                if to_deselect:
+                    has_updates = True
+                    umesh.bm.select_flush(False)
+                    umesh.update()
 
-        if has_selected_verts:
-            for crn in face.loops:
-                if crn.vert.select:
-                    for ff in crn.vert.link_faces:
-                        if ff.index not in (idx, -1):
-                            if ff.select:
-                                self.handle_deselect_vertex(face, idx)
-                                return False
-            return True
-        return False
+        elif self.umeshes.elem_mode == 'EDGE':
+            self.umeshes.filter_by_selected_mesh_edges()
+
+            for umesh in self.umeshes:
+                if umesh.is_full_edge_selected:
+                    continue
+
+                to_deselect = set()
+                for e in umesh.bm.edges:
+                    if not e.select:
+                        continue
+                    if e.is_wire:
+                        if any(ee.is_wire and not ee.select and not ee.hide
+                               for v in e.verts for ee in v.link_edges):
+                            to_deselect.add(e)
+                    else:
+                        selection_states_from_linked_faces = [f.select for v in e.verts for f in v.link_faces]
+                        if all(selection_states_from_linked_faces):
+                            continue
+                        elif any(selection_states_from_linked_faces):
+                            for crn in e.link_loops:
+                                if crn.face.hide:
+                                    continue
+                                if crn.face.select:
+                                    if all(crn_.face.select for crn_ in linked_crn_to_vert(crn)) or \
+                                            all(crn_.face.select for crn_ in linked_crn_to_vert(crn.link_loop_next)):
+                                        break
+                            else:  # not break
+                                to_deselect.add(e)
+                        else:  # shrink all visible unselected
+                            to_deselect.add(e)
+                for e in to_deselect:
+                    e.select = False
+
+                if to_deselect:
+                    has_updates = True
+                    umesh.bm.select_flush(False)
+
+                    for e in to_deselect:
+                        if e.is_wire:
+                            continue
+                        for v in e.verts:
+                            for ee in v.link_edges:
+                                if not ee.select or ee.is_wire:
+                                    continue
+                                if all(not f.select for f in ee.link_faces):
+                                    ee.select = False
+
+                    umesh.update()
+        else:
+            self.umeshes.filter_by_selected_mesh_faces()
+
+            for umesh in self.umeshes:
+                if umesh.is_full_face_selected:
+                    continue
+
+                to_deselect = set()
+                for f in utils.calc_selected_uv_faces(umesh):
+                    for crn in f.loops:
+                        if all(ff.select for ff in crn.vert.link_faces):  # x2.5 performance
+                            continue
+                        if any(not crn_.face.select for crn_ in linked_crn_to_vert(crn)):
+                            to_deselect.add(f)
+                            break
+
+                for f in to_deselect:
+                    f.select = False
+
+                if to_deselect:
+                    has_updates = True
+                    umesh.update()
+
+        if not has_updates:
+            self.report({'INFO'}, 'Not found faces for shrink deselect')
+        return {'FINISHED'}
 
 
 class UNIV_OT_Select_Edge_Grow_Base(Operator):
@@ -2109,7 +2238,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                 return prev_crn
         elif len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 \
                 and shared \
-                and len(cur_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx(crn)) == 3 \
+                and len(cur_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx_3d(crn)) == 3 \
                 and utils.shared_linked_crn_to_edge_by_idx(cur_quad_linked_crn_uv[1]):  # noqa # pylint:disable=used-before-assignment
             return cur_quad_linked_crn_uv[1]
         # TODO: Implement border and border with quad
@@ -2168,7 +2297,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
         elif len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 \
                 and shared \
-                and len(next_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx(next_crn)) == 3 \
+                and len(next_quad_linked_crn_uv := utils.linked_crn_to_vert_by_idx_3d(next_crn)) == 3 \
                 and utils.shared_linked_crn_to_edge_by_idx(next_quad_linked_crn_uv[1].link_loop_prev):  # noqa # pylint:disable=used-before-assignment
             return next_quad_linked_crn_uv[1].link_loop_prev
         else:
@@ -2371,14 +2500,23 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         # from .. import types  # noqa
         umesh = self.umeshes[0]
         uv = umesh.uv
-        islands = Islands.calc_visible(umesh)
-        islands[0].set_tag()
-        sel_crn = [crn for isl in islands for f in isl for crn in f.loops if crn[uv].select]
-        a = sel_crn[0]
-        b = sel_crn[1]
-        path = utils.ShortPath.calc_path_uv_vert(islands[0], a, b, [])
+        edge = next(e for e in umesh.bm.edges if e.select)
+        path = [crn for crn in edge.link_loops]
 
         self.calc_from_corners(path, umesh.uv)
+
+    # def test_invoke(self, _event):
+    #     # from .. import types  # noqa
+    #     umesh = self.umeshes[0]
+    #     uv = umesh.uv
+    #     islands = Islands.calc_visible(umesh)
+    #     islands[0].set_tag()
+    #     sel_crn = [crn for isl in islands for f in isl for crn in f.loops if crn[uv].select]
+    #     a = sel_crn[0]
+    #     b = sel_crn[1]
+    #     path = utils.ShortPath.calc_path_uv_vert(islands[0], a, b, [])
+    #
+    #     self.calc_from_corners(path, umesh.uv)
 
     # def test_invoke(self, _event):
     #     self.max_angle = math.radians(20)  # noqa
