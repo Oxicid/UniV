@@ -265,33 +265,50 @@ class FaceIsland:
         """
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
-        rot_matrix = Matrix.Rotation(angle, 2)
+        uv = self.umesh.uv
+
         if aspect != 1.0:
+            rot_matrix = Matrix.Rotation(angle, 2)
             rot_matrix[0][1] = aspect * rot_matrix[0][1]
             rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
-        uv = self.umesh.uv
-        diff = pivot-(pivot @ rot_matrix)
-        for face in self.faces:
-            for crn in face.loops:
-                crn_uv = crn[uv]
-                crn_uv.uv = crn_uv.uv @ rot_matrix + diff  # TODO: Find aspect ratio for Vector.rotate method
+            diff = pivot-(pivot @ rot_matrix)
+            for face in self.faces:
+                for crn in face.loops:
+                    crn_uv = crn[uv]
+                    crn_uv.uv = crn_uv.uv @ rot_matrix + diff
+        else:
+            rot_matrix = Matrix.Rotation(-angle, 2)
+            diff = pivot - (rot_matrix @ pivot)
+            vec_rotate = Vector.rotate
+            for face in self.faces:
+                for crn in face.loops:
+                    crn_co = crn[uv].uv
+                    vec_rotate(crn_co, rot_matrix)
+                    crn_co += diff
         return True
 
     def rotate_simple(self, angle: float, aspect: float = 1.0) -> bool:
         """Rotate a list of faces by angle (in radians) around a world center"""
         if math.isclose(angle, 0, abs_tol=0.0001):
             return False
-        rot_matrix = Matrix.Rotation(-angle, 2)
+
+        uv = self.umesh.uv
         if aspect != 1.0:
+            rot_matrix = Matrix.Rotation(-angle, 2)
             rot_matrix[0][1] = aspect * rot_matrix[0][1]
             rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
-        uv = self.umesh.uv
-        for face in self.faces:
-            for crn in face.loops:
-                crn_uv = crn[uv]
-                crn_uv.uv = crn_uv.uv @ rot_matrix
+            for face in self.faces:
+                for crn in face.loops:
+                    crn_uv = crn[uv]
+                    crn_uv.uv = crn_uv.uv @ rot_matrix
+        else:
+            vec_rotate = Vector.rotate
+            rot_matrix = Matrix.Rotation(angle, 2)
+            for face in self.faces:
+                for crn in face.loops:
+                    vec_rotate(crn[uv].uv, rot_matrix)
         return True
 
     def scale(self, scale: Vector, pivot: Vector) -> bool:
