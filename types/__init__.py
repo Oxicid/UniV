@@ -9,6 +9,7 @@ if 'bpy' in locals():
     from . import mesh_island
     from . import ray
     from . import umesh
+    from . import llvm
 
     from .. import reload
     reload.reload(globals())
@@ -29,3 +30,4 @@ from .loop_group import *
 from .mesh_island import *
 from .ray import *
 from .umesh import *
+from . import llvm
