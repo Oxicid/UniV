@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import inspect
+import unittest
 import functools
 import ctypes as ct
 from contextlib import contextmanager
@@ -15,6 +16,7 @@ except ImportError:
     binding = None
     Constant = None
 
+version = (0, 0, 2)
 
 class ll:
     module: 'ir.Module' = None
@@ -58,28 +60,21 @@ class ll:
         i32.type = ir.IntType(32)
         i64.type = ir.IntType(64)
 
-        bool_c.type = ir.IntType(1)
-        i8c.type = ir.IntType(8)
-        i16c.type = ir.IntType(16)
-        i32c.type = ir.IntType(32)
-        i64c.type = ir.IntType(64)
-
-        i8phi.type = ir.IntType(8)
-        i16phi.type = ir.IntType(16)
-        i32phi.type = ir.IntType(32)
-        i64phi.type = ir.IntType(64)
-
-        bool_arg.type = ir.IntType(1)
-        i8arg.type = ir.IntType(8)
-        i16arg.type = ir.IntType(16)
-        i32arg.type = ir.IntType(32)
-        i64arg.type = ir.IntType(64)
-
         sum_n()
 
-class int_super_base:
+class UniV:
+    type = None
+
+    @staticmethod
+    def expect_type_check(expect, other):
+        if expect != other:
+            raise TypeError(f"Expect type {expect}, given {other}")
+
+class int_super_base(UniV):
     type: 'ir.IntType' = None
-    var: 'ir.Type | ir.instructions.ICMPInstr' = None
+    signed = True
+    var: 'ir.Type | ir.instructions.ICMPInstr | ir.Constant' = None
+    _const_to_mutable_int = True
     def get_reference(self):
         return self.var.get_reference()  # noqa
 
@@ -88,7 +83,7 @@ class int_super_base:
         return bool_(fn.builder.icmp_signed('!=', self.value, zero))
 
     def and_(self, other, name=''):
-        bool_state = fn.builder.and_(self.to_bool().value, other.to_bool().value, name)
+        bool_state = fn.builder.and_(self.value, other.value, name)
         return bool_(bool_state)
 
     def or_(self, other, name=''):
@@ -96,25 +91,22 @@ class int_super_base:
         return bool_(bool_state)
 
     def __lt__(self, other):
-        value = fn.builder.icmp_signed('<', self.var, other.var)
-        return bool_(value)  # TODO: Fix from other
+        return bool_(fn.builder.icmp_signed('<', self.var, other.var))
 
     def __le__(self, other):
-        return bool_(fn.builder.icmp_signed('<=', self.value, other.value))
+        return bool_(fn.builder.icmp_signed('<=', self.var, other.var))
 
     def __gt__(self, other):
-        # return bool_(fn.builder.icmp_signed('>', self.value, other.value))
-        return bool_(fn.builder.icmp_signed('>', self.var, other.var))  # TODO: Fix from other
+        return bool_(fn.builder.icmp_signed('>', self.var, other.var))
 
     def __ge__(self, other):
-        return bool_(fn.builder.icmp_signed('>=', self.value, other.value))
+        return bool_(fn.builder.icmp_signed('>=', self.var, other.var))
 
     def __eq__(self, other):
-        # return bool_(fn.builder.icmp_signed('==', self.value, other.value))
         return bool_(fn.builder.icmp_signed('==', self.var, other.var))
 
     def __ne__(self, other):
-        return bool_(fn.builder.icmp_signed('!=', self.value, other.value))
+        return bool_(fn.builder.icmp_signed('!=', self.var, other.var))
 
     @property
     def value(self):
@@ -123,41 +115,90 @@ class int_super_base:
 # base mutable ints
 class int_base(int_super_base):
     def __init__(self, value, name=''):
-        if isinstance(value, ir.IntType):
+        if type(value) in (ir.IntType, ir.Argument, ir.instructions.ICMPInstr, ir.PhiInstr):
+            if type(value) == ir.instructions.ICMPInstr and value.type.width != 1:
+                raise NotImplementedError("Need implemented to_int")
             self.var = value
-        elif isinstance(value, int_base):
-            # TODO: More checks for avoid overflow
-            var_ptr = fn.builder.alloca(self.type, name)
-            fn.builder.store(value.value, var_ptr)  # int pointer
-            self.var = var_ptr
-        elif isinstance(value, int):
+            if name:  # empty str need when manual set name before
+                self.var.name = name
+        elif isinstance(value, int_base):  # univ ints
+            assert self.signed == value.signed
+            assert type(self) == type(value)
+            self.var = fn.builder.alloca(self.type, name=name)
+            fn.builder.store(value.value, self.var)
+        elif type(value) == ir.Constant:  # ir.Constant
+            assert self.type == value.type
+            if self._const_to_mutable_int:
+                self.var = fn.builder.alloca(self.type, name=name)
+                fn.builder.store(value, self.var)
+            else:
+                self.var = value
+        elif isinstance(value, int):  # py int
             self.var = fn.builder.alloca(self.type, name=name)
             fn.builder.store(ir.Constant(self.type, value), self.var)
-        elif isinstance(value, ir.instructions.ICMPInstr):
-            if value.type.width != 1:
-                raise NotImplementedError("Not implemented to_int")
-            self.var = value
-        elif isinstance(value, ir.instructions.Instruction):
+        elif type(value) == ir.instructions.Instruction:  # Add, Sub, and other
+            assert value.type == self.type
             self.var = fn.builder.alloca(self.type, name=name)
             fn.builder.store(ir.Constant(self.type, value), self.var)
         else:
             raise TypeError(f"Incorrect type: {type(value)}")
 
+    @classmethod
+    def const(cls, value: int):
+        assert isinstance(value, int)
+        assert int_super_base._const_to_mutable_int
+        int_super_base._const_to_mutable_int = False
+        try:
+            ret = cls(ir.Constant(cls.type, value))
+        finally:
+            int_super_base._const_to_mutable_int = True
+        return ret
+
+    @classmethod
+    def phi(cls, name):
+        return cls(fn.builder.phi(cls.type, name=name))
+
+    def add_incoming(self, value: 'int_base', block):
+        if value.type != self.type:
+            raise TypeError(f"Type mismatch: {value.type} vs {self.type}")
+        assert isinstance(self.var, ir.PhiInstr)
+        self.var.add_incoming(value, block)
+
     @property
     def value(self):
+        if isinstance(self.var, (ir.Constant, ir.PhiInstr)):
+            return self.var
         return fn.builder.load(self.var)
 
     @value.setter
     def value(self, other):
-        if isinstance(other, int_super_base):
+        if isinstance(self.var, (ir.Argument, ir.Constant)):
+            if isinstance(self.var, ir.Argument):
+                raise NotImplementedError("Function integer arguments cannot be modified directly.")
+            raise TypeError(f'{type(self.var)} is immutable type')
+        elif isinstance(self.var, ir.instructions.ICMPInstr):
+            raise TypeError(f'Pointer dereferencing cannot be applied to a variable resulting from a boolean expression')
+
+        if isinstance(other, int):
+            raise
+            # return
+
+        if isinstance(other, int_super_base):  # univ types with value property
+            if self.signed != other.signed:
+                # TODO: Improve behavior for boolean types
+                # TODO: Auto convert (i32 + u16) -> i32=(i32 + i32(u16))
+                # TODO: Error when assign (i16 <- u16)
+                # TODO: Error when convert (unsigned + signed (non boolean))
+                raise
             fn.builder.store(other.value, self.var)
-        elif hasattr(other, "type") and isinstance(other.type, ir.IntType):
+        elif isinstance(other, ir.IntType):
+            assert self.type.width == other.width
             # TODO: More checks
             fn.builder.store(other, self.var)
         elif isinstance(other, ir.instructions.Instruction):
             fn.builder.store(other, self.var)
         else:
-            raise TypeError(f"Incorrect type: {type(other)}, expect signed integer")
+            raise TypeError(f"Incorrect type: {type(other)}, expect integers")
 
     def __add__(self, other):
         if not isinstance(other, int_super_base):
@@ -165,6 +206,10 @@ class int_base(int_super_base):
         if self.type != other.type:
             raise TypeError(f"Incorrect type: {other.type}, expect {self.type}")
         # TODO: Add python int
+        b1 = type(self) == bool_
+        b2 = type(other) == bool_
+        if b1 or b2:
+            raise NotImplementedError('Not implement __add__ for boolean type')
         new = fn.builder.add(self.value, other.value)
         return type(self)(new)
 
@@ -173,6 +218,13 @@ class int_base(int_super_base):
             raise TypeError(f"Incorrect type: {type(other)}, expect signed integer")
         if self.type != other.type:
             raise TypeError(f"Incorrect type: {other.type}, expect {self.type}")
+
+        b1 = type(self) == bool_
+        b2 = type(other) == bool_
+        if b1 or b2:
+            if b1:
+                raise ValueError("Cannot apply in-place operation to boolean values")
+            raise NotImplementedError('Not implement __add__ for boolean type')
         self.value = fn.builder.add(self.value, other.value)
         return self
 
@@ -182,66 +234,35 @@ class i16(int_base): type = None
 class i32(int_base): type = None
 class i64(int_base): type = None
 
-# const rvalue integers
-class const_base(int_super_base):
-    type: 'ir.IntType' = None
-    def __init__(self, value):  # noqa
-        self.var = self.type(value)  # noqa
+
+# class Pointer: type = None
+
+class Array:
+    def __init__(self, ptr: 'ir.Value', univ_type):
+        if not isinstance(univ_type, UniV):
+            # TODO: Implement btypes
+            raise TypeError(f"Unsupported parameter type: {univ_type}")
+        self.ptr = ptr
+        self.type = ir.PointerType(univ_type.type)
+        self.univ_type = univ_type
 
     @property
-    def value(self):
-        return self.var
+    def base_type(self):
+        return self.univ_type.type
 
-class bool_c(const_base): type = None
-class i8c(const_base): type = None
-class i16c(const_base): type = None
-class i32c(const_base): type = None
-class i64c(const_base): type = None
+    def sizeof(self) -> int:
+        return sizeof(self.base_type)
 
-# phi integers
-class int_phi_base(int_super_base):
-    type: 'ir.IntType' = None
+    def __getitem__(self, index: int):
+        gep = fn.builder.gep(self.ptr, [ir.Constant(ir.IntType(32), index)])
+        return fn.builder.load(gep)
 
-    def __init__(self, name):
-        self.var = fn.builder.phi(self.type, name=name)
+    def __setitem__(self, index: int, value):
+        gep = fn.builder.gep(self.ptr, [ir.Constant(ir.IntType(32), index)])
+        return fn.builder.store(value, gep)
 
-    @property
-    def value(self):
-        return self.var
-
-    @value.setter
-    def value(self, other):
-        fn.builder.store(other.value, self.var)
-
-    def add_incoming(self, value: int_base, block):
-        if value.type != self.type:
-            raise TypeError(f"Type mismatch: {value.type} vs {self.type}")
-        self.var.add_incoming(value, block)  # noqa
-
-class i8phi(int_phi_base): type = None
-class i16phi(int_phi_base): type = None
-class i32phi(int_phi_base): type = None
-class i64phi(int_phi_base): type = None
-
-class int_arg_base(int_super_base):
-    def __init__(self, arg: 'ir.values.Argument', name=''):
-        assert type(arg) == ir.values.Argument
-        self.var: 'ir.values.Argument' = arg
-        self.var.name = name
-
-    @property
-    def value(self):
-        return fn.builder.load(self.var)
-
-    @value.setter
-    def value(self, other):
-        raise NotImplementedError("Function arguments cannot be modified directly.")
-
-class bool_arg(int_arg_base): type = None
-class i8arg(int_arg_base): type = None
-class i16arg(int_arg_base): type = None
-class i32arg(int_arg_base): type = None
-class i64arg(int_arg_base): type = None
+    def __repr__(self):
+        return f"<Array of {self.base_type}, LLVM ptr={self.ptr}>"
 
 def init_triplet_of_types():
     univ_llvm_ctypes: tuple[tuple[type, type, type] | tuple[type, type], ...] = (
@@ -256,8 +277,18 @@ Loop = namedtuple("Loop", ["index", "do_break"])
 
 def const(i): return ir.Constant(ir.IntType(32), i)
 
-def increment_index(builder, index):
-    return builder.add(index.var, const(1), name="incr")
+def sizeof(typ: ir.Type) -> int:
+    if isinstance(typ, ir.IntType):
+        return typ.width // 8
+    elif isinstance(typ, ir.FloatType):
+        return 4 if typ == ir.FloatType() else 8
+    elif isinstance(typ, ir.PointerType):
+        return 8
+    else:
+        raise NotImplementedError(f"sizeof not implemented for {typ}")
+
+def increment_index(builder, index):  # TODO: Delete this func
+    return builder.add(index.var, const(1), name="incr")  # TODO: Replace const
 
 def terminate(builder, target_block):
     builder.branch(target_block)
@@ -271,9 +302,9 @@ def for_range(count: i32):
     stop = count
     builder = fn.builder
 
-    bb_cond = fn.builder.append_basic_block("for.cond")
-    bb_body = fn.builder.append_basic_block("for.body")
-    bb_end = fn.builder.append_basic_block("for.end")
+    bb_cond = fn.builder.append_basic_block("for_range.cond")
+    bb_body = fn.builder.append_basic_block("for_range.body")
+    bb_end = fn.builder.append_basic_block("for_range.end")
 
     def do_break():
         builder.branch(bb_end)
@@ -282,8 +313,7 @@ def for_range(count: i32):
     builder.branch(bb_cond)
 
     with builder.goto_block(bb_cond):
-        assert isinstance(count, (i32, i32arg))
-        index = i32phi("loop.index")
+        index = i32.phi("loop.index")
         cbranch(index < stop, bb_body, bb_end)
 
     with builder.goto_block(bb_body):
@@ -344,11 +374,11 @@ class fn:
         if len(params) != len(llvm_func.args):
             raise ValueError(f"Argument count mismatch: {len(params)} (Python) vs {len(llvm_func.args)} (LLVM)")
 
-        univ_args = []
+        univ_args: list[UniV] = []
         for param, arg in zip(params, llvm_func.args):
             if param.annotation != i32:
                 raise NotImplementedError(f"Unsupported parameter type: {param.annotation}")
-            univ_args.append(i32arg(arg, param.name))
+            univ_args.append(i32(arg, param.name))
         return univ_args
 
     @staticmethod
@@ -380,9 +410,14 @@ def sum_n(n: i32) -> i32:
 
     return acc  # return type warning disable
 
-class TestLLVM:
-    # TODO: Implement unittest
-    @staticmethod
-    def test_sum_n():
+class TestLLVM(unittest.TestCase):
+    def test_sum_n(self):
         sum_n_ = ll.compile_and_run()
-        assert sum_n_(10) == 45
+        self.assertEqual(sum_n_(10), 45)
+
+    @staticmethod
+    def start():
+        suite = unittest.TestLoader().loadTestsFromTestCase(TestLLVM)
+        runner = unittest.TextTestRunner(verbosity=2)
+        result = runner.run(suite)
+        result.wasSuccessful()
