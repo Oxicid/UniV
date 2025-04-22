@@ -62,8 +62,8 @@ class UNIV_PT_General(Panel):
         split = layer.split(align=True)
         row = split.row(align=True)
         set_idname = prefix + '.univ_texel_density_set'
-        row.operator(set_idname).custom_texel = -1.0
         row.operator(prefix + '.univ_texel_density_get')
+        row.operator(set_idname).custom_texel = -1.0
         row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
