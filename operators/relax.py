@@ -54,6 +54,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
         self.umeshes = types.UMeshes()
         self.umeshes.fix_context()
+        # Legacy
         if not self.slim_support or self.legacy:
             if self.umeshes.sync:
                 if bpy.context.tool_settings.mesh_select_mode[2]:
@@ -65,7 +66,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             for umesh in self.umeshes:
                 umesh.bm.select_flush_mode()
-        else:
+        else:  # SLIM
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
             if not self.umeshes:

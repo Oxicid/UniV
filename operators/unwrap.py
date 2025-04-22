@@ -15,7 +15,7 @@ from ..utils import linked_crn_uv_by_island_index_unordered, \
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
-        self.umesh = umesh
+        self.umesh: types.UMesh = umesh
         self.pins = pins
         self.islands = island
         self.temp_selected = selected
@@ -157,6 +157,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return {'FINISHED'}
 
     # TODO: Implement has unlinked_and_linked_selected_edges
+    # TODO: Improve behavior self island unwrap
     @staticmethod
     def has_unlinked_and_linked_selected_faces(f_, uv, idx):
         unlinked_has_selected_face = False
@@ -270,6 +271,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
                 for e in ud.umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
+
+            if self.unwrap == 'MINIMUM_STRETCH':
+                if utils.get_select_mode_mesh_reversed() != 'FACE':
+                    # It might be worth bug reporting this moment when SLIM causes a "grow effect"
+                    ud.umesh.bm.select_flush(False)
 
     def unwrap_sync_faces(self, **unwrap_kwargs):
         assert bpy.context.tool_settings.mesh_select_mode[2]
