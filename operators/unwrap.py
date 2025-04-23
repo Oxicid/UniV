@@ -78,7 +78,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = types.UMeshes()
         self.umeshes.fix_context()
-        if context.area.ui_type != 'UV':
+        if context.area.ui_type != 'UV':  # TODO: Implement 3D version
             self.umeshes.set_sync(True)
 
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()

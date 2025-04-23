@@ -819,6 +819,20 @@ class UMeshes:
                             return True
         return False
 
+    def filter_by_selected_uv_verts(self) -> 'typing.NoReturn':
+        selected = []
+        for umesh in self:
+            if umesh.has_selected_uv_verts():
+                selected.append(umesh)
+        self.umeshes = selected
+
+    def filter_by_selected_uv_edges(self) -> 'typing.NoReturn':
+        selected = []
+        for umesh in self:
+            if umesh.has_selected_uv_edges():
+                selected.append(umesh)
+        self.umeshes = selected
+
     def filter_by_selected_uv_faces(self) -> 'typing.NoReturn':
         selected = []
         for umesh in self:
@@ -826,12 +840,14 @@ class UMeshes:
                 selected.append(umesh)
         self.umeshes = selected
 
-    def filter_by_selected_uv_verts(self) -> 'typing.NoReturn':
-        selected = []
-        for umesh in self:
-            if umesh.has_selected_uv_verts():
-                selected.append(umesh)
-        self.umeshes = selected
+    def filter_by_selected_uv_elem_by_mode(self) -> 'typing.NoReturn':
+        if self.elem_mode == 'VERTEX':
+            self.filter_by_selected_uv_verts()
+        elif self.elem_mode == 'EDGE':
+            self.filter_by_selected_uv_edges()
+        else:
+            self.filter_by_selected_uv_faces()
+
 
     def filtered_by_selected_and_visible_uv_verts(self) -> tuple['UMeshes', 'UMeshes']:
         selected = []
