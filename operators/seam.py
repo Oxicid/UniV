@@ -26,11 +26,13 @@ class UNIV_OT_Cut_VIEW2D(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     addition: BoolProperty(name='Addition', default=True)
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
     unwrap: EnumProperty(name='Unwrap', default='ANGLE_BASED',
                          items=(
                                 ('NONE', 'None', ''),
-                                ('ANGLE_BASED', 'Angle Based', ''),
-                                ('CONFORMAL', 'Conformal', '')
+                                ('ANGLE_BASED', 'Hard Surface', ''),
+                                ('CONFORMAL', 'Conformal', ''),
+                                ('MINIMUM_STRETCH', 'Organic', '')
                             ))
 
     @classmethod
@@ -39,6 +41,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
     def draw(self, context):
         self.layout.prop(self, 'addition')
+        self.layout.prop(self, 'use_correct_aspect')
         self.layout.column(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
@@ -63,6 +66,9 @@ class UNIV_OT_Cut_VIEW2D(Operator):
     def execute(self, context) -> set[str]:
         self.umeshes = types.UMeshes(report=self.report)
         self.umeshes.fix_context()
+        if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
+            self.unwrap = 'ANGLE_BASED'
+            self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
@@ -77,7 +83,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         else:
             self.cut_view_2d_no_sync()
         if self.unwrap != 'NONE':
-            self.unwrap_after_unwrap()
+            self.unwrap_after_cut()
         self.umeshes.update()
 
         self.umeshes.umeshes.extend(visible_umeshes)
@@ -143,21 +149,24 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                     elif not self.addition:
                         crn.edge.seam = False
 
-    def unwrap_after_unwrap(self):
+    def unwrap_after_cut(self):
         assert self.unwrap != 'NONE'
 
         save_transform_islands = []
         for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands = Islands.calc_selected_with_mark_seam(umesh)
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
+                    isl.apply_aspect_ratio()
                     save_transform_islands.append(isl.save_transform())
 
         if save_transform_islands:
-            bpy.ops.uv.unwrap(method=self.unwrap)
+            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False)
             for isl in save_transform_islands:
                 isl.shift()
                 isl.inplace()
+                isl.island.reset_aspect_ratio()
 
     def pick_cut(self):
         hit = types.CrnEdgeHit(self.mouse_pos, self.max_distance)

@@ -20,23 +20,21 @@ class UnwrapData:
         self.islands = island
         self.temp_selected = selected
 
-
-items = [('ANGLE_BASED', 'Hard Surface', ''), ('CONFORMAL', 'Conformal', '')]
-_bl_description = 'Inplace unwrap the mesh of object being edited'
-if bpy.app.version >= (4, 3, 0):
-    items.append(('MINIMUM_STRETCH', 'Organic', ''))
-    _bl_description += "\n\nOrganic Mode has incorrect behavior with pinned and flipped islands"
-
 MULTIPLAYER = 1
 UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
 class UNIV_OT_Unwrap(bpy.types.Operator):
     bl_idname = "uv.univ_unwrap"
     bl_label = "Unwrap"
-    bl_description = _bl_description
+    bl_description = ("Inplace unwrap the mesh of object being edited\n\n "
+                      "Organic Mode has incorrect behavior with pinned and flipped islands")
     bl_options = {'REGISTER', 'UNDO'}
 
-    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED', items=items)
+    unwrap: bpy.props.EnumProperty(name='Unwrap',
+                                   default='ANGLE_BASED',
+                                   items=(('ANGLE_BASED', 'Hard Surface', ''),
+                                          ('CONFORMAL', 'Conformal', ''),
+                                          ('MINIMUM_STRETCH', 'Organic', '')))
     unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
                 description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
@@ -52,7 +50,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
 
-        # col = self.layout.column(align=True)
         col = self.layout.column(align=False)
         split = col.split(factor=0.3, align=True)
         split.label(text='Unwrap Along')
@@ -80,6 +77,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = types.UMeshes()
         self.umeshes.fix_context()
+        if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
+            self.unwrap = 'ANGLE_BASED'
+            self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
+
         if context.area.ui_type != 'UV':  # TODO: Implement 3D version
             self.umeshes.set_sync(True)
         if self.umeshes.sync:
