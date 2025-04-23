@@ -257,6 +257,15 @@ class FaceIsland:
     def save_transform(self):
         return SaveTransform(self)
 
+    def apply_aspect_ratio(self):
+        scale = Vector((self.umesh.aspect, 1))
+        return self.scale_simple(scale)
+
+    def reset_aspect_ratio(self):
+        scale = Vector((1/self.umesh.aspect, 1))
+        return self.scale_simple(scale)
+
+
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         """Rotate a list of faces by angle (in radians) around a pivot
         :param angle: Angle in radians

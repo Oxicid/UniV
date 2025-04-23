@@ -41,6 +41,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
     mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Inner Island', default=True, description='Marks seams where there are split edges')
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -48,6 +49,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def draw(self, context):
 
+        self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
 
         # col = self.layout.column(align=True)
@@ -80,6 +82,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.umeshes.fix_context()
         if context.area.ui_type != 'UV':  # TODO: Implement 3D version
             self.umeshes.set_sync(True)
+        if self.umeshes.sync:
+            self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()  # TODO: Implement reversed by default
 
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
@@ -90,7 +94,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             return self.pick_unwrap()
         else:
             if self.umeshes.sync:
-                if bpy.context.tool_settings.mesh_select_mode[2]:
+                if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces()
                 else:
                     self.unwrap_sync_verts_edges()
@@ -131,6 +135,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unique_number_for_multiply = hash(isl[0])  # multiplayer
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
+        isl.umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
+        isl.apply_aspect_ratio()
         save_t = isl.save_transform()
         save_t.save_coords(self.unwrap_along, self.blend_factor)
 
@@ -141,13 +147,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             islands.indexing()
             isl.mark_seam_by_index(additional=True)
 
-        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         save_t.inplace(self.unwrap_along)
         save_t.apply_saved_coords(self.unwrap_along, self.blend_factor)
+        is_updated = isl.reset_aspect_ratio()
 
         isl.select = False
-        if shared_selected_faces or pinned_crn_uvs:
+        if shared_selected_faces or pinned_crn_uvs or is_updated:
             for f in shared_selected_faces:
                 f.select = False
             for crn_uv in pinned_crn_uvs:
@@ -178,19 +185,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unique_number_for_multiply = 0
         pin_and_inplace = []
         unwrap_data: list[UnwrapData] = []
-        for umesh in reversed(self.umeshes):
-            if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
-                if umesh.is_full_edge_deselected:
-                    self.umeshes.umeshes.remove(umesh)
-                    continue
-            elif bpy.context.tool_settings.mesh_select_mode[0]:  # VERTEX
-                if umesh.is_full_vert_deselected:
-                    self.umeshes.umeshes.remove(umesh)
-                    continue
-            else:
-                raise NotImplemented
-
+        for umesh in self.umeshes:
             uv = umesh.uv
+            umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             # TODO: Full select unselected verts (with pins) of island for avoid incorrect behavior for relax OT
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
             islands.indexing()
@@ -242,13 +239,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                         crn_uv.pin_uv = True
                         unpin_uvs.add(crn_uv)
 
-            if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+            if self.umeshes.elem_mode == 'EDGE':  # EDGE
                 for e in umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
             save_transform_islands = []
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
+                    isl.apply_aspect_ratio()
                     save_t = isl.save_transform()
                     save_t.save_coords(self.unwrap_along, self.blend_factor)
                     save_transform_islands.append(save_t)
@@ -257,7 +255,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             unwrap_data.append(UnwrapData(umesh, unpin_uvs, save_transform_islands, verts_to_select))
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
-        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         for ud in unwrap_data:
             for pin in ud.pins:
@@ -265,10 +263,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in ud.islands:
                 isl.inplace(self.unwrap_along)
                 isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+                isl.island.reset_aspect_ratio()
             for v in ud.temp_selected:
                 v.select = False
 
-            if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+            if self.umeshes.elem_mode == 'EDGE':  # EDGE
                 for e in ud.umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
@@ -278,16 +277,13 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     ud.umesh.bm.select_flush(False)
 
     def unwrap_sync_faces(self, **unwrap_kwargs):
-        assert bpy.context.tool_settings.mesh_select_mode[2]
+        assert self.umeshes.elem_mode == 'FACE'
         unique_number_for_multiply = 0
 
         unwrap_data: list = []
         for umesh in reversed(self.umeshes):
-            if umesh.is_full_face_deselected:
-                self.umeshes.umeshes.remove(umesh)
-                continue
-
             uv = umesh.uv
+            umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
             islands_extended.indexing()
 
@@ -300,6 +296,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     isl.mark_seam(additional=True)
                 else:
                     isl.mark_seam_by_index(additional=True)
+
+                isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
@@ -352,7 +350,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             unwrap_data.append((pinned, to_select_groups, save_transform_islands))
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
-        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         for pinned, faces_groups, islands in unwrap_data:
             for pin in pinned:
@@ -363,16 +361,13 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands:
                 isl.inplace(self.unwrap_along)
                 isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+                isl.island.reset_aspect_ratio()
 
     def unwrap_non_sync(self, **unwrap_kwargs):
         save_transform_islands = []
         unique_number_for_multiply = 0
         for umesh in reversed(self.umeshes):
-            uv = umesh.uv
-            if umesh.is_full_face_deselected or not any(crn[uv].select for f in umesh.bm.faces if f.select for crn in f.loops):
-                self.umeshes.umeshes.remove(umesh)
-                continue
-
+            umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
                 islands.indexing()
@@ -387,17 +382,19 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     isl.mark_seam_by_index(additional=True)
 
             for isl in islands:
+                isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
-        bpy.ops.uv.unwrap(method=self.unwrap, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         for isl in save_transform_islands:
             isl.inplace(self.unwrap_along)
             isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+            isl.island.reset_aspect_ratio()
 
     @staticmethod
     def multiply_relax(unique_number_for_multiply, unwrap_kwargs):

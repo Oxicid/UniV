@@ -36,6 +36,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     iterations: bpy.props.IntProperty(name='Iterations', default=20, min=5, max=150, soft_max=50)
     legacy: bpy.props.BoolProperty(name='Legacy Behavior', default=False)
     border_blend: bpy.props.FloatProperty(name='Border Blend', default=0.1, min=0, soft_min=0, soft_max=1)
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -49,6 +50,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.layout.prop(self, 'border_blend', slider=True)
         if self.slim_support:
             self.layout.prop(self, 'legacy')
+        self.layout.prop(self, 'use_correct_aspect')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,7 +87,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 return self.pick_unwrap(no_flip=True, iterations=self.iterations)
 
             if self.umeshes.sync:
-                if bpy.context.tool_settings.mesh_select_mode[2]:
+                if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)
                 else:
                     self.unwrap_sync_verts_edges(no_flip=True, iterations=self.iterations)
@@ -136,7 +138,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for v in verts_to_select:
                 v.select = True
 
-            if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+            if self.umeshes.elem_mode == 'EDGE':
                 for e in umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
