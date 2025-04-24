@@ -106,6 +106,25 @@ class icons:
                 _ = icon.icon_pixels[0]  # Need to force load icons, bugreport?
                 setattr(cls, attr, icon.icon_id)
 
+        import bpy
+        from pathlib import Path
+        from .. import ui
+
+        panels = [ui.UNIV_WT_edit_VIEW3D, ui.UNIV_WT_object_VIEW3D]
+
+        icon_path = Path(panels[0].bl_icon)
+        expected_icon = 'univ_mono' if prefs().color_mode == 'MONO' else 'univ'
+
+        if icon_path.parts[-1] != expected_icon:
+            new_path = icon_path.parent / expected_icon
+            for p in panels:
+                try:
+                    bpy.utils.unregister_tool(p)
+                    p.bl_icon = str(new_path)
+                    bpy.utils.register_tool(p)
+                except Exception as e:
+                    print(f'UniV: Updating icons for workspaces has failed:\n{e}')
+
     @classmethod
     def reset_icon_value_(cls):
         for attr in dir(cls):

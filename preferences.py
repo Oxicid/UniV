@@ -232,6 +232,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         default='COLOR',
         update=lambda self, _:__import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
 
+    keymap_workspace_filter: EnumProperty(name='Workspace Filter',
+        items=(
+            ('ALL', 'All', ''),
+            ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
+            ('WORKSPACE', 'UniV Workspace', 'Show keymaps from univ workspaces')
+        ),
+        default='ALL')
+
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
     panel_3d_view_category: StringProperty(name="Panel 3D View Category", description="Enter a name for the panel category",
@@ -269,36 +277,48 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
-            row.operator('wm.univ_keymaps_config', text='Default').mode = 'DEFAULT'
+            row.operator('wm.univ_keymaps_config', text='Refresh').mode = 'DEFAULT'
             row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
             row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
             row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
+
+            row = layout.row(align=True)
+            row.prop(self, 'keymap_workspace_filter', expand=True)
 
             layout.label(
                 text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
                 icon='INFO')
 
-            # TODO: Add 3D View
-            for area, kc, km, filtered_keymaps in keymaps.ConflictFilter.get_conflict_filtered_keymaps():
-                layout.label(text=area)
-                for config_filtered in filtered_keymaps.values():
-                    box = layout.box()
-                    for univ_kmi in config_filtered.univ_keys:
-                        rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-                        any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
+            if self.keymap_workspace_filter in ('ALL', 'DEFAULT'):
+                for area, kc, km, filtered_keymaps in keymaps.ConflictFilter.get_conflict_filtered_keymaps(keymaps.keys_areas):
+                    layout.label(text=area)
+                    for config_filtered in filtered_keymaps.values():
+                        box = layout.box()
+                        for univ_kmi in config_filtered.univ_keys:
+                            rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
+                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
 
-                        if config_filtered.default_keys:
-                            box.label(text='\t\tDefault',
-                                      icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
-                            for (default_km, default_kmi) in config_filtered.default_keys:
-                                rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
+                            if config_filtered.default_keys:
+                                box.label(text='\t\tDefault',
+                                          icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
+                                for (default_km, default_kmi) in config_filtered.default_keys:
+                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
 
-                        if config_filtered.user_defined:
-                            box.label(text='\t\tUser',
-                                      icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
-                            for (user_km, user_kmi) in config_filtered.user_defined:
-                                rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
-                layout.separator()
+                            if config_filtered.user_defined:
+                                box.label(text='\t\tUser',
+                                          icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
+                                for (user_km, user_kmi) in config_filtered.user_defined:
+                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
+                    layout.separator()
+
+            if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
+                layout.label(text='Workspace Tool')
+                kc = bpy.context.window_manager.keyconfigs.user
+                for area in keymaps.keys_areas_workspace:
+                    km = kc.keymaps[area]
+                    layout.label(text=area)
+                    for kmi in km.keymap_items:
+                        rna_keymap_ui.draw_kmi([], kc, km, kmi, layout, 1)
 
         # elif self.tab == 'INFO':
         else:

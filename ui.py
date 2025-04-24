@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
 import bpy
-from bpy.types import Panel, Menu
+from bpy.types import Panel, Menu, WorkSpaceTool
 
 from .icons import icons
 from .preferences import univ_settings, prefs
@@ -515,7 +516,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         # Angle
         pie = self.layout.menu_pie()
 
-        split = pie.split()
+        pie.split()
         pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
 
         # Bottom
@@ -532,13 +533,13 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        split = pie.split()
+        pie.split()
         # Left Upper
-        split = pie.split()
+        pie.split()
         # Right Upper
         pie.operator("mesh.univ_checker", icon_value=icons.checker)
         # Left Bottom
-        split = pie.split()
+        pie.split()
 
 class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
@@ -665,3 +666,32 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
         # Right Bottom
         pie.operator("mesh.loop_multi_select", text='Ring').ring = True
+
+class UNIV_WT_object_VIEW3D(WorkSpaceTool):
+    bl_space_type = 'VIEW_3D'
+    bl_context_mode = 'OBJECT'
+    bl_idname = 'UniV'
+    bl_description = ''
+    bl_label = 'UniV'
+    bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')
+    bl_keymap = ()
+
+    # @staticmethod
+    # def draw_settings(context, layout, tool):
+    #     layout.operator_context = 'INVOKE_DEFAULT'
+    #     col = layout.column(align=True)
+    #
+    #     col_align = col.column(align=True)
+    #     col_align.label(text='Mark')
+    #     split = col_align.split(align=True)
+    #     split.operator('mesh.univ_cut', icon_value=icons.cut)
+    #     split.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
+
+class UNIV_WT_edit_VIEW3D(WorkSpaceTool):
+    bl_space_type = 'VIEW_3D'
+    bl_context_mode = 'EDIT_MESH'
+    bl_idname = 'UniV'
+    bl_description = ''
+    bl_label = 'UniV'
+    bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')
+    bl_keymap = ()

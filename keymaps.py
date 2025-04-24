@@ -6,8 +6,41 @@ from collections import defaultdict
 
 keys = []
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']
+keys_areas_workspace = ['3D View Tool: Object, UniV', '3D View Tool: Edit Mesh, UniV']
 other_conflict_areas = ['Frames']
 
+
+def add_mesh_keymaps(km, univ_pro):
+
+
+    # Grow
+    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
+    kmi.properties.grow = False
+    keys.append((km, kmi))
+
+    # Edge grow
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
+    kmi.properties.grow = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
+    kmi.properties.grow = False
+    keys.append((km, kmi))
+
+    if univ_pro:
+        # Select loop
+        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
+        keys.append((km, kmi))
 
 def add_keymaps():
     global keys
@@ -41,34 +74,7 @@ def add_keymaps():
     kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
     keys.append((km, kmi))
 
-    # Grow
-    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    # Edge grow
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    if univ_pro:
-        # Select loop
-        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
-        keys.append((km, kmi))
+    add_mesh_keymaps(km, univ_pro)
 
     ### Window
     km = kc.keymaps.new(name='Window')
@@ -267,6 +273,78 @@ def add_keymaps():
     for _, kmi in keys:
         kmi.active = False
 
+    # Workspace keymaps
+    def workspace_duplicates(km_):
+        kmi_ = km_.keymap_items.new("mesh.univ_gravity", 'O', 'PRESS')
+        keys.append((km_, kmi_))
+
+        kmi_ = km_.keymap_items.new("mesh.univ_normalize", 'A', 'PRESS', shift=True)
+        keys.append((km_, kmi_))
+
+        kmi_ = km_.keymap_items.new("mesh.univ_adjust_td", 'A', 'PRESS', alt=True)
+        keys.append((km_, kmi_))
+
+        kmi_ = km_.keymap_items.new("mesh.univ_box_project", 'B', 'PRESS')
+        keys.append((km_, kmi_))
+
+        kmi_ = km_.keymap_items.new("mesh.univ_normal", 'N', 'PRESS')
+        keys.append((km_, kmi_))
+
+        kmi_ = km_.keymap_items.new("mesh.univ_view_project", 'V', 'PRESS')
+        keys.append((km_, kmi_))
+
+        if univ_pro:
+            kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', alt=True)
+            keys.append((km_, kmi_))
+
+    # Edit Mode
+    km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
+    kmi.properties.mode = 'ADD'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
+    kmi.properties.mode = 'SUB'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS')
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("mesh.univ_seam_border", 'B', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("mesh.univ_angle", 'A', 'PRESS', ctrl=True)
+    keys.append((km, kmi))
+
+    workspace_duplicates(km)
+
+    # Object Mode
+    km = kc.keymaps.new(name='3D View Tool: Object, UniV', space_type='VIEW_3D', tool=True)
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
+    kmi.properties.mode = 'ADD'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
+    kmi.properties.mode = 'SUB'
+    keys.append((km, kmi))
+
+    workspace_duplicates(km)
+
+
+
+
+
 def remove_keymaps():
     global keys
     import traceback
@@ -292,10 +370,10 @@ class ConflictFilter:
         return f'{key_name: <30}: UniV - {len(self.univ_keys)}, Blender - {len(self.default_keys)}, User - {len(self.user_defined)}'
 
     @staticmethod
-    def get_conflict_filtered_keymaps():
+    def get_conflict_filtered_keymaps(keys_areas_):
         kc = bpy.context.window_manager.keyconfigs.user
 
-        for area in keys_areas:
+        for area in keys_areas_:
             km = kc.keymaps[area]
 
             conflict_filter = defaultdict(ConflictFilter)
@@ -343,7 +421,7 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
         counter = 0
 
         def keymap_items():
-            for _area in keys_areas:
+            for _area in keys_areas+keys_areas_workspace:
                 _km = kc.keymaps[_area]
                 for _kmi in _km.keymap_items:
                     if '.univ_' in _kmi.idname:
@@ -376,7 +454,7 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
             message = f'Reset to default {counter} addon keymaps' if counter else 'All addon keymaps is default'
         elif self.mode == 'RESOLVE_ALL':
 
-            for area, kc, km, filtered_keymaps in ConflictFilter.get_conflict_filtered_keymaps():
+            for area, kc, km, filtered_keymaps in ConflictFilter.get_conflict_filtered_keymaps(keys_areas+keys_areas_workspace):
                 for config_filtered in filtered_keymaps.values():
                     if not any(univ_kmi.active for univ_kmi in config_filtered.univ_keys):
                         continue

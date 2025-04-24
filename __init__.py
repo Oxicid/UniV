@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 6, 4),
+    "version": (3, 6, 5),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -51,6 +51,7 @@ except ImportError:
     univ_pro = None
 
 classes = []
+classes_workspace = []
 
 def load_register_types():
     global classes
@@ -204,6 +205,13 @@ def load_register_types():
         classes = []
 load_register_types()
 
+def load_workspace_types():
+    classes_workspace.extend([
+        ui.UNIV_WT_edit_VIEW3D,
+        ui.UNIV_WT_object_VIEW3D]
+    )
+load_workspace_types()
+
 is_enabled = False
 
 def register():
@@ -217,11 +225,23 @@ def register():
             if not classes:
                 raise AttributeError('UniV: Failed to load operators, try re-enabling or restarting Blender')
 
+        if not classes_workspace:
+            load_workspace_types()
+            if not classes_workspace:
+                raise AttributeError('UniV: Failed to load workspace tool, try re-enabling or restarting Blender')
+
     is_enabled = True
 
     for c in classes:
         try:
             bpy.utils.register_class(c)
+        except Exception:  # noqa
+            print(f'UniV: Failed to register a class {c.__name__}')
+            traceback.print_exc()
+
+    for c in classes_workspace:
+        try:
+            bpy.utils.register_tool(c)
         except Exception:  # noqa
             print(f'UniV: Failed to register a class {c.__name__}')
             traceback.print_exc()
@@ -263,6 +283,14 @@ def unregister():
     # for scene in bpy.data.scenes:
     #     if "univ_settings" in scene:
     #         del scene["univ_settings"]
+
+    for c in reversed(classes_workspace):
+        try:
+            bpy.utils.unregister_tool(c)
+        except RuntimeError:
+            # if not hasattr(c, 'rna_type'):
+            #     continue
+            traceback.print_exc()
 
     for c in reversed(classes):
         try:
