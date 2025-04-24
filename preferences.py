@@ -236,9 +236,23 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         items=(
             ('ALL', 'All', ''),
             ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
-            ('WORKSPACE', 'UniV Workspace', 'Show keymaps from univ workspaces')
+            ('WORKSPACE', 'Workspace', 'Show keymaps from univ workspaces')
         ),
         default='ALL')
+
+    keymap_spaces_filter: EnumProperty(name='Spaces Filter',
+        items=(
+            ('ALL', 'All', ''),
+            ('UV Editor', 'UV', ''),
+            ('Window', 'Window', ''),
+            ('Object', 'Object', ''),
+            ('Mesh', 'Mesh', ''),
+
+        ),
+        default='ALL')
+
+    keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
+    keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
 
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
@@ -253,7 +267,6 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     def draw(self, _context):
         layout = self.layout
-
         row = layout.row()
         row.prop(self, "tab", expand=True)
 
@@ -283,18 +296,42 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
 
             row = layout.row(align=True)
-            row.prop(self, 'keymap_workspace_filter', expand=True)
+            sub_row = row.row(align=True)
+            sub_row.scale_x = 0.4
+            sub_row.prop(self, 'keymap_workspace_filter', expand=True)
+
+            row.separator()
+            sub_row = row.row()
+            sub_row.prop(self, 'keymap_spaces_filter', text='')
+            row.separator()
+
+            sub_row = row.row(align=True)
+            sub_row.prop(self, "keymap_name_filter", text="", icon='VIEWZOOM', placeholder="Search by Name")
+            sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
 
             layout.label(
                 text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
                 icon='INFO')
 
+
             if self.keymap_workspace_filter in ('ALL', 'DEFAULT'):
-                for area, kc, km, filtered_keymaps in keymaps.ConflictFilter.get_conflict_filtered_keymaps(keymaps.keys_areas):
+                if self.keymap_spaces_filter == 'ALL':
+                    areas = keymaps.keys_areas
+                else:
+                    areas = []
+                    for a in keymaps.keys_areas:
+                        if self.keymap_spaces_filter in a:
+                            areas.append(a)
+                            break
+                it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude(areas)
+                for area, kc, km, filtered_keymaps in it:
+                    km = km.active()
+                    layout.context_pointer_set("keymap", km)
                     layout.label(text=area)
                     for config_filtered in filtered_keymaps.values():
                         box = layout.box()
                         for univ_kmi in config_filtered.univ_keys:
+
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
                             any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
 
@@ -313,12 +350,44 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
             if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
                 layout.label(text='Workspace Tool')
-                kc = bpy.context.window_manager.keyconfigs.user
-                for area in keymaps.keys_areas_workspace:
-                    km = kc.keymaps[area]
+                if self.keymap_spaces_filter == 'ALL':
+                    areas = keymaps.keys_areas_workspace
+                else:
+                    areas = []
+                    for a in keymaps.keys_areas_workspace:
+                        if self.keymap_spaces_filter in a:
+                            areas.append(a)
+                            break
+
+                it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude_ws(areas)
+                for area, kc, km, filtered_keymaps in it:
+                    km = km.active()
+                    layout.context_pointer_set("keymap", km)
                     layout.label(text=area)
-                    for kmi in km.keymap_items:
-                        rna_keymap_ui.draw_kmi([], kc, km, kmi, layout, 1)
+                    for config_filtered in filtered_keymaps.values():
+                        box = layout.box()
+                        for univ_kmi in config_filtered.univ_keys:
+
+                            rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
+                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
+
+                            if univ_kmi.idname == 'view3d.select_box':
+                                continue
+
+                            if config_filtered.default_keys:
+                                box.label(text='\t\tDefault',
+                                          icon='ERROR' if any_active and any(
+                                              kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
+                                for (default_km, default_kmi) in config_filtered.default_keys:
+                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
+
+                            if config_filtered.user_defined:
+                                box.label(text='\t\tUser',
+                                          icon='ERROR' if any_active and any(
+                                              kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
+                                for (user_km, user_kmi) in config_filtered.user_defined:
+                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
+                    layout.separator()
 
         # elif self.tab == 'INFO':
         else:
