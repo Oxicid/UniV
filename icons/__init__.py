@@ -116,6 +116,8 @@ class icons:
         expected_icon = 'univ_mono' if prefs().color_mode == 'MONO' else 'univ'
 
         if icon_path.parts[-1] != expected_icon:
+            from .. import keymaps
+            keymaps.remove_keymaps_ws()
             new_path = icon_path.parent / expected_icon
             for p in panels:
                 try:
@@ -124,6 +126,7 @@ class icons:
                     bpy.utils.register_tool(p)
                 except Exception as e:
                     print(f'UniV: Updating icons for workspaces has failed:\n{e}')
+            keymaps.add_keymaps_ws()
 
     @classmethod
     def reset_icon_value_(cls):

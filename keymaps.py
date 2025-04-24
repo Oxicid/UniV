@@ -5,6 +5,7 @@ import bpy
 from collections import defaultdict
 
 keys = []
+keys_ws = []
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']
 keys_areas_workspace = ['3D View Tool: Object, UniV', '3D View Tool: Edit Mesh, UniV']
 other_conflict_areas = ['Frames']
@@ -46,9 +47,6 @@ def add_keymaps():
     global keys
 
     if not (kc := bpy.context.window_manager.keyconfigs.addon):
-        from .preferences import debug
-        if debug():
-            print('UniV: Failed to add keymaps. Result = ', kc)
         return
 
     try:
@@ -273,55 +271,65 @@ def add_keymaps():
     for _, kmi in keys:
         kmi.active = False
 
+def add_keymaps_ws():
+    global keys_ws
+    if not (kc := bpy.context.window_manager.keyconfigs.addon):
+        return
+
+    try:
+        from . import univ_pro
+    except ImportError:
+        univ_pro = None
+
     # Workspace keymaps
     def workspace_duplicates(km_):
         kmi_ = km_.keymap_items.new("mesh.univ_gravity", 'O', 'PRESS')
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         kmi_ = km_.keymap_items.new("mesh.univ_normalize", 'A', 'PRESS', shift=True)
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         kmi_ = km_.keymap_items.new("mesh.univ_adjust_td", 'A', 'PRESS', alt=True)
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         kmi_ = km_.keymap_items.new("mesh.univ_box_project", 'B', 'PRESS')
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         kmi_ = km_.keymap_items.new("mesh.univ_normal", 'N', 'PRESS')
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         kmi_ = km_.keymap_items.new("mesh.univ_view_project", 'V', 'PRESS')
-        keys.append((km_, kmi_))
+        keys_ws.append((km_, kmi_))
 
         if univ_pro:
             kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', alt=True)
-            keys.append((km_, kmi_))
+            keys_ws.append((km_, kmi_))
 
     # Edit Mode
     km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
     kmi.properties.mode = 'ADD'
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
     kmi.properties.mode = 'SUB'
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS')
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_seam_border", 'B', 'PRESS', alt=True)
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_angle", 'A', 'PRESS', ctrl=True)
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     workspace_duplicates(km)
 
@@ -329,20 +337,17 @@ def add_keymaps():
     km = kc.keymaps.new(name='3D View Tool: Object, UniV', space_type='VIEW_3D', tool=True)
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
     kmi.properties.mode = 'ADD'
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
     kmi.properties.mode = 'SUB'
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     workspace_duplicates(km)
-
-
-
 
 
 def remove_keymaps():
@@ -357,6 +362,19 @@ def remove_keymaps():
             if debug():
                 traceback.print_exc()
     keys.clear()
+
+def remove_keymaps_ws():
+    global keys_ws
+    import traceback
+    from .preferences import debug
+
+    for km, kmi in keys_ws:
+        try:
+            km.keymap_items.remove(kmi)
+        except RuntimeError:
+            if debug():
+                traceback.print_exc()
+    keys_ws.clear()
 
 
 class ConflictFilter:

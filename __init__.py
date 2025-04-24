@@ -266,13 +266,16 @@ def register():
 
     try:
         keymaps.add_keymaps()
+        keymaps.add_keymaps_ws()
     except AttributeError:
         traceback.print_exc()
+
     preferences.update_panel(None, None)
 
 
 def unregister():
     keymaps.remove_keymaps()
+    keymaps.remove_keymaps_ws()
     icons.icons.unregister_icons_()
     for handle in reversed(bpy.app.handlers.depsgraph_update_post):
         if handle.__name__.startswith('univ_'):

@@ -594,7 +594,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         pie = self.layout.menu_pie()
 
         # Left
-        split = pie.split()
+        pie.split()
 
         # Right
         pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
@@ -609,16 +609,16 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        split = pie.split()
+        pie.split()
 
         # Left Upper
-        split = pie.split()
+        pie.split()
 
         # Right Upper
         pie.operator("mesh.univ_checker", icon_value=icons.checker)
 
         # Left Bottom
-        split = pie.split()
+        pie.split()
 
 class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
