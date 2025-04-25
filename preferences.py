@@ -240,7 +240,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='ALL')
 
-    keymap_spaces_filter: EnumProperty(name='Spaces Filter',
+    keymap_spaces_filter: EnumProperty(name='Space Filter',
         items=(
             ('ALL', 'All', ''),
             ('UV Editor', 'UV', ''),
@@ -297,16 +297,17 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
             row = layout.row(align=True)
             sub_row = row.row(align=True)
-            sub_row.scale_x = 0.4
+            sub_row.scale_x = 0.45
             sub_row.prop(self, 'keymap_workspace_filter', expand=True)
 
             row.separator()
             sub_row = row.row()
+            sub_row.scale_x = 0.8
             sub_row.prop(self, 'keymap_spaces_filter', text='')
             row.separator()
 
             sub_row = row.row(align=True)
-            sub_row.prop(self, "keymap_name_filter", text="", icon='VIEWZOOM', placeholder="Search by Name")
+            sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
             sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
 
             layout.label(
@@ -325,11 +326,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                             break
                 it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude(areas)
                 for area, kc, km, filtered_keymaps in it:
-                    km = km.active()
-                    layout.context_pointer_set("keymap", km)
                     layout.label(text=area)
+                    col = layout.column(align=True)
+
                     for config_filtered in filtered_keymaps.values():
-                        box = layout.box()
+                        box = col.box()
                         for univ_kmi in config_filtered.univ_keys:
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
@@ -361,11 +362,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
                 it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude_ws(areas)
                 for area, kc, km, filtered_keymaps in it:
-                    km = km.active()
-                    layout.context_pointer_set("keymap", km)
                     layout.label(text=area)
+                    col = layout.column(align=True)
+
                     for config_filtered in filtered_keymaps.values():
-                        box = layout.box()
+                        box = col.box()
                         for univ_kmi in config_filtered.univ_keys:
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)

@@ -298,7 +298,7 @@ def add_keymaps_ws():
         kmi_ = km_.keymap_items.new("mesh.univ_normal", 'N', 'PRESS')
         keys_ws.append((km_, kmi_))
 
-        kmi_ = km_.keymap_items.new("mesh.univ_view_project", 'V', 'PRESS')
+        kmi_ = km_.keymap_items.new("mesh.univ_view_project", 'V', 'PRESS', ctrl=True)
         keys_ws.append((km_, kmi_))
 
         if univ_pro:
