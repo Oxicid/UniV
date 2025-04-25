@@ -89,6 +89,28 @@ def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
         return l_b
     return l_a + projection * line_vec
 
+from mathutils import Vector
+
+def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
+    prj = rv3d.perspective_matrix @ Vector((*coord, 1.0))
+
+    for i in range(2, 12):
+        if prj.w <= 0.0:
+            view_dir = (rv3d.view_rotation @ Vector((0.0, 0.0, -1.0))).normalized()
+            coord = coord + view_dir * push_forward
+            prj = rv3d.perspective_matrix @ Vector((*coord, 1.0))
+            push_forward *= i
+        else:
+            break
+
+    width_half = region.width / 2.0
+    height_half = region.height / 2.0
+
+    return Vector((
+        width_half + width_half * (prj.x / prj.w),
+        height_half + height_half * (prj.y / prj.w),
+    ))
+
 # def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
 #     line_vecs = l_b - l_a
 #     pt_vecs = pt - l_a

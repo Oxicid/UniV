@@ -62,9 +62,7 @@ class UMesh:
         self.bm = bm
         self.uv = bm.loops.layers.uv.verify()
 
-    def ensure(self, face=True, edge=False, vert=False, force=False):
-        if self.is_edit_bm or not force:
-            return
+    def ensure(self, face=True, edge=False, vert=False):
         if face:
             self.bm.faces.ensure_lookup_table()
         if edge:
@@ -558,9 +556,9 @@ class UMeshes:
             return True
         return any(umesh.update_tag for umesh in self.umeshes)
 
-    def ensure(self, face=True, edge=False, vert=False, force=False):
+    def ensure(self, face=True, edge=False, vert=False):
         for umesh in self.umeshes:
-            umesh.ensure(face, edge, vert, force)
+            umesh.ensure(face, edge, vert)
 
     def verify_uv(self):
         for umesh in self:
