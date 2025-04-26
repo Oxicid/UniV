@@ -15,8 +15,8 @@ from bpy.props import *
 
 from .. import utils
 from .. import types
-from ..types import Islands
-from ..preferences import prefs
+from ..types import AdvIslands
+from ..preferences import prefs, univ_settings
 
 
 class UNIV_OT_Cut_VIEW2D(Operator):
@@ -94,11 +94,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         return {'FINISHED'}
 
     def cut_view_2d_sync(self):
-        for umesh in reversed(self.umeshes):
-            if umesh.is_full_edge_deselected:
-                self.umeshes.umeshes.remove(umesh)
-                continue
-
+        for umesh in self.umeshes:
             uv = umesh.uv
             shared_is_linked = utils.shared_is_linked
             if umesh.is_full_edge_selected:
@@ -154,17 +150,16 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
         save_transform_islands = []
         for umesh in self.umeshes:
+            umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands = Islands.calc_selected_with_mark_seam(umesh)
+            islands = AdvIslands.calc_selected_with_mark_seam(umesh)
             for isl in islands:
-                if any(v.select for f in isl for v in f.verts):
-                    isl.apply_aspect_ratio()
-                    save_transform_islands.append(isl.save_transform())
+                isl.apply_aspect_ratio()
+                save_transform_islands.append(isl.save_transform())
 
         if save_transform_islands:
             bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False)
             for isl in save_transform_islands:
-                isl.shift()
                 isl.inplace()
                 isl.island.reset_aspect_ratio()
 
@@ -199,6 +194,14 @@ class UNIV_OT_Cut_VIEW3D(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     addition: BoolProperty(name='Addition', default=True)
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
+    unwrap: EnumProperty(name='Unwrap', default='ANGLE_BASED',
+                         items=(
+                                ('NONE', 'None', ''),
+                                ('ANGLE_BASED', 'Hard Surface', ''),
+                                ('CONFORMAL', 'Conformal', ''),
+                                ('MINIMUM_STRETCH', 'Organic', '')
+                            ))
 
     @classmethod
     def poll(cls, context):
@@ -245,17 +248,10 @@ class UNIV_OT_Cut_VIEW3D(Operator):
             return {'FINISHED'}
 
     def cut_view_3d(self):
+        umeshes_without_uv = []
+        save_transform_islands = []
         for umesh in self.umeshes:
-            if umesh.is_full_edge_deselected:
-                umesh.update_tag = False
-                continue
-            elif umesh.is_full_edge_selected:
-                for e in umesh.bm.edges:
-                    if not e.is_manifold:
-                        e.seam = True
-                    elif not self.addition:
-                        e.seam = False
-
+            # TODO: Skip updates, if edges has seams
             for e in umesh.bm.edges:
                 if not e.select:
                     continue
@@ -268,6 +264,50 @@ class UNIV_OT_Cut_VIEW3D(Operator):
                     e.seam = True
                 elif not self.addition:
                     e.seam = False
+
+            if not umesh.total_face_sel or self.unwrap == 'NONE':
+                continue
+
+            if not len(umesh.bm.loops.layers.uv):
+                umeshes_without_uv.append(umesh)
+                continue
+
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
+            umesh.verify_uv()
+            islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
+            adv_islands = islands.to_adv_islands()
+            for isl in adv_islands:
+                isl.apply_aspect_ratio()
+                save_t = isl.save_transform()
+                save_transform_islands.append(save_t)
+
+        if umeshes_without_uv or save_transform_islands:
+            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False)
+
+            for umesh in self.umeshes:
+                umesh.value = umesh.check_uniform_scale(report=self.report)
+
+            for isl in save_transform_islands:
+                isl.inplace()
+                isl.island.reset_aspect_ratio()
+
+            texel = univ_settings().texel_density
+            texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
+
+            for umesh in umeshes_without_uv:
+                umesh.verify_uv()
+                mesh_islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
+                adv_islands = mesh_islands.to_adv_islands()
+                adv_islands.calc_area_uv()
+                adv_islands.calc_area_3d(scale=umesh.value)
+
+                for isl in adv_islands:
+                    if (status := isl.set_texel(texel, texture_size)) is None:  # noqa
+                        # zero_area_islands.append(isl)  # TODO: Highlight islands with zero area
+                        continue
+                umesh.update()
+
 
     def pick_cut(self):
         result, loc, normal, index, obj, matrix = bpy.context.scene.ray_cast(
@@ -310,6 +350,7 @@ class UNIV_OT_Cut_VIEW3D(Operator):
                 min_dist = dist
 
         return min_edge, min_dist
+
 
 class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"

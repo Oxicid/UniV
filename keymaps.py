@@ -320,6 +320,11 @@ def add_keymaps_ws():
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS')
+    kmi.properties.addition = False
+    keys_ws.append((km, kmi))
+
+    kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS', shift=True)
+    kmi.properties.addition = True
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)

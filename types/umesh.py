@@ -497,6 +497,13 @@ class UMesh:
                     else:
                         crn.edge.seam = seam
 
+    def verify_uv(self):
+        layers_uv = self.bm.loops.layers.uv
+        if not layers_uv:
+            self.uv = layers_uv.new('UVMap')
+        else:
+            self.uv = self.bm.loops.layers.uv.verify()
+
     def __hash__(self):
         return hash(self.bm)
 
@@ -562,12 +569,7 @@ class UMeshes:
 
     def verify_uv(self):
         for umesh in self:
-            if not umesh.uv:
-                uv_layers = umesh.bm.loops.layers.uv
-                if not umesh.obj.data.uv_layers:
-                    umesh.uv = uv_layers.new('UVMap')
-                else:
-                    umesh.uv = uv_layers.verify()
+            umesh.verify_uv()
 
     def loop(self):
         active = bpy.context.active_object

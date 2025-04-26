@@ -140,51 +140,64 @@ class SaveTransform:
 
         old_dir = self.old_coords[0] - self.old_coords[1]
         new_dir = crn_co - crn_next_co
+        def set_texel():
+            self.island.calc_area_uv()
+            self.island.calc_area_3d(scale=self.island.umesh.value)
+            from ..preferences import univ_settings
+            texel = univ_settings().texel_density
+            texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+            if (status := self.island.set_texel(texel, texture_size)) is None:  # noqa
+                # zero_area_islands.append(isl)  # TODO: Add report callback
+                pass
+
 
         if self.bbox.max_length < 2e-05:  # Small and zero area island protection
             new_bbox = self.island.calc_bbox()
             pivot = new_bbox.center
             if new_bbox.max_length != 0:
                 self.island.rotate(old_dir.angle_signed(new_dir, 0), pivot)
-                scale = 0.15 / new_bbox.max_length
-                self.island.scale(Vector((scale, scale)), pivot)  # TODO: Optimize when implement simple scale_with_set_position
+                if hasattr(self.island, 'calc_area_uv'):
+                    set_texel()
+                else:
+                    scale = 0.15 / new_bbox.max_length
+                    self.island.scale(Vector((scale, scale)), pivot)
+
+            # TODO: Optimize when implement simple scale_with_set_position
             self.island.set_position(self.bbox.center, pivot)
         else:  # TODO: Fix large islands
             if angle := old_dir.angle_signed(new_dir, 0):
                 self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.island.calc_bbox()
 
+            old_center = self.bbox.center
+            new_center = new_bbox.center
             if axis == 'BOTH':
                 if self.bbox.width > self.bbox.height:
-
-                    scale = self.bbox.width / new_bbox.width
-                    self.island.scale(Vector((scale, scale)), new_bbox.center)
-
-                    old_center = self.bbox.center
-                    new_center = new_bbox.center
+                    if new_bbox.width:
+                        scale = self.bbox.width / new_bbox.width
+                        self.island.scale(Vector((scale, scale)), new_bbox.center)
+                    else:
+                        set_texel()
                 else:
-                    scale = self.bbox.height / new_bbox.height
-                    self.island.scale(Vector((scale, scale)), new_bbox.center)
-
-                    old_center = self.bbox.center
-                    new_center = new_bbox.center
+                    if new_bbox.height:
+                        scale = self.bbox.height / new_bbox.height
+                        self.island.scale(Vector((scale, scale)), new_bbox.center)
+                    else:
+                        set_texel()
                 self.island.set_position(old_center, new_center)
             else:
                 if axis == 'X':
-                    scale = self.bbox.height / new_bbox.height
-
-                    self.island.scale(Vector((scale, scale)), new_bbox.center)
-
-                    old_center = self.bbox.center
-                    new_center = new_bbox.center
+                    if new_bbox.height:
+                        scale = self.bbox.height / new_bbox.height
+                        self.island.scale(Vector((scale, scale)), new_bbox.center)
+                    else:
+                        set_texel()
                 else:
-                    scale = self.bbox.width / new_bbox.width
-
-                    self.island.scale(Vector((scale, scale)), new_bbox.center)
-
-                    old_center = self.bbox.center
-                    new_center = new_bbox.center
-
+                    if new_bbox.width:
+                        scale = self.bbox.width / new_bbox.width
+                        self.island.scale(Vector((scale, scale)), new_bbox.center)
+                    else:
+                        set_texel()
                 self.island.set_position(old_center, new_center)
 
         if self.is_full_selected:

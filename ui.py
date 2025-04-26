@@ -670,7 +670,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 class UNIV_WT_object_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'
     bl_context_mode = 'OBJECT'
-    bl_idname = 'UniV'
+    bl_idname = 'tool.univ'
     bl_description = ''
     bl_label = 'UniV'
     bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')
@@ -690,7 +690,7 @@ class UNIV_WT_object_VIEW3D(WorkSpaceTool):
 class UNIV_WT_edit_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'
     bl_context_mode = 'EDIT_MESH'
-    bl_idname = 'UniV'
+    bl_idname = 'tool.univ'
     bl_description = ''
     bl_label = 'UniV'
     bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')

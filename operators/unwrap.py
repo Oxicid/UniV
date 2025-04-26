@@ -136,6 +136,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unique_number_for_multiply = hash(isl[0])  # multiplayer
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
+        isl.umesh.value = isl.umesh.check_uniform_scale(report=self.report)
         isl.umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         isl.apply_aspect_ratio()
         save_t = isl.save_transform()
@@ -188,9 +189,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unwrap_data: list[UnwrapData] = []
         for umesh in self.umeshes:
             uv = umesh.uv
+            umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             # TODO: Full select unselected verts (with pins) of island for avoid incorrect behavior for relax OT
-            islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = types.AdvIslands.calc_extended_any_elem_with_mark_seam(umesh)
             islands.indexing()
 
             for isl in islands:
@@ -284,8 +286,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unwrap_data: list = []
         for umesh in reversed(self.umeshes):
             uv = umesh.uv
+            umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands_extended = types.Islands.calc_extended_with_mark_seam(umesh)
+            islands_extended = types.AdvIslands.calc_extended_with_mark_seam(umesh)
             islands_extended.indexing()
 
             save_transform_islands = []
@@ -368,8 +371,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         save_transform_islands = []
         unique_number_for_multiply = 0
         for umesh in reversed(self.umeshes):
+            umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands = types.Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = types.AdvIslands.calc_extended_any_elem_with_mark_seam(umesh)
             if not self.mark_seam_inner_island:
                 islands.indexing()
 
