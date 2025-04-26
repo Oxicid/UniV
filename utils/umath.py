@@ -89,7 +89,25 @@ def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
         return l_b
     return l_a + projection * line_vec
 
-from mathutils import Vector
+def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
+    pt = Vector(mouse_pos)
+    mat = umesh.obj.matrix_world
+    min_edge = None
+    min_dist = float('inf')
+    for e in face.edges:
+        v_a, v_b = e.verts
+
+        co_a = loc3d_to_reg2d_safe(region, rv3d, mat @ v_a.co)
+        co_b = loc3d_to_reg2d_safe(region, rv3d, mat @ v_b.co)
+
+        close_pt = closest_pt_to_line(pt, co_a, co_b)
+        dist = (close_pt - pt).length
+        if dist < min_dist:
+            min_edge = e
+            min_dist = dist
+
+    return min_edge, min_dist
+
 
 def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
     prj = rv3d.perspective_matrix @ Vector((*coord, 1.0))

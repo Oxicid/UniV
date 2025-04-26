@@ -327,6 +327,9 @@ def add_keymaps_ws():
     kmi.properties.addition = True
     keys_ws.append((km, kmi))
 
+    kmi = km.keymap_items.new("mesh.univ_weld", 'W', 'PRESS')
+    keys_ws.append((km, kmi))
+
     kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)
     keys_ws.append((km, kmi))
 

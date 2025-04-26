@@ -8,7 +8,6 @@ if 'bpy' in locals():
 import bpy
 import math
 import bl_math
-from bpy_extras import view3d_utils
 from mathutils import Vector
 from bpy.types import Operator
 from bpy.props import *
@@ -187,7 +186,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
-class UNIV_OT_Cut_VIEW3D(Operator):
+class UNIV_OT_Cut_VIEW3D(Operator, types.Hit3D_Presets):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
@@ -209,24 +208,12 @@ class UNIV_OT_Cut_VIEW3D(Operator):
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
-            if context.area.type == 'VIEW_3D':
-                self.mouse_pos = event.mouse_region_x, event.mouse_region_y
-                self.region = bpy.context.region
-                self.rv3d = bpy.context.space_data.region_3d
-                self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos))
-                self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos))
+            self.init_data_for_ray_cast(event)
             return self.execute(context)
-
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mouse_pos = None
-        self.region = None
-        self.rv3d = None
-        self.region_data = None
-        self.ray_origin = None
-        self.ray_direction = None
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context) -> set[str]:
@@ -319,10 +306,9 @@ class UNIV_OT_Cut_VIEW3D(Operator):
         if result and obj and obj.type == 'MESH':
             for umesh in self.umeshes:
                 if umesh.obj == obj:
-                    # NOTE: When changing props ensures is reset, maybe it is related to update_edit_mesh ?
                     umesh.ensure()
                     face = umesh.bm.faces[index]
-                    closest_edge, closest_dist = self.find_closest_edge_3d_to_2d(face, umesh)
+                    closest_edge, closest_dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos, face, umesh, self.region, self.rv3d)
                     if closest_dist < prefs().max_pick_distance:
                         if closest_edge.seam:
                             return {'CANCELLED'}
@@ -331,26 +317,6 @@ class UNIV_OT_Cut_VIEW3D(Operator):
                         umesh.update()
                         return {'FINISHED'}
         return {'CANCELLED'}
-
-    def find_closest_edge_3d_to_2d(self, face, umesh):
-        pt = Vector(self.mouse_pos)
-        mat = umesh.obj.matrix_world
-        min_edge = None
-        min_dist = float('inf')
-        for e in face.edges:
-            v_a, v_b = e.verts
-
-            co_a = utils.loc3d_to_reg2d_safe(self.region, self.rv3d, mat @ v_a.co)
-            co_b = utils.loc3d_to_reg2d_safe(self.region, self.rv3d, mat @ v_b.co)
-
-            close_pt = utils.closest_pt_to_line(pt, co_a, co_b)
-            dist = (close_pt - pt).length
-            if dist < min_dist:
-                min_edge = e
-                min_dist = dist
-
-        return min_edge, min_dist
-
 
 class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"

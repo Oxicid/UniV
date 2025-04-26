@@ -121,7 +121,6 @@ class Stitch:
                                 else:
                                     self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg)
 
-
                     balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
                     balanced_target_islands.extend(stack)
 
@@ -132,7 +131,6 @@ class Stitch:
         if self.flipped_3d_count:
             self.report({'WARNING'}, f'Found {self.flipped_3d_count} loops with 3D flipped faces. '  # noqa
                                      f'For correct result need recalculate normals')
-
 
     def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
@@ -220,7 +218,6 @@ class Stitch:
             # Move
             trans.set_position(pt_a1, pt_b1)
             trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
-
 
     def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
@@ -360,7 +357,6 @@ class Stitch:
             orto *= aspect_vec
             delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
-
 
     def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
         """Enhances multi-stitching steps for a more even distribution"""
@@ -583,7 +579,6 @@ class Stitch:
         draw.DotLinesDrawSimple.draw_register(welded, welded_color)
 
 
-
 class UNIV_OT_Weld(Operator, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
@@ -664,7 +659,10 @@ class UNIV_OT_Weld(Operator, Stitch):
                 umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
             if not selected_umeshes and self.mouse_position:
-                self.pick_weld()
+                hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
+                for umesh in self.umeshes:
+                    hit.find_nearest_crn_by_visible_faces(umesh)
+                self.pick_weld(hit)
                 self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
                 bpy.context.area.tag_redraw()
                 return {'FINISHED'}
@@ -857,11 +855,7 @@ class UNIV_OT_Weld(Operator, Stitch):
                 compare_index += 1
         return corners_groups
 
-    def pick_weld(self):
-        hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
-        for umesh in self.umeshes:
-            hit.find_nearest_crn_by_visible_faces(umesh)
-
+    def pick_weld(self, hit):
         if not hit:
             self.report({'WARNING'}, 'Edge not found within a given radius')
             return
@@ -882,7 +876,6 @@ class UNIV_OT_Weld(Operator, Stitch):
                 hit.umesh.update()
                 return
             return
-
 
         # Fast calculate, if edge has non-manifold links
         if utils.is_flipped_3d(ref_crn):
@@ -952,6 +945,102 @@ class UNIV_OT_Weld(Operator, Stitch):
             hit.umesh.update()
         return
 
+
+class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.Hit3D_Presets):
+    bl_idname = "mesh.univ_weld"
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            self.init_data_for_ray_cast(event)
+            return self.execute(context)
+        self.use_by_distance = event.alt
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        Stitch.__init__(self)
+        self.update_seams = True
+
+    def execute(self, context):
+        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes.set_sync()
+        for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+
+        if self.use_by_distance:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            umeshes_without_uv = []
+            for umesh in reversed(self.umeshes):
+                if not len(umesh.bm.loops.layers.uv):
+                    if selected_umeshes:
+                        umeshes_without_uv.append(umesh)
+                    self.umeshes.umeshes.remove(umesh)
+            self.umeshes.verify_uv()
+
+            if not self.umeshes and not umeshes_without_uv:
+                return self.umeshes.update(info='Not found edges for manipulate')
+
+            if self.umeshes:
+                if self.weld_by_distance_type == 'BY_ISLANDS':
+                    self.weld_by_distance_island(extended=bool(selected_umeshes))
+                else:
+                    self.weld_by_distance_all(selected=bool(selected_umeshes))
+
+            for umesh in umeshes_without_uv:
+                update_tag = False
+                for e in umesh.bm.edges:
+                    if e.select and e.seam:
+                        e.seam = False
+                        update_tag = True
+                umesh.update_tag = update_tag
+
+            self.umeshes.umeshes.extend(umeshes_without_uv)
+        else:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            umeshes_without_uv = []
+            for umesh in reversed(self.umeshes):
+                if not len(umesh.bm.loops.layers.uv):
+                    if selected_umeshes:
+                        umeshes_without_uv.append(umesh)
+                    self.umeshes.umeshes.remove(umesh)
+            self.umeshes.verify_uv()
+
+            if not self.umeshes and not umeshes_without_uv:
+                return self.umeshes.update(info='Not found edges for manipulate')
+
+            if not selected_umeshes and self.mouse_pos:
+                result, loc, normal, index, obj, matrix = bpy.context.scene.ray_cast(
+                    bpy.context.view_layer.depsgraph,
+                    origin=self.ray_origin,
+                    direction=self.ray_direction
+                )
+                if result and obj and obj.type == 'MESH':
+                    for umesh in self.umeshes:
+                        if umesh.obj == obj:
+                            umesh.ensure()
+                            face = umesh.bm.faces[index]
+                            closest_edge, closest_dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos, face, umesh,
+                                                                                          self.region, self.rv3d)
+                            if closest_dist < prefs().max_pick_distance:
+                                for crn in closest_edge.link_loops:
+                                    if crn.face == face:
+                                        hit = types.CrnEdgeHit(self.mouse_pos, self.max_distance)
+                                        hit.crn = crn
+                                        hit.umesh = umesh
+                                        self.pick_weld(hit)
+                                        break
+                                return {'FINISHED'}
+                return {'FINISHED'}
+
+            self.weld()
+            # bpy.context.area.tag_redraw()
+
+        self.umeshes.update(info='Not found elements for weld')
+        return {'FINISHED'}
 
 class UNIV_OT_Stitch(Operator, Stitch):
     bl_idname = "uv.univ_stitch"

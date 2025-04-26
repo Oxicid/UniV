@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
-import math
 
 if 'bpy' in locals():
     from .. import reload
@@ -8,16 +7,18 @@ if 'bpy' in locals():
 
 import typing
 
-from math import inf
+import bpy
+import math
+from math import inf, isclose
 from bmesh.types import BMFace, BMLoop
 from mathutils import Vector
 from mathutils.kdtree import KDTree
 from itertools import chain
+from bpy_extras import view3d_utils
 
 from . import Islands, FaceIsland, AdvIslands, AdvIsland, UnionIslands, LoopGroups
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
-from math import isclose
 from .. import utils
 from ..utils import closest_pt_to_line, point_inside_face
 
@@ -578,3 +579,20 @@ class CrnEdgeHit:
 
     def __bool__(self):
         return bool(self.crn)
+
+class Hit3D_Presets:
+    def __init__(self):
+        self.mouse_pos = None
+        self.region = None
+        self.rv3d = None
+        self.region_data = None
+        self.ray_origin = None
+        self.ray_direction = None
+
+    def init_data_for_ray_cast(self, event):
+        if bpy.context.area.type == 'VIEW_3D':
+            self.mouse_pos = event.mouse_region_x, event.mouse_region_y
+            self.region = bpy.context.region
+            self.rv3d = bpy.context.space_data.region_3d
+            self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos))
+            self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos))
