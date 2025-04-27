@@ -210,6 +210,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
         if event.value == 'PRESS':
             self.init_data_for_ray_cast(event)
             return self.execute(context)
+        self.addition = event.shift
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
@@ -238,6 +239,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
         umeshes_without_uv = []
         save_transform_islands = []
         for umesh in self.umeshes:
+            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             # TODO: Skip updates, if edges has seams
             for e in umesh.bm.edges:
                 if not e.select:
@@ -259,7 +261,6 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
                 umeshes_without_uv.append(umesh)
                 continue
 
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.verify_uv()
             islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
             adv_islands = islands.to_adv_islands()
@@ -281,7 +282,6 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
             texel = univ_settings().texel_density
             texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
 
-
             for umesh in umeshes_without_uv:
                 umesh.verify_uv()
                 mesh_islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
@@ -290,6 +290,8 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
                 adv_islands.calc_area_3d(scale=umesh.value)
 
                 for isl in adv_islands:
+                    scale = Vector((1 / umesh.aspect, 1))
+                    isl.scale(scale, pivot=isl.bbox.center)
                     if (status := isl.set_texel(texel, texture_size)) is None:  # noqa
                         # zero_area_islands.append(isl)  # TODO: Highlight islands with zero area
                         continue
