@@ -186,7 +186,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
-class UNIV_OT_Cut_VIEW3D(Operator, types.Hit3D_Presets):
+class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
@@ -227,7 +227,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.Hit3D_Presets):
         if not self.umeshes:
             return self.umeshes.update(info='No elements for manipulate')
 
-        if not selected and self.mouse_pos:
+        if not selected and self.mouse_pos_from_3d:
             return self.pick_cut()
         else:
             self.cut_view_3d()
@@ -297,25 +297,12 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.Hit3D_Presets):
 
 
     def pick_cut(self):
-        result, loc, normal, index, obj, matrix = bpy.context.scene.ray_cast(
-            bpy.context.view_layer.depsgraph,
-            origin=self.ray_origin,
-            direction=self.ray_direction
-        )
-
-        if result and obj and obj.type == 'MESH':
-            for umesh in self.umeshes:
-                if umesh.obj == obj:
-                    umesh.ensure()
-                    face = umesh.bm.faces[index]
-                    closest_edge, closest_dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos, face, umesh, self.region, self.rv3d)
-                    if closest_dist < prefs().max_pick_distance:
-                        if closest_edge.seam:
-                            return {'CANCELLED'}
-
-                        closest_edge.seam = True
-                        umesh.update()
-                        return {'FINISHED'}
+        if hit := self.ray_cast(prefs().max_pick_distance):
+            if hit.crn.edge.seam:
+                return {'CANCELLED'}
+            hit.crn.edge.seam = True
+            hit.umesh.update()
+            return {'FINISHED'}
         return {'CANCELLED'}
 
 class UNIV_OT_Angle(Operator):

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 6, 8),
+    "version": (3, 6, 9),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -73,6 +73,7 @@ def load_register_types():
             # Stitch and Weld
             stitch_and_weld.UNIV_OT_Weld_VIEW3D,
             stitch_and_weld.UNIV_OT_Weld,
+            stitch_and_weld.UNIV_OT_Stitch_VIEW3D,
             stitch_and_weld.UNIV_OT_Stitch,
             # Transforms
             transform.UNIV_OT_Orient,

@@ -580,9 +580,9 @@ class CrnEdgeHit:
     def __bool__(self):
         return bool(self.crn)
 
-class Hit3D_Presets:
+class RayCast:
     def __init__(self):
-        self.mouse_pos = None
+        self.mouse_pos_from_3d = None
         self.region = None
         self.rv3d = None
         self.region_data = None
@@ -591,8 +591,33 @@ class Hit3D_Presets:
 
     def init_data_for_ray_cast(self, event):
         if bpy.context.area.type == 'VIEW_3D':
-            self.mouse_pos = event.mouse_region_x, event.mouse_region_y
+            self.mouse_pos_from_3d = event.mouse_region_x, event.mouse_region_y
             self.region = bpy.context.region
             self.rv3d = bpy.context.space_data.region_3d
-            self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos))
-            self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos))
+            self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+            self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+
+    def ray_cast(self, max_pick_radius):
+        result, loc, normal, index, obj, matrix = bpy.context.scene.ray_cast(
+            bpy.context.view_layer.depsgraph,
+            origin=self.ray_origin,
+            direction=self.ray_direction
+        )
+        if not (result and obj and obj.type == 'MESH'):
+            return
+
+        if not hasattr(self, 'umeshes'):
+            raise AttributeError('Need umeshes')
+        for umesh in self.umeshes:  # noqa
+            if umesh.obj == obj:
+                umesh.ensure()
+                face = umesh.bm.faces[index]
+                e, dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d)
+                if dist < max_pick_radius:
+                    for crn in e.link_loops:
+                        if crn.face == face:
+                            hit = CrnEdgeHit(self.mouse_pos_from_3d)
+                            hit.crn = crn
+                            hit.umesh = umesh
+                            return hit
+                return

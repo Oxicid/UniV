@@ -329,7 +329,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row.operator('mesh.univ_view_project', icon_value=icons.view)
 
         col_align.label(text='Misc')
-        col_align.operator('mesh.univ_weld', icon_value=icons.weld)
+        row = col_align.row(align=True)
+        row.operator('mesh.univ_weld', icon_value=icons.weld)
+        row.operator('mesh.univ_stitch', icon_value=icons.stitch)
         row = col_align.row(align=True)
         row.scale_y = 1.35
         row.operator('mesh.univ_stack', icon_value=icons.stack)

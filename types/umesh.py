@@ -4,6 +4,7 @@
 import typing  # noqa
 
 import bpy
+import copy
 import bmesh
 import mathutils
 
@@ -862,7 +863,6 @@ class UMeshes:
                 if not umesh2.has_visible_uv_faces():
                     visible.remove(umesh2)
 
-        import copy
         u1 = copy.copy(self)
         u2 = copy.copy(self)
         u1.umeshes = selected
@@ -882,7 +882,6 @@ class UMeshes:
                 if not umesh2.has_visible_uv_faces():
                     visible.remove(umesh2)
 
-        import copy
         u1 = copy.copy(self)
         u2 = copy.copy(self)
         u1.umeshes = selected
@@ -903,7 +902,6 @@ class UMeshes:
                 if not umesh2.has_visible_uv_faces():
                     visible.remove(umesh2)
 
-        import copy
         u1 = copy.copy(self)
         u2 = copy.copy(self)
         u1.umeshes = selected
@@ -919,7 +917,9 @@ class UMeshes:
             else:
                 unselect_or_invisible.append(umesh)
         self.umeshes = selected
-        return unselect_or_invisible
+        other = copy.copy(self)
+        other.umeshes = unselect_or_invisible
+        return other
 
     def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
         """Filter full selected and visible with not full selected"""
@@ -938,6 +938,20 @@ class UMeshes:
         u1.umeshes = selected
         u2.umeshes = visible
         return u1, u2
+
+    def filtered_by_uv_exist(self):
+        with_uv_map = []
+        without_uv_map = []
+        for umesh in self:
+            if len(umesh.bm.loops.layers.uv):
+                with_uv_map.append(umesh)
+            else:
+                without_uv_map.append(umesh)
+
+        self.umeshes = with_uv_map
+        missing = copy.copy(self)
+        missing.umeshes = without_uv_map
+        return missing
 
     @property
     def has_update_mesh(self):
