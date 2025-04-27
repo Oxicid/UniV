@@ -968,6 +968,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Stitch.__init__(self)
+        types.RayCast.__init__(self)
         self.update_seams = True
 
     def execute(self, context):
@@ -977,48 +978,56 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
         if self.use_by_distance:
-            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
-            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
-
-            umeshes_without_uv = []
-            for umesh in reversed(self.umeshes):
-                if not len(umesh.bm.loops.layers.uv):
-                    if selected_umeshes:
-                        umeshes_without_uv.append(umesh)
-                    self.umeshes.umeshes.remove(umesh)
-            self.umeshes.verify_uv()
-
-            if not self.umeshes and not umeshes_without_uv:
-                return self.umeshes.update(info='Not found edges for manipulate')
-
-            if self.umeshes:
-                if self.weld_by_distance_type == 'BY_ISLANDS':
-                    self.weld_by_distance_island(extended=bool(selected_umeshes))
-                else:
-                    self.weld_by_distance_all(selected=bool(selected_umeshes))
-
-            self.clear_seams_from_selected_edges(umeshes_without_uv)
-            self.umeshes.umeshes.extend(umeshes_without_uv)
+            self.weld_by_distance_from_3d()
         else:
-            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
-            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
-
-            umeshes_without_uv = self.umeshes.filtered_by_uv_exist()
-            self.umeshes.verify_uv()
-
-            if not self.umeshes and not umeshes_without_uv:
-                return self.umeshes.update(info='Not found edges for manipulate')
-
-            if not selected_umeshes and self.mouse_pos_from_3d:
-                if hit := self.ray_cast(prefs().max_pick_distance):
-                    self.pick_weld(hit)
-                    return {'FINISHED'}
-                return {'FINISHED'}
-
-            self.weld()
+            if res := self.weld_by_edge_from_3d():
+                return res
 
         self.umeshes.update(info='Not found elements for weld')
         return {'FINISHED'}
+
+    def weld_by_distance_from_3d(self):
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        umeshes_without_uv = self.umeshes.filtered_by_uv_exist()
+        self.umeshes.verify_uv()
+
+        if not self.umeshes and not umeshes_without_uv:
+            return self.umeshes.update(info='Not found edges for manipulate')
+
+        if self.umeshes:
+            if self.weld_by_distance_type == 'BY_ISLANDS':
+                self.weld_by_distance_island(extended=bool(selected_umeshes))
+            else:
+                self.weld_by_distance_all(selected=bool(selected_umeshes))
+
+        self.clear_seams_from_selected_edges(umeshes_without_uv)
+        self.umeshes.umeshes.extend(umeshes_without_uv)
+
+    def weld_by_edge_from_3d(self):
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if not self.umeshes:
+            return self.umeshes.update(info='Not found edges for manipulate')
+        if not selected_umeshes and self.mouse_pos_from_3d:
+            if hit := self.ray_cast(prefs().max_pick_distance):
+                if len(hit.umesh.bm.loops.layers.uv):
+                    hit.umesh.verify_uv()
+                    self.pick_weld(hit)
+                else:
+                    if not hit.crn.edge.seam:
+                        return {'CANCELLED'}
+                    hit.crn.edge.seam = False
+                    hit.umesh.update()
+            return {'FINISHED'}
+
+        umeshes_without_uv = self.umeshes.filtered_by_uv_exist()
+        self.umeshes.verify_uv()
+        self.weld()
+        self.clear_seams_from_selected_edges(umeshes_without_uv)
+        self.umeshes.umeshes.extend(umeshes_without_uv)
 
 class UNIV_OT_Stitch(Operator, Stitch):
     bl_idname = "uv.univ_stitch"
@@ -1154,6 +1163,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
             self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg)
             hit.umesh.update()
 
+
 class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
     bl_idname = "mesh.univ_stitch"
 
@@ -1202,7 +1212,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         if not self.umeshes:
-            return self.umeshes.update()
+            return
         if not selected_umeshes and self.mouse_pos_from_3d:
             if self.padding and (img_size := utils.get_active_image_size()):  # TODO: Get active image size from material id
                 if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
@@ -1219,8 +1229,6 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
                     hit.crn.edge.seam = False
                     hit.umesh.update()
                     return {'FINISHED'}
-            else:
-                self.report({'WARNING'}, 'Edge not found within a given radius')
             return {'FINISHED'}
 
         without_uv = self.umeshes.filtered_by_uv_exist()
