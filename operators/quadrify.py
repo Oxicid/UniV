@@ -93,6 +93,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
+                        set_corner_tag_by_border_and_by_tag(isl)
                         quad(isl)
                         counter += 1
                         umesh.update_tag = True
@@ -149,6 +150,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
         for isl in quad_islands:
             utils.set_faces_tag(isl, True)
+            set_corner_tag_by_border_and_by_tag(isl)
             quad(isl)
 
         umesh = hit.island.umesh
@@ -248,6 +250,15 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 
+def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
+    uv = island.umesh.uv
+    for crn in island.corners_iter():
+        prev = crn.link_loop_radial_prev
+        if crn.edge.seam or crn == prev or not prev.face.tag:
+            crn.tag = False
+            continue
+        crn.tag = utils.is_pair(crn, prev, uv)
+
 def quad(island: AdvIsland):
     uv = island.umesh.uv
 
@@ -337,7 +348,7 @@ def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, ri
 
 
 def follow_active_uv(f_act, island: AdvIsland):
-    uv = island.umesh.uv
+    uv = island.umesh.uv  # noqa
 
     def walk_face(f):  # noqa
         # all faces in this list must be tagged
@@ -348,9 +359,8 @@ def follow_active_uv(f_act, island: AdvIsland):
         while faces_a:
             for f in faces_a:  # noqa
                 for l in f.loops:  # noqa
-                    l_edge = l.edge
-                    if l_edge.is_manifold and not l_edge.seam:
-                        l_other = l.link_loop_radial_next
+                    if l.tag:
+                        l_other = l.link_loop_radial_prev
                         f_other = l_other.face
                         if f_other.tag:
                             yield l
@@ -359,25 +369,6 @@ def follow_active_uv(f_act, island: AdvIsland):
             # swap
             faces_a, faces_b = faces_b, faces_a
             faces_b.clear()
-
-    def walk_edgeloop(l: BMLoop):  # noqa
-        e_first = l.edge
-        while True:
-            e = l.edge  # noqa
-            yield e
-
-            # don't step past non-manifold edges
-            if not e.seam:
-                # walk around the quad and then onto the next face
-                next_crn = l.link_loop_radial_next
-                if next_crn != l and next_crn.face.tag:
-                    l = next_crn.link_loop_next.link_loop_next  # noqa
-                    if l.edge is e_first:
-                        break
-                else:
-                    break
-            else:
-                break
 
     def extrapolate_uv(fac,
                        l_a_outer, l_a_inner,
@@ -426,7 +417,7 @@ def follow_active_uv(f_act, island: AdvIsland):
         l_b_uv = [l[uv].uv for l in l_b]  # noqa
 
         try:
-            fac = edge_lengths[l_b[2].edge.index][0] / edge_lengths[l_a[1].edge.index][0]
+            fac = edge_lengths[l_b[2].edge.index] / edge_lengths[l_a[1].edge.index]
         except ZeroDivisionError:
             fac = 1.0
 
@@ -438,32 +429,19 @@ def follow_active_uv(f_act, island: AdvIsland):
                        l_a_uv[2], l_a_uv[1],
                        l_b_uv[2], l_b_uv[1])
 
-    # Calculate average length per loop if needed
+    # Calculate average ring length
     island.umesh.bm.edges.index_update()
-    edge_lengths: list[None | list[float]] = [None] * len(island.umesh.bm.edges)
+    edge_lengths: list[None | float] = [None] * len(island.umesh.bm.edges)
 
     for f in island:
-        # we know it's a quad
-        l_quad = f.loops
-        l_pair_a = (l_quad[0], l_quad[2])
-        l_pair_b = (l_quad[1], l_quad[3])
+        first_crn = f.loops[0]
+        for ring_crn in (first_crn, first_crn.link_loop_next):
+            if edge_lengths[ring_crn.edge.index] is None:
+                edges = get_ring_edges_from_crn(ring_crn)
 
-        for l_pair in (l_pair_a, l_pair_b):
-            if edge_lengths[l_pair[0].edge.index] is None:
-
-                edge_length_store = [-1.0]
-                edge_length_accum = 0.0
-                edge_length_total = 0
-
-                for l in l_pair:
-                    if edge_lengths[l.edge.index] is None:
-                        for e in walk_edgeloop(l):
-                            if edge_lengths[e.index] is None:
-                                edge_lengths[e.index] = edge_length_store
-                                edge_length_accum += e.calc_length()
-                                edge_length_total += 1
-
-                edge_length_store[0] = edge_length_accum / edge_length_total
+                avg_length = sum(e.calc_length() for e in edges) / len(edges)
+                for e in edges:
+                    edge_lengths[e.index] = avg_length
 
     f_act.tag = False
     for l_prev_ in walk_face(f_act):
@@ -471,3 +449,35 @@ def follow_active_uv(f_act, island: AdvIsland):
 
 def hypot_vert(v1, v2):
     return hypot(*(v1 - v2))
+
+def get_ring_edges_from_crn(first_crn: BMLoop):
+    first_edge = first_crn.edge
+    is_circular = False
+    edges = [first_edge]
+
+    # first direction
+    iter_crn = first_crn
+    while True:
+        ring_crn = iter_crn.link_loop_next.link_loop_next
+        if not ring_crn.tag:
+            edges.append(ring_crn.edge)
+            break
+
+        if ring_crn.edge == first_edge:
+            is_circular = True
+            break
+
+        edges.append(ring_crn.edge)
+        iter_crn = ring_crn.link_loop_radial_prev
+
+    # other dir
+    if not is_circular and first_crn.tag:
+        iter_crn = first_crn.link_loop_radial_prev
+        while True:
+            ring_crn = iter_crn.link_loop_next.link_loop_next
+            if not ring_crn.tag:
+                edges.append(ring_crn.edge)
+                break
+            iter_crn = ring_crn.link_loop_radial_prev
+            edges.append(ring_crn.edge)
+    return edges
