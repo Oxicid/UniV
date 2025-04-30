@@ -272,13 +272,12 @@ class UNIV_OT_Align_pie(Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.umeshes = None
-        self.mode = 'ALIGN'
         self.is_island_mode = False
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
         settings = univ_settings()
-        self.mode = settings.align_mode
+        self.mode = settings.align_mode  # noqa
         if settings.align_island_mode == 'FOLLOW':
             self.is_island_mode = utils.is_island_mode()
         else:
@@ -623,10 +622,10 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
                 return {'CANCELLED'}
         return self.execute(context)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.umeshes = None
-        self.is_island_mode = False
+    def execute(self, context):
+        self.umeshes = types.UMeshes(report=self.report)
+        self.is_island_mode = utils.is_island_mode()
+        return self.align()
 
 
 class UNIV_OT_Flip(Operator):

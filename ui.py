@@ -555,10 +555,16 @@ class IMAGE_MT_PIE_univ_align(Menu):
         pie.operator('uv.univ_align_pie', text='Bottom', icon_value=icons.arrow_bottom).direction = 'BOTTOM'
         pie.operator('uv.univ_align_pie', text='Upper', icon_value=icons.arrow_top).direction = 'UPPER'
 
-        row = pie.row(align=True)
+        col = pie.column()
+        col.scale_x = 1.2
+        col.scale_y = 1.2
+        row = col.row(align=True)
+        row.alignment = 'CENTER'
         row.prop(univ_settings(), 'align_island_mode', expand=True, icon_only=True)
-        row.separator()
+        col.separator(factor=0.2)
+        row = col.row(align=True)
         row.prop(univ_settings(), 'align_mode', expand=True, icon_only=True)
+
         pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
         pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
         pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
