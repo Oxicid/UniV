@@ -330,6 +330,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         col_align.label(text='Misc')
         row = col_align.row(align=True)
+        row.operator('mesh.univ_relax', icon_value=icons.relax)
         row.operator('mesh.univ_unwrap', icon_value=icons.unwrap)
 
         row = col_align.row(align=True)

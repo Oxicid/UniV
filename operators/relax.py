@@ -59,7 +59,6 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.unwrap = 'MINIMUM_STRETCH'
 
     def execute(self, context):
-
         self.umeshes = types.UMeshes()
         self.umeshes.fix_context()
 
@@ -78,6 +77,11 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for umesh in self.umeshes:
                 umesh.bm.select_flush_mode()
         else:  # SLIM
+            operators = context.window_manager.operators
+            if not operators or operators[-1].name != 'Relax':
+                unwrap.MULTIPLAYER = 1
+                unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
+
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
             if not self.umeshes:
@@ -309,3 +313,61 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             relax_data.append(RelaxData(umesh, [], coords_before, border_corners_for_unwrap, save_transform_islands))
 
         self.relax_b(relax_data)
+
+
+class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
+    bl_idname = "mesh.univ_relax"
+    bl_label = "Relax"
+    bl_description = "Warning: Incorrect behavior with flipped islands"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    unwrap: bpy.props.StringProperty(default='MINIMUM_STRETCH', options={'HIDDEN'})
+    iterations: bpy.props.IntProperty(name='Iterations', default=20, min=5, max=150, soft_max=50)
+
+    def draw(self, context):
+        if unwrap.MULTIPLAYER != 1:
+            self.layout.label(text=f'Multiplayer: x{unwrap.MULTIPLAYER}')
+        self.layout.prop(self, 'iterations', slider=True)
+        self.layout.prop(self, 'use_correct_aspect')
+
+    def execute(self, context):
+        operators = context.window_manager.operators
+        if not operators or operators[-1].name != 'Relax':
+                unwrap.MULTIPLAYER = 1
+                unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
+
+        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+
+        self.umeshes.fix_context()
+        self.umeshes.set_sync()
+        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
+
+        from ..preferences import univ_settings
+        self.texel = univ_settings().texel_density
+        self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=True)
+
+        if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
+            self.report({'WARNING'}, 'Relax is not supported in Blender versions below 4.3')
+            return {'CANCELLED'}
+
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        if not selected_umeshes and self.mouse_pos_from_3d:
+            return self.pick_unwrap(no_flip=True, iterations=self.iterations)
+        else:
+            for u in reversed(self.umeshes):
+                if not u.has_uv and not u.total_face_sel:
+                    self.umeshes.umeshes.remove(u)
+            if not self.umeshes:
+                self.report({'WARNING'}, 'Need selected faces for objects without uv')
+                return {'CANCELLED'}
+
+            self.unwrap_selected(no_flip=True, iterations=self.iterations)
+            self.umeshes.update()
+            return {'FINISHED'}
