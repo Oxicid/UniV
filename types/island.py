@@ -34,17 +34,37 @@ class eInfoSelectFaceIsland(enum.IntEnum):
     FULL_SELECTED = 2
 
 class SaveTransform:
-    def __init__(self, island: 'FaceIsland | AdvIsland'):
+    def __init__(self, island: 'FaceIsland | AdvIsland | AdvIslands'):
         self.island = island
         self.old_crn_pos: list[Vector | float] = []  # need for mix co
-        self.rotate = True
         self.is_full_selected = False
         self.target_crn: BMLoop | None = None
         self.old_coords: list[Vector] = [Vector((0, 0)), Vector((0, 0))]
-        uv = island.umesh.uv
+        self.rotate = True
 
-        corners, pinned_corners = self.calc_static_corners(island, uv)
+        if isinstance(island, AdvIslands):
+            self.target_subisland = max((i for i in self.island), key=lambda i: i.bbox.area)
+            self.calc_target_rotate_corner()
+            self.bbox = self.target_subisland.bbox
+        else:
+            self.calc_target_rotate_corner()
+            self.bbox = self.island.calc_bbox()
+
+    def calc_target_rotate_corner(self):
+        uv = self.island.umesh.uv
+        if isinstance(self.island, AdvIslands):
+            corners = []
+            pinned_corners = []
+            for isl in self.island:
+                corners_, pinned_corners_ = self.calc_static_corners(isl, uv)
+                corners.extend(corners_)
+                pinned_corners.extend(pinned_corners_)
+        else:
+            corners, pinned_corners = self.calc_static_corners(self.island, uv)
+
         if corners or pinned_corners:
+            # Based on the static corners, we determine whether to rotate and scale the island.
+            # If there are at least two non-overlapping corners, we don't do anything.
             corners_iter = itertools.chain(corners, pinned_corners)
             co = next(corners_iter)[uv].uv
             for crn_ in corners_iter:
@@ -64,20 +84,21 @@ class SaveTransform:
 
         else:
             self.is_full_selected = True
-            max_uv_area_face = island.calc_max_uv_area_face()
+            if isinstance(self.island, AdvIslands):
+                max_uv_area_face = self.target_subisland.calc_max_uv_area_face()
+            else:
+                max_uv_area_face = self.island.calc_max_uv_area_face()
             max_length_crn = utils.calc_max_length_uv_crn(max_uv_area_face.loops, uv)
             max_length_crn[uv].pin_uv = True
             self.target_crn = max_length_crn
             self.old_coords = [max_length_crn[uv].uv.copy(), max_length_crn.link_loop_next[uv].uv.copy()]
-
-        self.bbox = self.island.calc_bbox()
 
     @staticmethod
     def calc_static_corners(island, uv) -> tuple[list[BMLoop], list[BMLoop]]:
         corners = []
         pinned_corners = []
         if island.umesh.sync:
-            if bpy.context.tool_settings.mesh_select_mode[2]:  # FACES
+            if utils.get_select_mode_mesh_reversed() == 'FACE':
                 for f in island:
                     if f.select:
                         for crn in f.loops:
@@ -91,7 +112,7 @@ class SaveTransform:
                             else:
                                 # crn_uv.pin_uv = True
                                 corners.append(crn)
-            elif bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
+            elif utils.get_select_mode_mesh_reversed() == 'EDGE':
                 for f in island:
                     for crn in f.loops:
                         crn_uv = crn[uv]
@@ -122,14 +143,6 @@ class SaveTransform:
 
         return corners, pinned_corners
 
-    def shift(self):
-        """A small shift to keep the island from merging."""
-        sign_x = hash(self.bbox.width) % 2 == 0
-        sign_y = hash(self.bbox.width) % 2 == 0
-        x = self.bbox.width * 0.005
-        y = self.bbox.height * 0.005
-        self.island.move(Vector((x if sign_x else -x, y if sign_y else -y)))
-
     def inplace(self, axis='BOTH'):
         if not self.rotate:
             return
@@ -149,7 +162,6 @@ class SaveTransform:
             if (status := self.island.set_texel(texel, texture_size)) is None:  # noqa
                 # zero_area_islands.append(isl)  # TODO: Add report callback
                 pass
-
 
         if self.bbox.max_length < 2e-05:  # Small and zero area island protection
             new_bbox = self.island.calc_bbox()
@@ -199,6 +211,58 @@ class SaveTransform:
                     else:
                         set_texel()
                 self.island.set_position(old_center, new_center)
+
+        if self.is_full_selected:
+            self.target_crn[uv].pin_uv = False
+
+    def inplace_mesh_island(self):
+        if not self.rotate:
+            return
+        uv = self.island.umesh.uv
+
+        crn_co = self.target_crn[uv].uv if self.target_crn else Vector((0.0, 0.0))
+        crn_next_co = self.target_crn.link_loop_next[uv].uv if self.target_crn else Vector((0.0, 0.0))
+
+        old_dir = self.old_coords[0] - self.old_coords[1]
+        new_dir = crn_co - crn_next_co
+        def set_texel():
+            self.island.calc_area_uv()
+            self.island.calc_area_3d(scale=self.island.umesh.value)
+            from ..preferences import univ_settings
+            texel = univ_settings().texel_density
+            texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+            union_islands = UnionIslands(self.island.islands)
+            union_islands.set_texel(texel, texture_size)
+
+        if self.bbox.max_length < 2e-05:  # Small and zero area island protection
+            new_bbox = self.target_subisland.calc_bbox()
+            pivot = new_bbox.center
+            if new_bbox.max_length != 0:
+                self.island.rotate(old_dir.angle_signed(new_dir, 0), pivot)
+                set_texel()
+            self.island.set_position(self.bbox.center, pivot)
+        else:
+            if angle := old_dir.angle_signed(new_dir, 0):
+                pass
+                self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
+            new_bbox = self.target_subisland.calc_bbox()
+
+            old_center = self.bbox.center
+            new_center = new_bbox.center
+
+            if self.bbox.width > self.bbox.height:
+                if new_bbox.width:
+                    scale = self.bbox.width / new_bbox.width
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
+                else:
+                    set_texel()
+            else:
+                if new_bbox.height:
+                    scale = self.bbox.height / new_bbox.height
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
+                else:
+                    set_texel()
+            self.island.set_position(old_center, new_center)
 
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
@@ -1748,6 +1812,17 @@ class Islands(IslandsBase):
         islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         return cls(islands, umesh)
 
+    def calc_max_uv_area_face(self):
+        uv = self.umesh.uv
+        area = -1.0
+        face = None
+        for isl in self:
+            for f in isl:
+                if area < (area_ := utils.calc_face_area_uv(f, uv)):
+                    area = area_
+                    face = f
+        return face
+
     def move(self, delta: Vector) -> bool:
         return bool(sum(island.move(delta) for island in self.islands))
 
@@ -1786,6 +1861,14 @@ class Islands(IslandsBase):
             for face in island:
                 face.tag = True
                 face.index = idx
+
+    def apply_aspect_ratio(self):
+        scale = Vector((self.umesh.aspect, 1))
+        return self.scale_simple(scale)
+
+    def reset_aspect_ratio(self):
+        scale = Vector((1/self.umesh.aspect, 1))
+        return self.scale_simple(scale)
 
     @staticmethod
     def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland, selected=True) -> bool:

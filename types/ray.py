@@ -9,6 +9,7 @@ import typing
 
 import bpy
 import math
+import bmesh
 from math import inf, isclose
 from bmesh.types import BMFace, BMLoop
 from mathutils import Vector
@@ -16,7 +17,7 @@ from mathutils.kdtree import KDTree
 from itertools import chain
 from bpy_extras import view3d_utils
 
-from . import Islands, FaceIsland, AdvIslands, AdvIsland, UnionIslands, LoopGroups
+from . import Islands, FaceIsland, AdvIslands, AdvIsland, MeshIsland, UnionIslands, LoopGroups
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 from .. import utils
@@ -457,6 +458,7 @@ class CrnEdgeHit:
         self.point = pt
         self.min_dist = min_dist
         self.crn: BMLoop | None = None
+        self.face: BMFace | None = None  # use for incref
         self.umesh = None
 
     def find_nearest_crn_by_visible_faces(self, umesh):
@@ -577,6 +579,26 @@ class CrnEdgeHit:
 
         return AdvIsland(list(island), self.umesh), island
 
+    def calc_mesh_island_with_seam(self) -> tuple[MeshIsland, set[BMFace]]:
+        assert self.crn, 'Not found picked corner'
+        island: set[BMFace] = {self.crn.face}
+        stack = []
+        parts_of_island = [self.crn.face]
+        while parts_of_island:
+            for f in parts_of_island:
+                for crn in f.loops:
+                    pair_crn = crn.link_loop_radial_prev
+                    ff = pair_crn.face
+                    if ff in island or ff.hide or crn.edge.seam:
+                        continue
+
+                    island.add(ff)
+                    stack.append(ff)
+            parts_of_island = stack
+            stack = []
+
+        return MeshIsland(list(island), self.umesh), island
+
     def __bool__(self):
         return bool(self.crn)
 
@@ -588,6 +610,8 @@ class RayCast:
         self.region_data = None
         self.ray_origin = None
         self.ray_direction = None
+        self.active_bmesh = None
+        self.umeshes = None
 
     def init_data_for_ray_cast(self, event):
         if bpy.context.area.type == 'VIEW_3D':
@@ -606,18 +630,17 @@ class RayCast:
         if not (result and obj and obj.type == 'MESH'):
             return
 
-        if not hasattr(self, 'umeshes'):
-            raise AttributeError('Need umeshes')
-        for umesh in self.umeshes:  # noqa
-            if umesh.obj == obj:
-                umesh.ensure()
-                face = umesh.bm.faces[index]
-                e, dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d)
-                if dist < max_pick_radius:
-                    for crn in e.link_loops:
-                        if crn.face == face:
-                            hit = CrnEdgeHit(self.mouse_pos_from_3d)
-                            hit.crn = crn
-                            hit.umesh = umesh
-                            return hit
-                return
+        umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
+        umesh.ensure()
+        umesh.bm = bmesh.from_edit_mesh(umesh.obj.data)
+
+        face = umesh.bm.faces[index]
+        e, dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d)
+        if dist < max_pick_radius:
+            for crn in e.link_loops:
+                if crn.face == face:
+                    hit = CrnEdgeHit(self.mouse_pos_from_3d)
+                    hit.crn = crn
+                    hit.umesh = umesh
+                    hit.face = crn.face  # incref
+                    return hit

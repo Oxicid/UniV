@@ -58,6 +58,39 @@ class MeshIsland:
         adv_isl.value = self.value
         return adv_isl
 
+    def calc_adv_subislands_with_mark_seam(self):
+        assert self.faces
+        assert self.umesh.uv
+        all_added = set()
+        adv_islands: list[island.AdvIsland] = []
+
+        uv = self.umesh.uv
+        for first_face in self.faces:
+            if first_face in all_added:
+                continue
+            stack = []
+            adv_island: set[BMFace] = {first_face}
+            parts_of_island = [first_face]
+            while parts_of_island:
+                for f in parts_of_island:
+                    for crn in f.loops:
+                        pair_crn = crn.link_loop_radial_prev
+                        ff = pair_crn.face
+                        if ff in adv_island or ff.hide or crn.edge.seam:
+                            continue
+                        if ff in all_added:
+                            continue
+                        if crn[uv].uv == pair_crn.link_loop_next[uv].uv and \
+                            crn.link_loop_next[uv].uv == pair_crn[uv].uv:
+                            adv_island.add(ff)
+                            stack.append(ff)
+                parts_of_island = stack
+                stack = []
+            all_added.update(adv_island)
+            adv_islands.append(island.AdvIsland(list(adv_island), self.umesh))
+
+        return island.AdvIslands(adv_islands, self.umesh)
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -147,6 +180,7 @@ class MeshIslands(MeshIslandsBase):
         self.mesh_islands: list[MeshIsland] = islands
         self.umesh: UMesh = umesh
         self.value: float | int = -1  # value for different purposes
+        self.sequence = []
 
     @classmethod
     def calc_all(cls, umesh: UMesh):
@@ -185,6 +219,16 @@ class MeshIslands(MeshIslandsBase):
     def calc_visible_with_mark_seam(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
         islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_extended_with_mark_seam(cls, umesh: _umesh.UMesh):
+        cls.tag_filter_visible(umesh)
+        if umesh.is_full_face_selected:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                       if cls.island_filter_is_any_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod

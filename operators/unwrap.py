@@ -38,7 +38,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
                 description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Inner Island', default=True, description='Marks seams where there are split edges')
+    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam splitted edges', default=True, description='Marks seams where there are split edges')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -413,15 +413,425 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 MULTIPLAYER = 1
                 UNIQUE_NUMBER_FOR_MULTIPLY = unique_number_for_multiply
 
-# class UNIV_OT_Unwrap_VIEW3D(UNIV_OT_Unwrap):
-#     bl_idname = "mesh.univ_unwrap"
-#     bl_label = "Unwrap"
-#     bl_options = {'REGISTER', 'UNDO'}
-#
-#     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-#     mark_seam_type: bpy.props.EnumProperty(name='Mark Seam Border Type', default='UV_BORDER',
-#                                       items=(('UV_BORDER', 'Angle Based', ''), ('SELECTED_BORDER', 'Selected Border', '')))
-#
-#     def draw(self, context):
-#         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
-#         self.layout.prop(self, 'mark_seam_inner_island')
+
+class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
+    bl_idname = "mesh.univ_unwrap"
+    bl_label = "Unwrap"
+    bl_description = ("Inplace unwrap the mesh of object being edited\n\n "
+                      "Organic Mode has incorrect behavior with pinned and flipped islands")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    unwrap: bpy.props.EnumProperty(name='Unwrap',
+                                   default='ANGLE_BASED',
+                                   items=(('ANGLE_BASED', 'Hard Surface', ''),
+                                          ('CONFORMAL', 'Conformal', ''),
+                                          ('MINIMUM_STRETCH', 'Organic', '')))
+
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        self.layout.prop(self, 'use_correct_aspect')
+        self.layout.row(align=True).prop(self, 'unwrap', expand=True)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            self.init_data_for_ray_cast(event)
+            return self.execute(context)
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        types.RayCast.__init__(self)
+        self.umeshes: types.UMeshes | None = None
+        self.texel = -1
+        self.texture_size = -1
+
+    def execute(self, context):
+        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+
+        self.umeshes.fix_context()
+        self.umeshes.set_sync()
+        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
+
+        from ..preferences import univ_settings
+        self.texel = univ_settings().texel_density
+        self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=True)
+
+        if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
+            self.unwrap = 'ANGLE_BASED'
+            self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
+
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        if not selected_umeshes and self.mouse_pos_from_3d:
+            return self.pick_unwrap()
+        else:
+            for u in reversed(self.umeshes):
+                if not u.has_uv and not u.total_face_sel:
+                    self.umeshes.umeshes.remove(u)
+            if not self.umeshes:
+                self.report({'WARNING'}, 'Need selected faces for objects without uv')
+                return {'CANCELLED'}
+
+            self.unwrap_selected()
+            self.umeshes.update()
+            return {'FINISHED'}
+
+    def pick_unwrap(self, **unwrap_kwargs):
+        if not (hit := self.ray_cast(prefs().max_pick_distance)):
+            return {'CANCELLED'}
+
+        umesh = hit.umesh
+        if umesh.has_uv:
+            umesh.verify_uv()
+            mesh_island, mesh_isl_set = hit.calc_mesh_island_with_seam()
+            adv_subislands = mesh_island.calc_adv_subislands_with_mark_seam()
+            for isl in adv_subislands:
+                isl.select = True
+
+            shared_selected_faces = []
+            pinned_crn_uvs = []
+            # In vert/edge selection mode, you can accidentally select extra faces.
+            # To avoid this, we pin them.
+            if umesh.total_face_sel != len(mesh_isl_set):
+                uv = umesh.uv
+                for f in umesh.bm.faces:
+                    if f.select and f not in mesh_isl_set:
+                        shared_selected_faces.append(f)
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if not crn_uv.pin_uv:
+                                crn_uv.pin_uv = True
+                                pinned_crn_uvs.append(crn_uv)
+
+            unique_number_for_multiply = hash(mesh_island[0])  # multiplayer
+            UNIV_OT_Unwrap.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+
+            umesh.value = umesh.check_uniform_scale(report=self.report)
+
+            for isl in adv_subislands:
+                isl.apply_aspect_ratio()
+            save_t = types.SaveTransform(adv_subislands)
+
+            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            umesh.verify_uv()
+
+            adv_island = mesh_island.to_adv_island()
+            save_t.island = adv_island
+            save_t.inplace()
+
+            adv_island.reset_aspect_ratio()
+            adv_island.select = False
+
+            for f in shared_selected_faces:
+                f.select = False
+            for crn_uv in pinned_crn_uvs:
+                crn_uv.pin_uv = False
+        else:
+            mesh_island, mesh_isl_set = hit.calc_mesh_island_with_seam()
+            adv_island = mesh_island.to_adv_island()
+            adv_island.select = True
+
+            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+
+            umesh.verify_uv()
+            unique_number_for_multiply = hash(mesh_island[0])  # multiplayer
+            UNIV_OT_Unwrap.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+
+            umesh.value = umesh.check_uniform_scale(report=self.report)
+
+            adv_island.calc_area_uv()
+            adv_island.calc_area_3d(scale=umesh.value)
+
+            if (status := adv_island.set_texel(self.texel, self.texture_size)) is None:  # noqa
+                # zero_area_islands.append(isl)
+                pass
+
+            # reset aspect
+            scale = Vector((1 / umesh.aspect, 1))
+            adv_island.scale(scale, adv_island.bbox.center)
+            adv_island.select = False
+
+        umesh.update()
+        return {'FINISHED'}
+
+    def unwrap_selected(self, **unwrap_kwargs):
+        meshes_with_uvs = []
+        meshes_without_uvs = []
+        for umesh in self.umeshes:
+            if not umesh.has_uv:
+                meshes_without_uvs.append(umesh)
+            else:
+                umesh.verify_uv()
+                meshes_with_uvs.append(umesh)
+                if self.umeshes.elem_mode == 'VERTEX':
+                    if umesh.total_face_sel:
+                        self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
+                    else:
+                        self.unwrap_selected_verts(umesh)
+                elif self.umeshes.elem_mode == 'EDGE':
+                    if umesh.total_face_sel:
+                        self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
+                    else:
+                        self.unwrap_selected_edges(umesh)
+                else:
+                    self.unwrap_selected_faces_preprocess(umesh)
+
+        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+
+        for umesh in meshes_with_uvs:
+            self.unwrap_selected_faces_postprocess(umesh)
+            umesh.bm.select_flush(False)
+        self.unwrap_without_uvs(meshes_without_uvs, **unwrap_kwargs)
+
+    @staticmethod
+    def unwrap_selected_faces_preprocess(umesh):
+        assert umesh.total_face_sel
+        mesh_islands = types.MeshIslands.calc_extended_with_mark_seam(umesh)
+        pinned = []
+        to_select = []
+        save_transform_islands = []
+
+        uv = umesh.uv
+        for mesh_isl in mesh_islands:
+            adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
+            adv_islands.apply_aspect_ratio()
+            safe_transform = types.SaveTransform(adv_islands)
+            save_transform_islands.append(safe_transform)
+
+            for f in mesh_isl:
+                if f.select:
+                    continue
+                to_select.append(f)
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    if crn_uv.pin_uv:
+                        continue
+
+                    if crn.vert.select:
+                        # If linked faces are selected, then crn should unwrap as well
+                        if any(crn_.face.select for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)):
+                            continue
+                    crn_uv.pin_uv = True
+                    pinned.append(crn_uv)
+
+        for f in to_select:
+            f.select = True
+        umesh.other = UnwrapData(None, pinned, save_transform_islands, to_select)
+
+    @staticmethod
+    def unwrap_selected_faces_postprocess(umesh):
+        unwrap_data: UnwrapData = umesh.other
+        for f in unwrap_data.temp_selected:
+            f.select = False
+        for crn_uv in unwrap_data.pins:
+            crn_uv.pin_uv = False
+
+        for safe_transform in unwrap_data.islands:
+            safe_transform.inplace_mesh_island()
+            safe_transform.island.reset_aspect_ratio()
+
+    def unwrap_selected_faces_preprocess_vert_edge_mode(self, umesh):
+        assert umesh.total_face_sel
+        assert self.umeshes.elem_mode in ('VERTEX', 'EDGE')
+        mesh_islands = types.MeshIslands.calc_visible_with_mark_seam(umesh)
+        pinned = []
+        to_select = []
+        without_selection_islands = []
+        save_transform_islands = []
+
+        uv = umesh.uv
+        for mesh_isl in mesh_islands:
+            if not any(f.select for f in mesh_isl):
+                without_selection_islands.append(mesh_isl)
+                continue
+
+            adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
+            adv_islands.apply_aspect_ratio()
+            safe_transform = types.SaveTransform(adv_islands)
+            save_transform_islands.append(safe_transform)
+
+            for f in mesh_isl:
+                if f.select:
+                    continue
+                to_select.append(f)
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    if crn_uv.pin_uv:
+                        continue
+
+                    if crn.vert.select:
+                        # If linked faces are selected, then crn should unwrap as well
+                        if any(crn_.face.select for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)):
+                            continue
+                    crn_uv.pin_uv = True
+                    pinned.append(crn_uv)
+
+        expected_total_selected_faces = umesh.total_face_sel + len(to_select)
+        if self.umeshes.elem_mode == 'VERTEX':
+            to_deselect_elements = [v for f in to_select for v in f.verts if not v.select]
+        else:
+            to_deselect_elements = [e for f in to_select for e in f.edges if not e.select]
+
+        for f in to_select:
+            f.select = True
+
+        # May select faces from other islands, if so pin them and safe face to unselect
+        if expected_total_selected_faces != umesh.total_face_sel:
+            for isl in without_selection_islands:
+                for f in isl:
+                    if f.select:
+                        to_deselect_elements.append(f)
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if not crn_uv.pin_uv:
+                                pinned.append(crn_uv)
+
+        umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
+
+    def unwrap_selected_verts(self, umesh):
+        assert not umesh.total_face_sel
+        assert self.umeshes.elem_mode == 'VERTEX'
+        mesh_islands = types.MeshIslands.calc_visible_with_mark_seam(umesh)
+        pinned = []
+        to_select = []
+        without_selection_islands = []
+        save_transform_islands = []
+
+        uv = umesh.uv
+        for mesh_isl in mesh_islands:
+            if not any(v.select for f in mesh_isl for v in f.verts):
+                without_selection_islands.append(mesh_isl)
+                continue
+
+            adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
+            adv_islands.apply_aspect_ratio()
+            safe_transform = types.SaveTransform(adv_islands)
+            save_transform_islands.append(safe_transform)
+            to_select.extend(mesh_isl)
+
+            for f in mesh_isl:
+                for crn in f.loops:
+                    if crn.vert.select:
+                        continue
+
+                    crn_uv = crn[uv]
+                    if crn_uv.pin_uv:
+                        continue
+
+                    crn_uv.pin_uv = True
+                    pinned.append(crn_uv)
+
+        expected_total_selected_faces = umesh.total_face_sel + len(to_select)
+        to_deselect_elements = [v for f in to_select for v in f.verts if not v.select]
+
+        for f in to_select:
+            f.select = True
+
+        # May select faces from other islands, if so pin them and safe face to unselect
+        if expected_total_selected_faces != umesh.total_face_sel:
+            for isl in without_selection_islands:
+                for f in isl:
+                    if f.select:
+                        to_deselect_elements.append(f)
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if not crn_uv.pin_uv:
+                                pinned.append(crn_uv)
+
+        umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
+
+    def unwrap_selected_edges(self, umesh):
+        assert not umesh.total_face_sel
+        assert self.umeshes.elem_mode == 'EDGE'
+        mesh_islands = types.MeshIslands.calc_visible_with_mark_seam(umesh)
+        pinned = []
+        to_select = []
+        without_selection_islands = []
+        save_transform_islands = []
+
+        uv = umesh.uv
+        for mesh_isl in mesh_islands:
+            if not any(e.select for f in mesh_isl for e in f.edges):
+                without_selection_islands.append(mesh_isl)
+                continue
+
+            adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
+            adv_islands.apply_aspect_ratio()
+            safe_transform = types.SaveTransform(adv_islands)
+            save_transform_islands.append(safe_transform)
+            to_select.extend(mesh_isl)
+
+            for f in mesh_isl:
+                if all(not v.select for v in f.verts):
+                    for crn in f.loops:
+                        crn_uv = crn[uv]
+                        if crn_uv.pin_uv:
+                            continue
+                        crn_uv.pin_uv = True
+                        pinned.append(crn_uv)
+                    continue
+
+                for crn in f.loops:
+                    if crn.edge.select:
+                        continue
+                    crn_uv = crn[uv]
+                    if crn.vert.select:
+                        if crn_uv.pin_uv:
+                            continue
+                        if any(crn_.edge.select for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)):
+                            continue
+
+                    if crn_uv.pin_uv:
+                        continue
+                    crn_uv.pin_uv = True
+                    pinned.append(crn_uv)
+
+        expected_total_selected_faces = umesh.total_face_sel + len(to_select)
+        to_deselect_elements = [e for f in to_select for e in f.edges if not e.select]
+
+        for f in to_select:
+            f.select = True
+
+        # May select faces from other islands, if so pin them and safe face to unselect
+        if expected_total_selected_faces != umesh.total_face_sel:
+            for isl in without_selection_islands:
+                for f in isl:
+                    if f.select:
+                        to_deselect_elements.append(f)
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if not crn_uv.pin_uv:
+                                pinned.append(crn_uv)
+
+        umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
+
+    def unwrap_without_uvs(self, umeshes, **unwrap_kwargs):
+        for umesh in umeshes:
+            mesh_islands = types.MeshIslands.calc_extended_with_mark_seam(umesh)
+            unique_number_for_multiply = hash(mesh_islands[0][0])  # multiplayer
+            UNIV_OT_Unwrap.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
+            umesh.value = umesh.check_uniform_scale(report=self.report)
+            umesh.verify_uv()
+
+            adv_islands = mesh_islands.to_adv_islands()
+
+            adv_islands.calc_area_uv()
+            adv_islands.calc_area_3d(scale=umesh.value)
+
+            # reset aspect
+            for adv_isl in adv_islands:
+                adv_isl.set_texel(self.texel, self.texture_size)
+                scale = Vector((1 / umesh.aspect, 1))
+                adv_isl.scale(scale, adv_isl.bbox.center)
+

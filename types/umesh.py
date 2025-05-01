@@ -32,6 +32,7 @@ class UMesh:
         # self.islands_calc_type
         # self.islands_calc_subtype
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
+        self.other = utils.NoInit()
         self.aspect: float = 1.0
         self.sequence: list[BMFace] | list['AdvIsland'] = []  # noqa
 
@@ -288,6 +289,10 @@ class UMesh:
                     if isinstance(value := mod['Input_1'], float):
                         return value
         return pi
+
+    @property
+    def has_uv(self):
+        return bool(self.bm.loops.layers.uv)
 
     def tag_hidden_corners(self):
         corners = (_crn for f in self.bm.faces for _crn in f.loops)
@@ -763,6 +768,14 @@ class UMeshes:
                 objs.sort(key=lambda a: a.name)
                 bmeshes.append(UMesh(bm, objs[0], False, verify_uv))
         return cls(bmeshes, report=report)
+
+    def calc_aspect_ratio(self, from_mesh):
+        if from_mesh:
+            for umesh in self:
+                umesh.aspect = utils.get_aspect_ratio(umesh)
+        else:
+            for umesh in self:
+                umesh.aspect = utils.get_aspect_ratio()
 
     @classmethod
     def calc_any_unique(cls, report=None, verify_uv=True):
