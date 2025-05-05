@@ -1,62 +1,10 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="100%"
-   height="100%"
-   viewBox="0 0 32 32"
-   version="1.1"
-   xml:space="preserve"
-   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
-   id="svg3"
-   sodipodi:docname="univ_icon_distribute.svg"
-   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
-     id="defs3" /><sodipodi:namedview
-     id="namedview3"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="26.71875"
-     inkscape:cx="16"
-     inkscape:cy="16"
-     inkscape:window-width="1920"
-     inkscape:window-height="1057"
-     inkscape:window-x="-8"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg3" /><rect
-     id="Distribute"
-     x="0"
-     y="0"
-     width="32"
-     height="32"
-     style="fill:none;" /><g
-     id="g3"
-     transform="matrix(1.3337232,0,0,1.3337232,-5.3395712,-5.6275742)"><path
-       d="M 24.667,21.477 H 7.333 v 1.667 L 4,20.644 l 3.333,-2.5 v 1.666 h 17.334 v -1.666 l 3.333,2.5 -3.333,2.5 z"
-       style="fill:#6b6b6b"
-       id="path1" /><rect
-       x="20.583"
-       y="10.582"
-       width="5.5"
-       height="5.5"
-       style="fill:#dc87ff"
-       id="rect1" /><rect
-       x="5.9169998"
-       y="10.582"
-       width="5.5"
-       height="5.5"
-       style="fill:#62cdf9"
-       id="rect2" /><rect
-       x="13.25"
-       y="10.582"
-       width="5.5"
-       height="5.5"
-       style="fill:#7d87ff"
-       id="rect3" /></g></svg>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m26 23h-20v3l-5-4.5 5-4.5v3h20v-3l5 4.5-5 4.5z" fill="#ffffff"/>
+
+<rect x="2" y="8" width="7" height="7" fill="#62cdf9"/>
+<rect x="12.5" y="8" width="7" height="7" fill="#7d87ff"/>
+<rect x="23" y="8" width="7" height="7" fill="#dc87ff"/>
+
+
+</svg>

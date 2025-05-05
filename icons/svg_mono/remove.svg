@@ -1,17 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-8.52651e-15,-50.88)">
-        <g id="Remove" transform="matrix(1,0,0,1,-52.4638,212)">
-            <rect x="52.464" y="0" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(1.14286,0,0,1.14286,-10.1234,-2.57143)">
-                <g transform="matrix(1.18116,0,0,1.18942,-1647.02,-3.991)">
-                    <path d="M1446.83,14.053L1458.77,14.053C1458.77,14.053 1457.84,21.446 1457.51,24.081C1457.44,24.606 1456.99,25 1456.46,25C1454.7,25 1450.9,25 1449.14,25C1448.61,25 1448.16,24.606 1448.09,24.081C1447.76,21.446 1446.83,14.053 1446.83,14.053ZM1456.01,15.877L1455.1,15.877L1455.1,22.719L1456.01,22.719L1456.01,15.877ZM1453.26,15.877L1452.34,15.877L1452.34,22.719L1453.26,22.719L1453.26,15.877ZM1450.5,15.877L1449.58,15.877L1449.58,22.719L1450.5,22.719L1450.5,15.877Z" style="fill:rgb(139,198,161);"/>
-                </g>
-                <g transform="matrix(1.02126,0,0,0.72339,-1417.47,5.30873)">
-                    <path d="M1457.62,5L1464,5L1464,8L1447,8L1447,5L1453.91,5L1453.91,2.871C1453.91,2.39 1454.18,2 1454.52,2L1457.01,2C1457.35,2 1457.62,2.39 1457.62,2.871L1457.62,5Z" style="fill:rgb(139,198,161);"/>
-                </g>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<path d="m8.44 12h16.1s-1.26 10.3-1.7 13.8c-0.0944 0.692-0.702 1.22-1.42 1.22h-9.88c-0.716 0-1.32-0.523-1.42-1.22-0.445-3.47-1.7-13.8-1.7-13.8zm12.4 3h-1.23v8.99h1.23zm-3.71 0h-1.24v8.99h1.24zm-3.73 0h-1.24v8.99h1.24z" fill="#8bc6a1"/>
+<path d="m19 8h7v2h-19v-2l8 0.0131v-2.01c0-0.642 0.352-1 1-1h2c0.562 0 1.01 0.233 1 1z" fill="#8bc6a1"/>
 </svg>

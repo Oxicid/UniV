@@ -1,61 +1,8 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="100%"
-   height="100%"
-   viewBox="0 0 32 32"
-   version="1.1"
-   xml:space="preserve"
-   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
-   id="svg5"
-   sodipodi:docname="univ_icon_random.svg"
-   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
-     id="defs5" /><sodipodi:namedview
-     id="namedview5"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="26.71875"
-     inkscape:cx="16"
-     inkscape:cy="16"
-     inkscape:window-width="1920"
-     inkscape:window-height="1057"
-     inkscape:window-x="-8"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg5" /><rect
-     id="Random"
-     x="0"
-     y="0"
-     width="32"
-     height="32"
-     style="fill:none;" /><path
-     d="M 0.53699037,22.348364 10.875312,31.487552 14.560563,18.190194 Z"
-     style="fill:#ff87a9;stroke-width:1.46414"
-     id="path1" /><path
-     d="m 16.207726,0.9323259 0.357251,6.9297945 6.071806,-3.3587468 z"
-     style="fill:#ff87a9;stroke-width:1.46414"
-     id="path2" /><path
-     d="m 26.210759,25.994083 -5.039585,2.7277 -2.7277,-5.039584 5.039584,-2.727701 z"
-     style="fill:#dc87ff;stroke-width:1.46414"
-     id="path3" /><path
-     d="m 20.71729,15.34829 3.329464,-7.6662593 7.657474,3.3265363 -3.329464,7.666259 z"
-     style="fill:#62cdf9;stroke-width:1.46414"
-     id="path4" /><circle
-     cx="14.531281"
-     cy="13.053976"
-     r="2.5051508"
-     style="fill:#62cdf9;stroke-width:1.46414"
-     id="circle4" /><circle
-     cx="5.8635468"
-     cy="6.2603469"
-     r="5.3280206"
-     style="fill:#7d87ff;stroke-width:1.46414"
-     id="circle5" /></svg>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<path d="m3.5 20.9 8.3 7.33 2.96-10.7z" fill="#ff87a9"/>
+<path d="m16.1 3.74 0.287 5.56 4.87-2.69z" fill="#ff87a9"/>
+<path d="m21.9 19.8 2.19 4.04-4.04 2.19-2.19-4.04z" fill="#dc87ff"/>
+<path d="m25.8 18-6.15-2.67 2.67-6.15 6.15 2.67z" fill="#62cdf9"/>
+<circle cx="14.7" cy="13.5" r="2.01" fill="#62cdf9" />
+<circle cx="7.77" cy="8.02" r="4.27" fill="#7d87ff" />
+</svg>

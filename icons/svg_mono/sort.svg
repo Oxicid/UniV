@@ -1,28 +1,9 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-50.4,0)">
-        <g id="Sort" transform="matrix(1,0,0,1,26,0)">
-            <rect x="184" y="0" width="32" height="32" style="fill:none;"/>
-            <clipPath id="_clip1">
-                <rect x="184" y="0" width="32" height="32"/>
-            </clipPath>
-            <g clip-path="url(#_clip1)">
-                <g transform="matrix(1,0,0,1,0,-0.685185)">
-                    <g transform="matrix(-1.20833,-1.47978e-16,2.26089e-16,-1.84615,491.5,55.1076)">
-                        <rect x="228" y="16" width="24" height="2" style="fill:rgb(199,199,199);"/>
-                    </g>
-                    <g transform="matrix(0.417792,-5.11648e-17,-7.01689e-16,-5.72972,102.67,110.622)">
-                        <path d="M252.923,16L240.462,17.454L228,16L252.923,16Z" style="fill:rgb(139,198,161);"/>
-                    </g>
-                    <g transform="matrix(-7.85371e-17,-1.28261,-1.28261,7.85371e-17,210.087,370.381)">
-                        <circle cx="278" cy="14" r="4" style="fill:rgb(139,198,161);"/>
-                    </g>
-                    <g transform="matrix(0.25,-3.1323e-17,-3.63153e-16,-3.03463,153,67.5002)">
-                        <rect x="228" y="16" width="24" height="2" style="fill:rgb(139,198,161);"/>
-                    </g>
-                </g>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m22 17-4.5-7-4.5 7.04z" fill="#8bc6a1"/>
+<circle cx="7.5" cy="12.5" r="4.5" fill="#8bc6a1"/>
+<rect x="24" y="12" width="5" height="5" fill="#8bc6a1"/>
+
+<rect x="3" y="20" width="26" height="3" fill="#c7c7c7"/>
+
 </svg>

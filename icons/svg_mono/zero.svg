@@ -1,21 +1,10 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-10.08,-40.56)">
-        <g id="Zero" transform="matrix(1,0,0,1,-10.4638,169)">
-            <rect x="52.464" y="0" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(0.720725,0.720725,-0.720725,0.720725,-767.672,-848.347)">
-                <path d="M1181.4,23.929L1181.4,34.359L1178.4,34.359L1178.4,24.071C1174.15,23.532 1170.86,19.898 1170.86,15.5C1170.86,10.731 1174.73,6.86 1179.5,6.86C1184.27,6.86 1188.14,10.731 1188.14,15.5C1188.14,19.614 1185.26,23.061 1181.4,23.929ZM1179.5,9.14C1175.99,9.14 1173.14,11.99 1173.14,15.5C1173.14,19.01 1175.99,21.86 1179.5,21.86C1183.01,21.86 1185.86,19.01 1185.86,15.5C1185.86,11.99 1183.01,9.14 1179.5,9.14Z" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(0.320498,0,0,0.320498,-58.562,12.1832)">
-                <circle cx="397" cy="8" r="6" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(0.320498,0,0,0.320498,-53.2399,12.1832)">
-                <circle cx="397" cy="8" r="6" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(0.320498,0,0,0.320498,-55.8789,7.65286)">
-                <circle cx="397" cy="8" r="6" style="fill:rgb(199,199,199);"/>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m14.1 20.4-7.52 7.52-2.16-2.16 7.41-7.41c-2.67-3.45-2.43-8.44 0.743-11.6 3.44-3.44 9.02-3.44 12.5 0 3.44 3.44 3.44 9.02 0 12.5-2.97 2.97-7.53 3.37-10.9 1.22zm9.29-12c-2.53-2.53-6.64-2.53-9.17 0-2.53 2.53-2.53 6.64 0 9.17 2.53 2.53 6.64 2.53 9.17 0 2.53-2.53 2.53-6.64 0-9.17z" fill="#8bc6a1"/>
+<g fill="#c7c7c7">
+<circle cx="16.2" cy="14.7" r="1.92"/>
+<circle cx="21.5" cy="14.7" r="1.92"/>
+<circle cx="18.9" cy="10.2" r="1.92"/>
+
+</g>
 </svg>

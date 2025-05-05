@@ -5,9 +5,22 @@ import bpy
 import gpu
 import typing
 
-from mathutils import Vector
+from mathutils import Vector, Color
 from bmesh.types import BMLoop
+from bl_math import clamp
 
+
+def rgb_to_hex(rgb):
+    return f"#{int(clamp(rgb[0]) * 255.0):02x}" \
+           f"{int(clamp(rgb[1]) * 255.0):02x}" \
+           f"{int(clamp(rgb[2]) * 255.0):02x}"
+
+
+def hex_to_rgb(hexcode):
+    import binascii
+    unhex = binascii.unhexlify(hexcode[1:])
+    assert len(unhex) == 3, f"Expected hexcode size - 7, given size - {len(hexcode)}"
+    return Color(unhex) / 255
 
 def hsv_to_rgb(h, s, v):
     """Saturate is mutable"""

@@ -15,7 +15,7 @@ except ImportError:
 
 UV_LAYERS_ENABLE = True
 
-def prefs():
+def prefs() -> 'UNIV_AddonPreferences':
     return bpy.context.preferences.addons[__package__].preferences
 
 def univ_settings() -> 'UNIV_Settings':
@@ -231,7 +231,40 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
         default='COLOR',
         update=lambda self, _:__import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
+    icon_size: EnumProperty(name='Icon Size',
+        items=(('32', '32', ''), ('64', '64', ''), ('128', '128', ''), ('256', '256', '')),
+        default='32')
+    icon_antialiasing: EnumProperty(name='Anti-Aliasing',
+        items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
+        default='4')
+    # ----------
+    # Mono
+    icon_mono_green: FloatVectorProperty(name='Green',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.258181, 0.564712, 0.3564003, 1))  #8bc6a1
 
+    icon_mono_gray: FloatVectorProperty(name='Grey Color',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.5711, 0.5711, 0.5711, 1))  #c7c7c7
+
+    # Colored
+    icon_colored_violet: FloatVectorProperty(name='Violet',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.20505, 0.24228, 1, 1))  #7d87ff
+
+    icon_colored_cian: FloatVectorProperty(name='Cian',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.1221, 0.6105, 0.9473, 1))  #62cdf9
+
+    icon_colored_purple: FloatVectorProperty(name='Purple',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.71569, 0.24228, 1, 1))  #dc87ff
+
+    icon_colored_pink: FloatVectorProperty(name='Pink',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 0.24228, 0.396755, 1))  #ff87a9
+    # Common
+    icon_white_color: FloatVectorProperty(name='White Color',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 1, 1, 1))  #ffffff
+
+    icon_select_arrow_color: FloatVectorProperty(name='Select Arrow Color',
+        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.83879, 0.83879, 0.83879, 1))  #ececec
+
+    # ----------
     keymap_workspace_filter: EnumProperty(name='Workspace Filter',
         items=(
             ('ALL', 'All', ''),
@@ -283,10 +316,46 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.prop(self, 'enable_uv_layers_sync_borders_seam')
 
         elif self.tab == 'UI':
-            layout.prop(self, 'color_mode')
             layout.prop(self, 'show_view_3d_panel')
             layout.prop(self, 'panel_3d_view_category')
             layout.prop(self, 'show_split_toggle_uv_button')
+            layout.separator()
+            box = layout.box()
+            box.prop(self, 'color_mode')
+
+            split = box.split()
+            col = split.column()
+
+            if self.color_mode == 'MONO':
+                col.label(text="Green Color:")
+                col.label(text="Gray Color:")
+            else:
+                col.label(text="Violet Color:")
+                col.label(text="Cian Color:")
+                col.label(text="Purple Color:")
+                col.label(text="Pink Color:")
+
+            col.label(text="White Color:")
+            col.label(text="Select Arrow Color:")
+            col = split.column()
+            if self.color_mode == 'MONO':
+                col.prop(self, "icon_mono_green", text="")
+                col.prop(self, "icon_mono_gray", text="")
+            else:
+                col.prop(self, "icon_colored_violet", text="")
+                col.prop(self, "icon_colored_cian", text="")
+                col.prop(self, "icon_colored_purple", text="")
+                col.prop(self, "icon_colored_pink", text="")
+
+            col.prop(self, "icon_white_color", text="")
+            col.prop(self, "icon_select_arrow_color", text="")
+
+            box_row = box.row()
+            box_row.prop(self, 'icon_size')
+            box_row.prop(self, 'icon_antialiasing', text='AA')
+            box_row = box.row(align=True)
+            box_row.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
+            box_row.operator('wm.univ_icons_generator', text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()

@@ -1,18 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-124.08,-60.96)">
-        <g id="Select-Stacked" serif:id="Select Stacked" transform="matrix(1,0,0,1,-2,0)">
-            <rect x="519" y="254" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(1.19647,0,0,1.19647,524.567,241.702)">
-                <path d="M5.377,19.472L5.377,17.8L14.571,17.8L14.571,26.994L12.899,26.994L12.899,19.472L5.377,19.472Z" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(1,0,0,1,524,249)">
-                <rect x="4" y="18" width="10" height="10" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(0.849245,0,0,0.849245,-432.29,256.645)">
-                <path d="M1153.13,29.856L1124.87,29.856L1124.87,1.595L1153.13,1.595L1153.13,29.856ZM1150.78,3.95L1127.23,3.95L1127.23,27.501L1150.78,27.501L1150.78,3.95Z" style="fill:rgb(139,198,161);"/>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" version="1.1" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m12 11v-2h11v11h-2v-9z" fill="#c7c7c7"/>
+<rect x="9" y="13" width="10" height="10" fill="#c7c7c7"/>
+<path d="m28 28h-24v-24h24zm-2-22h-20v20h20z" fill="#8bc6a1"/>
+
 </svg>

@@ -1,18 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-20.16,0)">
-        <g id="Orient" transform="matrix(1,0,0,1,39,0)">
-            <rect x="45" y="0" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(0.94308,0,0,0.924122,3.31845,2.36543)">
-                <path d="M54.513,5.561L57.299,8.636L48.282,9.909L49.57,1L52.732,3.704C55.049,2.004 57.908,1 61,1C66.931,1 72.006,4.696 74.044,9.909L71.262,9.909C69.387,6.139 65.494,3.545 61,3.545C58.593,3.545 56.358,4.29 54.513,5.561Z" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(-0.94308,-1.15494e-16,1.13172e-16,-0.924122,118.682,29.6346)">
-                <path d="M54.513,5.561L57.299,8.636L48.282,9.909L49.57,1L52.732,3.704C55.049,2.004 57.908,1 61,1C66.931,1 72.006,4.696 74.044,9.909L71.262,9.909C69.387,6.139 65.494,3.545 61,3.545C58.593,3.545 56.358,4.29 54.513,5.561Z" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(0.899852,0,0,0.436519,5.65909,8.79743)">
-                <rect x="48" y="13" width="27" height="7" style="fill:rgb(199,199,199);"/>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m9.73 7.98 2.63 2.84-8.5 1.18 1.21-8.23 2.98 2.5c2.19-1.57 4.88-2.5 7.8-2.5 5.59 0 10.2 3.42 12.2 8.23h-2.63c-1.77-3.48-5.29-5.88-9.52-5.88-2.27 0-4.38 0.688-6.12 1.86z" fill="#8bc6a1"/>
+<path d="m22.3 24-2.63-2.84 8.36-1.18-1.07 8.23-2.98-2.5c-2.19 1.57-4.88 2.5-7.8 2.5-5.59 0-10.2-3.42-12.2-8.23h2.6c1.77 3.48 5.32 5.88 9.55 5.88 2.27 0 4.38-0.688 6.12-1.86z" fill="#8bc6a1"/>
+<rect x="4" y="14" width="24" height="3" fill="#c7c7c7"/>
+
 </svg>

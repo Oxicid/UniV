@@ -1,20 +1,10 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.5;">
-    <g transform="matrix(0.24,0,0,0.24,-40.32,-30.48)">
-        <g id="Cursor" transform="matrix(1,0,0,1,115.536,127)">
-            <rect x="52.464" y="0" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(0.916667,0,0,0.916667,5.70532,1.33333)">
-                <g transform="matrix(1.0645,0,0,0.517044,-1076.94,16)">
-                    <path d="M1078.05,-25.912C1083.45,-24.113 1087.71,-15.33 1088.59,-4.22L1086.43,-4.22C1085.6,-12.911 1082.27,-19.766 1078.05,-21.468L1078.05,-25.912ZM1073.95,25.912C1068.55,24.113 1064.29,15.33 1063.41,4.22L1065.57,4.22C1066.4,12.911 1069.73,19.766 1073.95,21.468L1073.95,25.912Z" style="fill:rgb(139,198,161);stroke:rgb(139,198,161);stroke-width:1.3px;"/>
-                </g>
-                <g transform="matrix(1.0645,0,0,0.517044,-1058.84,16)">
-                    <path d="M1046.41,-4.22C1047.29,-15.33 1051.55,-24.113 1056.95,-25.912L1056.95,-21.468C1052.73,-19.766 1049.4,-12.911 1048.57,-4.22L1046.41,-4.22ZM1071.59,4.22C1070.71,15.33 1066.45,24.113 1061.05,25.912L1061.05,21.468C1065.27,19.766 1068.6,12.911 1069.43,4.22L1071.59,4.22Z" style="fill:rgb(199,199,199);stroke:rgb(199,199,199);stroke-width:1.3px;stroke-linecap:round;"/>
-                </g>
-                <g transform="matrix(1.13103,0,0,0.904827,-1129.3,-0.739297)">
-                    <path d="M1060,11L1060,16L1058,16L1058,11L1060,11ZM1065,19.75L1061,19.75L1061,17.25L1065,17.25L1065,19.75ZM1060,21L1060,26L1058,26L1058,21L1060,21ZM1057,19.75L1053,19.75L1053,17.25L1057,17.25L1057,19.75Z" style="fill:white;"/>
-                </g>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m17 10v4h-2v-4zm5 7h-4v-2h4zm-5 1v4h-2v-4zm-3-1h-4v-2h4z" fill="#ffffff"/>
+
+<path d="m3.07 17c0.508 6.36 5.56 11.4 11.9 11.9v-2.51c-4.98-0.49-8.93-4.43-9.42-9.42z" fill="#8bc6a1"/>
+<path d="m26.4 17c-0.493 4.98-4.44 8.93-9.42 9.42v2.51c6.36-0.506 11.4-5.56 11.9-11.9z" fill="#c7c7c7"/>
+<path d="m17 3.07v2.51c5 0.478 8.95 4.42 9.45 9.42h2.51c-0.509-6.38-5.58-11.4-12-11.9z" fill="#8bc6a1"/>
+<path d="m15 3.08c-6.36 0.506-11.4 5.56-11.9 11.9h2.51c0.493-4.98 4.44-8.93 9.42-9.42z" fill="#c7c7c7"/>
+
 </svg>

@@ -1,18 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-30,-82.08)">
-        <g id="Vertical-A" serif:id="Vertical A" transform="matrix(0.914286,0,0,0.914286,163.4,306.343)">
-            <rect x="-42" y="39" width="35" height="35" style="fill:none;"/>
-            <g id="Shift" transform="matrix(1.09375,0,0,1.09375,-42,39)">
-                <rect x="0" y="0" width="32" height="32" style="fill:none;"/>
-            </g>
-            <g transform="matrix(1.47808,0,0,1.47808,-48.3333,32.8507)">
-                <path d="M8.915,10.08L11.018,8.316L17.291,15.952L10.954,23.662L8.834,21.92L13.724,15.97L8.915,10.08Z" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(1.47808,0,0,1.47808,-48.3333,32.8507)">
-                <path d="M17.291,10.102L19.393,8.338L25.644,15.952L19.411,23.71L17.291,21.968L22.077,15.97L17.291,10.102Z" style="fill:rgb(199,199,199);"/>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<path d="m6.25 8 2.85-2.35 8.48 10.3-8.56 10.5-2.86-2.5 6.6-8z" fill="#8bc6a1"/>
+<path d="m17.6 8 2.82-2.35 8.46 10.3-8.41 10.5-2.87-2.5 6.42-8z" fill="#c7c7c7"/>
 </svg>

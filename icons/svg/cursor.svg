@@ -1,71 +1,10 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="100%"
-   height="100%"
-   viewBox="0 0 32 32"
-   version="1.1"
-   xml:space="preserve"
-   style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;"
-   id="svg6"
-   sodipodi:docname="univ_icon_cursor.svg"
-   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns="http://www.w3.org/2000/svg"
-   xmlns:svg="http://www.w3.org/2000/svg"><defs
-     id="defs6" /><sodipodi:namedview
-     id="namedview6"
-     pagecolor="#ffffff"
-     bordercolor="#000000"
-     borderopacity="0.25"
-     inkscape:showpageshadow="2"
-     inkscape:pageopacity="0.0"
-     inkscape:pagecheckerboard="0"
-     inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="18.893009"
-     inkscape:cx="12.570787"
-     inkscape:cy="15.481917"
-     inkscape:window-width="1920"
-     inkscape:window-height="1057"
-     inkscape:window-x="-8"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg6" /><rect
-     id="Cursor"
-     x="0"
-     y="0"
-     width="32"
-     height="32"
-     style="fill:none;" /><g
-     id="g6"
-     transform="matrix(1.4468985,0,0,1.4468985,-7.1503768,-7.1503768)"><path
-       d="m 6.885,16.976 c 0.453,4.272 3.846,7.673 8.115,8.137 v 1.842 C 9.718,26.478 5.508,22.261 5.043,16.976 Z"
-       style="fill:#7d87ff"
-       id="path1" /><path
-       d="M 26.957,16.976 C 26.492,22.261 22.282,26.478 17,26.955 v -1.842 c 4.269,-0.464 7.662,-3.865 8.115,-8.137 z"
-       style="fill:#ff87a9"
-       id="path2" /><path
-       d="M 5.029,15.19 C 5.42,9.828 9.663,5.527 15,5.045 V 6.887 C 10.676,7.357 7.25,10.84 6.869,15.19 Z"
-       style="fill:#ff87a9"
-       id="path3" /><path
-       d="m 17,5.045 c 5.337,0.482 9.58,4.783 9.971,10.145 h -1.84 C 24.75,10.84 21.324,7.357 17,6.887 Z"
-       style="fill:#7d87ff"
-       id="path4" /><rect
-       x="15.083"
-       y="10.5"
-       width="1.8329999"
-       height="3.6670001"
-       style="fill:#ffffff"
-       id="rect4" /><path
-       d="M 21.5,16.917 H 17.833 V 15.083 H 21.5 Z"
-       style="fill:#ffffff"
-       id="path5" /><rect
-       x="15.083"
-       y="17.833"
-       width="1.8329999"
-       height="3.6670001"
-       style="fill:#ffffff"
-       id="rect5" /><path
-       d="M 14.167,16.917 H 10.5 v -1.834 h 3.667 z"
-       style="fill:#ffffff"
-       id="path6" /></g></svg>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+
+<path d="m17 10v4h-2v-4zm5 7h-4v-2h4zm-5 1v4h-2v-4zm-3-1h-4v-2h4z" fill="#ffffff"/>
+
+<path d="m3.07 17c0.508 6.36 5.56 11.4 11.9 11.9v-2.51c-4.98-0.49-8.93-4.43-9.42-9.42z" fill="#7d87ff"/>
+<path d="m26.4 17c-0.493 4.98-4.44 8.93-9.42 9.42v2.51c6.36-0.506 11.4-5.56 11.9-11.9z" fill="#ff87a9"/>
+<path d="m17 3.07v2.51c5 0.478 8.95 4.42 9.45 9.42h2.51c-0.509-6.38-5.58-11.4-12-11.9z" fill="#7d87ff"/>
+<path d="m15 3.08c-6.36 0.506-11.4 5.56-11.9 11.9h2.51c0.493-4.98 4.44-8.93 9.42-9.42z" fill="#ff87a9"/>
+
+</svg>

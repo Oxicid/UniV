@@ -1,33 +1,14 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 8 8" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
-    <g transform="matrix(0.24,0,0,0.24,-50.4,-10.0742)">
-        <g id="Pack" transform="matrix(1,0,0,1,104,41.9759)">
-            <rect x="106" y="0" width="32" height="32" style="fill:none;"/>
-            <g transform="matrix(1.12592,0,0,1.08571,-518.369,-1.46979)">
-                <rect x="559" y="6" width="6" height="14" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(1.4074,2.58959e-32,0,0.300132,-675.717,20.977)">
-                <rect x="559" y="6" width="6" height="14" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(0.844443,0,0,1.26666,-358.488,-5.08883)">
-                <rect x="567" y="16" width="4" height="4" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(1.12592,0,0,1.12932,-518.932,-1.75179)">
-                <rect x="573" y="6" width="6" height="3" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(9.47966e-17,-1.54815,0.482539,2.9547e-17,123.327,885.658)">
-                <rect x="559" y="6" width="6" height="14" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(1.05555,0,0,1.05555,-479.666,-0.444393)">
-                <rect x="570" y="22" width="4" height="4" style="fill:rgb(139,198,161);"/>
-            </g>
-            <g transform="matrix(1.05555,0,0,1.05555,-472.91,-0.444393)">
-                <rect x="570" y="22" width="4" height="4" style="fill:rgb(199,199,199);"/>
-            </g>
-            <g transform="matrix(-0.562962,-9.394e-17,5.18854e-17,-0.544311,438.385,15.9103)">
-                <rect x="559" y="6" width="6" height="14" style="fill:rgb(199,199,199);"/>
-            </g>
-        </g>
-    </g>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<g fill="#8bc6a1">
+<rect x="5" y="5" width="7" height="16"/>
+<rect x="20" y="10" width="7" height="11"/>
+<rect x="16" y="23" width="4" height="4"/>
+</g>
+<g fill="#c7c7c7">
+<rect x="5" y="23" width="8" height="4"/>
+<rect x="23" y="23" width="4" height="4"/>
+<rect x="14" y="15" width="4" height="6"/>
+<rect x="14" y="5" width="4" height="8"/>
+<rect x="20" y="5" width="7" height="3"/>
+</g>
 </svg>
