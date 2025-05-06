@@ -1940,12 +1940,13 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     bl_description = "Randomize selected UV islands or faces"
     bl_options = {'REGISTER', 'UNDO'}
 
-    between: BoolProperty(name='Between', default=False)
-    bound_between: EnumProperty(name='Bound Between', default='OFF', items=(('OFF', 'Off', ''), ('CROP', 'Crop', ''), ('CLAMP', 'Clamp', '')))
+    between: BoolProperty(name='Shaffle', default=False)
+    bound_between: EnumProperty(name='Bound Shaffle', default='OFF', items=(('OFF', 'Off', ''), ('CROP', 'Crop', ''), ('CLAMP', 'Clamp', '')))
     round_mode: EnumProperty(name='Round Mode', default='OFF', items=(('OFF', 'Off', ''), ('INT', 'Int', ''), ('STEPS', 'Steps', '')))
     steps: FloatVectorProperty(name='Steps', description="Incorrectly works with Within Image Bounds",
                                default=(0, 0), min=0, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
     strength: FloatVectorProperty(name='Strength', default=(1, 1), min=-10, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
+    flip_strength: FloatVectorProperty(name='Flip', default=(0, 0), min=0, max=1, size=2, subtype='XYZ')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     rotation: FloatProperty(name='Rotation Range', default=0, min=0, soft_max=math.pi * 2, subtype='ANGLE',
         update=lambda self, _: setattr(self, 'rotation_steps', self.rotation) if self.rotation < self.rotation_steps else None)
@@ -1972,6 +1973,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             if self.round_mode == 'STEPS':
                 layout.prop(self, 'steps', slider=True)
             layout.prop(self, 'strength', slider=True)
+        layout.prop(self, 'flip_strength', slider=True)
 
         if self.bound_between != 'CROP':
             layout.prop(self, 'scale_factor', slider=True)
@@ -2072,8 +2074,11 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             rand_rotation = random.uniform(-self.rotation, self.rotation)
             random.seed(seed + 1000)
             rand_scale = random.uniform(self.min_scale, self.max_scale)
+            flip_x = random.choices([-1, 1], weights=[self.flip_strength[0], 1 - self.flip_strength[0]], k=1)[0]
+            flip_y = random.choices([-1, 1], weights=[self.flip_strength[1], 1 - self.flip_strength[1]], k=1)[0]
 
-            if self.bool_bounds or self.rotation or self.scale_factor != 0:
+            if (self.bool_bounds or self.rotation or
+                    self.scale_factor != 0 or -1 in (flip_x, flip_y)):
 
                 bb = island.bbox
                 if bb.min_length == 0:
@@ -2111,6 +2116,9 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                     scale = Vector((scale, scale))
                     island.scale(scale, pivot=vec_origin)
                     bb.scale(scale)
+
+                if -1 in (flip_x, flip_y):
+                    island.scale(Vector((flip_x, flip_y)), pivot=vec_origin)
 
                 if self.bool_bounds:
                     to_center_delta = Vector((0.5, 0.5)) - vec_origin
@@ -2153,6 +2161,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
         random.seed(self.seed)
         random.shuffle(shaffle_island_bboxes)
 
+
         for e_seed, island in enumerate(self.all_islands, start=100):
             seed = e_seed + self.seed
             random.seed(seed)
@@ -2160,7 +2169,13 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             random.seed(seed + 1000)
             rand_scale = random.uniform(self.min_scale, self.max_scale)
 
+            flip_x = random.choices([-1, 1], weights=[self.flip_strength[0], 1 - self.flip_strength[0]], k=1)[0]
+            flip_y = random.choices([-1, 1], weights=[self.flip_strength[1], 1 - self.flip_strength[1]], k=1)[0]
+
             bb = island.bbox
+            if -1 in (flip_x, flip_y):
+                island.scale(Vector((flip_x, flip_y)), pivot=bb.center)
+
             if self.rotation or self.scale_factor != 0:
                 if bb.min_length == 0:
                     self.non_valid_counter += 1
