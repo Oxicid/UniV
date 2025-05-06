@@ -376,8 +376,12 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.separator()
 
             sub_row = row.row(align=True)
-            sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
-            sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
+            if bpy.app.version >= (3, 3, 0):
+                sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
+                sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
+            else:
+                sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA')
+                sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET')
 
             layout.label(
                 text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
