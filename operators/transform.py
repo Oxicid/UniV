@@ -2067,7 +2067,6 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             self.all_islands = self.calc_overlapped_island_groups(_islands)
 
     def random(self):
-        bb_general = BBox()
         for e_seed, island in enumerate(self.all_islands, start=100):
             seed = e_seed + self.seed
             random.seed(seed)
@@ -2086,6 +2085,8 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                     continue
 
                 vec_origin = bb.center
+                if -1 in (flip_x, flip_y):
+                    island.scale(Vector((flip_x, flip_y)), pivot=vec_origin)
 
                 if self.rotation:
                     angle = rand_rotation
@@ -2102,6 +2103,8 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 
                 scale = bl_math.lerp(1.0, rand_scale, self.scale_factor)
 
+                # We choose a scale of 100 units on purpose, in case it will not be changed,
+                # then the conditional check will not pass.
                 new_scale = 100
                 # Reset the scale to 0.5 to fit in the tile.
                 if self.bool_bounds:
@@ -2117,22 +2120,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                     island.scale(scale, pivot=vec_origin)
                     bb.scale(scale)
 
-                if -1 in (flip_x, flip_y):
-                    island.scale(Vector((flip_x, flip_y)), pivot=vec_origin)
-
-                if self.bool_bounds:
-                    to_center_delta = Vector((0.5, 0.5)) - vec_origin
-                    island.move(to_center_delta)
-                    bb.move(to_center_delta)
-                    bb_general.union(bb)
-
-            if self.bool_bounds:
-                move = Vector((
-                    min(bb_general.xmin, abs(1 - bb_general.xmax)) * max(min(self.strength.x, 1), -1),
-                    min(bb_general.ymin, abs(1 - bb_general.ymax)) * max(min(self.strength.y, 1), -1)
-                ))
-            else:
-                move = Vector((self.strength.x, self.strength.y))
+            move = Vector((self.strength.x, self.strength.y))
 
             if not (move.x or move.y):
                 continue
@@ -2155,6 +2143,20 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 
             if not self.bool_bounds:
                 island.move(randmove)
+            else:
+                min_bb_prev = island.bbox.tile_from_center
+                bb = island.calc_bbox()
+                try:
+                    wrap_x = self.wrap_line(bb.xmin+randmove.x, bb.width, min_bb_prev.x, min_bb_prev.x+1)
+                except ZeroDivisionError:
+                    wrap_x = bb.min.x
+                try:
+                    wrap_y = self.wrap_line(bb.ymin+randmove.y, bb.height, min_bb_prev.y, min_bb_prev.y+1)
+                except ZeroDivisionError:
+                    wrap_y = bb.min.y
+                # TODO: Crop island if max_length > 1.0
+                delta = Vector((wrap_x, wrap_y))
+                island.set_position(delta, bb.min)
 
     def random_between(self):
         shaffle_island_bboxes: list[BBox] = [isl.bbox.copy() for isl in self.all_islands]
@@ -2233,6 +2235,10 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 
             crop_scale = min(width_scale, height_scale)
             island.scale(Vector((crop_scale, crop_scale)), bb.center)
+
+    @staticmethod
+    def wrap_line(x, width, a, b):
+        return (x - a) % (b - a - width) + a
 
     @staticmethod
     def round_threshold(a, min_clip):
