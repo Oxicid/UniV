@@ -335,6 +335,10 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             if not selected:
                 self.umeshes.umeshes.remove(umesh)
                 continue
+
+            if isinstance(selected, types.MeshIslands):
+                selected = selected.to_adv_islands()
+
             selected.indexing()
 
             for sel_isl in selected:
