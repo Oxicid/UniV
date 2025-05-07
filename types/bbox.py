@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
+from math import inf
 import copy
 import typing
 from mathutils import Vector, Matrix
@@ -600,3 +601,20 @@ class BBox:
 
     def __or__(self, other: 'BBox'):
         return self.union(other)
+
+class BBox3D:
+    def __init__(self, xyz_min=Vector((-inf, -inf, -inf)), xyz_max=Vector((inf, inf, inf))):
+        self.min = xyz_min
+        self.max = xyz_max
+
+    @classmethod
+    def get_from_umesh(cls, umesh):
+        return cls(Vector(umesh.obj.bound_box[0]), Vector(umesh.obj.bound_box[6]))
+
+    def to_bbox_2d(self, axis: typing.Literal['x', 'y', 'z']):
+        if axis == 'z':
+            return BBox(self.min.x, self.max.x, self.min.y, self.max.y)
+        elif axis == 'y':
+            return BBox(self.min.y, self.max.y, self.min.z, self.max.z)
+        else:
+            return BBox(self.min.x, self.max.x, self.min.z, self.max.z)

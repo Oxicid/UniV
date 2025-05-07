@@ -364,6 +364,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row.operator('mesh.univ_checker', icon_value=icons.checker)
         row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
+        col_align.label(text='Other')
+        row = col_align.row(align=True)
+        row.operator('mesh.univ_flatten')
+
         UNIV_PT_General.draw_uv_layers(layout)
 
 

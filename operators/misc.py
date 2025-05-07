@@ -1130,8 +1130,13 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
     # def invoke(self, context, event):
     #     if event.value == 'PRESS':
     #         return self.execute(context)
-    #     self.sorted_by_name = event.alt  # TODO: Add sorted by name
+    #
+    #     self.lock_overlap = event.shift
     #     return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
         if not (objects := utils.calc_any_unique_obj()):
@@ -1192,3 +1197,105 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
             self.report({'WARNING'}, info)
 
         return {'FINISHED'}
+
+class UNIV_OT_Flatten(Operator):
+    bl_idname = 'mesh.univ_flatten'
+    bl_label = 'Flatten'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Convert 3d coords to 2D from uv map"
+
+    axis: bpy.props.EnumProperty(name="Axis", default='z', items=(
+                                    ('z', 'Bottom', ''),
+                                    ('y', 'Side', ''),
+                                    ('x', 'Front', '')))
+    # use_shape_keys: BoolProperty(name='Use Shape Keys', default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes: UMeshes | None = None
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
+        self.use_shape_keys = False
+
+    def execute(self, context):
+        self.umeshes = UMeshes(report=self.report)
+        self.umeshes.fix_context()
+        self.umeshes.set_sync()
+        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
+
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+            if selected_umeshes:
+                for umesh in self.umeshes:
+                    uv = umesh.uv
+                    split_edges = set()
+                    for f in (selected_faces := utils.calc_selected_uv_faces(umesh)):
+                        for crn in f.loops:
+                            if not crn.link_loop_radial_prev.face.select:
+                                split_edges.add(crn.edge)
+                                continue
+                            if utils.is_boundary_sync(crn, uv):
+                                split_edges.add(crn.edge)
+                    if split_edges:
+                        bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                        umesh.bm.select_flush(True)
+                    self.apply_coords(selected_faces, umesh)
+            else:
+                for umesh in self.umeshes:
+                    uv = umesh.uv
+                    split_edges = set()
+                    for f in (visible_faces := utils.calc_visible_uv_faces(umesh)):
+                        for crn in f.loops:
+                            if utils.is_boundary_sync(crn, uv):
+                                split_edges.add(crn.edge)
+                    bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                    self.apply_coords(visible_faces, umesh)
+        else:
+            for umesh in self.umeshes:
+                uv = umesh.uv
+                split_edges = set()
+                for f in umesh.bm.faces:
+                    for crn in f.loops:
+                        if not utils.is_pair(crn, crn.link_loop_radial_prev, uv):
+                            split_edges.add(crn.edge)
+                bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                self.apply_coords(umesh.bm.faces, umesh)
+
+        ret = self.umeshes.update()
+        self.umeshes.free()
+        return ret
+
+    def apply_coords(self, faces, umesh):
+        uv = umesh.uv
+        bb3d = types.BBox3D.get_from_umesh(umesh)
+        bb = bb3d.to_bbox_2d(self.axis)
+        max_length = bb.max_length
+        delta = Vector((-0.5, -0.5))
+
+        if self.use_shape_keys:
+            if umesh.obj.data.shape_keys:
+                if len(umesh.obj.data.shape_keys.key_blocks) > 1:
+                    for i in range(len(umesh.obj.data.shape_keys.key_blocks)):
+                        bpy.context.object.active_shape_key_index = 0
+                        bpy.ops.object.shape_key_remove(all=False)
+
+            umesh.obj.shape_key_add(name="model", from_mix=True)
+            umesh.obj.shape_key_add(name="uv", from_mix=True)
+            umesh.obj.active_shape_key_index = 1
+            bpy.context.active_object.active_shape_key.value = 1
+        else:
+            for f in faces:
+                for crn in f.loops:
+                    if self.axis == 'z':
+                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d()
+                    elif self.axis == 'y':
+                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().zxy
+                    else:
+                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().xzy
+
+        umesh.bm.normal_update()

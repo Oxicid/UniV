@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 5),
+    "version": (3, 7, 6),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -174,6 +174,8 @@ def load_register_types():
             misc.UNIV_OT_MoveDown,
             misc.UNIV_OT_SetActiveRender,
             misc.UNIV_OT_UV_Layers_Manager,
+            # Mesh
+            misc.UNIV_OT_Flatten,
         ])
 
         if univ_pro:
