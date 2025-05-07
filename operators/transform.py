@@ -208,21 +208,27 @@ class UNIV_OT_Crop(Operator):
 
         scale = Vector((scale_x, scale_y))
         bbox.scale(scale)
-        delta = Vector((padding, padding)) / 2 - bbox.min + offset
+
+        pos_x = utils.wrap_line(bbox.min.x, bbox.width+padding, 0, 1, default=0)
+        pos_y = utils.wrap_line(bbox.min.y, bbox.height+padding, 0, 1, default=0)
+
+        set_pos = Vector((pos_x, pos_y)) + Vector((padding, padding)) / 2
+        set_pos += offset
         if axis == 'XY':
             if inplace:
-                delta += Vector(math.floor(val) for val in bbox.center)
+                set_pos += bbox.tile_from_center
         elif axis == 'X':
-            delta.y = 0
+            set_pos.y = 0
             if inplace:
-                delta.x += math.floor(bbox.center_x)
+                set_pos.x += math.floor(bbox.center_x)
         else:
-            delta.x = 0
+            set_pos.x = 0
             if inplace:
-                delta.y += math.floor(bbox.center_y)
+                set_pos.y += math.floor(bbox.center_y)
+
         for islands in islands_of_mesh:
             islands.scale(scale, bbox.center)
-            islands.move(delta)
+            islands.set_position(set_pos, bbox.min)
 
     @staticmethod
     def get_event_info():
@@ -2091,7 +2097,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                 if self.rotation:
                     angle = rand_rotation
                     if self.rotation_steps:
-                        angle = self.round_threshold(angle, self.rotation_steps)
+                        angle = utils.round_threshold(angle, self.rotation_steps)
                         # clamp angle in self.rotation
                         if angle > self.rotation:
                             angle -= self.rotation_steps
@@ -2137,23 +2143,18 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             elif self.round_mode == 'STEPS':
                 # TODO bool_bounds for steps
                 if self.steps.x > 1e-05:
-                    randmove.x = self.round_threshold(randmove.x, self.steps.x)
+                    randmove.x = utils.round_threshold(randmove.x, self.steps.x)
                 if self.steps.y > 1e-05:
-                    randmove.y = self.round_threshold(randmove.y, self.steps.y)
+                    randmove.y = utils.round_threshold(randmove.y, self.steps.y)
 
             if not self.bool_bounds:
                 island.move(randmove)
             else:
                 min_bb_prev = island.bbox.tile_from_center
                 bb = island.calc_bbox()
-                try:
-                    wrap_x = self.wrap_line(bb.xmin+randmove.x, bb.width, min_bb_prev.x, min_bb_prev.x+1)
-                except ZeroDivisionError:
-                    wrap_x = bb.min.x
-                try:
-                    wrap_y = self.wrap_line(bb.ymin+randmove.y, bb.height, min_bb_prev.y, min_bb_prev.y+1)
-                except ZeroDivisionError:
-                    wrap_y = bb.min.y
+                wrap_x = utils.wrap_line(bb.xmin+randmove.x, bb.width, min_bb_prev.x, min_bb_prev.x+1, default=bb.min.x)
+                wrap_y = utils.wrap_line(bb.ymin+randmove.y, bb.height, min_bb_prev.y, min_bb_prev.y+1, default=bb.min.y)
+
                 # TODO: Crop island if max_length > 1.0
                 delta = Vector((wrap_x, wrap_y))
                 island.set_position(delta, bb.min)
@@ -2188,7 +2189,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                 if self.rotation:
                     angle = rand_rotation
                     if self.rotation_steps:
-                        angle = self.round_threshold(angle, self.rotation_steps)
+                        angle = utils.round_threshold(angle, self.rotation_steps)
                         # clamp angle in self.rotation
                         if angle > self.rotation:
                             angle -= self.rotation_steps
@@ -2236,13 +2237,6 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             crop_scale = min(width_scale, height_scale)
             island.scale(Vector((crop_scale, crop_scale)), bb.center)
 
-    @staticmethod
-    def wrap_line(x, width, a, b):
-        return (x - a) % (b - a - width) + a
-
-    @staticmethod
-    def round_threshold(a, min_clip):
-        return round(float(a) / min_clip) * min_clip
 
 
 class UNIV_OT_Orient(Operator, utils.OverlapHelper):

@@ -76,6 +76,15 @@ def round_vector_to_cardinal(v):
 def round_threshold(a, min_clip):
     return round(float(a) / min_clip) * min_clip
 
+def wrap_line(start, width, min_bound, max_bound, default=None):
+    try:
+        return (start - min_bound) % (max_bound - min_bound - width) + min_bound
+    except ZeroDivisionError:
+        if default is None:
+            raise ZeroDivisionError
+        else:
+            return default
+
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     line_vec = l_b - l_a
     pt_vec = pt - l_a
