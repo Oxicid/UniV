@@ -121,7 +121,10 @@ class UNIV_PT_General(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator_context = 'INVOKE_DEFAULT'
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
         col = layout.column(align=True)
 
         col.label(text='Transform')
@@ -304,7 +307,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator_context = 'INVOKE_DEFAULT'
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
         col = layout.column(align=True)
 
         col_align = col.column(align=True)
@@ -395,6 +401,7 @@ class UNIV_PT_GlobalSettings(Panel):
         layout.separator()
         layout.prop(settings, 'uv_layers_show')
         layout.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
+        layout.prop(prefs(), 'use_csa_mods')
 
 
 class UNIV_PT_PackSettings(Panel):
@@ -695,7 +702,10 @@ class UNIV_WT_object_VIEW3D(WorkSpaceTool):
 
     # @staticmethod
     # def draw_settings(context, layout, tool):
+    # if prefs().use_csa_mods:
     #     layout.operator_context = 'INVOKE_DEFAULT'
+    # else:
+    #     layout.operator_context = 'EXEC_DEFAULT'
     #     col = layout.column(align=True)
     #
     #     col_align = col.column(align=True)

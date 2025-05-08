@@ -219,6 +219,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='EXTENDED')
 
+    use_csa_mods: bpy.props.BoolProperty(default=True,
+        name="Use Modifier Keys",
+        description="Enable behavior changes based on Ctrl, Shift, and Alt keys when invoking the operator"
+    )
+
     snap_points_default: EnumProperty(name='Default Snap Points',
         items=(
             ('ALL', 'All', ''),
@@ -306,6 +311,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         if self.tab == 'GENERAL':
             layout.prop(self, 'debug')
             layout.prop(self, 'mode')
+            layout.prop(self, 'use_csa_mods')
             layout.separator()
 
             layout.label(text='QuickSnap:')
