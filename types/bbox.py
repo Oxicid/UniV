@@ -618,3 +618,29 @@ class BBox3D:
             return BBox(self.min.y, self.max.y, self.min.z, self.max.z)
         else:
             return BBox(self.min.x, self.max.x, self.min.z, self.max.z)
+
+    @classmethod
+    def calc_bbox(cls, coords):
+        xmin = math.inf
+        xmax = -math.inf
+        ymin = math.inf
+        ymax = -math.inf
+        zmin = math.inf
+        zmax = -math.inf
+
+        for x, y, z in coords:
+            if xmin > x:
+                xmin = x
+            if xmax < x:
+                xmax = x
+            if ymin > y:
+                ymin = y
+            if ymax < y:
+                ymax = y
+
+            if zmin > z:
+                zmin = z
+            if zmax < z:
+                zmax = z
+
+        return cls(Vector((xmin, ymin, zmin)), Vector((xmax, ymax, zmax)))

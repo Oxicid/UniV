@@ -1208,7 +1208,7 @@ class UNIV_OT_Flatten(Operator):
                                     ('z', 'Bottom', ''),
                                     ('y', 'Side', ''),
                                     ('x', 'Front', '')))
-    # use_shape_keys: BoolProperty(name='Use Shape Keys', default=False)
+    use_shape_keys: BoolProperty(name='Use Shape Keys', default=False)
 
     @classmethod
     def poll(cls, context):
@@ -1219,32 +1219,44 @@ class UNIV_OT_Flatten(Operator):
         self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
-        self.use_shape_keys = False
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
         self.umeshes.set_sync()
         self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
+        if not self.umeshes:
+            return self.umeshes.update()
 
         if self.umeshes.is_edit_mode:
             selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+            if not self.umeshes:
+                return self.umeshes.update(info='Not found faces for manipulate')
             if selected_umeshes:
                 for umesh in self.umeshes:
                     uv = umesh.uv
                     split_edges = set()
                     for f in (selected_faces := utils.calc_selected_uv_faces(umesh)):
                         for crn in f.loops:
-                            if not crn.link_loop_radial_prev.face.select:
-                                split_edges.add(crn.edge)
-                                continue
-                            if utils.is_boundary_sync(crn, uv):
+                            if not crn.link_loop_radial_prev.face.select or utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
                     if split_edges:
                         bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                        for e in split_edges:
+                            e.select = True
                         umesh.bm.select_flush(True)
+                    if self.use_shape_keys:
+                        continue
                     self.apply_coords(selected_faces, umesh)
+                if self.use_shape_keys:
+                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+                    for umesh in self.umeshes:
+                        self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
+                        umesh.obj.data.update_tag()
+                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+                    return {'FINISHED'}
+
             else:
                 for umesh in self.umeshes:
                     uv = umesh.uv
@@ -1254,7 +1266,16 @@ class UNIV_OT_Flatten(Operator):
                             if utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
                     bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                    if self.use_shape_keys:
+                        continue
                     self.apply_coords(visible_faces, umesh)
+
+                if self.use_shape_keys:
+                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+                    for umesh in self.umeshes:
+                        self.apply_shape_keys((f for f in umesh.obj.data.polygons if not f.hide), umesh)
+                        umesh.obj.data.update_tag()
+                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
         else:
             for umesh in self.umeshes:
                 uv = umesh.uv
@@ -1263,12 +1284,22 @@ class UNIV_OT_Flatten(Operator):
                     for crn in f.loops:
                         if not utils.is_pair(crn, crn.link_loop_radial_prev, uv):
                             split_edges.add(crn.edge)
-                bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
-                self.apply_coords(umesh.bm.faces, umesh)
+                if split_edges:
+                    bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
+                    umesh.update()
 
-        ret = self.umeshes.update()
+                if self.use_shape_keys:
+                    umesh.free()
+                    self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
+                    umesh.obj.data.update_tag()
+                else:
+                    self.apply_coords(umesh.bm.faces, umesh)
+            if self.use_shape_keys:
+                return {'FINISHED'}
+
+        self.umeshes.silent_update()
         self.umeshes.free()
-        return ret
+        return {'FINISHED'}
 
     def apply_coords(self, faces, umesh):
         uv = umesh.uv
@@ -1277,25 +1308,56 @@ class UNIV_OT_Flatten(Operator):
         max_length = bb.max_length
         delta = Vector((-0.5, -0.5))
 
-        if self.use_shape_keys:
-            if umesh.obj.data.shape_keys:
-                if len(umesh.obj.data.shape_keys.key_blocks) > 1:
-                    for i in range(len(umesh.obj.data.shape_keys.key_blocks)):
-                        bpy.context.object.active_shape_key_index = 0
-                        bpy.ops.object.shape_key_remove(all=False)
-
-            umesh.obj.shape_key_add(name="model", from_mix=True)
-            umesh.obj.shape_key_add(name="uv", from_mix=True)
-            umesh.obj.active_shape_key_index = 1
-            bpy.context.active_object.active_shape_key.value = 1
-        else:
-            for f in faces:
-                for crn in f.loops:
-                    if self.axis == 'z':
-                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d()
-                    elif self.axis == 'y':
-                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().zxy
-                    else:
-                        crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().xzy
+        for f in faces:
+            for crn in f.loops:
+                if self.axis == 'z':
+                    crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d()
+                elif self.axis == 'y':
+                    crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().zxy
+                else:
+                    crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().xzy
 
         umesh.bm.normal_update()
+
+    def apply_shape_keys(self, faces, umesh: types.UMesh):
+        if not umesh.obj.data.shape_keys:
+            bb3d = types.BBox3D.get_from_umesh(umesh)
+        else:
+            base_sk_data = umesh.obj.data.shape_keys.key_blocks[0].data
+            coords = (base_sk_data[i].co for i in range(len(umesh.obj.data.vertices)))
+            bb3d = types.BBox3D.calc_bbox(coords)
+
+        bb = bb3d.to_bbox_2d(self.axis)
+        max_length = bb.max_length
+        delta = Vector((-0.5, -0.5))
+
+        uv_data = umesh.obj.data.uv_layers.active.data
+
+        if not umesh.obj.data.shape_keys:
+            umesh.obj.shape_key_add(name="model", from_mix=True)
+            sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
+        else:
+            if not (sk := umesh.obj.data.shape_keys.key_blocks.get('uv')):
+                sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
+
+        idx = 0
+        for idx, sk_ in enumerate(umesh.obj.data.shape_keys.key_blocks):
+            if umesh.obj.data.shape_keys.key_blocks[idx] == sk:
+                break
+
+        umesh.obj.active_shape_key_index = idx
+        umesh.obj.active_shape_key.value = 1
+
+        corners = umesh.obj.data.loops
+        sk_data = sk.data
+        for poly in faces:
+            for loop_index in poly.loop_indices:
+                uv_co = uv_data[loop_index].uv
+                vert_index = corners[loop_index].vertex_index
+
+                if self.axis == 'z':
+                    sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d()
+                elif self.axis == 'y':
+                    sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().zxy
+                else:
+                    sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().xzy
