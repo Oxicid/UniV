@@ -1204,15 +1204,32 @@ class UNIV_OT_Flatten(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Convert 3d coords to 2D from uv map"
 
-    axis: bpy.props.EnumProperty(name="Axis", default='z', items=(
+    axis: EnumProperty(name="Axis", default='z', items=(
                                     ('z', 'Bottom', ''),
                                     ('y', 'Side', ''),
                                     ('x', 'Front', '')))
-    use_shape_keys: BoolProperty(name='Use Shape Keys', default=False)
+
+    flatten_type: EnumProperty(name="Flatten Type", default='MESH', items=(
+                                    ('MESH', 'Mesh', ''),
+                                    ('SHAPE_KEY', 'Shape Key', ''),
+                                    ('MODIFIER', 'Modifier', '')))
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+    mix_factor: FloatProperty(name='Mix Factor', default=1, min=0, max=1)
+    weld_distance: FloatProperty(name='Weld Distance', default=0.00001, min=0)
 
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        layout.row(align=True).prop(self, 'axis', expand=True)
+        layout.prop(self, 'use_correct_aspect')
+        if self.flatten_type == 'MODIFIER':
+            layout.prop(self, 'mix_factor')
+            layout.prop(self, 'weld_distance')
+        layout.row(align=True).prop(self, 'flatten_type', expand=True)
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1227,12 +1244,18 @@ class UNIV_OT_Flatten(Operator):
         self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         if not self.umeshes:
             return self.umeshes.update()
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=True)
 
         if self.umeshes.is_edit_mode:
             selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
             if not self.umeshes:
                 return self.umeshes.update(info='Not found faces for manipulate')
+
+            if self.apply_gn():
+                return {'FINISHED'}
+
             if selected_umeshes:
                 for umesh in self.umeshes:
                     uv = umesh.uv
@@ -1246,10 +1269,10 @@ class UNIV_OT_Flatten(Operator):
                         for e in split_edges:
                             e.select = True
                         umesh.bm.select_flush(True)
-                    if self.use_shape_keys:
+                    if self.flatten_type == 'SHAPE_KEY':
                         continue
                     self.apply_coords(selected_faces, umesh)
-                if self.use_shape_keys:
+                if self.flatten_type == 'SHAPE_KEY':
                     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
                     for umesh in self.umeshes:
                         self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
@@ -1266,17 +1289,20 @@ class UNIV_OT_Flatten(Operator):
                             if utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
                     bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
-                    if self.use_shape_keys:
+                    if self.flatten_type == 'SHAPE_KEY':
                         continue
                     self.apply_coords(visible_faces, umesh)
 
-                if self.use_shape_keys:
+                if self.flatten_type == 'SHAPE_KEY':
                     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
                     for umesh in self.umeshes:
                         self.apply_shape_keys((f for f in umesh.obj.data.polygons if not f.hide), umesh)
                         umesh.obj.data.update_tag()
                     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
         else:
+            if self.apply_gn():
+                return {'FINISHED'}
+
             for umesh in self.umeshes:
                 uv = umesh.uv
                 split_edges = set()
@@ -1288,13 +1314,13 @@ class UNIV_OT_Flatten(Operator):
                     bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
                     umesh.update()
 
-                if self.use_shape_keys:
+                if self.flatten_type == 'SHAPE_KEY':
                     umesh.free()
                     self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
                     umesh.obj.data.update_tag()
                 else:
                     self.apply_coords(umesh.bm.faces, umesh)
-            if self.use_shape_keys:
+            if self.flatten_type == 'SHAPE_KEY':
                 return {'FINISHED'}
 
         self.umeshes.silent_update()
@@ -1306,6 +1332,8 @@ class UNIV_OT_Flatten(Operator):
         bb3d = types.BBox3D.get_from_umesh(umesh)
         bb = bb3d.to_bbox_2d(self.axis)
         max_length = bb.max_length
+        if umesh.aspect != 1:
+            max_length = self.aspect_to_scale(umesh.aspect).to_2d() * max_length
         delta = Vector((-0.5, -0.5))
 
         for f in faces:
@@ -1329,6 +1357,8 @@ class UNIV_OT_Flatten(Operator):
 
         bb = bb3d.to_bbox_2d(self.axis)
         max_length = bb.max_length
+        if umesh.aspect != 1:
+            max_length = self.aspect_to_scale(umesh.aspect).to_2d() * max_length
         delta = Vector((-0.5, -0.5))
 
         uv_data = umesh.obj.data.uv_layers.active.data
@@ -1361,3 +1391,379 @@ class UNIV_OT_Flatten(Operator):
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().zxy
                 else:
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().xzy
+
+    def apply_gn(self):
+        if self.flatten_type == 'MODIFIER':
+            if bpy.app.version < (4, 1, 0):
+                self.report({'WARNING'}, 'Modifier types is not supported in Blender versions below 4.1')
+                return True
+            node_group = self.get_flatten_node_group()
+            self.create_gn_flatter_modifier(node_group)
+            utils.update_area_by_type('VIEW_3D')
+            return True
+
+    def create_gn_flatter_modifier(self, node_group):
+        axis = {'z': 2, 'y': 3, 'x': 4}
+        for umesh in self.umeshes:
+            has_checker_modifier = False
+
+            for m in umesh.obj.modifiers:
+                if not isinstance(m, bpy.types.NodesModifier):
+                    continue
+                if m.name.startswith('UniV Flatten'):
+                    has_checker_modifier = True
+                    if m.node_group != node_group:
+                        m.node_group = node_group
+
+                    m['Socket_2'] = umesh.uv.name
+                    m['Socket_3'] = axis[self.axis]
+                    m['Socket_4'] = self.aspect_to_scale(umesh.aspect)
+                    m['Socket_5'] = self.weld_distance
+                    m['Socket_6'] = self.mix_factor
+                    umesh.obj.update_tag()
+                    break
+
+            if not has_checker_modifier:
+                m = umesh.obj.modifiers.new(name='UniV Flatten', type='NODES')
+                m.node_group = node_group
+                m['Socket_2'] = umesh.uv.name
+                m['Socket_3'] = axis[self.axis]
+                m['Socket_4'] = self.aspect_to_scale(umesh.aspect)
+                m['Socket_5'] = self.weld_distance
+                m['Socket_6'] = self.mix_factor
+
+    def get_flatten_node_group(self):
+        """Get exist flatten node group"""
+        for ng in reversed(bpy.data.node_groups):
+            if ng.name.startswith('UniV Flatten'):
+                if self.flatten_node_group_is_changed(ng):
+                    if ng.users == 0:
+                        bpy.data.node_groups.remove(ng)
+                else:
+                    return ng
+        return self._create_flatten_node_group()
+
+
+    @staticmethod
+    def flatten_node_group_is_changed(ng):
+        items = ng.interface.items_tree
+        if len(items) != 7:
+            return True
+        expect_types = (
+            'Geometry',
+            'Geometry',
+            'String',
+            'Menu',
+            'Vector',
+            'Float',
+            'Float'
+        )
+        for str_typ, item in zip(expect_types, items):
+            bpy_type = (getattr(bpy.types, 'NodeTreeInterfaceSocket' + str_typ))
+            if not isinstance(item.rna_type, bpy_type):
+                return True
+        return False
+
+    @staticmethod
+    def _create_flatten_node_group():
+        bb = bpy.data.node_groups.new(type='GeometryNodeTree', name="UniV Flatten")
+
+        # Interface
+        # Socket Geometry
+        geometry_socket = bb.interface.new_socket(name="Geometry", in_out='OUTPUT', socket_type='NodeSocketGeometry')
+        geometry_socket.attribute_domain = 'POINT'
+
+        # Socket Geometry
+        geometry_socket_1 = bb.interface.new_socket(name="Geometry", in_out='INPUT', socket_type='NodeSocketGeometry')
+        geometry_socket_1.attribute_domain = 'POINT'
+
+        # Socket UV Map
+        uv_map_socket = bb.interface.new_socket(name="UV Map", in_out='INPUT', socket_type='NodeSocketString')
+        uv_map_socket.default_value = "UVMap"
+        uv_map_socket.subtype = 'NONE'
+        uv_map_socket.attribute_domain = 'POINT'
+
+        # Socket Axis
+        axis_socket = bb.interface.new_socket(name="Axis", in_out='INPUT', socket_type='NodeSocketMenu')
+        axis_socket.attribute_domain = 'POINT'
+        axis_socket.force_non_field = True
+
+        # Socket Aspect Ratio
+        aspect_ratio_socket = bb.interface.new_socket(name="Aspect Ratio", in_out='INPUT', socket_type='NodeSocketVector')
+        aspect_ratio_socket.default_value = (1.0, 1.0, 0.0)
+        aspect_ratio_socket.min_value = 0.01
+        aspect_ratio_socket.max_value = 10000
+        aspect_ratio_socket.default_attribute_name = "Aspect Ratio"
+        aspect_ratio_socket.force_non_field = True
+
+        # Socket Distance
+        distance_socket = bb.interface.new_socket(name="Distance", in_out='INPUT', socket_type='NodeSocketFloat')
+        distance_socket.default_value = 0.00001
+        distance_socket.min_value = 0.0
+        distance_socket.subtype = 'DISTANCE'
+        distance_socket.attribute_domain = 'POINT'
+        distance_socket.force_non_field = True
+
+        # Socket Factor
+        factor_socket = bb.interface.new_socket(name="Factor", in_out='INPUT', socket_type='NodeSocketFloat')
+        factor_socket.default_value = 1.0
+        factor_socket.min_value = 0.0
+        factor_socket.max_value = 1.0
+        factor_socket.subtype = 'FACTOR'
+        factor_socket.attribute_domain = 'POINT'
+        factor_socket.force_non_field = True
+
+        # initialize UniV Flatten nodes
+        # node Group Input
+        group_input = bb.nodes.new("NodeGroupInput")
+
+        # node Group Output
+        group_output = bb.nodes.new("NodeGroupOutput")
+        group_output.is_active_output = True
+
+        # node Split Edges
+        split_edges = bb.nodes.new("GeometryNodeSplitEdges")
+        split_edges.name = "Split Edges"
+
+        # node Set Position
+        set_position = bb.nodes.new("GeometryNodeSetPosition")
+        set_position.name = "Set Position"
+
+        # node Named Attribute
+        named_attribute = bb.nodes.new("GeometryNodeInputNamedAttribute")
+        named_attribute.label = "UV Attribute"
+        named_attribute.data_type = 'FLOAT_VECTOR'
+
+        # node Bounding Box
+        bounding_box = bb.nodes.new("GeometryNodeBoundBox")
+
+        # node Vector Math
+        vector_math = bb.nodes.new("ShaderNodeVectorMath")
+        vector_math.name = "Vector Math"
+        vector_math.operation = 'SUBTRACT'
+
+        # node Separate XYZ
+        separate_xyz_widths = bb.nodes.new("ShaderNodeSeparateXYZ")
+        separate_xyz_widths.label = "BBox Widths"
+
+        # Remap
+        remap_to_center = bb.nodes.new("ShaderNodeVectorMath")
+        remap_to_center.label = "Remap to centered range"
+        remap_to_center.operation = 'SUBTRACT'
+        remap_to_center.inputs[1].default_value = (0.5, 0.5, 0.0)
+
+        # Scale UV
+        max_length_1 = bb.nodes.new("ShaderNodeMath")
+        max_length_1.label = "Max Length"
+        max_length_1.operation = 'MAXIMUM'
+
+        max_length_2 = bb.nodes.new("ShaderNodeMath")
+        max_length_2.label = "Max Length"
+        max_length_2.operation = 'MAXIMUM'
+
+        max_length_3 = bb.nodes.new("ShaderNodeMath")
+        max_length_3.label = "Max Length"
+        max_length_3.operation = 'MAXIMUM'
+
+        scale_uv = bb.nodes.new("ShaderNodeVectorMath")
+        scale_uv.label = "Scale UV"
+        scale_uv.operation = 'MULTIPLY'
+
+        # node Menu Switch
+        menu_switch = bb.nodes.new("GeometryNodeMenuSwitch")
+        menu_switch.label = "Axis Index Menu"
+        menu_switch.data_type = 'INT'
+        menu_switch.enum_items.clear()
+
+        for idx, item in enumerate(['Bottom', 'Side', 'Front']):
+            menu_switch.enum_items.new(item)
+            menu_switch.inputs[idx + 1].default_value = idx
+
+        # node Index Switch
+        index_switch = bb.nodes.new("GeometryNodeIndexSwitch")
+        index_switch.label = "Get scale from bbox"
+        index_switch.name = "Index Switch"
+        index_switch.data_type = 'FLOAT'
+        index_switch.index_switch_items.clear()
+        for _ in range(3):
+            index_switch.index_switch_items.new()
+
+        # node Index Switch
+        index_switch_001 = bb.nodes.new("GeometryNodeIndexSwitch")
+        index_switch_001.label = "Switch scale by axis"
+        index_switch_001.data_type = 'VECTOR'
+        index_switch_001.index_switch_items.clear()
+        for _ in range(3):
+            index_switch_001.index_switch_items.new()
+
+        # node Side swizzle separate
+        separate_xyz_001 = bb.nodes.new("ShaderNodeSeparateXYZ")
+
+        # node Side swizzle combine
+        combine_xyz = bb.nodes.new("ShaderNodeCombineXYZ")
+
+        # node Front swizzle separate
+        separate_xyz_002 = bb.nodes.new("ShaderNodeSeparateXYZ")
+        separate_xyz_002.label = "Front swizzle separate"
+
+        # node Front swizzle combine
+        combine_xyz_001 = bb.nodes.new("ShaderNodeCombineXYZ")
+        combine_xyz_001.label = "Front swizzle combine"
+
+        # node Merge by Distance
+        merge_by_distance = bb.nodes.new("GeometryNodeMergeByDistance")
+        merge_by_distance.name = "Merge by Distance"
+        merge_by_distance.mode = 'ALL'
+
+        # node Aspect Ratio Scale
+        vector_math_004 = bb.nodes.new("ShaderNodeVectorMath")
+        vector_math_004.label = "Aspect Ratio Scale"
+        vector_math_004.operation = 'MULTIPLY'
+
+        # node Factor
+        mix_factor = bb.nodes.new("ShaderNodeMix")
+        mix_factor.label = "Factor"
+        mix_factor.blend_type = 'MIX'
+        mix_factor.data_type = 'VECTOR'
+        mix_factor.factor_mode = 'UNIFORM'
+
+        # node Position
+        position = bb.nodes.new("GeometryNodeInputPosition")
+        position.name = "Position"
+
+        # node No UVMap case
+        switch = bb.nodes.new("GeometryNodeSwitch")
+        switch.label = "No UVMap case"
+        switch.input_type = 'FLOAT'
+        switch.inputs[1].default_value = 0.0
+
+        # Set locations
+        group_input.location = (-1465, -10)
+        group_output.location = (1600, 30)
+        split_edges.location = (685, 1)
+        set_position.location = (1138, 28)
+        named_attribute.location = (-782, -155)
+        bounding_box.location = (-1170, -592)
+        vector_math.location = (-978, -587)
+        separate_xyz_widths.location = (-785, -590)
+        max_length_1.location = (-585, -395)
+        remap_to_center.location = (-585, -145)
+        scale_uv.location = (42, -192)
+        menu_switch.location = (-1170, -380)
+        index_switch.location = (-360, -460)
+        max_length_2.location = (-586, -560)
+        index_switch_001.location = (685, -120)
+        separate_xyz_001.location = (268, -250)
+        combine_xyz.location = (460, -250)
+        max_length_3.location = (-590, -730)
+        separate_xyz_002.location = (268, -400)
+        combine_xyz_001.location = (460, -400)
+        merge_by_distance.location = (1315, 18)
+        vector_math_004.location = (-165, -460)
+        mix_factor.location = (920, -40)
+        position.location = (685, -335)
+        switch.location = (680, 160)
+
+        # initialize bb links
+        # group_input.Geometry -> split_edges.Mesh
+        bb.links.new(group_input.outputs[0], split_edges.inputs[0])
+        # split_edges.Mesh -> set_position.Geometry
+        bb.links.new(split_edges.outputs[0], set_position.inputs[0])
+        # group_input.Geometry -> bounding_box.Geometry
+        bb.links.new(group_input.outputs[0], bounding_box.inputs[0])
+
+        # named_attribute.Attribute -> vector_math_001.Vector
+        bb.links.new(named_attribute.outputs[0], remap_to_center.inputs[0])
+        # vector_math_001.Vector -> vector_math_002.Vector
+        bb.links.new(remap_to_center.outputs[0], scale_uv.inputs[0])
+
+        # vector_math.Vector -> separate_xyz.Vector
+        bb.links.new(vector_math.outputs[0], separate_xyz_widths.inputs[0])
+        # separate_xyz.X -> math.Value
+        bb.links.new(separate_xyz_widths.outputs[0], max_length_1.inputs[0])
+        # separate_xyz.Y -> math.Value
+        bb.links.new(separate_xyz_widths.outputs[1], max_length_1.inputs[1])
+        # math.Value -> index_switch.0
+        bb.links.new(max_length_1.outputs[0], index_switch.inputs[1])
+        # separate_xyz.Y -> math_001.Value
+        bb.links.new(separate_xyz_widths.outputs[1], max_length_2.inputs[0])
+        # separate_xyz.Z -> math_001.Value
+        bb.links.new(separate_xyz_widths.outputs[2], max_length_2.inputs[1])
+        # math_001.Value -> index_switch.1
+        bb.links.new(max_length_2.outputs[0], index_switch.inputs[2])
+        # separate_xyz.X -> math_002.Value
+        bb.links.new(separate_xyz_widths.outputs[0], max_length_3.inputs[0])
+        # separate_xyz.Z -> math_002.Value
+        bb.links.new(separate_xyz_widths.outputs[2], max_length_3.inputs[1])
+        # math_002.Value -> index_switch.2
+        bb.links.new(max_length_3.outputs[0], index_switch.inputs[3])
+        # vector_math_002.Vector -> index_switch_001.0
+        bb.links.new(scale_uv.outputs[0], index_switch_001.inputs[1])
+        # vector_math_002.Vector -> separate_xyz_001.Vector
+        bb.links.new(scale_uv.outputs[0], separate_xyz_001.inputs[0])
+        # vector_math_002.Vector -> separate_xyz_002.Vector
+        bb.links.new(scale_uv.outputs[0], separate_xyz_002.inputs[0])
+
+        # bounding_box.Max -> vector_math.Vector
+        bb.links.new(bounding_box.outputs[2], vector_math.inputs[0])
+        # bounding_box.Min -> vector_math.Vector
+        bb.links.new(bounding_box.outputs[1], vector_math.inputs[1])
+        # group_input.UV Map -> named_attribute.Name
+        bb.links.new(group_input.outputs[1], named_attribute.inputs[0])
+        # merge_by_distance.Geometry -> group_output.Geometry
+        bb.links.new(merge_by_distance.outputs[0], group_output.inputs[0])
+        # group_input.Axis -> menu_switch.Menu
+        bb.links.new(group_input.outputs[2], menu_switch.inputs[0])
+        # menu_switch.Output -> index_switch.Index
+        bb.links.new(menu_switch.outputs[0], index_switch.inputs[0])
+        # separate_xyz_001.Z -> combine_xyz.X
+        bb.links.new(separate_xyz_001.outputs[2], combine_xyz.inputs[0])
+        # separate_xyz_001.X -> combine_xyz.Y
+        bb.links.new(separate_xyz_001.outputs[0], combine_xyz.inputs[1])
+        # separate_xyz_001.Y -> combine_xyz.Z
+        bb.links.new(separate_xyz_001.outputs[1], combine_xyz.inputs[2])
+        # combine_xyz.Vector -> index_switch_001.1
+        bb.links.new(combine_xyz.outputs[0], index_switch_001.inputs[2])
+        # menu_switch.Output -> index_switch_001.Index
+        bb.links.new(menu_switch.outputs[0], index_switch_001.inputs[0])
+        # separate_xyz_002.X -> combine_xyz_001.X
+        bb.links.new(separate_xyz_002.outputs[0], combine_xyz_001.inputs[0])
+        # separate_xyz_002.Z -> combine_xyz_001.Y
+        bb.links.new(separate_xyz_002.outputs[2], combine_xyz_001.inputs[1])
+        # separate_xyz_002.Y -> combine_xyz_001.Z
+        bb.links.new(separate_xyz_002.outputs[1], combine_xyz_001.inputs[2])
+        # combine_xyz_001.Vector -> index_switch_001.2
+        bb.links.new(combine_xyz_001.outputs[0], index_switch_001.inputs[3])
+        # set_position.Geometry -> merge_by_distance.Geometry
+        bb.links.new(set_position.outputs[0], merge_by_distance.inputs[0])
+        # group_input.Distance -> merge_by_distance.Distance
+        bb.links.new(group_input.outputs[4], merge_by_distance.inputs[2])
+        # index_switch.Output -> vector_math_004.Vector
+        bb.links.new(index_switch.outputs[0], vector_math_004.inputs[0])
+        # vector_math_004.Vector -> vector_math_002.Vector
+        bb.links.new(vector_math_004.outputs[0], scale_uv.inputs[1])
+        # group_input.Aspect Ratio -> vector_math_004.Vector
+        bb.links.new(group_input.outputs[3], vector_math_004.inputs[1])
+        # index_switch_001.Output -> mix.B
+        bb.links.new(index_switch_001.outputs[0], mix_factor.inputs[5])
+        # position.Position -> mix.A
+        bb.links.new(position.outputs[0], mix_factor.inputs[4])
+        # mix.Result -> set_position.Position
+        bb.links.new(mix_factor.outputs[1], set_position.inputs[2])
+        # named_attribute.Exists -> switch.Switch
+        bb.links.new(named_attribute.outputs[1], switch.inputs[0])
+        # group_input.Factor -> switch.True
+        bb.links.new(group_input.outputs[5], switch.inputs[2])
+        # switch.Output -> mix.Factor
+        bb.links.new(switch.outputs[0], mix_factor.inputs[0])
+        return bb
+
+    @staticmethod
+    def aspect_to_scale(aspect_y):
+        if aspect_y > 1:
+            return Vector((aspect_y, 1, 0))
+        else:
+            return Vector((1, 1/aspect_y, 0))
+
+# TODO: Add FlattenSanitizer - Delete ShapeKeys and GN
+
