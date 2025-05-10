@@ -1202,7 +1202,11 @@ class UNIV_OT_Flatten(Operator):
     bl_idname = 'mesh.univ_flatten'
     bl_label = 'Flatten'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = f"Convert 3d coords to 2D from uv map"
+    bl_description = "Convert 3d coords to 2D from uv map\n\n" \
+                     "Context keymaps on button:\n" \
+                     "\t\tDefault - Mesh\n" \
+                     "\t\tShift - Shape Keys\n" \
+                     "\t\tAlt - Modifier" \
 
     axis: EnumProperty(name="Axis", default='z', items=(
                                     ('z', 'Bottom', ''),
@@ -1220,6 +1224,19 @@ class UNIV_OT_Flatten(Operator):
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        if event.alt:
+            self.flatten_type = 'MODIFIER'
+        elif event.shift:
+            self.flatten_type = 'SHAPE_KEY'
+        else:
+            self.flatten_type = 'MESH'
+
+        return self.execute(context)
 
     def draw(self, context):
         layout = self.layout
@@ -1442,7 +1459,6 @@ class UNIV_OT_Flatten(Operator):
                 else:
                     return ng
         return self._create_flatten_node_group()
-
 
     @staticmethod
     def flatten_node_group_is_changed(ng):
@@ -1765,5 +1781,76 @@ class UNIV_OT_Flatten(Operator):
         else:
             return Vector((1, 1/aspect_y, 0))
 
-# TODO: Add FlattenSanitizer - Delete ShapeKeys and GN
+class UNIV_OT_FlattenCleanup(Operator):
+    bl_idname = 'mesh.univ_flatten_clean_up'
+    bl_label = 'Flatten'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Remove Flatten modifiers and shape keys and unused nodes"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes: UMeshes | None = None
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
+
+    def execute(self, context):
+        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes.fix_context()
+        self.umeshes.set_sync()
+
+        removed_sk_counter = 0
+        removed_modifiers = 0
+        removed_geometry_nodes = 0
+        if self.umeshes:
+            has_shape_keys = self.has_flatten_shape_keys()
+            if has_shape_keys:
+                if self.umeshes.is_edit_mode:
+                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+
+            for umesh in self.umeshes:
+                # Remove shape keys
+                if umesh.obj.data.shape_keys and umesh.obj.data.shape_keys.key_blocks.get('uv'):
+                    if len(umesh.obj.data.shape_keys.key_blocks) == 2:
+                        umesh.obj.shape_key_clear()
+                        removed_sk_counter += 1
+                    else:
+                        sk = umesh.obj.data.shape_keys.key_blocks.get('uv')
+                        umesh.obj.shape_key_remove(sk)
+                        removed_sk_counter += 1
+
+                # Remove modifiers
+                for m in reversed(umesh.obj.modifiers):
+                    if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                        umesh.obj.modifiers.remove(m)
+                        removed_modifiers += 1
+
+                umesh.obj.data.update_tag()
+                if self.umeshes.is_edit_mode:
+                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+
+        # Remove geometry nodes
+        for ng in reversed(bpy.data.node_groups):
+            if ng.name.startswith('UniV Flatten'):
+                if ng.users == 0:
+                    bpy.data.node_groups.remove(ng)
+                    removed_geometry_nodes += 1
+
+        info = ''
+        if removed_sk_counter:
+            info += f"Removed {removed_sk_counter} shape keys. "
+        if removed_modifiers:
+            info += f"Removed {removed_modifiers} modifiers. "
+        if not removed_modifiers and removed_geometry_nodes:
+            info += f"Removed {removed_geometry_nodes} node groups."
+
+        if info:
+            self.report({'INFO'}, info)
+
+        return {'FINISHED'}
+
+    def has_flatten_shape_keys(self):
+        for umesh in self.umeshes:
+            if umesh.obj.data.shape_keys:
+                if umesh.obj.data.shape_keys.key_blocks.get('uv'):
+                    return True
+        return False

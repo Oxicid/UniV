@@ -176,6 +176,7 @@ def load_register_types():
             misc.UNIV_OT_UV_Layers_Manager,
             # Mesh
             misc.UNIV_OT_Flatten,
+            misc.UNIV_OT_FlattenCleanup,
         ])
 
         if univ_pro:
