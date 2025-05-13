@@ -504,6 +504,11 @@ class UNIV_PT_TD_PresetsManager(Panel):
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
 
+        if context.area.type == 'IMAGE_EDITOR':
+            layout.separator()
+            layout.operator("uv.univ_texel_density_from_texture")
+            layout.separator()
+
         row = layout.row()
         col = row.column()
         col.scale_x = 0.5

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 8),
+    "version": (3, 7, 9),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -36,6 +36,7 @@ from .operators import select
 from .operators import stitch_and_weld
 from .operators import stack
 from .operators import straight
+from .operators import texel
 from .operators import toggle
 from .operators import transform
 from .operators import unwrap
@@ -89,16 +90,18 @@ def load_register_types():
             transform.UNIV_OT_Home,
             transform.UNIV_OT_Shift,
             transform.UNIV_OT_Random,
-            transform.UNIV_OT_ResetScale,
-            transform.UNIV_OT_AdjustScale,
-            transform.UNIV_OT_AdjustScale_VIEW3D,
-            transform.UNIV_OT_Normalize,
-            transform.UNIV_OT_Normalize_VIEW3D,
-            transform.UNIV_OT_TexelDensitySet,
-            transform.UNIV_OT_TexelDensitySet_VIEW3D,
-            transform.UNIV_OT_TexelDensityGet,
-            transform.UNIV_OT_TexelDensityGet_VIEW3D,
             transform.UNIV_OT_Pack,
+            # Texel
+            texel.UNIV_OT_ResetScale,
+            texel.UNIV_OT_AdjustScale,
+            texel.UNIV_OT_AdjustScale_VIEW3D,
+            texel.UNIV_OT_Normalize,
+            texel.UNIV_OT_Normalize_VIEW3D,
+            texel.UNIV_OT_TexelDensitySet,
+            texel.UNIV_OT_TexelDensitySet_VIEW3D,
+            texel.UNIV_OT_TexelDensityGet,
+            texel.UNIV_OT_TexelDensityGet_VIEW3D,
+            texel.UNIV_OT_TexelDensityFromTexture,
             # Quadrify
             quadrify.UNIV_OT_Quadrify,
             straight.UNIV_OT_Straight,

@@ -235,3 +235,20 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
             objs.sort(key=lambda a: a.name)
             objects.append(objs[0])
     return objects
+
+
+UNIT_CONVERTION = {
+    'mm': (0.001, 1000),
+    'cm': (0.01, 100),
+    'm': (1, 1),
+    'km': (1000, 0.001),
+    'in': (0.0254, 39.3701),
+    'ft': (0.3048, 3.28084),
+    'yd': (0.9144, 1.09361),
+    'mi': (1609.34, 0.000621371),
+}
+
+UNITS = '(mi|mm|cm|m|km|in|ft|yd)'
+UNITS_T = typing.Literal['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi',]
+def unit_conversion(value: float, from_type: UNITS_T, to_type: UNITS_T) -> float:
+    return value * UNIT_CONVERTION[from_type.lower()][0] * UNIT_CONVERTION[to_type.lower()][1]
