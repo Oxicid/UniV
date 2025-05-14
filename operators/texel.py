@@ -933,6 +933,8 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
             total_3d_area += utils.calc_total_area_3d(faces, scale)
             total_uv_area += utils.calc_total_area_uv(faces, umesh.uv)
 
+        self.umeshes.free()
+
         area_3d = sqrt(total_3d_area)
         area_uv = sqrt(total_uv_area) * self.texture_size
         if isclose(area_3d, 0.0, abs_tol=1e-6) or isclose(area_uv, 0.0, abs_tol=1e-6):
@@ -1144,3 +1146,97 @@ class TexelDensity_NameExtract_Test:
         for name in texts:
             UNIV_OT_TexelDensityFromTexture.get_physical_size_from_name(name)
 
+class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
+    bl_idname = "uv.univ_calc_udims_from_3d_area"
+    bl_label = 'Calc UDIMs from 3D Area'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Calc required UDIMs count coefficient from 3d area"
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def execute(self, context):
+        umeshes = types.UMeshes(report=self.report)
+        if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
+            umeshes.set_sync()
+
+        has_selected = False
+        if umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                has_selected = True
+                umeshes = selected_umeshes
+            else:
+                umeshes = unselected_umeshes
+
+        if not umeshes:
+            self.report({'WARNING'}, 'Faces not found')
+            return {'CANCELLED'}
+
+        total_3d_area = 0.0
+        for umesh in umeshes:
+            if umeshes.is_edit_mode:
+                faces = utils.calc_uv_faces(umesh, selected=has_selected)
+            else:
+                faces = umesh.bm.faces
+            scale = umesh.check_uniform_scale()
+            total_3d_area += utils.calc_total_area_3d(faces, scale)
+
+        res = self.compute_required_udims(total_3d_area)
+        self.report({'INFO'}, f'Average tiles coefficient {res:.1f}')
+        umeshes.free()
+        return {'FINISHED'}
+
+    @staticmethod
+    def compute_required_udims(geom_area):
+        texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+        texels_per_tile = texture_size ** 2
+        texel_area_m2 = 1 / univ_settings().texel_density ** 2
+        tile_coverage_m2 = texels_per_tile * texel_area_m2
+        return geom_area / tile_coverage_m2 * 1.15
+
+class UNIV_OT_CalcUDIMsFrom_3DArea_VIEW3D(UNIV_OT_CalcUDIMsFrom_3DArea):
+    bl_idname = "mesh.univ_calc_udims_from_3d_area"
+
+class UNIV_OT_Calc_UV_Area(Operator):
+    bl_idname = "uv.univ_calc_uv_area"
+    bl_label = 'Area'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def execute(self, context):
+        umeshes = types.UMeshes(report=self.report)
+        if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
+            umeshes.set_sync()
+
+        has_selected = False
+        if umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                has_selected = True
+                umeshes = selected_umeshes
+            else:
+                umeshes = unselected_umeshes
+
+        if not umeshes:
+            self.report({'WARNING'}, 'Faces not found')
+            return {'CANCELLED'}
+
+        total_area = 0.0
+        for umesh in umeshes:
+            if umeshes.is_edit_mode:
+                faces = utils.calc_uv_faces(umesh, selected=has_selected)
+            else:
+                faces = umesh.bm.faces
+            total_area += utils.calc_total_area_uv(faces, umesh.uv)
+
+        self.report({'INFO'}, f'UV Area: {total_area:.4f}')
+        umeshes.free()
+        return {'FINISHED'}
+
+class UNIV_OT_Calc_UV_Area_VIEW3D(UNIV_OT_Calc_UV_Area):
+    bl_idname = "mesh.univ_calc_uv_area"

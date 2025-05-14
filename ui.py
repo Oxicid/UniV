@@ -507,6 +507,13 @@ class UNIV_PT_TD_PresetsManager(Panel):
         if context.area.type == 'IMAGE_EDITOR':
             layout.separator()
             layout.operator("uv.univ_texel_density_from_texture")
+            layout.operator("uv.univ_calc_udims_from_3d_area")
+            layout.operator("uv.univ_calc_uv_area")
+            layout.separator()
+        else:
+            layout.separator()
+            layout.operator("mesh.univ_calc_udims_from_3d_area")
+            layout.operator("mesh.univ_calc_uv_area")
             layout.separator()
 
         row = layout.row()

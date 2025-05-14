@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 10),
+    "version": (3, 7, 11),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -102,6 +102,10 @@ def load_register_types():
             texel.UNIV_OT_TexelDensityGet,
             texel.UNIV_OT_TexelDensityGet_VIEW3D,
             texel.UNIV_OT_TexelDensityFromTexture,
+            texel.UNIV_OT_CalcUDIMsFrom_3DArea_VIEW3D,
+            texel.UNIV_OT_CalcUDIMsFrom_3DArea,
+            texel.UNIV_OT_Calc_UV_Area_VIEW3D,
+            texel.UNIV_OT_Calc_UV_Area,
             # Quadrify
             quadrify.UNIV_OT_Quadrify,
             straight.UNIV_OT_Straight,
