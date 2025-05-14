@@ -21,11 +21,11 @@ generated_types = (
 )
 
 def _update_size_x(self, _context):
-    if self.lock_size:
+    if self.lock_size and self.size_y != self.size_x:
         self.size_y = self.size_x
 
 def _update_size_y(self, _context):
-    if self.lock_size:
+    if self.lock_size and self.size_x != self.size_y:
         self.size_x = self.size_y
 
 def _update_lock_size(self, _context):
