@@ -317,6 +317,7 @@ def unregister():
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
+    texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
 
 
 if __name__ == "__main__":

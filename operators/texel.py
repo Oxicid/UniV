@@ -946,13 +946,15 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
 class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):
     bl_idname = "uv.univ_texel_density_get"
 
+POLIIGON_PHYSICAL_SIZES: dict[int | tuple[float, float]] | dict[int | None]| None = None
+
 class UNIV_OT_TexelDensityFromTexture(Operator):
     bl_idname = "uv.univ_texel_density_from_texture"
     bl_label = 'TD From Texture'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Extracts dimensions from the texture name:" \
-                    "Name_30cm_Albedo -> 0.3m" \
-                    "Name_2.5Mx2.5M_Albedo → 2.5 x 2.5 m" \
+                    "Name_30cm_Albedo → 0.3m" \
+                    "Name_2.5Mx2.5M_Albedo → 2.5 x 2.5 m\n" \
                     "Supported units: mm, cm, m, km, in, ft, yd, mi\n\n" \
                     "Quixel Megascans textures are supported if the original " \
                     "filenames are intact and the texture path contains the corresponding JSON file. \n\n" \
@@ -993,6 +995,7 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
             if size := self.get_physical_size_quixel(path):
                 self.update_texel_from_size(size)
                 return {'FINISHED'}
+        self.report({'WARNING'}, 'Physical size not found in name or metadata')
 
         return {'FINISHED'}
 
@@ -1062,7 +1065,17 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
             return
 
         try:
-            poliigon_id: str = match_poliigon_id.group(1)
+            poliigon_id: int = int(match_poliigon_id.group(1))
+
+            if POLIIGON_PHYSICAL_SIZES is None:
+                self.load_poliigon_physical_size_cache()
+
+            if poliigon_id in POLIIGON_PHYSICAL_SIZES:
+                ret = POLIIGON_PHYSICAL_SIZES[poliigon_id]
+                if not ret:
+                    self.report({'WARNING'}, "Sizes not found")
+                return ret
+
             # TODO: Implement cache system (and save them in txt)
             url = f"https://www.poliigon.com/texture/.../{poliigon_id}"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
@@ -1080,16 +1093,39 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
                 width_unit = match.group(2)
                 height = match.group(3)
                 height_unit = match.group(4)
-
                 x_size = utils.unit_conversion(float(width), width_unit, 'm')
                 y_size = utils.unit_conversion(float(height), height_unit, 'm')
-                return x_size, y_size
+                size = x_size, y_size
+                POLIIGON_PHYSICAL_SIZES[poliigon_id] = size
+                return size
             else:
+                POLIIGON_PHYSICAL_SIZES[poliigon_id] = None
                 self.report({'WARNING'}, "Sizes not found")
         except requests.exceptions.ConnectionError:
             self.report({'WARNING'}, 'Not found internet connection for get texel density from id')
         except requests.exceptions.Timeout:
             self.report({'WARNING'}, 'Server response timeout, try again')
+
+    @staticmethod
+    def load_poliigon_physical_size_cache():
+        json_path = Path(__file__).parent / 'poliigon_physical_size_cache.json'
+        global POLIIGON_PHYSICAL_SIZES
+        if json_path.exists():
+            with open(json_path, 'r', encoding='utf-8') as f:
+                try:
+                    POLIIGON_PHYSICAL_SIZES = {int(k): v for k, v in json.load(f).items()}
+                except (ValueError, json.JSONDecodeError):
+                    POLIIGON_PHYSICAL_SIZES = {}
+        else:
+            POLIIGON_PHYSICAL_SIZES = {}
+
+    @staticmethod
+    def store_poliigon_physical_size_cache():
+        json_path = Path(__file__).parent / 'poliigon_physical_size_cache.json'
+        global POLIIGON_PHYSICAL_SIZES
+        if POLIIGON_PHYSICAL_SIZES:
+            with open(json_path, 'w', encoding='utf-8') as f:
+               json.dump(POLIIGON_PHYSICAL_SIZES, f, sort_keys=True, indent=4, separators=(',', ': '))  # noqa
 
 class TexelDensity_NameExtract_Test:
     @staticmethod
