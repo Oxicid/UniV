@@ -289,6 +289,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='ALL')
 
+    show_only_conflict_keymaps: BoolProperty(name='Only Error', default=False)
+
     keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
     keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
 
@@ -379,6 +381,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             sub_row = row.row()
             sub_row.scale_x = 0.8
             sub_row.prop(self, 'keymap_spaces_filter', text='')
+            sub_row.prop(self, 'show_only_conflict_keymaps', toggle=True)
             row.separator()
 
             sub_row = row.row(align=True)
@@ -409,24 +412,38 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                     col = layout.column(align=True)
 
                     for config_filtered in filtered_keymaps.values():
-                        box = col.box()
-                        for univ_kmi in config_filtered.univ_keys:
+                        box = None
 
-                            rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
+                        for univ_kmi in config_filtered.univ_keys:
                             any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
 
+                            conflict_state_default_keys = 'NONE'
                             if config_filtered.default_keys:
-                                box.label(text='\t\tDefault',
-                                          icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
+                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys):
+                                    conflict_state_default_keys = 'ERROR'
+
+                            conflict_state_user_defined = 'NONE'
+                            if config_filtered.default_keys:
+                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
+                                    conflict_state_user_defined = 'ERROR'
+
+                            if self.show_only_conflict_keymaps:
+                                if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
+                                    continue
+
+                            if not box:
+                                box = col.box()
+
+                            rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
+                            if config_filtered.default_keys:
+                                box.label(text='\t\tDefault', icon=conflict_state_default_keys)
                                 for (default_km, default_kmi) in config_filtered.default_keys:
                                     rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
 
                             if config_filtered.user_defined:
-                                box.label(text='\t\tUser',
-                                          icon='ERROR' if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
+                                box.label(text='\t\tUser', icon=conflict_state_user_defined)
                                 for (user_km, user_kmi) in config_filtered.user_defined:
                                     rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
-                    layout.separator()
 
             if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
                 layout.label(text='Workspace Tool')
@@ -445,29 +462,44 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                     col = layout.column(align=True)
 
                     for config_filtered in filtered_keymaps.values():
-                        box = col.box()
+                        box = None
+
                         for univ_kmi in config_filtered.univ_keys:
+                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
+
+                            conflict_state_default_keys = 'NONE'
+                            if config_filtered.default_keys:
+                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys):
+                                    conflict_state_default_keys = 'ERROR'
+
+                            conflict_state_user_defined = 'NONE'
+                            if config_filtered.default_keys:
+                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
+                                    conflict_state_user_defined = 'ERROR'
+
+                            if self.show_only_conflict_keymaps:
+                                if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
+                                    continue
+                                if univ_kmi.idname == 'view3d.select_box':
+                                    continue
+
+                            if not box:
+                                box = col.box()
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
 
                             if univ_kmi.idname == 'view3d.select_box':
                                 continue
 
                             if config_filtered.default_keys:
-                                box.label(text='\t\tDefault',
-                                          icon='ERROR' if any_active and any(
-                                              kmi_.active for (_, kmi_) in config_filtered.default_keys) else 'NONE')
+                                box.label(text='\t\tDefault', icon=conflict_state_default_keys)
                                 for (default_km, default_kmi) in config_filtered.default_keys:
                                     rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
 
                             if config_filtered.user_defined:
-                                box.label(text='\t\tUser',
-                                          icon='ERROR' if any_active and any(
-                                              kmi_.active for (_, kmi_) in config_filtered.user_defined) else 'NONE')
+                                box.label(text='\t\tUser', icon=conflict_state_user_defined)
                                 for (user_km, user_kmi) in config_filtered.user_defined:
                                     rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
-                    layout.separator()
 
         # elif self.tab == 'INFO':
         else:
