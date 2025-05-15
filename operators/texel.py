@@ -7,18 +7,18 @@ if 'bpy' in locals():
 
 import re
 import bpy  # noqa: F401
+import gpu
 import json
 import math
 import bl_math
-from collections.abc import Callable
-
 import numpy as np
 
+from bpy.props import *
 from pathlib import Path
 from bpy.types import Operator
-from bpy.props import *
+from collections.abc import Callable
 
-from math import pi, sqrt, isclose
+from math import pi, sqrt, floor, isclose
 from mathutils import Vector, Matrix
 from mathutils.geometry import area_tri
 
@@ -1240,3 +1240,136 @@ class UNIV_OT_Calc_UV_Area(Operator):
 
 class UNIV_OT_Calc_UV_Area_VIEW3D(UNIV_OT_Calc_UV_Area):
     bl_idname = "mesh.univ_calc_uv_area"
+
+class UNIV_OT_Calc_UV_Coverage(Operator):
+    bl_idname = "uv.univ_calc_uv_coverage"
+    bl_label = 'Coverage'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def execute(self, context):
+        umeshes = types.UMeshes(report=self.report)
+        if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
+            umeshes.set_sync()
+
+        has_selected = False
+        if umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                has_selected = True
+                umeshes = selected_umeshes
+            else:
+                umeshes = unselected_umeshes
+
+        if not umeshes:
+            self.report({'WARNING'}, 'Faces not found')
+            return {'CANCELLED'}
+
+        tiles = set()
+        coords = []
+        coords_append = coords.append
+        for umesh in umeshes:
+            uv = umesh.uv
+            if umeshes.is_edit_mode:
+                islands = AdvIslands.calc_extended_or_visible(umesh, extended=has_selected)
+                islands.calc_tris()
+                tris_iter = (t for isl in islands for t in isl.tris)
+            else:
+                tris_iter = umesh.bm.calc_loop_triangles()
+
+            for a, b, c in tris_iter:
+                uv_a = a[uv].uv
+                uv_b = b[uv].uv
+                uv_c = c[uv].uv
+                coords_append(uv_a)
+                coords_append(uv_b)
+                coords_append(uv_c)
+                center = (uv_a + uv_b + uv_c) / 3
+                tiles.add(tuple(floor(v) for v in center))
+
+        from gpu_extras.batch import batch_for_shader
+        shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+        batch = batch_for_shader(shader, 'TRIS', {"pos": coords})
+        umeshes.free()
+
+        self.draw_coverage(tiles, shader, batch)
+
+        return {'FINISHED'}
+
+    def draw_coverage(self, tiles, shader, batch):
+        size_x = int(univ_settings().size_x)
+        size_y = int(univ_settings().size_y)
+        offscreen = gpu.types.GPUOffScreen(size_x, size_y)
+        offscreen.bind()
+
+        if bpy.app.version < (3, 5, 0):
+            import bgl
+            bgl.glEnable(bgl.GL_ALPHA)
+        else:
+            gpu.state.blend_set('ALPHA')
+
+        total_coverage = 0
+        tiles_with_res = {}
+        try:
+            for tile in tiles:
+                fb = gpu.state.active_framebuffer_get()
+                fb.clear(color=(0.0, 0.0, 0.0, 0.0))
+                with gpu.matrix.push_pop():
+                    gpu.matrix.load_matrix(self.get_normalize_uvs_matrix(tile))
+                    gpu.matrix.load_projection_matrix(Matrix.Identity(4))
+
+                    shader.bind()
+                    shader.uniform_float("color", (1, 1, 1, 1))
+                    batch.draw(shader)
+
+                pixel_data = fb.read_color(0, 0, size_x, size_y, 4, 0, 'UBYTE')
+                pixel_data.dimensions = size_x * size_y * 4
+
+                alpha_channel = np.frombuffer(pixel_data, dtype=np.uint8)[3::4]
+                uv_coverage = np.count_nonzero(alpha_channel) / (size_x * size_y)
+                if uv_coverage:
+                    tiles_with_res[tile] = uv_coverage
+                    total_coverage += uv_coverage
+        finally:
+            offscreen.unbind()
+            offscreen.free()
+
+        self.report({'INFO'}, f' Total UV Coverage: {total_coverage:.4f}')
+        if tiles_with_res:
+            tiles_with_value = list(tiles_with_res.items())
+            tiles_with_value.sort(key=lambda tup: tup[0][0])
+            tiles_with_value.sort(key=lambda tup: tup[1])
+            text = []
+            for t, v in tiles_with_value:
+                first = f"{t[0]}, {t[1]}"
+                first += (6 - len(first)) * '  '
+                text.append(f"{first} = {v: .5f}")
+
+            from .. import draw
+            if not self.bl_idname.startswith('UV'):
+                draw.TextDraw.target_area = 'VIEW_3D'
+
+            draw.TextDraw.draw(text)
+            draw.TextDraw.max_draw_time = 4
+            bpy.context.area.tag_redraw()
+
+        if bpy.app.version < (3, 5, 0):
+            bgl.glDisable(bgl.GL_BLEND)  # noqa
+        else:
+            gpu.state.blend_set('NONE')
+
+    @staticmethod
+    def get_normalize_uvs_matrix(tile):
+        """Matrix maps x and y coordinates from [0, 1] to [-1, 1]"""
+        matrix = Matrix.Identity(4)
+        matrix.col[3][0] = -1 - (tile[0] * 2)
+        matrix.col[3][1] = -1 - (tile[1] * 2)
+        matrix[0][0] = 2
+        matrix[1][1] = 2
+        return matrix
+
+class UNIV_OT_Calc_UV_Coverage_VIEW3D(UNIV_OT_Calc_UV_Coverage):
+    bl_idname = "mesh.univ_calc_uv_coverage"

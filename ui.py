@@ -504,17 +504,19 @@ class UNIV_PT_TD_PresetsManager(Panel):
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
 
+        layout.separator()
+        col = layout.column(align=True)
+        row = col.row(align=True)
         if context.area.type == 'IMAGE_EDITOR':
-            layout.separator()
-            layout.operator("uv.univ_texel_density_from_texture")
-            layout.operator("uv.univ_calc_udims_from_3d_area")
-            layout.operator("uv.univ_calc_uv_area")
-            layout.separator()
+            row.operator("uv.univ_calc_uv_area")
+            row.operator("uv.univ_calc_uv_coverage")
+            col.operator("uv.univ_texel_density_from_texture")
+            col.operator("uv.univ_calc_udims_from_3d_area")
         else:
-            layout.separator()
-            layout.operator("mesh.univ_calc_udims_from_3d_area")
-            layout.operator("mesh.univ_calc_uv_area")
-            layout.separator()
+            row.operator("mesh.univ_calc_uv_area")
+            row.operator("mesh.univ_calc_uv_coverage")
+            col.operator("mesh.univ_calc_udims_from_3d_area")
+        layout.separator()
 
         row = layout.row()
         col = row.column()
