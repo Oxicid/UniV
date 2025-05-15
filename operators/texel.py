@@ -18,7 +18,7 @@ from pathlib import Path
 from bpy.types import Operator
 from collections.abc import Callable
 
-from math import pi, sqrt, floor, isclose
+from math import pi, sqrt, isclose
 from mathutils import Vector, Matrix
 from mathutils.geometry import area_tri
 
@@ -1245,6 +1245,9 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
     bl_idname = "uv.univ_calc_uv_coverage"
     bl_label = 'Coverage'
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Calculates coverage area. Overlaps do not increase the total value. \n\n" \
+                "NOTE: The tiles used for coverage calculation are determined \nby vertex and face center inclusion in a tile.\n\n" \
+                "For example, a plane scaled 10x will result in 6 tiles, not 100."
 
     @classmethod
     def poll(cls, context):
@@ -1281,14 +1284,29 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
                 tris_iter = umesh.bm.calc_loop_triangles()
 
             for a, b, c in tris_iter:
-                uv_a = a[uv].uv
-                uv_b = b[uv].uv
-                uv_c = c[uv].uv
-                coords_append(uv_a)
-                coords_append(uv_b)
-                coords_append(uv_c)
-                center = (uv_a + uv_b + uv_c) / 3
-                tiles.add(tuple(floor(v) for v in center))
+                coords_append(a[uv].uv)
+                coords_append(b[uv].uv)
+                coords_append(c[uv].uv)
+
+        arr = np.empty((len(coords), 2), dtype=np.float32)
+        for i, v in enumerate(coords):
+            arr[i] = v.to_tuple()  # to_tuple -> x4 performance
+        coords = arr
+
+        triplet_coords = coords.reshape(-1, 3, 2)
+        centroid = np.mean(triplet_coords, axis=1)
+
+        np_tiles = np.floor(centroid).astype(np.int32)
+        tiles.update(((tuple(t) for t in np_tiles)))
+
+        centered = np.nextafter(triplet_coords, centroid.reshape(-1, 1, 2))
+        np_tiles = np.floor(centered).astype(np.int32).reshape(-1, 2)
+
+        tiles.update(((tuple(t) for t in np_tiles)))
+
+        if len(tiles) > 200:
+            self.report({'WARNING'}, f'Too many tiles ({len(tiles)}) - operation cancelled')
+            return {'CANCELLED'}
 
         from gpu_extras.batch import batch_for_shader
         shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
@@ -1338,10 +1356,10 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
             offscreen.free()
 
         self.report({'INFO'}, f' Total UV Coverage: {total_coverage:.4f}')
-        if tiles_with_res:
+        if len(tiles_with_res) > 1:
             tiles_with_value = list(tiles_with_res.items())
-            tiles_with_value.sort(key=lambda tup: tup[0][0])
-            tiles_with_value.sort(key=lambda tup: tup[1])
+            tiles_with_value.sort(key=lambda tup: tup[0][1], reverse=True)
+            tiles_with_value.sort(key=lambda tup: tup[0][0], reverse=True)
             text = []
             for t, v in tiles_with_value:
                 first = f"{t[0]}, {t[1]}"
