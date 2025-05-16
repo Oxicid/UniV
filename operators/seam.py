@@ -452,14 +452,15 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
             umeshes.set_sync()
 
         sync = umeshes.sync
-        for umesh in reversed(umeshes):
+        for umesh in umeshes:
             if self.selected:
                 faces = utils.calc_selected_uv_faces(umesh)
             else:
                 faces = utils.calc_visible_uv_faces(umesh)
 
             if not faces:
-                umeshes.umeshes.remove(umesh)
+                umesh.update_tag = False
+                continue
 
             uv = umesh.uv
             is_pair = utils.is_pair
@@ -521,6 +522,11 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
                         elif not self.addition:
                             crn_edge.seam = False
 
+        if self.bl_idname.startswith('UV'):
+            from .. import draw
+            color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+            coords = draw.mesh_extract.extract_seams(umeshes)
+            draw.LinesDrawSimple.draw_register(coords, color)
         umeshes.update()
         return {'FINISHED'}
 

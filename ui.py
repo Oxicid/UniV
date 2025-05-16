@@ -401,7 +401,14 @@ class UNIV_PT_GlobalSettings(Panel):
         layout.prop(settings, 'padding', slider=True)
         layout.separator()
         layout.prop(settings, 'uv_layers_show')
-        layout.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
+
+        indent_px = 16
+        split = layout.split(factor=indent_px / bpy.context.region.width)
+        _ = split.column()
+        col = split.column()
+        col.active = settings.uv_layers_show
+        col.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
+
         layout.prop(prefs(), 'use_csa_mods')
 
 
