@@ -550,7 +550,6 @@ class IMAGE_MT_PIE_univ_edit(Menu):
     #     return context.mode == 'EDIT'
 
     def draw(self, _context):
-        # Angle
         layout = self.layout
         if prefs().use_csa_mods:
             layout.operator_context = 'INVOKE_DEFAULT'
@@ -559,7 +558,12 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
         pie = layout.menu_pie()
 
-        pie.split()
+        # Left
+        if univ_pro:
+            pie.operator("uv.univ_select_flat", icon_value=icons.flat)
+        else:
+            pie.split()
+
         pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
 
         # Bottom
@@ -589,7 +593,10 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         # Right Upper
         pie.operator("mesh.univ_checker", icon_value=icons.checker)
         # Left Bottom
-        pie.split()
+        if univ_pro:
+            pie.operator("uv.univ_select_loop", icon_value=icons.loop_select)
+        else:
+            pie.split()
 
 class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
@@ -707,7 +714,10 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         pie = layout.menu_pie()
 
         # Left
-        pie.operator("mesh.univ_select_flat", icon_value=icons.flat)
+        if univ_pro:
+            pie.operator("mesh.univ_select_flat", icon_value=icons.flat)
+        else:
+            pie.operator("mesh.faces_select_linked_flat")
         # Right
         pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
 
@@ -744,7 +754,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         if univ_pro:
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
-            pie.operator("mesh.loop_multi_select", text='Loop', icon_value=icons.loop_select).ring=False
+            pie.operator("mesh.loop_multi_select", text='Loop').ring=False
         # Right Bottom
         pie.operator("mesh.loop_multi_select", text='Ring').ring = True
 
