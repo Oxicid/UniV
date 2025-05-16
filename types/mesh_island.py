@@ -39,10 +39,25 @@ class MeshIsland:
                 for e in face.edges:
                     e.select = state
 
-    def select(self, mode, force=False):
-        if force:
-            return self.__select_force(True)
-        self._select_ex(True, mode)
+    @property
+    def select(self):
+        raise NotImplementedError()
+
+    @select.setter
+    def select(self, state: bool):
+        for face in self.faces:
+            face.select = state
+
+    @property
+    def has_all_face_select(self):
+        return all(f.select for f in self)
+
+    @property
+    def has_any_elem_select(self):
+        if utils.get_select_mode_mesh_reversed() == 'FACE':
+            return any(f.select for f in self)
+        else:
+            return any(v.select for f in self for v in f.verts)
 
     def deselect(self, mode, force=False):
         if force:

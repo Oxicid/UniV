@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 13),
+    "version": (3, 7, 14),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -138,7 +138,8 @@ def load_register_types():
             select.UNIV_OT_SelectTexelDensity_VIEW3D,
             select.UNIV_OT_SelectByArea,
             select.UNIV_OT_Stacked,
-            select.UNIV_OT_SelectByVertexCount,
+            select.UNIV_OT_SelectByVertexCount_VIEW2D,
+            select.UNIV_OT_SelectByVertexCount_VIEW3D,
             select.UNIV_OT_Tests,
             # QuickSnap
             quick_snap.UNIV_OT_QuickSnap,

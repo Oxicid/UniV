@@ -791,6 +791,43 @@ class FaceIsland:
             else:
                 return self.__info_face_select_sync()
 
+    @property
+    def has_all_face_select(self):
+        if self.umesh.sync:
+            return all(f.select for f in self)
+        else:
+            uv = self.umesh.uv
+            if utils.get_select_mode_uv() == 'EDGE':
+                for f in self:
+                    if not all(crn[uv].select_edge for crn in f.loops):
+                        return False
+            else:
+                for f in self:
+                    if not all(crn[uv].select for crn in f.loops):
+                        return False
+            return True
+
+    @property
+    def has_any_elem_select(self):
+        if self.umesh.sync:
+            if utils.get_select_mode_mesh_reversed() == 'FACE':
+                return any(f.select for f in self)
+            else:
+                return any(v.select for f in self for v in f.verts)
+        else:
+            uv = self.umesh.uv
+            if utils.get_select_mode_uv() == 'EDGE':
+                for f in self:
+                    for crn in f.loops:
+                        if crn[uv].select_edge:
+                            return True
+            else:
+                for f in self:
+                    for crn in f.loops:
+                        if crn[uv].select:
+                            return True
+            return False
+
     def calc_materials(self, umesh: _umesh.UMesh) -> tuple[str, ...]:
         indexes = set()
         for f in self.faces:

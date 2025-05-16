@@ -495,9 +495,13 @@ class UNIV_PT_TD_PresetsManager(Panel):
     bl_category = 'UniV'
 
     def draw(self, context):
-        settings = univ_settings()
-
         layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        settings = univ_settings()
         layout.label(text=f"Texel Density: {round(settings.texel_density, 4)}")
         row = layout.row(align=True, heading='Size')
         row.prop(settings, 'size_x', text='')
@@ -547,7 +551,13 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
     def draw(self, _context):
         # Angle
-        pie = self.layout.menu_pie()
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
 
         pie.split()
         pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
@@ -556,6 +566,13 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         col = pie.column(align=True)
         col.separator(factor=18)
         col.scale_x = 0.8
+
+        row = col.row(align=True)
+        row.scale_y = 1.35
+        row.operator('uv.univ_select_by_vertex_count', text='Tris').polygone_type = 'TRIS'
+        row.operator('uv.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
+        row.operator('uv.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
+        col.separator(factor=0.35)
 
         row = col.row(align=True)
         row.scale_y = 1.35
@@ -578,7 +595,13 @@ class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
 
     def draw(self, _context):
-        pie = self.layout.menu_pie()
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
 
         pie.operator('uv.univ_align_pie', text='Left', icon_value=icons.arrow_left).direction = 'LEFT'
         pie.operator('uv.univ_align_pie', text='Right', icon_value=icons.arrow_right).direction = 'RIGHT'
@@ -603,7 +626,14 @@ class IMAGE_MT_PIE_univ_misc(Menu):
     bl_label = 'UniV Pie'
 
     def draw(self, _context):
-        pie = self.layout.menu_pie()
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
         # Left
         pie.operator('uv.univ_relax', icon_value=icons.relax)
         # Right
@@ -629,8 +659,13 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
     bl_label = 'UniV Pie'
 
     def draw(self, _context):
-        # Angle
-        pie = self.layout.menu_pie()
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
 
         # Left
         pie.split()
@@ -663,7 +698,14 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
 
     def draw(self, _context):
-        pie = self.layout.menu_pie()
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
         # Left
         pie.operator("mesh.univ_select_flat", icon_value=icons.flat)
         # Right
