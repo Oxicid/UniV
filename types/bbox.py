@@ -171,6 +171,12 @@ class BBox:
         self.ymin += y
         self.ymax += y
 
+    def moved(self, new_center: Vector):
+        half_size = (self.max - self.min) * 0.5
+        xmin, ymin = (new_center - half_size)
+        xmax, ymax = (new_center + half_size)
+        return BBox(xmin, xmax, ymin, ymax)
+
     @property
     def width(self) -> float:
         return self.xmax - self.xmin
@@ -531,6 +537,10 @@ class BBox:
                     if abs(self.ymax - other.ymax) < threshold:
                         return True
         return False
+
+    def overlap(self, other: 'BBox') -> bool:
+        return not (self.xmax <= other.xmin or other.xmax <= self.xmin or
+                    self.ymax <= other.ymin or other.ymax <= self.ymin)
 
     def isect(self, other: 'BBox') -> 'BBox | None':
         xmin = self.xmin if (self.xmin > other.xmin) else other.xmin

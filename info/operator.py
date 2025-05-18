@@ -1,16 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-align_event_info_ex = \
-        "Default - Align faces/verts\n" \
-        "Shift - Move faces/verts. Mnemonic - Move(Shift) faces/verts\n" \
-        "Ctrl - Align to cursor. Mnemonic - Cursor(Ctrl) faces/verts\n" \
-        "Ctrl+Shift+Alt - Align to cursor union\n" \
-        "Alt - Align to faces/verts\n\n" \
-        "Has [Ctrl | Shift | Alt + Arrows] keymaps, but it conflicts with the \'Frame Jump\' operator"
-# "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
-align_info = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
-
 crop_event_info_ex = \
         "Default - Crop faces/verts\n" \
         "Shift - Individual Crop faces/verts.\n" \

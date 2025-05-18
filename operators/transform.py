@@ -9,6 +9,7 @@ import bpy
 import math
 import random
 import bl_math
+import typing  # noqa
 from collections.abc import Callable
 
 import numpy as np
@@ -16,9 +17,8 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
-from math import pi, sin, cos, atan2, sqrt, isclose
-from mathutils import Vector, Matrix
-from mathutils.geometry import area_tri
+from math import pi, sin, cos, atan2, isclose
+from mathutils import Vector
 from collections import defaultdict
 
 from .. import utils
@@ -250,6 +250,154 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
         return info.operator.fill_event_info_ex
 
 
+class Collect(utils.OverlapHelper):
+    def collect_islands(self):
+        settings = univ_settings()
+        padding = settings.padding / min(int(settings.size_x), int(settings.size_y))
+        padding = bl_math.clamp(padding, 0.001, float('inf'))
+        padding *= 2
+
+        umeshes = UMeshes.calc()
+        umeshes.fix_context()
+
+        selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+        umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if selected_umeshes:
+            islands_calc_type = AdvIslands.calc_selected_with_mark_seam
+        else:
+            islands_calc_type = AdvIslands.calc_visible_with_mark_seam
+
+        all_islands = []
+        for umesh in umeshes:
+            if adv_islands := islands_calc_type(umesh):
+                if self.lock_overlap_mode == 'ANY':
+                    adv_islands.calc_tris()
+                    adv_islands.calc_flat_uv_coords(save_triplet=True)
+                all_islands.extend(adv_islands)
+            umesh.update_tag = bool(adv_islands)
+
+        if not all_islands:
+            self.report({'WARNING'}, 'Islands not found')  # noqa
+            return {'FINISHED'}
+
+        if self.lock_overlap:
+            threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
+            all_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+
+        general_bbox = BBox()
+        for isl in all_islands:
+            general_bbox.union(isl.bbox)
+
+        # Sort by center
+        general_center = general_bbox.center
+        all_islands.sort(key = lambda isl_: (isl_.bbox.center - general_center).length)
+
+        # Scale to avoid small padding
+        all_bbox = []
+        for isl in all_islands:
+            bb = isl.bbox
+            bb.pad(Vector((padding, padding)) * 0.52)
+            all_bbox.append(bb)
+
+        radius = self.estimate_min_radius(all_bbox, 1.2 + padding)
+        boxes = self.pack_bboxes(all_bbox, step=padding, max_radius = radius)
+
+        placed = []
+        failed_to_place = []
+        for isl, new_bb, old_bb in zip(all_islands, boxes, all_bbox):
+            if new_bb is None:
+                failed_to_place.append(isl)
+            else:
+                placed.append(isl)
+                to = new_bb.center
+                _from = old_bb.center
+                delta = (to - _from) + general_center
+                isl.move(delta)
+
+        if failed_to_place:
+            if not placed:
+                self.report({'WARNING'}, "Failed inplace packing")  # noqa
+                return {'FINISHED'}
+            else:
+                self.report({'INFO'}, "Some islands couldn't be packed and were placed to the right.")  # noqa
+
+            placed_bbox = BBox()
+            for isl in placed:
+                placed_bbox.union(isl.calc_bbox())
+            placed_bbox.pad(Vector((padding, padding)))
+
+            right_center = (placed_bbox.right_upper + placed_bbox.right_bottom) / 2
+            for failed_isl in failed_to_place:
+                right_center.x += padding
+
+                bb = failed_isl.calc_bbox()
+                left_center = (bb.left_upper + bb.left_bottom) / 2
+
+                failed_isl.set_position(right_center, left_center)
+                right_center.x += bb.width
+
+        return umeshes.update()
+
+    @staticmethod
+    def generate_search_positions(max_radius: float, step: float):
+        r = int(max_radius / step)
+        if r > 150:
+            new_r = 150
+            step = max_radius / new_r
+            r = new_r
+
+
+        range_xy = np.arange(-r, r + 1)  # dtype='int16'
+        grid_x, grid_y = np.meshgrid(range_xy, range_xy)
+
+        dist = np.hypot(grid_x, grid_y)
+
+        coords = np.stack([grid_x, grid_y], axis=-1).reshape(-1, 2)
+        distances = dist.flatten()
+
+        coords = coords[np.argsort(distances)].astype('float32')
+        coords *= np.float32(step)  # dtype='float32'
+        return coords
+
+    def pack_bboxes(self, rects: list[BBox], step, max_radius) -> list[BBox | None]:
+        placed = []
+        failed_idx = []
+        positions = self.generate_search_positions(max_radius, step)
+
+        for bbox in rects:
+            for pos in positions:
+                candidate = bbox.moved(Vector(pos))
+                for r in reversed(placed):
+                    if candidate.overlap(r):
+                        break
+                else:
+                    placed.append(candidate)
+                    positions = self.subtract_points_by_bbox(positions, candidate)
+                    break
+            else:
+                failed_idx.append(len(placed))
+
+        for idx in reversed(failed_idx):
+            placed.insert(idx, None)
+
+        return placed
+
+    @staticmethod
+    def subtract_points_by_bbox(coords, bbox):
+        bb_min = np.array(bbox.min, dtype='float32')
+        bb_max = np.array(bbox.max, dtype='float32')
+        mask = np.all((coords >= bb_min) & (coords <= bb_max), axis=1)
+        return coords[~mask]
+
+    @staticmethod
+    def estimate_min_radius(bboxes, margin=1.2):
+        total_area = sum(bb.area for bb in bboxes)
+        max_length = max(bb.max_length for bb in bboxes) / 2 * 1.2
+        radius = math.sqrt(total_area / math.pi)
+        max_radius = max(radius, max_length)
+        return max_radius * margin
+
 align_align_direction_items = (
     ('UPPER', 'Upper', ''),
     ('BOTTOM', 'Bottom', ''),
@@ -263,7 +411,7 @@ align_align_direction_items = (
     ('LEFT_BOTTOM', 'Left bottom', ''),
     ('RIGHT_BOTTOM', 'Right bottom', ''),
 )
-class UNIV_OT_Align_pie(Operator):
+class UNIV_OT_Align_pie(Operator, Collect):
     bl_idname = 'uv.univ_align_pie'
     bl_label = 'Align'
     bl_description = "Align verts, edges, faces, islands and cursor"
@@ -274,6 +422,13 @@ class UNIV_OT_Align_pie(Operator):
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        if self.is_island_mode and self.mode == 'INDIVIDUAL_OR_MOVE' and self.direction == 'CENTER':
+            self.layout.label(text='Collect')
+            self.draw_overlap()
+            self.layout.separator()
+        self.layout.prop(self, 'direction')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -328,7 +483,10 @@ class UNIV_OT_Align_pie(Operator):
 
             case 'INDIVIDUAL_OR_MOVE':  # OR INDIVIDUAL
                 if self.is_island_mode:
-                    self.move_ex(selected=True)
+                    if self.direction == 'CENTER':
+                        return self.collect_islands()
+                    else:
+                        self.move_ex(selected=True)
                 else:
                     self.individual_scale_zero()
                 if not self.umeshes.final():
@@ -379,7 +537,7 @@ class UNIV_OT_Align_pie(Operator):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if corners := utils.calc_uv_corners(umesh, selected=selected):  # TODO: Implement bbox by individual modes
+            if corners := utils.calc_uv_corners(umesh, selected=selected):  # TODO: Implement bbox for island and vertex mode
                 all_groups.append((corners, umesh.uv))
                 bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
                 general_bbox.union(bbox)
@@ -589,10 +747,18 @@ class UNIV_OT_Align_pie(Operator):
             case _:
                 raise NotImplementedError(direction)
 
+align_event_info_ex = \
+        "Default - Align faces/verts\n" \
+        "Shift - Arrows and H/V align vertices or edges individually in Vertex/Edge mode\n" \
+        "\t\t\tIn Island mode, they move entire islands. \n\t\t\tCenter button collects islands in Island mode.\n" \
+        "Ctrl - Align to cursor\n" \
+        "Ctrl+Shift+Alt - Align to cursor union\n" \
+        "Alt - Move cursor to selected faces/verts"
+        # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 
 class UNIV_OT_Align(UNIV_OT_Align_pie):
     bl_idname = 'uv.univ_align'
-    bl_description = info.operator.align_info
+    bl_description = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
 
     mode: EnumProperty(name="Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', ''),
@@ -604,6 +770,10 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
     ))
 
     def draw(self, context):
+        if self.is_island_mode and self.mode == 'INDIVIDUAL_OR_MOVE' and self.direction == 'CENTER':
+            self.layout.label(text='Collect')
+            self.draw_overlap()
+            self.layout.separator()
         self.layout.prop(self, 'direction')
         self.layout.column(align=True).prop(self, 'mode', expand=True)
 
@@ -624,7 +794,7 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
                 self.mode = 'INDIVIDUAL_OR_MOVE'
             case _:
                 self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
-                                      f"See all variations:\n\n{info.operator.align_event_info_ex}")
+                                      f"See all variations:\n\n{align_event_info_ex}")
                 return {'CANCELLED'}
         return self.execute(context)
 
@@ -2708,4 +2878,3 @@ class UNIV_OT_Pack(Operator):
         KEYUP = 0x0002  # Release  # noqa
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
-
