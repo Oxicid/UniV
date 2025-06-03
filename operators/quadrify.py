@@ -122,7 +122,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         quad_islands.calc_flat_unique_uv_coords()
         quad_islands.calc_flat_3d_coords(save_triplet=True, scale=umesh.value)
         quad_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
-        from .transform import UNIV_OT_Normalize_VIEW3D
+        from .texel import UNIV_OT_Normalize_VIEW3D
         for isl in quad_islands:
             center = isl.bbox.center
             isl.value = center

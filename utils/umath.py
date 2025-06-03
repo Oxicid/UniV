@@ -66,7 +66,7 @@ def weighted_linear_space(start, stop, w):
     cum_w = np.insert(np.cumsum(nw), 0, 0)  # Create cumulative weight sum
     return start + np.outer(cum_w, stop - start)
 
-def round_vector_to_cardinal(v):
+def vec_to_cardinal(v):
     x, y = v
     if abs(x) >= abs(y):
         return Vector([np.sign(x), 0])
