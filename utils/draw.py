@@ -168,6 +168,26 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
         self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
 
+    def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['CrnEdgeGrow'] | 'CrnEdgeGrow'):  # noqa
+        from gpu_extras.batch import batch_for_shader
+        if not groups:
+            self.mid_points = []
+            self.texts = []
+            return
+
+        if type(groups).__name__ == 'CrnEdgeGrow':
+            groups = [[groups]]
+        elif type(groups[0]).__name__ == 'CrnEdgeGrow':
+            groups = [groups]
+
+        offset_lines = self.uv_segments_to_lines_with_offset(groups)
+        color = color_for_groups(groups)
+        self.calc_text_data_from_lines(offset_lines)
+
+        self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
+        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+        self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+
     def get_mouse_pos(self, event):
         return Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
 
@@ -267,6 +287,34 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                     idx += 1
                     edges[idx] = (end_edge + n).to_tuple()
                     idx += 1
+        return edges
+
+    @staticmethod
+    def uv_segments_to_lines_with_offset(segments: typing.Sequence[typing.Sequence], line_offset=0.008):
+        """exact - correct line offset for flipped faces"""
+        import numpy as np
+        size = sum(len(seg) for seg in segments)
+
+        edges = np.empty(shape=(size*2, 2), dtype='float32')
+        idx = 0
+
+        for seg in segments:
+            for adv_crn in seg:
+                start_edge = adv_crn.curr_pt
+                end_edge = adv_crn.next_pt
+
+                # offset
+                nx, ny = (end_edge - start_edge)
+
+                n = Vector((-ny, nx))
+                n.normalize()
+                n *= line_offset
+
+                edges[idx] = (start_edge + n).to_tuple()
+                idx += 1
+                edges[idx] = (end_edge + n).to_tuple()
+                idx += 1
+
         return edges
 
     def calc_text_data_from_lines(self, edges: typing.Sequence | typing.Any, scale=0.000015):

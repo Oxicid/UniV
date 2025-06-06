@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+import numpy as np
 
 if 'bpy' in locals():
     from .. import reload
@@ -7,10 +8,11 @@ if 'bpy' in locals():
 
 import typing
 from mathutils import Vector
-from collections import defaultdict
+from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
 from ..utils import prev_disc, linked_crn_uv_by_crn_tag_unordered_included, linked_crn_uv, vec_isclose_to_zero
+from math import pi
 from . import umesh as _umesh
 from . import bbox
 from .. import utils
@@ -614,3 +616,484 @@ class LoopGroups:
 class UnionLoopGroup(LoopGroups):
     def __init__(self, loop_groups: list[LoopGroup]):
         super().__init__(loop_groups, None)
+
+class AdvCorner:
+    def __init__(self, crn: BMLoop, uv, invert=False):
+        self.crn = crn
+        self.invert: bool = invert
+        self.uv = uv
+        self._vec = None
+        self._is_pair: bool | None = None
+
+    @property
+    def vec(self):
+        if not self._vec:
+            if self.invert:
+                _vec = self.crn.link_loop_prev[self.uv].uv - self.crn[self.uv].uv
+            else:
+                _vec = self.crn.link_loop_next[self.uv].uv - self.crn[self.uv].uv
+            _vec.normalize()
+            self._vec = _vec
+            return _vec
+        return self._vec
+
+    @vec.setter
+    def vec(self, v):
+        self._vec = v
+
+    def angle(self, other: 'typing.Self', max_angle: float):
+        return self.vec.angle(other.vec, max_angle)  # noqa
+
+    @property
+    def is_pair(self):
+        if self._is_pair is None:
+            if self.invert:
+                pair = self.crn.link_loop_prev.link_loop_radial_prev
+                self._is_pair = utils.is_pair_by_idx(self.crn.link_loop_prev, pair, self.uv)
+            else:
+                pair = self.crn.link_loop_radial_prev
+                self._is_pair = utils.is_pair_by_idx(self.crn, pair, self.uv)
+        return self._is_pair
+
+    @is_pair.setter
+    def is_pair(self, v: bool):
+        self._is_pair = v
+
+    @property
+    def vert(self):
+        return self.crn.vert
+
+    @property
+    def length(self):
+        if self.invert:
+            return (self.crn[self.uv].uv - self.crn.link_loop_prev[self.uv].uv).length
+        return (self.crn[self.uv].uv - self.crn.link_loop_next[self.uv].uv).length
+
+    @property
+    def angle_from_cardinal(self):
+        vec = self.vec
+        card_vec = utils.vec_to_cardinal(vec)
+        angle = vec.angle(card_vec, 0)
+        return min(angle, pi-angle)
+
+    @property
+    def next(self):
+        # NOTE: Need face indexing
+        if self.invert:
+            crn_prev = self.crn.link_loop_prev
+            crn_prev_prev = crn_prev.link_loop_prev
+            pair_prev_prev = crn_prev_prev.link_loop_radial_prev
+            if utils.is_pair_by_idx(crn_prev_prev, pair_prev_prev, self.uv):
+                return AdvCorner(pair_prev_prev, self.uv)
+            else:
+                return AdvCorner(crn_prev, self.uv, invert=True)
+        else:
+            return AdvCorner(self.crn.link_loop_next, self.uv)
+
+    @property
+    def prev(self):
+        # NOTE: Need face indexing
+        if self.invert:
+            pair = self.crn.link_loop_radial_prev
+            if utils.is_pair_by_idx(self.crn, pair, self.uv):
+                return AdvCorner(pair, self.uv)
+            else:
+                return AdvCorner(self.crn.link_loop_next, self.uv, invert=True)
+        else:
+            return AdvCorner(self.crn.link_loop_prev, self.uv)
+
+    def toggle_dir(self):
+        if self.is_pair:
+            self.crn = self.crn.link_loop_radial_prev
+        else:
+            if self.invert:
+                self.invert = False
+                self.crn = self.crn.link_loop_prev
+            else:
+                self.invert = True
+                self.crn = self.crn.link_loop_next
+        if self._vec is not None:
+            self._vec *= -1
+        return self
+
+    @property
+    def curr_pt(self):
+        return self.crn[self.uv].uv
+
+    @property
+    def next_pt(self):
+        if self.invert:
+            return self.crn.link_loop_prev[self.uv].uv
+        else:
+            return self.crn.link_loop_next[self.uv].uv
+
+    # def normalize(self):
+    #     if self.invert:
+    #         if utils.is_pair_by_idx(self.crn, self.crn.link_loop_radial_prev, self.uv):
+    #             self.invert = False
+    #             self.crn = self.crn.link_loop_radial_prev
+    #             return True
+    #     return False
+
+    def copy(self):
+        adv_crn = AdvCorner(self.crn, self.uv, self.invert)
+        adv_crn._is_pair = self.is_pair
+        if self._vec:
+            adv_crn._vec = self._vec.copy()
+        else:
+            adv_crn._vec = None
+        return adv_crn
+
+    def __hash__(self):
+        return hash(self.crn)
+
+    def __eq__(self, other):
+        return self.crn == other.crn and self.invert == other.invert
+
+
+class Segment:
+    def __init__(self, seg, umesh):
+        self.seg: list[AdvCorner] = seg
+        self.umesh = umesh
+        self.tag = True
+
+        self.angles_seq: list[float] = []
+        self.lengths_seq: list[float] = []
+
+        self._length: float | utils.NoInit = utils.NoInit()
+        self._weight_angle: float | utils.NoInit = utils.NoInit()
+        self.value: float | utils.NoInit = utils.NoInit()
+
+        self.is_start_lock: bool = False
+        self.is_end_lock: bool = False
+
+    def reverse(self):
+        self.seg = [crn.toggle_dir() for crn in reversed(self.seg)]
+        self.angles_seq.reverse()
+        self.lengths_seq.reverse()
+
+        temp_lock = self.is_start_lock
+        self.is_start_lock = self.is_end_lock
+        self.is_end_lock = temp_lock
+
+    def join_from_end(self, other: 'Segment'):
+        assert self.end_vert == other.start_vert
+        assert self.end_co == other.start_co
+        assert not self.is_end_lock
+        assert not other.is_start_lock
+
+        self.seg.extend(other.seg)
+        self.angles_seq.extend(other.angles_seq)
+        self.lengths_seq.extend(other.lengths_seq)
+
+        self._length += other._length
+        self._weight_angle = utils.NoInit()
+
+        self.is_end_lock = other.is_end_lock
+        other.tag = False
+
+    def calc_angles_from_card_dir(self):
+        for adv_crn in self:
+            self.angles_seq.append(adv_crn.angle_from_cardinal)
+
+    def calc_lengths(self):
+        for adv_crn in self:
+            self.lengths_seq.append(adv_crn.length)
+
+    @property
+    def length(self):
+        if isinstance(self._length, utils.NoInit):
+            if not self.lengths_seq:
+                self.calc_lengths()
+            self._length = sum(self.lengths_seq)
+        return self._length
+
+    @length.setter
+    def length(self, value: float):
+        self._length = value
+
+    @property
+    def weight_angle(self):
+        if isinstance(self._weight_angle, utils.NoInit):
+            if not self.angles_seq:
+                self.calc_angles_from_card_dir()
+
+            if not self.lengths_seq:
+                self.calc_lengths()
+            try:
+                self._weight_angle = np.average(self.angles_seq, weights=self.lengths_seq)
+            except ZeroDivisionError:
+                self._weight_angle = 0
+
+
+        return self._weight_angle
+
+    @weight_angle.setter
+    def weight_angle(self, value: float):
+        self._weight_angle = value
+
+    @property
+    def start_vert(self):
+        return self.seg[0].vert
+
+    @property
+    def end_vert(self):
+        adv_crn = self.seg[-1]
+        if adv_crn.invert:
+            return adv_crn.crn.link_loop_prev.vert
+        else:
+            return adv_crn.crn.link_loop_next.vert
+
+    @property
+    def start_co(self):
+        adv_crn = self.seg[0]
+        return adv_crn.crn[adv_crn.uv].uv
+
+    @property
+    def end_co(self):
+        adv_crn = self.seg[-1]
+        if adv_crn.invert:
+            return adv_crn.crn.link_loop_prev[adv_crn.uv].uv
+        else:
+            return adv_crn.crn.link_loop_next[adv_crn.uv].uv
+
+    @property
+    def is_circular(self):
+        return self.start_vert == self.end_vert and self.start_co == self.end_co
+
+    @staticmethod
+    def fix_zero_vec(seg):
+        pass
+
+    def break_by_cardinal_dir(self):
+        from ..utils import vec_to_cardinal
+        if len(self) <= 1:
+            return Segments([self], self.umesh)
+        seg = list(self.seg)
+
+        break_indexes = []
+        if self.is_circular:
+            prev_cardinal = vec_to_cardinal(seg[-1].vec)
+            for i in range(len(seg)):
+                curr_cardinal = vec_to_cardinal(seg[i].vec)
+                if curr_cardinal != prev_cardinal:
+                    break_indexes.append(i)
+                prev_cardinal = curr_cardinal
+
+            slices = []
+            for i in range(len(break_indexes)):
+                start = break_indexes[i]
+                end = break_indexes[(i + 1) % len(break_indexes)]
+                if start < end:
+                    slices.append(seg[start:end])
+                else:
+                    slices.append(seg[start:] + seg[:end])
+        else:
+
+            for i in range(len(seg)-1):
+                prev_cardinal = vec_to_cardinal(seg[i].vec)
+                curr_cardinal = vec_to_cardinal(seg[i+1].vec)
+                if curr_cardinal != prev_cardinal:
+                    break_indexes.append(i+1)
+
+            full_breaks = [0] + break_indexes + [len(seg)]
+
+            slices = [
+                seg[full_breaks[i]:full_breaks[i + 1]]
+                for i in range(len(full_breaks) - 1)
+            ]
+
+        slices = [Segment(seg, self.umesh) for seg in slices]
+
+        if len(slices) > 1:
+            if self.is_circular:
+                for seg in slices:
+                    seg.is_end_lock = True
+                    seg.is_start_lock = True
+            else:
+                last_idx = len(slices) - 1
+                for idx, seg in enumerate(slices):
+                    if idx != 0:
+                        seg.is_start_lock = True
+
+                    if idx != last_idx:
+                        seg.is_end_lock = True
+
+        return Segments(slices, self.umesh)
+
+    def __iter__(self):
+        return iter(self.seg)
+
+    def __getitem__(self, idx) -> AdvCorner:
+        return self.seg[idx]
+
+    def __len__(self):
+        return len(self.seg)
+
+    def __bool__(self):
+        return bool(self.seg)
+
+    def __str__(self):
+        return f'Segment. Adv Corner count = {len(self.seg)}'
+
+
+class Segments:
+    def __init__(self, segments, umesh):
+        self.segments: typing.Sequence[Segment]  = segments
+        self.umesh = umesh
+
+    @classmethod
+    def calc_by_tags(cls):
+        pass
+
+    @classmethod
+    def from_tagged_corners(cls, to_select_corns: list[BMLoop], umesh):
+        # NOTE: Need indexing islands and tagged corners
+
+        uv = umesh.uv
+        is_pair = utils.is_pair_by_idx
+        appended = set()
+        segments = []
+
+        for crn in to_select_corns:
+            seg = deque()
+            first_crn = AdvCorner(crn, uv)
+            if first_crn in appended:
+                continue
+
+            appended.add(first_crn)
+            seg.append(first_crn)
+
+            if first_crn.is_pair:
+                pair = AdvCorner(crn.link_loop_radial_prev, uv)
+                pair.is_pair = True
+                appended.add(pair)
+            else:
+                pair = AdvCorner(crn.link_loop_next, uv, invert=True)
+                pair.is_pair = False
+                appended.add(pair)
+
+            # Forward Grow
+            while True:
+                lead = seg[-1]
+                if lead.invert:
+                    next_check = lead.crn
+                else:
+                    next_check = lead.crn.link_loop_next
+
+                linked = utils.linked_crn_uv_by_idx_unordered_included(next_check, uv)
+
+                count = 0
+                filtered = []
+                for crn_l in linked:
+                    # Next grow
+                    if crn_l.tag:
+                        next_grow = AdvCorner(crn_l, uv)
+                        count += 1
+                        if next_grow not in appended:
+                            next_grow.is_pair = is_pair(crn_l, crn_l.link_loop_radial_prev, uv)
+                            filtered.append(next_grow)
+
+                    # Here we skip pair edges, as they are processed in the previous condition.
+                    prev = crn_l.link_loop_prev
+                    if prev.tag and not is_pair(prev, prev.link_loop_radial_prev, uv):
+                        prev_grow = AdvCorner(crn_l, uv, invert=True)
+                        count += 1
+                        if prev_grow not in appended:
+                            filtered.append(prev_grow)
+
+                if count >= 3:
+                    break
+
+                if len(filtered) == 1:
+                    next_elem = filtered[0]
+                    if next_elem in appended:
+                        break
+
+                    seg.append(next_elem)
+
+                    # Add possible CrnGrow variants so that we don't go through them again
+                    appended.add(next_elem)
+                    if next_elem.invert:
+                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv))
+                    else:
+                        # The pair doesn't have an invert option, so we do without them
+                        if is_pair(next_elem.crn, next_elem.crn.link_loop_radial_prev, uv):
+                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv))
+                        else:
+                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, invert=True))
+                else:
+                    break
+
+            # Backward Grow
+            while True:
+                lead = seg[0]
+                next_check = lead.crn
+                linked = utils.linked_crn_uv_by_idx_unordered_included(next_check, uv)
+
+                count = 0
+                filtered = []
+                for crn_l in linked:
+                    # Next grow
+                    if crn_l.tag:
+                        if is_pair(crn_l, crn_l.link_loop_radial_prev, uv):
+                            next_grow = AdvCorner(crn_l.link_loop_radial_prev, uv)
+                            next_grow.is_pair = True
+                        else:
+                            next_grow = AdvCorner(crn_l.link_loop_next, uv, invert=True)
+                            next_grow.is_pair = False
+                        count += 1
+                        if next_grow not in appended:
+                            filtered.append(next_grow)
+
+                    prev = crn_l.link_loop_prev
+                    if prev.tag and not is_pair(prev, prev.link_loop_radial_prev, uv):
+                        prev_grow = AdvCorner(prev, uv)
+                        prev_grow.is_pair = False
+                        count += 1
+                        if prev_grow not in appended:
+                            filtered.append(prev_grow)
+
+                if count >= 3:
+                    break
+
+                if len(filtered) == 1:
+                    next_elem = filtered[0]
+                    if next_elem in appended:
+                        break
+
+                    seg.appendleft(next_elem)
+                    appended.add(next_elem)
+                    if next_elem.invert:
+                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv))
+                    else:
+                        if next_elem.is_pair:
+                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv))
+                        else:
+                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, invert=True))
+                else:
+                    break
+
+            segments.append(Segment(seg, umesh))
+        return cls(segments, umesh)
+
+    def break_by_cardinal_dir(self):
+        segments = []
+        for seg in self:
+            segments.extend(seg.break_by_cardinal_dir().segments)
+        return Segments(segments, self.umesh)
+
+    def __iter__(self) -> typing.Iterator[Segment]:
+        return iter(self.segments)
+
+    def __getitem__(self, idx) -> Segment:
+        return self.segments[idx]
+
+    def __len__(self):
+        return len(self.segments)
+
+    def __bool__(self):
+        return bool(self.segments)
+
+    def __str__(self):
+        return f'Segments. Segments count = {len(self.segments)}'

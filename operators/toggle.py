@@ -234,8 +234,6 @@ class UNIV_OT_SplitUVToggle(Operator):
                         active_area.ui_type = 'UV'  # TODO: Implement N-Panel swap
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.uv_editor.show_stretch = prefs().show_stretch
-                        image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                         if hasattr(image_editor, 'show_gizmo_navigate'):
                             image_editor.show_gizmo_navigate = False
 
@@ -254,8 +252,6 @@ class UNIV_OT_SplitUVToggle(Operator):
                         area.ui_type = 'UV'
 
                         image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        image_editor.uv_editor.show_stretch = prefs().show_stretch
-                        image_editor.uv_editor.display_stretch_type = prefs().display_stretch_type
                         if hasattr(image_editor, 'show_gizmo_navigate'):
                             image_editor.show_gizmo_navigate = False
 
