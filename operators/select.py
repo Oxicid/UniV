@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
-import numpy as np
 
 if 'bpy' in locals():
     from .. import reload
@@ -2498,23 +2497,23 @@ class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     def test_invoke(self, _event):
-        # from .. import types  # noqa
         umesh = self.umeshes[0]
         uv = umesh.uv
 
-        x_vec = Vector((1, 0))
-        # y_vec = Vector((0, 1))
-        angle = math.radians(20)
-        edge_orient = x_vec
+        if False:
+            edge_orient = Vector((0, 1))
+        else:
+            edge_orient = Vector((1, 0))
 
+        from math import radians as to_rad
+        angle = to_rad(21)
         negative_ange = math.pi - angle
 
         groups = []
         islands = AdvIslands.calc_visible(umesh)
         islands.indexing()
 
-
-        isl =  AdvIslands.calc_visible(umesh)[0]
+        isl = AdvIslands.calc_visible(umesh)[0]
 
         to_select_corns = []
         for crn in isl.corners_iter():
@@ -2541,158 +2540,10 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         segments = segments.break_by_cardinal_dir()
         segments.segments.sort(key=lambda seg__: seg__.length)
         segments.segments.sort(key=lambda seg__: seg__.weight_angle, reverse=True)
-
-        new_segments = self.join_segments_by_angle(segments)
-        self.calc_from_segments(new_segments)
-
-    def join_segments_by_angle(self, segments):
-        new_segments = []
-        while segments:
-            tar_seg: types.Segment = segments.segments.pop()
-            if not tar_seg.tag:  # Skip joined segments
-                continue
-            tar_seg.tag = False
-
-            if tar_seg.is_start_lock and tar_seg.is_end_lock:
-                new_segments.append(tar_seg)
-                continue
-
-            tar_start_vert = tar_seg.start_vert
-            tar_end_vert = tar_seg.end_vert
-
-            tar_start_co = tar_seg.start_co
-            tar_end_co = tar_seg.end_co
-
-            grow_from_start = []
-            grow_from_end = []
-
-            # Collect and reverse segments that can be joined together
-            for seg in segments:
-                if not seg.tag:
-                    continue
-
-                end_vert = seg.end_vert
-                end_co = seg.end_co
-
-                # Grow from start
-                if not tar_seg.is_start_lock:
-                    if tar_start_vert == end_vert:
-                        if tar_start_co == end_co:
-                            grow_from_start.append(seg)
-                            continue
-                    elif tar_start_vert == seg.start_vert:
-                        if tar_start_co == seg.start_co:
-                            seg.reverse()
-                            grow_from_start.append(seg)
-                            continue
-
-                # Grow from end
-                if not tar_seg.is_end_lock:
-                    if tar_end_vert == seg.start_vert:
-                        if tar_end_co == seg.start_co:
-                            grow_from_end.append(seg)
-                            continue
-                    elif tar_end_vert == end_vert:
-                        if tar_end_co == end_co:
-                            seg.reverse()
-                            grow_from_end.append(seg)
-                            continue
-
-            self.join_segments_by_optimal_angle(grow_from_end, grow_from_start, new_segments, segments, tar_seg)
-
-        return new_segments
-
-    def join_segments_by_optimal_angle(self, grow_from_end, grow_from_start, new_segments, segments, tar_seg):
-        # Connecting the segments at the optimal angle
-        is_joined = False
-        if grow_from_end:
-            tar_vec = tar_seg[-1].vec
-            card_vec = utils.vec_to_cardinal(tar_vec)
-
-            for seg in reversed(grow_from_end):
-                if card_vec != utils.vec_to_cardinal(seg[0].vec):
-                    seg.is_start_lock = True
-                    grow_from_end.remove(seg)
-
-            if not grow_from_end:
-                tar_seg.is_end_lock = True
-
-            for seg in grow_from_end:
-                seg.value = card_vec.angle_signed(seg[0].vec)
-            self.preserving_identical_oppositely_angles(grow_from_end)
-
-            min_seg = None
-            min_angle = float('inf')
-
-            for seg in grow_from_end:
-                if seg.is_start_lock:
-                    continue
-                if (min_a := tar_vec.angle(seg[0].vec)) < min_angle:
-                    min_angle = min_a
-                    min_seg = seg
-
-            # Lock not joined segments
-            if min_seg is not None:
-                for seg in grow_from_end:
-                    if not seg.is_start_lock and (seg is not min_seg):
-                        seg.is_start_lock = True
-                tar_seg.join_from_end(min_seg)
-                tar_seg.tag = True
-                is_joined = True
-        assert not tar_seg.is_circular
-
-        if grow_from_start:
-            tar_vec = tar_seg[0].vec
-            card_vec = utils.vec_to_cardinal(tar_vec)
-
-            for seg in reversed(grow_from_start):
-                if card_vec != utils.vec_to_cardinal(seg[-1].vec):
-                    seg.is_end_lock = True
-                    grow_from_start.remove(seg)
-
-            if not grow_from_start:
-                tar_seg.is_start_lock = True
-
-            for seg in grow_from_start:
-                seg.value = card_vec.angle_signed(seg[-1].vec, 0)
-            self.preserving_identical_oppositely_angles(grow_from_start)
-
-            min_seg = None
-            min_angle = float('inf')
-
-            for seg in grow_from_start:
-                if seg.is_end_lock:
-                    continue
-                if (min_a := tar_vec.angle(seg[-1].vec, 0)) < min_angle:
-                    min_angle = min_a
-                    min_seg = seg
-
-            if min_seg is not None:
-                for seg in grow_from_start:
-                    if not seg.is_end_lock and (seg is not min_seg):
-                        seg.is_end_lock = True
-                tar_seg.tag = False
-                min_seg.join_from_end(tar_seg)
-                min_seg.tag = True
-                tar_seg = min_seg
-                is_joined = True
-
-        if is_joined:
-            segments.segments.append(tar_seg)
-        else:
-            new_segments.append(tar_seg)
-
-    @staticmethod
-    def preserving_identical_oppositely_angles(grow_from):
-        # Preserving segments with identical but oppositely directed angles
-        for seg_a in grow_from:
-            for seg_b in grow_from:
-                if seg_a is seg_b or np.sign(seg_a.value) == np.sign(seg_b.value):
-                    continue
-
-                if isclose(seg_a.value, -seg_b.value, abs_tol=math.radians(1)):
-                    seg_a.is_end_lock = True
-                    seg_b.is_end_lock = True
+        segments.segments.reverse()
+        # from . import transform
+        # new_segments = transform.Align_by_Angle.join_segments_by_angle(transform.Align_by_Angle, segments)
+        self.calc_from_segments(segments)
 
 
 class UNIV_OT_SelectByArea(Operator):

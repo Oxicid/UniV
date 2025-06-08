@@ -759,6 +759,7 @@ class Segment:
 
         self.angles_seq: list[float] = []
         self.lengths_seq: list[float] = []
+        self.chain_linked_corners: list[list[BMLoop]] = []
 
         self._length: float | utils.NoInit = utils.NoInit()
         self._weight_angle: float | utils.NoInit = utils.NoInit()
@@ -766,6 +767,19 @@ class Segment:
 
         self.is_start_lock: bool = False
         self.is_end_lock: bool = False
+
+    def calc_chain_linked_corners(self):
+        uv = self.umesh.uv
+        for adv_crn in self.seg:
+            linked = utils.linked_crn_uv_by_idx_unordered_included(adv_crn.crn, uv)
+            self.chain_linked_corners.append(linked)
+
+        if self.is_start_lock:
+            del self.chain_linked_corners[0]
+
+        if not self.is_end_lock:
+            linked = utils.linked_crn_uv_by_idx_unordered_included(self.seg[-1].next.crn, uv)
+            self.chain_linked_corners.append(linked)
 
     def reverse(self):
         self.seg = [crn.toggle_dir() for crn in reversed(self.seg)]
@@ -831,6 +845,14 @@ class Segment:
     @weight_angle.setter
     def weight_angle(self, value: float):
         self._weight_angle = value
+
+    @property
+    def start(self):
+        return self.start_vert, self.start_co
+
+    @property
+    def end(self):
+        return self.end_vert, self.end_co
 
     @property
     def start_vert(self):
@@ -934,12 +956,12 @@ class Segment:
         return bool(self.seg)
 
     def __str__(self):
-        return f'Segment. Adv Corner count = {len(self.seg)}'
+        return f'Segment. Adv Corner count = {len(self.seg)}, start lock = {self.is_start_lock}, end lock {self.is_end_lock}'
 
 
 class Segments:
     def __init__(self, segments, umesh):
-        self.segments: typing.Sequence[Segment]  = segments
+        self.segments: typing.Sequence[Segment] | list[Segment] = segments
         self.umesh = umesh
 
     @classmethod

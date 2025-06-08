@@ -177,7 +177,9 @@ class UNIV_Settings(bpy.types.PropertyGroup):
 
     align_mode: EnumProperty(name="Align Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', 'Align', 'EMPTY_SINGLE_ARROW', 0),
-        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', 'Individual Align, Move in Island Mode, and Collect in Island mode when press Center', 'PIVOT_INDIVIDUAL', 1),
+        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', 'Individual Align. Move in Island Mode. '
+                                                    'Collect in Island mode when press Center. '
+                                                    'HV applies align by edge angle in Island mode', 'PIVOT_INDIVIDUAL', 1),
         ('ALIGN_CURSOR', 'Move cursor to selected', 'Move cursor to selected', 'ORIENTATION_CURSOR', 2),
         ('ALIGN_TO_CURSOR', 'Align to cursor', 'Align to cursor', 'PIVOT_CURSOR', 3),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', 'Align to cursor union', 'EVENT_U', 4)

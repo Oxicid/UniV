@@ -528,7 +528,7 @@ class UMeshes:
         self._cancel = False
         self.sync: bool = utils.sync()
         self.elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
-            utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+            utils.get_select_mode_mesh_reversed() if self.sync else utils.get_select_mode_uv()
         self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
 
     def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa

@@ -17,7 +17,7 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 
-from math import pi, sin, cos, atan2, isclose
+from math import pi, sin, cos, atan2, isclose, radians as to_rad
 from mathutils import Vector
 from collections import defaultdict
 
@@ -249,6 +249,318 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     def get_event_info():
         return info.operator.fill_event_info_ex
 
+class Align_by_Angle:
+
+    angle: FloatProperty(name='Angle', default=to_rad(15), min=to_rad(2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
+
+    def align_edge_by_angle(self, x_axis):
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()  # noqa
+        umeshes: types.UMeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        umeshes.fix_context()
+        umeshes.calc_aspect_ratio(from_mesh=False)
+
+        if not umeshes:
+            return umeshes.update()
+        umeshes.update_tag = False
+
+        has_segments = False
+        for umesh in umeshes:
+            uv = umesh.uv
+            edge_orient = Vector((not x_axis, x_axis))
+
+            angle = self.angle
+            negative_ange = math.pi - angle
+
+            groups = []
+            islands = AdvIslands.calc_visible(umesh)
+            islands.indexing()
+
+            for isl in islands:
+                isl.apply_aspect_ratio()
+                if selected_umeshes:
+                    if umeshes.sync:
+                        if umeshes.elem_mode == 'FACE' or umesh.total_face_sel:
+                            def corners_iter():
+                                for crn_ in isl.corners_iter():
+                                    if crn_.edge.select:
+                                        if crn_.face.select or (utils.is_pair(crn_, crn_.link_loop_prev, uv) and crn_.link_loop_prev.face.select):
+                                            yield crn_
+                                        else:
+                                            crn_.tag = False
+                                    else:
+                                        crn_.tag = False
+                        else:
+                            def corners_iter():
+                                for crn_ in isl.corners_iter():
+                                    if crn_.edge.select:
+                                        yield crn_
+                                    else:
+                                        crn_.tag = False
+                    else:
+                        def corners_iter():
+                            for crn_ in isl.corners_iter():
+                                if not crn_[uv].select_edge:
+                                    crn_.tag = False
+                                    continue
+                                yield crn_
+                else:
+                    def corners_iter():
+                        return isl.corners_iter()
+
+                to_segmenting_corners = []
+                for crn in corners_iter():
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
+                    a = vec.angle(edge_orient, 0)
+
+                    if a <= angle or a >= negative_ange:
+                        to_segmenting_corners.append(crn)
+                        crn.tag = True
+                    else:
+                        crn.tag = False
+
+                    groups.append(to_segmenting_corners)
+
+                has_segments |= bool(to_segmenting_corners)
+                segments = types.Segments.from_tagged_corners(to_segmenting_corners, umesh)
+                segments = segments.break_by_cardinal_dir()
+                segments.segments.sort(key=lambda seg__: seg__.length)
+                segments.segments.sort(key=lambda seg__: seg__.weight_angle, reverse=True)
+
+                new_segments = self.join_segments_by_angle(segments)
+                self.align_by_angle_ex(new_segments, x_axis)
+                isl.reset_aspect_ratio()
+
+        if not has_segments:
+            self.report({'INFO'}, f'Not found edges with {math.degrees(self.angle):.1f} angle')  # noqa
+        elif not umeshes.update_tag:
+            self.report({'INFO'}, 'All edges aligned')  # noqa
+        umeshes.silent_update()
+        return {'FINISHED'}
+
+    @staticmethod
+    def align_by_angle_ex(segments: types.Segments, x_axis=True):
+        uv = segments.umesh.uv
+        for idx, seg in enumerate(segments):
+            if seg.is_end_lock:
+                seg.lengths_seq.pop()
+
+            if not seg.lengths_seq:
+                continue
+
+            if seg.is_start_lock:
+                del seg.lengths_seq[0]
+            if not seg.lengths_seq:
+                continue
+
+            seg.calc_chain_linked_corners()
+            center_coords = []
+            it = iter(seg.chain_linked_corners)
+
+            if x_axis:
+                prev_co = next(it)[0][uv].uv.x
+                for chain in it:
+                    curr_co = chain[0][uv].uv.x
+                    center_coords.append((prev_co + curr_co) * 0.5)
+                    prev_co = curr_co
+            else:
+                prev_co = next(it)[0][uv].uv.y
+                for chain in it:
+                    curr_co = chain[0][uv].uv.y
+                    center_coords.append((prev_co + curr_co) * 0.5)
+                    prev_co = curr_co
+
+            try:
+                component: float = np.average(center_coords, weights=seg.lengths_seq)  # noqa
+            except ZeroDivisionError:
+                continue
+
+            all_equal = True
+            if x_axis:
+                for chain in seg.chain_linked_corners:
+                    if not isclose(chain[0][uv].uv.x, component, abs_tol=1e-6):
+                        all_equal = False
+                        for crn in chain:
+                            crn[uv].uv.x = component
+            else:
+                for chain in seg.chain_linked_corners:
+                    if not isclose(chain[0][uv].uv.y, component, abs_tol=1e-6):
+                        all_equal = False
+                        for crn in chain:
+                            crn[uv].uv.y = component
+            if not all_equal:
+                segments.umesh.update_tag = True
+
+    def join_segments_by_angle(self, segments: types.Segments):  # noqa
+        new_segments = []
+        while segments:
+            tar_seg: types.Segment = segments.segments.pop()
+            if not tar_seg.tag:  # Skip joined segments
+                continue
+            tar_seg.tag = False
+
+            if tar_seg.is_start_lock and tar_seg.is_end_lock:
+                new_segments.append(tar_seg)
+                continue
+
+            tar_start_vert = tar_seg.start_vert
+            tar_end_vert = tar_seg.end_vert
+
+            tar_start_co = tar_seg.start_co
+            tar_end_co = tar_seg.end_co
+
+            grow_from_start = []
+            grow_from_end = []
+
+            # Collect and reverse segments that can be joined together
+            for seg in reversed(segments):
+                if not seg.tag:
+                    continue
+
+                end_vert = seg.end_vert
+                end_co = seg.end_co
+
+                # Grow from start
+                if not tar_seg.is_start_lock:
+                    if tar_start_vert == end_vert:
+                        if tar_start_co == end_co:
+                            grow_from_start.append(seg)
+                            continue
+                    elif tar_start_vert == seg.start_vert:
+                        if tar_start_co == seg.start_co:
+                            seg.reverse()
+                            grow_from_start.append(seg)
+                            continue
+
+                # Grow from end
+                if not tar_seg.is_end_lock:
+                    if tar_end_vert == seg.start_vert:
+                        if tar_end_co == seg.start_co:
+                            grow_from_end.append(seg)
+                            continue
+                    elif tar_end_vert == end_vert:
+                        if tar_end_co == end_co:
+                            seg.reverse()
+                            grow_from_end.append(seg)
+                            continue
+
+            Align_by_Angle.join_segments_by_optimal_angle(grow_from_end, grow_from_start, new_segments, segments, tar_seg)
+
+        return types.Segments(new_segments, segments.umesh)
+
+    @staticmethod
+    def join_segments_by_optimal_angle(grow_from_end, grow_from_start, new_segments, segments, tar_seg):
+        """Connecting the segments at the optimal angle"""
+        is_joined = False
+        # Save the start and end variables in advance, as the segment may be joined and
+        # the result will be wrong for cutting off non-priority segments.
+        tar_seg_start = tar_seg.start
+        tar_seg_end = tar_seg.end
+
+        if grow_from_end:
+            tar_vec = tar_seg[-1].vec
+            card_vec = utils.vec_to_cardinal(tar_vec)
+
+            for seg in reversed(grow_from_end):
+                if card_vec != utils.vec_to_cardinal(seg[0].vec):
+                    seg.is_start_lock = True
+                    # Check the other end, since segments can be cyclic, in which case you need to lock.
+                    seg.is_end_lock |= tar_seg_start == seg.end
+                    grow_from_end.remove(seg)
+
+            if not grow_from_end:
+                tar_seg.is_end_lock = True
+
+            for seg in grow_from_end:
+                seg.value = card_vec.angle_signed(seg[0].vec)
+            Align_by_Angle.preserving_identical_oppositely_angles(grow_from_end, start_lock=True)
+
+            min_seg = None
+            min_angle = float('inf')
+
+            for seg in grow_from_end:
+                if seg.is_start_lock:
+                    continue
+                if (min_a := tar_vec.angle(seg[0].vec)) < min_angle:
+                    min_angle = min_a
+                    min_seg = seg
+
+            # Lock not joined segments
+            if min_seg is not None:
+                for seg in grow_from_end:
+                    if not (seg is min_seg):
+                        seg.is_start_lock = True
+                        # Check the other end, since segments can be cyclic, in which case you need to lock.
+                        seg.is_end_lock |= tar_seg_start == seg.end
+
+                tar_seg.join_from_end(min_seg)
+                tar_seg.tag = True
+                is_joined = True
+
+        assert not tar_seg.is_circular
+
+        if grow_from_start:
+            tar_vec = tar_seg[0].vec
+            card_vec = utils.vec_to_cardinal(tar_vec)
+
+            for seg in reversed(grow_from_start):
+                if card_vec != utils.vec_to_cardinal(seg[-1].vec):
+                    seg.is_end_lock = True
+                    # Check the other end, since segments can be cyclic, in which case you need to lock.
+                    seg.is_start_lock |= tar_seg_end == seg.start
+                    grow_from_start.remove(seg)
+
+            if not grow_from_start:
+                tar_seg.is_start_lock = True
+
+            for seg in grow_from_start:
+                seg.value = card_vec.angle_signed(seg[-1].vec, 0)
+
+            Align_by_Angle.preserving_identical_oppositely_angles(grow_from_start, start_lock=False)
+
+            min_seg = None
+            min_angle = float('inf')
+
+            for seg in grow_from_start:
+                if seg.is_end_lock:
+                    continue
+                if (min_a := tar_vec.angle(seg[-1].vec, 0)) < min_angle:
+                    min_angle = min_a
+                    min_seg = seg
+
+            if min_seg is not None:
+                for seg in grow_from_start:
+                    if not (seg is min_seg):
+                        seg.is_end_lock = True
+                        # Check the other end, since segments can be cyclic, in which case you need to lock.
+                        seg.is_start_lock |= tar_seg_end == seg.start
+
+                tar_seg.tag = False
+                min_seg.join_from_end(tar_seg)
+                min_seg.tag = True
+                tar_seg = min_seg
+                is_joined = True
+
+        if is_joined:
+            segments.segments.append(tar_seg)
+        else:
+            new_segments.append(tar_seg)
+
+    @staticmethod
+    def preserving_identical_oppositely_angles(grow_from, start_lock):
+        # Preserving segments with identical but oppositely directed angles
+        for seg_a in grow_from:
+            for seg_b in grow_from:
+                if seg_a is seg_b or np.sign(seg_a.value) == np.sign(seg_b.value):
+                    continue
+
+                if isclose(seg_a.value, -seg_b.value, abs_tol=to_rad(1.5)):
+                    if start_lock:
+                        seg_a.is_start_lock = True
+                        seg_b.is_start_lock = True
+                    else:
+                        seg_a.is_end_lock = True
+                        seg_b.is_end_lock = True
+
 
 class Collect(utils.OverlapHelper):
     def collect_islands(self):
@@ -411,7 +723,7 @@ align_align_direction_items = (
     ('LEFT_BOTTOM', 'Left bottom', ''),
     ('RIGHT_BOTTOM', 'Right bottom', ''),
 )
-class UNIV_OT_Align_pie(Operator, Collect):
+class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     bl_idname = 'uv.univ_align_pie'
     bl_label = 'Align'
     bl_description = "Align verts, edges, faces, islands and cursor"
@@ -424,10 +736,17 @@ class UNIV_OT_Align_pie(Operator, Collect):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
-        if self.is_island_mode and self.mode == 'INDIVIDUAL_OR_MOVE' and self.direction == 'CENTER':
-            self.layout.label(text='Collect')
-            self.draw_overlap()
-            self.layout.separator()
+        if self.is_island_mode:
+            if self.mode == 'INDIVIDUAL_OR_MOVE':
+                if self.direction == 'CENTER':
+                    self.layout.label(text='Collect')
+                    self.draw_overlap()
+                    self.layout.separator()
+                elif self.direction in ('HORIZONTAL', 'VERTICAL'):
+                    self.layout.label(text='Align by Angle')
+                    self.layout.prop(self, 'angle', slider=True)
+                    self.layout.separator()
+
         self.layout.prop(self, 'direction')
 
     def __init__(self, *args, **kwargs):
@@ -485,6 +804,8 @@ class UNIV_OT_Align_pie(Operator, Collect):
                 if self.is_island_mode:
                     if self.direction == 'CENTER':
                         return self.collect_islands()
+                    elif self.direction in ('HORIZONTAL', 'VERTICAL'):
+                        return self.align_edge_by_angle(x_axis=self.direction == 'VERTICAL')
                     else:
                         self.move_ex(selected=True)
                 else:
@@ -749,8 +1070,10 @@ class UNIV_OT_Align_pie(Operator, Collect):
 
 align_event_info_ex = \
         "Default - Align faces/verts\n" \
-        "Shift - Arrows and H/V align vertices or edges individually in Vertex/Edge mode\n" \
-        "\t\t\tIn Island mode, they move entire islands. \n\t\t\tCenter button collects islands in Island mode.\n" \
+        "Shift - Arrows and H/V align vertices or edges individually in Vertex/Edge mode.\n" \
+         "\t\t\tIn Island mode, they move entire islands.\n" \
+         "\t\t\tCenter button collects islands in Island mode.\n" \
+         "\t\t\tH/V buttons - align edges by angle in Island mode.\n" \
         "Ctrl - Align to cursor\n" \
         "Ctrl+Shift+Alt - Align to cursor union\n" \
         "Alt - Move cursor to selected faces/verts"
@@ -770,10 +1093,17 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
     ))
 
     def draw(self, context):
-        if self.is_island_mode and self.mode == 'INDIVIDUAL_OR_MOVE' and self.direction == 'CENTER':
-            self.layout.label(text='Collect')
-            self.draw_overlap()
-            self.layout.separator()
+        if self.is_island_mode:
+            if self.mode == 'INDIVIDUAL_OR_MOVE':
+                if self.direction == 'CENTER':
+                    self.layout.label(text='Collect')
+                    self.draw_overlap()
+                    self.layout.separator()
+                elif self.direction in ('HORIZONTAL', 'VERTICAL'):
+                    self.layout.label(text='Align by Angle')
+                    self.layout.prop(self, 'angle', slider=True)
+                    self.layout.separator()
+
         self.layout.prop(self, 'direction')
         self.layout.column(align=True).prop(self, 'mode', expand=True)
 
