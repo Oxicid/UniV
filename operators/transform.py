@@ -743,7 +743,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     self.draw_overlap()
                     self.layout.separator()
                 elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                    self.layout.label(text='Align by Angle')
+                    self.layout.label(text='Align Edge by Angle')
                     self.layout.prop(self, 'angle', slider=True)
                     self.layout.separator()
 
@@ -811,7 +811,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 else:
                     self.individual_scale_zero()
                 if not self.umeshes.final():
-                    if self.direction in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:
+                    if self.direction in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:  # TODO: Delete???
                         self.align_ex(selected=False)
                     else:
                         self.move_ex(selected=False)

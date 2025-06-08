@@ -241,11 +241,6 @@ class UNIV_PT_General(Panel):
         col_align.separator(factor=0.35)
 
         row = col_align.row(align=True)
-        row.operator('uv.univ_select_border_edge_by_angle', icon_value=icons.border_by_angle).edge_dir = 'BOTH'
-        row.operator('uv.univ_select_border_edge_by_angle', text='', icon_value=icons.horizontal_a).edge_dir = 'HORIZONTAL'
-        row.operator('uv.univ_select_border_edge_by_angle', text='', icon_value=icons.vertical_a).edge_dir = 'VERTICAL'
-
-        row = col_align.row(align=True)
         row.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
         row.operator('uv.univ_select_square_island', text='',  icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
         row.operator('uv.univ_select_square_island', text='',  icon_value=icons.vertical_a).shape = 'VERTICAL'

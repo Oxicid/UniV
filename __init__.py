@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 19),
+    "version": (3, 7, 20),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -128,7 +128,6 @@ def load_register_types():
             select.UNIV_OT_Select_By_Cursor,
             select.UNIV_OT_Select_Square_Island,
             select.UNIV_OT_Select_Border,
-            select.UNIV_OT_Select_Border_Edge_by_Angle,
             select.UNIV_OT_Select_Pick,
             select.UNIV_OT_Select_Grow_VIEW3D,
             select.UNIV_OT_Select_Grow,
