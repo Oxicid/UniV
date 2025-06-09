@@ -296,6 +296,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
     keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
 
+    split_toggle_uv_by_cursor: BoolProperty(name='Split ToggleUV by Mouse Cursor', default=False)
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
     panel_3d_view_category: StringProperty(name="Panel 3D View Category", description="Enter a name for the panel category",
@@ -328,7 +329,9 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         elif self.tab == 'UI':
             layout.prop(self, 'show_view_3d_panel')
             layout.prop(self, 'panel_3d_view_category')
-            layout.prop(self, 'show_split_toggle_uv_button')
+            row = layout.row()
+            row.prop(self, 'split_toggle_uv_by_cursor')
+            row.prop(self, 'show_split_toggle_uv_button')
             layout.separator()
             box = layout.box()
             box.prop(self, 'color_mode')

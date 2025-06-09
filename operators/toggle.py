@@ -35,6 +35,8 @@ class UNIV_OT_SplitUVToggle(Operator):
                        ))
 
     def invoke(self, context, event):
+        self.mouse_x_pos = event.mouse_x
+
         if event.value == 'PRESS':
             self.mode = 'SPLIT'
             return self.execute(context)
@@ -52,6 +54,10 @@ class UNIV_OT_SplitUVToggle(Operator):
                 self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement.")
                 return {'CANCELLED'}
         return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mouse_x_pos = 0
 
     def execute(self, context):
         if context.area is None or context.area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
@@ -100,9 +106,6 @@ class UNIV_OT_SplitUVToggle(Operator):
                             image_editor.show_gizmo_navigate = False
 
                         area.tag_redraw()
-                        c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(area))
-                        c_region.info()
-
                         self.category_setter_register(area)
                         return {'FINISHED'}
 
@@ -119,20 +122,32 @@ class UNIV_OT_SplitUVToggle(Operator):
                     self.category_setter_register(active_area)
                     return {'FINISHED'}
 
-            # Split VIEW_3D
+            # Split VIEW_3D - create UV area
             bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
 
-            for area in context.screen.areas:
-                if area.ui_type == 'VIEW_3D' and area != active_area:
-                    if area.height == area.height:
-                        area.ui_type = 'UV'
+            target_area = None
+            mouse_in_right_side = self.mouse_x_pos > ((active_area.x + active_area.width) // 2)
+            if prefs().split_toggle_uv_by_cursor and mouse_in_right_side:
+                target_area = active_area
+            else:
+                for area in context.screen.areas:
+                    if area.ui_type == 'VIEW_3D' and area != active_area:
+                        if area.height == area.height:
+                            target_area = area
+                            break
 
-                        image_editor = [space for space in area.spaces if space.type == 'IMAGE_EDITOR'][0]
-                        if hasattr(image_editor, 'show_gizmo_navigate'):
-                            image_editor.show_gizmo_navigate = False
+            if target_area:
+                target_area.ui_type = 'UV'
 
-                        self.category_setter_register(area)
-                        return {'FINISHED'}
+                image_editor = next(space for space in target_area.spaces if space.type == 'IMAGE_EDITOR')
+                if hasattr(image_editor, 'show_gizmo_navigate'):
+                    image_editor.show_gizmo_navigate = False
+
+                self.category_setter_register(target_area)
+                return {'FINISHED'}
+            else:
+                self.report({'WARNING'}, 'Splitted area not found')
+                return {'CANCELLED'}
 
         # Change ui_type to ShaderNodeTree from area_type
         elif active_area.type == 'IMAGE_EDITOR' and active_area.ui_type != 'UV':
@@ -160,11 +175,15 @@ class UNIV_OT_SplitUVToggle(Operator):
                             bpy.ops.screen.area_close()
                         return {'FINISHED'}
 
-            # Split from UV
+            # Split from UV - create 3D area
             bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
-            active_area.ui_type = 'VIEW_3D'
-
             new_area, = set(context.screen.areas[:]) - old_areas
+
+            mouse_in_right_side = self.mouse_x_pos > ((active_area.x + active_area.width) // 2)
+            if not (prefs().split_toggle_uv_by_cursor and mouse_in_right_side):
+                new_area, active_area = active_area, new_area
+
+            active_area.ui_type = 'VIEW_3D'
             c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(new_area))
             if c_region.alignment:
                 self.category_setter_register(new_area)

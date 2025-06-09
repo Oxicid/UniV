@@ -590,6 +590,7 @@ class UNIV_OT_Select_Border(Operator):
         ('VERTICAL', 'Vertical', ''),
     ))
 
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     angle: FloatProperty(name='Angle', default=math.radians(5), min=0, max=math.radians(45.001), subtype='ANGLE')
 
     def draw(self, context):
@@ -598,6 +599,7 @@ class UNIV_OT_Select_Border(Operator):
             row.prop(self, 'edge_dir', expand=True)
             layout = self.layout
             layout.prop(self, 'angle', slider=True)
+            layout.prop(self, 'use_correct_aspect')
 
         col = self.layout.column(align=True)
         col.prop(self, 'border_mode', expand=True)
@@ -764,7 +766,8 @@ class UNIV_OT_Select_Border(Operator):
 
         self.edge_orient = self.x_vec if self.edge_dir == 'HORIZONTAL' else self.y_vec
         self.umeshes = UMeshes(report=self.report)
-        self.umeshes.calc_aspect_ratio(from_mesh=False)
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=False)
 
         self.negative_ange = math.pi - self.angle
 
