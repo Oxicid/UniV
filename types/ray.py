@@ -630,6 +630,11 @@ class RayCast:
         if not (result and obj and obj.type == 'MESH'):
             return
 
+        if obj.mode != 'EDIT':
+            # TODO: Pick edit mode objects throw object mode - objects
+            self.report({'WARNING'}, f'Raycast hit non-edit mode object - {obj.name!r}')  # noqa
+            return
+
         umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
         umesh.ensure()
         umesh.bm = bmesh.from_edit_mesh(umesh.obj.data)
