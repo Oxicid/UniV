@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 22),
+    "version": (3, 7, 23),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -143,6 +143,7 @@ def load_register_types():
             # QuickSnap
             quick_snap.UNIV_OT_QuickSnap,
             # UI
+            ui.UNIV_PT_TD_LayersManager,
             ui.UNIV_UL_TD_PresetsManager,
             ui.UNIV_PT_TD_PresetsManager,
             ui.UNIV_UL_UV_LayersManager,
@@ -181,6 +182,7 @@ def load_register_types():
             misc.UNIV_OT_Remove,
             misc.UNIV_OT_MoveUp,
             misc.UNIV_OT_MoveDown,
+            misc.UNIV_OT_CopyToLayer,
             misc.UNIV_OT_SetActiveRender,
             misc.UNIV_OT_UV_Layers_Manager,
             # Mesh

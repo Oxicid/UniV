@@ -108,6 +108,20 @@ _udim_source = [
     ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
     ('ACTIVE_UDIM', 'Active UDIM', "Pack islands to active UDIM image tile or UDIM grid tile where 2D cursor is located")
 ]
+copy_to_layers_uv_channels_items_from = [
+    ('0', 'Active', ''),
+    ('1', '1', ''),
+    ('2', '2', ''),
+    ('3', '3', ''),
+    ('4', '4', ''),
+    ('5', '5', ''),
+    ('6', '6', ''),
+    ('7', '7', ''),
+    ('8', '8', ''),
+]
+copy_to_layers_uv_channels_items_to = copy_to_layers_uv_channels_items_from.copy()
+copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
+
 if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
@@ -137,6 +151,9 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0, update=_update_uv_layers_active_idx)
     uv_layers_active_render_idx: IntProperty(name='Active uv render index', min=-1, max=7, default=-1)
     uv_layers_presets: CollectionProperty(name="UV Layers", type=UNIV_UV_Layers, options={'SKIP_SAVE'})
+
+    copy_to_layers_from: EnumProperty(name='From', default='0', items=copy_to_layers_uv_channels_items_from)
+    copy_to_layers_to: EnumProperty(name='To', default='0', items=copy_to_layers_uv_channels_items_to)
 
     # Pack Settings
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',

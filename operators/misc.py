@@ -1096,6 +1096,137 @@ class UNIV_OT_Remove(Operator):
 
         return {'FINISHED'}
 
+class UNIV_OT_CopyToLayer(Operator):
+    bl_idname = 'uv.univ_copy_to_layer'
+    bl_label = 'Copy'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def execute(self, context):
+        umeshes = UMeshes(report=self.report)
+
+        copy_from = int(univ_settings().copy_to_layers_from)
+        copy_to = int(univ_settings().copy_to_layers_to)
+
+        if copy_from != 0:
+            if copy_from == copy_to:
+                self.report({'WARNING'}, 'The From and To indexes are identical')
+                return {'CANCELLED'}
+
+        source_and_target_same_count = 0
+        missed_source_meshes_count = 0
+        missed_target_meshes_count = 0
+        if umeshes.is_edit_mode:
+            if context.area.type != 'IMAGE_EDITOR':
+                umeshes.set_sync()
+
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
+            umeshes = selected if selected else visible
+            if not umeshes:
+                return umeshes.update()
+
+            for umesh in reversed(umeshes):
+                if len(umesh.obj.data.uv_layers) == 1:
+                    umeshes.umeshes.remove(umesh)
+            if not umeshes:
+                return umeshes.update(info='Not found meshes with 2 and more uvs for copy coordinates')
+
+            for umesh in reversed(umeshes):
+                if copy_from == 0:
+                    donor_uv = umesh.uv
+                else:
+                    if len(umesh.obj.data.uv_layers) < copy_from:
+                        umeshes.umeshes.remove(umesh)
+                        missed_source_meshes_count += 1
+                        continue
+                    donor_uv = umesh.bm.loops.layers.uv[copy_from-1]
+
+                faces = utils.calc_selected_uv_faces(umesh) if selected else utils.calc_visible_uv_faces(umesh)
+                if copy_to == 0:
+                    for idx in range(len(umesh.obj.data.uv_layers)):
+                        recipient_uv = umesh.bm.loops.layers.uv[idx]
+                        if donor_uv.name == recipient_uv.name:
+                            continue
+
+                        for f in faces:
+                            for crn in f.loops:
+                                crn[recipient_uv].uv = crn[donor_uv].uv
+                else:
+                    if len(umesh.obj.data.uv_layers) < copy_to:
+                        umeshes.umeshes.remove(umesh)
+                        missed_target_meshes_count += 1
+                        continue
+
+                    recipient_uv = umesh.bm.loops.layers.uv[copy_to-1]
+                    if recipient_uv.name == donor_uv.name:
+                        umeshes.umeshes.remove(umesh)
+                        source_and_target_same_count += 1
+                        continue
+
+                    for f in faces:
+                        for crn in f.loops:
+                            crn[recipient_uv].uv = crn[donor_uv].uv
+
+        else:
+            if not umeshes:
+                return umeshes.update()
+
+            for umesh in reversed(umeshes):
+                if len(umesh.obj.data.uv_layers) == 1:
+                    umeshes.umeshes.remove(umesh)
+            if not umeshes:
+                return umeshes.update(info='Not found meshes with 2 and more uvs for copy coordinates')
+
+            for umesh in reversed(umeshes):
+                if copy_from == 0:
+                    donor_uv = umesh.obj.data.uv_layers.active
+                else:
+                    if len(umesh.obj.data.uv_layers) < copy_from:
+                        umeshes.umeshes.remove(umesh)
+                        missed_source_meshes_count += 1
+                        continue
+                    donor_uv = umesh.obj.data.uv_layers[copy_from - 1]
+
+                size = len(umesh.obj.data.loops) * 2
+                donor_uv_coords = np.empty(size, dtype='float32')
+                donor_uv.data.foreach_get("uv", donor_uv_coords)
+
+                if copy_to == 0:
+                    for idx in range(len(umesh.obj.data.uv_layers)):
+                        recipient_uv = umesh.obj.data.uv_layers[idx]
+                        if donor_uv.name == recipient_uv.name:
+                            continue
+                        recipient_uv.data.foreach_set("uv", donor_uv_coords)
+                else:
+                    if len(umesh.obj.data.uv_layers) < copy_to:
+                        umeshes.umeshes.remove(umesh)
+                        missed_target_meshes_count += 1
+                        continue
+
+                    recipient_uv = umesh.obj.data.uv_layers[copy_to - 1]
+                    if recipient_uv.name == donor_uv.name:
+                        umeshes.umeshes.remove(umesh)
+                        source_and_target_same_count += 1
+                        continue
+                    recipient_uv.data.foreach_set("uv", donor_uv_coords)
+
+        info = ''
+        if source_and_target_same_count:
+            info += f'{source_and_target_same_count} meshes has same source and target UV channel. '
+        if missed_source_meshes_count:
+            info += f'{missed_source_meshes_count} meshes do not have the required source UV channel to provide coordinates for transfer. '
+        if missed_target_meshes_count:
+            info += f'{missed_target_meshes_count} meshes do not have the required target UV channel to receive source coordinates.'
+        if info:
+            self.report({'WARNING'}, info)
+
+        for umesh in umeshes:
+            umesh.obj.update_tag()
+        return {'FINISHED'}
+
 class UNIV_OT_SetActiveRender(Operator):
     bl_idname = 'mesh.univ_active_render_set'
     bl_label = 'Remove'

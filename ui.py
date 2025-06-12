@@ -111,7 +111,7 @@ class UNIV_PT_General(Panel):
         col.operator('mesh.univ_move_up', icon='TRIA_UP', text='')
         col.operator('mesh.univ_move_down', icon='TRIA_DOWN', text='')
         col.separator(factor=0.25)
-        col.operator('mesh.univ_fix_uvs', icon='EVENT_F', text='')
+        col.popover(panel='UNIV_PT_layers_manager', text='', icon_value=icons.settings_a)
 
     def draw_header(self, context):
         layout = self.layout
@@ -542,6 +542,32 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
         col.separator()
         col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+
+class UNIV_PT_TD_LayersManager(Panel):
+    bl_label = 'Layers Manager'
+    bl_idname = 'UNIV_PT_layers_manager'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_options = {'INSTANCED'}
+    bl_region_type = 'UI'
+    bl_category = 'UniV'
+
+    def draw(self, context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        settings = univ_settings()
+        layout.operator('mesh.univ_fix_uvs', icon='EVENT_F')
+
+        row = layout.row(align=True)
+        row.prop(settings, 'copy_to_layers_from', text='')
+        row.label(text='', icon_value=icons.shift)
+        row.prop(settings, 'copy_to_layers_to', text='')
+        row.separator(factor=0.35)
+        row.operator('uv.univ_copy_to_layer')
+
 
 
 class IMAGE_MT_PIE_univ_edit(Menu):
