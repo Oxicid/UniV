@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 23),
+    "version": (3, 7, 24),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -198,6 +198,8 @@ def load_register_types():
                 # Select
                 univ_pro.select.UNIV_OT_Select_Flat_VIEW3D,
                 univ_pro.select.UNIV_OT_Select_Flat,
+                univ_pro.select.UNIV_OT_SelectSimilar_VIEW2D,
+                univ_pro.select.UNIV_OT_SelectSimilar_VIEW3D,
                 # Transform
                 univ_pro.drag.UNIV_OT_Drag,
                 # Transfer

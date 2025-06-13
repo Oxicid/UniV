@@ -527,7 +527,7 @@ class UMeshes:
         self.report_obj = report
         self._cancel = False
         self.sync: bool = utils.sync()
-        self.elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
+        self._elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
             utils.get_select_mode_mesh_reversed() if self.sync else utils.get_select_mode_uv()
         self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
 
@@ -560,6 +560,19 @@ class UMeshes:
         for umesh in self:
             umesh.update_tag = value
 
+    @property
+    def elem_mode(self):
+        return self._elem_mode
+
+    @elem_mode.setter
+    def elem_mode(self, mode: typing.Literal['VERTEX', 'EDGE', 'FACE']):
+        assert self.sync
+        if self._elem_mode != mode:
+            utils.set_select_mode_mesh(mode)
+            self._elem_mode = mode
+            for umesh in self:
+                umesh.bm.select_mode = {mode}
+
     def silent_update(self):
         for umesh in self:
             umesh.update()
@@ -572,6 +585,40 @@ class UMeshes:
     def ensure(self, face=True, edge=False, vert=False):
         for umesh in self.umeshes:
             umesh.ensure(face, edge, vert)
+
+    def deselect_all_elem(self):
+        for umesh in self:
+            if self.sync:
+                if self._elem_mode == 'FACE':
+                    if umesh.is_full_face_deselected:
+                        continue
+                    umesh.update_tag = True
+                    if umesh.is_full_face_selected:
+                        for f in umesh.bm.faces:
+                            f.select = False
+                    else:
+                        for f in umesh.bm.faces:
+                            if f.select:
+                                f.select = False
+                else:
+                    if umesh.is_full_vert_deselected:
+                        continue
+                    umesh.update_tag = True
+                    if umesh.is_full_vert_selected:
+                        for v in umesh.bm.verts:
+                            v.select = False
+                    else:
+                        for v in umesh.bm.verts:
+                            if v.select:
+                                v.select = False
+            else:
+                if selected_corners := utils.calc_selected_uv_vert_corners(umesh):
+                    uv = umesh.uv
+                    umesh.update_tag = True
+                    for crn in selected_corners:
+                        crn_uv = crn[uv]
+                        crn_uv.select = False
+                        crn_uv.select_edge = False
 
     def verify_uv(self):
         for umesh in self:

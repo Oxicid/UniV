@@ -213,7 +213,10 @@ class UNIV_PT_General(Panel):
 
         split = col_align.split(align=True)
         split.scale_y = 1.3
-        split.operator('uv.univ_stack', icon_value=icons.stack)
+        row = split.row(align=True)
+        row.operator('uv.univ_stack', icon_value=icons.stack)
+        if univ_pro:
+            row.operator('uv.univ_select_similar', text='', icon_value=icons.arrow)
 
         # Select
         col_align.label(text='Select')
@@ -340,6 +343,8 @@ class UNIV_PT_General_VIEW_3D(Panel):
         row = col_align.row(align=True)
         row.scale_y = 1.35
         row.operator('mesh.univ_stack', icon_value=icons.stack)
+        if univ_pro:
+            row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
         col_align.label(text='Transform')
         col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)
