@@ -424,6 +424,9 @@ class UNIV_PT_PackSettings(Panel):
         layout = self.layout
         settings = univ_settings()
 
+        if uvpm_exist := hasattr(context.scene, 'uvpm3_props'):
+            layout.prop(settings, 'use_uvpm')
+
         row = layout.row(align=True, heading='Size')
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
@@ -432,15 +435,22 @@ class UNIV_PT_PackSettings(Panel):
         layout.prop(settings, 'padding', slider=True)
         layout.separator()
 
+        if settings.use_uvpm:
+            if uvpm_exist:
+                self.draw_uvpm()
+            else:
+                layout.label(text='UVPackmaster not found')
+            return
+
         if not bpy.app.version >= (3, 6, 0):
-            layout.prop(settings, 'rotate', toggle=1)
+            layout.prop(settings, 'rotate', toggle=True)
         else:
             row = layout.row(align=True)
             row.prop(settings, 'shape_method', expand=True)
 
             row = layout.row(align=True)
-            row.prop(settings, 'scale', toggle=1)
-            row.prop(settings, 'rotate', toggle=1)
+            row.prop(settings, 'scale', toggle=True)
+            row.prop(settings, 'rotate', toggle=True)
 
             if settings.rotate:
                 row = layout.row().column()
@@ -454,6 +464,33 @@ class UNIV_PT_PackSettings(Panel):
             self.layout.prop(settings, 'pin')
             layout.prop(settings, 'merge_overlap')
         layout.prop(settings, 'udim_source')
+
+    def draw_uvpm(self):
+        layout = self.layout
+        settings = univ_settings()
+        uvpm_settings = bpy.context.scene.uvpm3_props
+
+        row = layout.row(align=True)
+        row.prop(settings, 'scale', toggle=True)
+        row.prop(uvpm_settings, 'rotation_enable', text='Rotation', toggle=True)
+        row.prop(uvpm_settings, 'flipping_enable', text='Flip', toggle=True)
+        if settings.scale:
+            row = layout.row(align=True)
+            row.prop(uvpm_settings, 'normalize_scale', text='Normalize', toggle=True)
+            row.prop(uvpm_settings, 'heuristic_allow_mixed_scales', text='Mixed Scale', toggle=True)
+        if uvpm_settings.rotation_enable:
+            row = layout.row(align=True)
+            row.prop(uvpm_settings, 'pre_rotation_disable', text='Pre-Rotation Disable', toggle=True)
+            subrow = row.column()
+            subrow.scale_x = 0.8
+            subrow.prop(uvpm_settings, 'rotation_step', text='Step')
+
+        layout.prop(uvpm_settings, 'lock_overlapping_enable', text='Lock Overlaps')
+        if uvpm_settings.lock_overlapping_enable:
+            row = layout.row(align=True)
+            row.prop(uvpm_settings, 'lock_overlapping_mode', expand=True)
+
+        layout.prop(uvpm_settings.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):

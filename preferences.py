@@ -156,6 +156,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     copy_to_layers_to: EnumProperty(name='To', default='0', items=copy_to_layers_uv_channels_items_to)
 
     # Pack Settings
+    use_uvpm: BoolProperty(name='Use UVPackmaster', default=False)
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
                                items=(('CONCAVE', 'Exact', 'Uses exact geometry'), ('AABB', 'Fast', 'Uses bounding boxes'))
                                )

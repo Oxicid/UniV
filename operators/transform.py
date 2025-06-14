@@ -3165,14 +3165,66 @@ class UNIV_OT_Pack(Operator):
     bl_description = f"Pack selected islands\n\n" \
                      f"Has [P] keymap, but it conflicts with the 'Pin' operator"
 
-    def invoke(self, context, event):
-        return self.execute(context)
+    # def invoke(self, context, event):
+    #     return self.execute(context)
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
+        if univ_settings().use_uvpm:
+            if hasattr(context.scene, 'uvpm3_props'):
+                return self.pack_uvpm()
+            else:
+                univ_settings().use_uvpm = False
+                self.report({'WARNING'}, 'UVPackmaster not found')
+                return {'CANCELLED'}
+        else:
+            return self.pack_native()
+
+    @staticmethod
+    def pack_uvpm():
+        # TODO: Add Info about unselected and hidden faces
+        # TODO: Use UniV orient (instead Pre-Rotation) and remove AXIS_ALIGNED method
+        # TODO: Use UniV normalize
+        # TODO: Add for Exact Overlap Mode threshold
+        # TODO: Add scale checker for packed meshes
+
+        settings = univ_settings()
+        uvpm_settings = bpy.context.scene.uvpm3_props
+
+        if hasattr(uvpm_settings, 'scale_mode'):
+            uvpm_settings.scale_mode = '0' if settings.scale else '1'
+        else:
+            uvpm_settings.fixed_scale = not settings.scale
+
+        uvpm_settings.pixel_margin_enable = True
+        uvpm_settings.pixel_margin_tex_size = min(int(settings.size_x), int(settings.size_y))
+        uvpm_settings.pixel_margin = settings.padding
+
+        uvpm_settings.heuristic_enable = True
+        total_selected = sum(umesh.total_face_sel for umesh in UMeshes.calc(verify_uv=False))
+        if total_selected > 50_000:
+            time_in_sec = 8
+        elif total_selected > 10_000:
+            time_in_sec = 4
+        else:
+            time_in_sec = 2
+        uvpm_settings.heuristic_max_wait_time = time_in_sec * 4
+        uvpm_settings.heuristic_search_time = time_in_sec
+
+        if size := utils.get_active_image_size():
+            uvpm_settings.tex_ratio = size[0] != size[1]
+        else:
+            uvpm_settings.tex_ratio = False
+
+        if uvpm_settings.precision == 500:
+            uvpm_settings.precision = 800
+
+        return bpy.ops.uvpackmaster3.pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
+
+    def pack_native(self):
         umeshes = UMeshes.calc(verify_uv=False)
         umeshes.fix_context()
 
