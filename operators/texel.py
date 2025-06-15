@@ -84,8 +84,10 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             for umesh in self.umeshes:
                 umesh.ensure(face=True)
 
+        if self.use_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=False)
+
         for umesh in self.umeshes:
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
             adv_islands = islands_calc_type(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
             all_islands.extend(adv_islands)
@@ -243,6 +245,9 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         if not is_uv_area:
             self.umeshes.set_sync(True)
 
+        if self.use_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=not is_uv_area)
+
         for umesh in self.umeshes:
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -261,7 +266,6 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 umesh.ensure(face=True)
 
         for umesh in self.umeshes:
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
             adv_islands = islands_calc_type(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
             all_islands.extend(adv_islands)
@@ -496,7 +500,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         all_islands = []
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
             adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
@@ -546,6 +549,9 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
 
+        if self.use_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))  # TODO: Implement exact aspect for materials (get aspect by face mat id)
+
         for umesh in self.umeshes:
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -577,7 +583,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
             adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
@@ -643,6 +648,9 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
 
+        if self.use_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
+
         for umesh in self.umeshes:
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -656,7 +664,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
-            umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0  # TODO: Report heterogeneous aspects
             umesh.ensure()
             adv_islands = AdvIslands.calc_with_hidden(umesh)
 
