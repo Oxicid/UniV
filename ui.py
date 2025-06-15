@@ -555,15 +555,17 @@ class UNIV_PT_TD_PresetsManager(Panel):
         layout.separator()
         col = layout.column(align=True)
         row = col.row(align=True)
+        row.operator("uv.univ_calc_uv_area")
+        row.operator("uv.univ_calc_uv_coverage")
         if context.area.type == 'IMAGE_EDITOR':
-            row.operator("uv.univ_calc_uv_area")
-            row.operator("uv.univ_calc_uv_coverage")
             col.operator("uv.univ_texel_density_from_texture")
-            col.operator("uv.univ_calc_udims_from_3d_area")
-        else:
-            row.operator("mesh.univ_calc_uv_area")
-            row.operator("mesh.univ_calc_uv_coverage")
-            col.operator("mesh.univ_calc_udims_from_3d_area")
+        row = col.row(align=True)
+        row.operator('uv.univ_texel_density_from_physical_size')
+        row = row.split().row(align=True)
+        row.scale_x = 0.7
+        row.prop(settings, 'texture_physical_size', expand=True, text='')
+
+        col.operator("mesh.univ_calc_udims_from_3d_area")
         layout.separator()
 
         row = layout.row()

@@ -1146,6 +1146,26 @@ class TexelDensity_NameExtract_Test:
         for name in texts:
             UNIV_OT_TexelDensityFromTexture.get_physical_size_from_name(name)
 
+class UNIV_OT_TexelDensityFromPhysicalSize(Operator):
+    bl_idname = "uv.univ_texel_density_from_physical_size"
+    bl_label = 'TD from Phys Size'
+    bl_description = "Calculate Texel Density from Physical Texture Size.\n" \
+                     " In the Y component, it's not necessary to specify the size if the width and height are equal.\n" \
+                     "Formula: TD = Global Texture Size / Physical Texture Size (meters)"
+
+    def execute(self, context):
+        size = univ_settings().texture_physical_size.copy()
+        if utils.vec_isclose_to_zero(size, abs_tol=0.001):
+            self.report({'WARNING'}, 'Physical Size must be a non-zero size')
+            return {'CANCELLED'}
+
+        if size[1] == 0.0:
+            size[1] = size[0]
+        elif size[0] == 0.0:
+            size[0] = size[1]
+        UNIV_OT_TexelDensityFromTexture.update_texel_from_size(size)
+        return {'FINISHED'}
+
 class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
     bl_idname = "uv.univ_calc_udims_from_3d_area"
     bl_label = 'Calc UDIMs from 3D Area'

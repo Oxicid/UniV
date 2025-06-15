@@ -143,6 +143,8 @@ class UNIV_Settings(bpy.types.PropertyGroup):
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8)
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
+    texture_physical_size: FloatVectorProperty(name='TD from Physical Size', default=(2.5, 0.0), min=0.0,
+                                                    soft_max=6, size=2, subtype='TRANSLATION')
 
     # UV Layer
     uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)
