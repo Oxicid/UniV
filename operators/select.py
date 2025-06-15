@@ -2553,7 +2553,7 @@ class UNIV_OT_SelectByArea(Operator):
         ('Y', 'Size Y', ''),
     ))
 
-    threshold: FloatProperty(name='Threshold', default=0.005, min=0, soft_min=0.005, soft_max=0.1, max=0.5, subtype='FACTOR')
+    threshold: FloatProperty(name='Threshold', default=0.005, min=0, soft_min=0.005, max=0.5, subtype='FACTOR')
     lower_slider: FloatProperty(name='Low', default=0.1, min=0, max=0.9, subtype='PERCENTAGE',
         update=lambda self, _: setattr(self, 'higher_slider', self.lower_slider+0.05) if self.higher_slider-0.05 < self.lower_slider else None)
     higher_slider: FloatProperty(name='High', default=0.8, min=0.1, max=1, subtype='PERCENTAGE',
@@ -2635,8 +2635,8 @@ class UNIV_OT_SelectByArea(Operator):
         else:  # self.size_mode == 'LARGE':
             lower = lerp(min_value, max_value, self.higher_slider)
             higher = max_value
-        lower -= self.threshold
-        higher += self.threshold
+        lower -= lower * self.threshold
+        higher += higher * self.threshold
 
         for islands in islands_of_mesh:
             umesh = islands.umesh

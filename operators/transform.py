@@ -1428,7 +1428,11 @@ class UNIV_OT_Rotate(Operator):
 class UNIV_OT_Sort(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_sort'
     bl_label = 'Sort'
-    bl_description = 'Sort'
+    bl_description = \
+        "Default - Sort islands\n" \
+        "Shift - Lock Overlaps.\n" \
+        "Ctrl - Start sort position to Cursor\n" \
+        "Alt - Disable orient"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
@@ -1437,7 +1441,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
     area_subgroups: IntProperty(name='Area Subgroups', default=4, min=1, max=200, soft_max=8)
     reverse: BoolProperty(name='Reverse', default=True)
     to_cursor: BoolProperty(name='To Cursor', default=False)
-    align: BoolProperty(name='Orient', default=False)  # TODO: Rename align to orient
+    orient: BoolProperty(name='Orient', default=False)
     subgroup_type: EnumProperty(name='Subgroup Type', default='NONE', items=(
         ('NONE', 'None', ''),
         ('AREA', 'Area', ''),
@@ -1450,7 +1454,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         layout = self.layout
         layout.prop(self, 'reverse')
         layout.prop(self, 'to_cursor')
-        layout.prop(self, 'align')
+        layout.prop(self, 'orient')
         if self.subgroup_type == 'NONE':
             self.draw_overlap()
         layout.prop(self, 'padding', slider=True)
@@ -1470,7 +1474,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
             return self.execute(context)
         self.to_cursor = event.ctrl
         self.lock_overlap = event.shift
-        self.align = event.alt
+        self.orient = not event.alt
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
@@ -1522,7 +1526,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         general_bbox = BBox()
         union_islands_groups = self.calc_overlapped_island_groups(_islands)
         for union_island in union_islands_groups:
-            if self.align:
+            if self.orient:
                 isl_coords = union_island.calc_convex_points()
                 general_bbox.union(union_island.bbox)
                 angle = utils.calc_min_align_angle(isl_coords)
@@ -1543,7 +1547,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         general_bbox = BBox()
         for umesh in self.umeshes:
             if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
-                if self.align:
+                if self.orient:
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
                         general_bbox.union(island.bbox)
@@ -1628,7 +1632,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         if is_horizontal:
             for island in islands:
                 width = island.bbox.width
-                if self.align and island.bbox.height < width:
+                if self.orient and island.bbox.height < width:
                     width = island.bbox.height
                     self.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
                     island.calc_bbox()
@@ -1638,7 +1642,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         else:
             for island in islands:
                 height = island.bbox.height
-                if self.align and island.bbox.width < height:
+                if self.orient and island.bbox.width < height:
                     height = island.bbox.width
                     self.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
                     island.calc_bbox()  # TODO: Optimize this
