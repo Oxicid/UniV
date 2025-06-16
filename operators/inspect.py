@@ -204,12 +204,6 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             max_angle_from_obj_smooth = max(umesh.smooth_angle for umesh in umeshes)
             self.user_angle = bl_math.clamp(self.user_angle, 0.0, max_angle_from_obj_smooth)
 
-        if umeshes.sync:
-            if utils.get_select_mode_mesh() != 'EDGE':
-                utils.set_select_mode_mesh('EDGE')
-        else:
-            if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
-                utils.set_select_mode_uv('EDGE')
         result = self.select_inner(umeshes, self.use_auto_smooth, self.user_angle)
         if formatted_text := self.data_formatting(result):
             self.report({'WARNING'}, formatted_text)
