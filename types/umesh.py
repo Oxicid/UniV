@@ -565,13 +565,15 @@ class UMeshes:
         return self._elem_mode
 
     @elem_mode.setter
-    def elem_mode(self, mode: typing.Literal['VERTEX', 'EDGE', 'FACE']):
-        assert self.sync
+    def elem_mode(self, mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']):
         if self._elem_mode != mode:
-            utils.set_select_mode_mesh(mode)
             self._elem_mode = mode
-            for umesh in self:
-                umesh.bm.select_mode = {mode}
+            if self.sync:
+                utils.set_select_mode_mesh(mode)  # noqa
+                for umesh in self:
+                    umesh.bm.select_mode = {mode}
+            else:
+                utils.set_select_mode_uv(mode)
 
     def silent_update(self):
         for umesh in self:

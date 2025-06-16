@@ -7,6 +7,7 @@ if 'bpy' in locals():
 
 import bpy
 import math
+import enum
 import bl_math
 
 from mathutils.geometry import area_tri
@@ -15,6 +16,43 @@ from bpy.types import Operator
 
 from .. import utils
 from .. import types
+
+class Inspect(enum.IntFlag):
+    Overlap = enum.auto()
+    OverlapWithModifier = enum.auto()
+    InexactOverlap = enum.auto()
+    SelfOverlap = enum.auto()
+    TroubleOverlapFace = enum.auto()
+    OverlapByPadding = enum.auto()
+    DoubleVertices3D = enum.auto()
+    __pass2 = enum.auto()
+
+    Zero = enum.auto()
+    __pass3 = enum.auto()
+
+    Flipped = enum.auto()
+    Flipped3D = enum.auto()
+    InsideNormalsOrient = enum.auto()
+    Rotated = enum.auto()
+    __pass4 = enum.auto()
+
+    NonManifold = enum.auto()
+    NonSplitted = enum.auto()
+    TileIsect = enum.auto()
+    __pass5 = enum.auto()
+    __pass6 = enum.auto()
+
+    OverScaled = enum.auto()
+    OverStretched = enum.auto()
+    AngleStretch = enum.auto()
+    __pass7 = enum.auto()
+
+    Concave = enum.auto()
+    DeduplicateUVLayers = enum.auto()
+    RepairAfterJoin = enum.auto()
+    __pass8 = enum.auto()
+    IncorrectBMeshTags = enum.auto()
+    Other = enum.auto()
 
 
 class UNIV_OT_Check_Zero(Operator):
@@ -33,10 +71,12 @@ class UNIV_OT_Check_Zero(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        sync = bpy.context.scene.tool_settings.use_uv_select_sync
         umeshes = types.UMeshes()
         umeshes.fix_context()
-        total_counter = self.zero(self.precision, umeshes, sync)
+        umeshes.update_tag = False
+        bpy.ops.uv.select_all(action='DESELECT')
+
+        total_counter = self.zero(self.precision, umeshes)
 
         if not total_counter:
             self.report({'INFO'}, 'Degenerate triangles not found')
@@ -46,40 +86,34 @@ class UNIV_OT_Check_Zero(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def zero(precision, umeshes, sync):
-        if sync:
-            utils.set_select_mode_mesh('FACE')
-        bpy.ops.uv.select_all(action='DESELECT')
+    def zero(precision, umeshes, batch_inspect=False):
+        sync = umeshes.sync
+        if sync and umeshes.elem_mode != 'FACE':
+            umeshes.elem_mode = 'FACE'
 
-        precision = precision * 0.001
+        precision *= 0.001
         total_counter = 0
+        select_set = utils.face_select_linked_func(sync)
         for umesh in umeshes:
             if not sync and umesh.is_full_face_deselected:
-                umesh.update_tag = False
                 continue
 
-            local_counter = 0
             uv = umesh.uv
-            loop_triangles = umesh.bm.calc_loop_triangles()
-            for tris in loop_triangles:
-                if sync:
-                    if tris[0].face.hide:
-                        continue
-                else:
-                    if not tris[0].face.select:
-                        continue
-                area = area_tri(tris[0][uv].uv, tris[1][uv].uv, tris[2][uv].uv)
-                if area < precision:
-                    if sync:
-                        tris[0].face.select = True
-                    else:
-                        for crn in tris[0].face.loops:
-                            crn[uv].select = True
-                            crn[uv].select_edge = True
+            local_counter = 0
+            for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
+                face = tris_a.face
+                if face.hide if sync else not face.select:
+                    continue
+
+                area = area_tri(tris_a[uv].uv, tris_b[uv].uv, tris_c[uv].uv)
+                if area <= precision:
+                    select_set(face, uv)
                     local_counter += 1
-            umesh.update_tag = bool(local_counter)
+            umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
-        umeshes.update()
+
+        if not batch_inspect:
+            umeshes.update()
         return total_counter
 
 
@@ -96,6 +130,9 @@ class UNIV_OT_Check_Flipped(Operator):
     def execute(self, context):
         umeshes = types.UMeshes()
         umeshes.fix_context()
+        umeshes.update_tag = False
+        bpy.ops.uv.select_all(action='DESELECT')
+
         total_counter = self.flipped(umeshes)
 
         if not total_counter:
@@ -106,45 +143,36 @@ class UNIV_OT_Check_Flipped(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def flipped(umeshes):
+    def flipped(umeshes, batch_inspect=False):
         sync = umeshes.sync
-        if sync:
-            utils.set_select_mode_mesh('FACE')
-        bpy.ops.uv.select_all(action='DESELECT')
+        if sync and umeshes.elem_mode != 'FACE':
+            umeshes.elem_mode = 'FACE'
 
         total_counter = 0
+        select_set = utils.face_select_linked_func(sync)
         for umesh in umeshes:
             if not sync and umesh.is_full_face_deselected:
-                umesh.update_tag = False
                 continue
 
-            local_counter = 0
             uv = umesh.uv
-            loop_triangles = umesh.bm.calc_loop_triangles()
-            for tris in loop_triangles:
-                if sync:
-                    if tris[0].face.hide:
-                        continue
-                else:
-                    if not tris[0].face.select:
-                        continue
-                a = tris[0][uv].uv
-                b = tris[1][uv].uv
-                c = tris[2][uv].uv
+            local_counter = 0
+            for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
+                face = tris_a.face
+                if face.hide if sync else not face.select:
+                    continue
 
-                area = a.cross(b) + b.cross(c) + c.cross(a)
-                if area < 0:
-                    if sync:
-                        tris[0].face.select = True
-                    else:
-                        for crn in tris[0].face.loops:
-                            crn_uv = crn[uv]
-                            crn_uv.select = True
-                            crn_uv.select_edge = True
+                a = tris_a[uv].uv
+                b = tris_b[uv].uv
+                c = tris_c[uv].uv
+
+                signed_area = a.cross(b) + b.cross(c) + c.cross(a)
+                if signed_area < 0:
+                    select_set(face, uv)
                     local_counter += 1
-            umesh.update_tag = bool(local_counter)
+            umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
-        umeshes.update()
+        if batch_inspect is False:
+            umeshes.update()
         return total_counter
 
 
@@ -295,7 +323,7 @@ class UNIV_OT_Check_Overlap(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     check_mode: EnumProperty(name='Check Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('INEXACT', 'Inexact', '')))
-    threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+    threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
     def poll(cls, context):
@@ -310,17 +338,39 @@ class UNIV_OT_Check_Overlap(Operator):
     def execute(self, context):
         umeshes = types.UMeshes()
         umeshes.fix_context()
-        if umeshes.sync:
-            if utils.get_select_mode_mesh() != 'FACE':
-                utils.set_select_mode_mesh('FACE')
+        umeshes.update_tag = False
+
+        count = self.overlap_check(umeshes, self.check_mode, self.threshold)
+        self.report(*self.get_info_from_count(count, self.check_mode))
+        umeshes.silent_update()
+        return {'FINISHED'}
+
+    @staticmethod
+    def get_info_from_count(count, check_mode):
+        if count:
+            if check_mode == 'INEXACT':
+                return {'WARNING'}, f"Found {count} islands with inexact overlap"
+            else:
+                return {'WARNING'}, f"Found about {count} edges with overlap"
+        else:
+            if check_mode == 'INEXACT':
+                return {'INFO'}, f"Inexact islands with overlap not found"
+            else:
+                return {'INFO'}, f"Edges with overlap not found"
+
+    @staticmethod
+    def overlap_check(umeshes, check_mode, threshold=0.001) -> int:
+        if umeshes.sync and umeshes.elem_mode != 'FACE':
+            umeshes.elem_mode = 'FACE'
 
         bpy.ops.uv.select_overlap()
 
         count = 0
-        if self.check_mode == 'INEXACT':
+        if check_mode == 'INEXACT':
             all_islands = []
             for umesh in umeshes:
                 adv_islands = types.AdvIslands.calc_extended_with_mark_seam(umesh)
+                # The following subdivision is needed to ignore the exact self overlaps that are created from the flipped face
                 for isl in reversed(adv_islands):
                     if isl.has_flip_with_noflip():
                         adv_islands.islands.remove(isl)
@@ -329,39 +379,18 @@ class UNIV_OT_Check_Overlap(Operator):
                         adv_islands.islands.extend(flipped)
                 all_islands.extend(adv_islands)
 
-            overlapped = types.UnionIslands.calc_overlapped_island_groups(all_islands, self.threshold)
-            umeshes.update_tag = False
+            overlapped = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
             for isl in overlapped:
                 if isinstance(isl, types.AdvIsland):
                     count += 1
                 else:
                     isl.select = False
                     isl.umesh.update_tag = True
-            umeshes.silent_update()
-            if count:
-                self.report({'WARNING'}, f"Found {count} islands with inexact overlap")
-            else:
-                self.report({'INFO'}, f"Inexact islands with overlap not found")
-            return {'FINISHED'}
         else:
             for umesh in umeshes:
                 if umesh.sync:
                     count += umesh.total_edge_sel
                 else:
-                    if umesh.is_full_face_deselected:
-                        continue
-                    uv = umesh.uv
-                    if umesh.is_full_face_selected:
-                        for f in umesh.bm.faces:
-                            for crn in f.loops:
-                                count += crn[uv].select_edge
-                    else:
-                        for f in umesh.bm.faces:
-                            if f.select:
-                                for crn in f.loops:
-                                    count += crn[uv].select_edge
-            if count:
-                self.report({'WARNING'}, f"Found about {count} edges with overlap")
-            else:
-                self.report({'INFO'}, f"Edges with overlap not found")
-        return {'FINISHED'}
+                    count += len(utils.calc_selected_uv_edge_corners(umesh))
+
+        return count
