@@ -182,13 +182,11 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_description = "Selects the edges where seams should be marked and unwrapped without connection"
     bl_options = {'REGISTER', 'UNDO'}
 
-    check_non_seam: bpy.props.BoolProperty(name='Check Non-Seam', default=True)
     use_auto_smooth: bpy.props.BoolProperty(name='Use Auto Smooth', default=True)
     user_angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, 'check_non_seam')
         layout.prop(self, 'use_auto_smooth')
         layout.prop(self, 'user_angle', slider=True)
 
@@ -212,7 +210,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         else:
             if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
                 utils.set_select_mode_uv('EDGE')
-        result = self.select_inner(umeshes, self.check_non_seam, self.use_auto_smooth, self.user_angle)
+        result = self.select_inner(umeshes, self.use_auto_smooth, self.user_angle)
         if formatted_text := self.data_formatting(result):
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
@@ -222,7 +220,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def select_inner(umeshes, check_non_seam, use_auto_smooth, user_angle):
+    def select_inner(umeshes, use_auto_smooth, user_angle, batch_inspect=False):
         non_seam_counter = 0
         angle_counter = 0
         sharps_counter = 0
@@ -233,12 +231,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         is_boundary = utils.is_boundary_sync if sync else utils.is_boundary_non_sync
 
         for umesh in umeshes:
-            local_non_seam_counter = 0
-            local_angle_counter = 0
-            local_sharps_counter = 0
-            local_seam_counter = 0
-            local_mtl_counter = 0
-
+            to_select = set()
             if use_auto_smooth:
                 angle = min(umesh.smooth_angle, user_angle)
             else:
@@ -246,53 +239,52 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 
             uv = umesh.uv
             for crn in utils.calc_visible_uv_corners(umesh):
-                edge = crn.edge
-                shared_crn = crn.link_loop_radial_prev
-                if sync:
-                    if edge.select:
-                        continue
-                else:
-                    if shared_crn[uv].select_edge:
-                        continue
-
-                if is_boundary(crn, uv):
-                    if not check_non_seam or crn.edge.seam:
-                        continue
-                    local_non_seam_counter += 1
-                    if shared_crn != crn:
-                        shared_crn[uv].select = True
-                        shared_crn[uv].select_edge = True
-                        shared_crn.link_loop_next[uv].select = True
-                        shared_crn.link_loop_next[uv].select = True
-                elif not edge.smooth:
-                    local_sharps_counter += 1
-                elif edge.calc_face_angle() >= angle:
-                    local_angle_counter += 1
-                elif edge.seam:
-                    local_seam_counter += 1
-                elif shared_crn.face.material_index != crn.face.material_index:
-                    local_mtl_counter += 1
-                else:
+                if (pair_crn := crn.link_loop_radial_prev) in to_select:
                     continue
 
-                if sync:
-                    edge.select = True
+                edge = crn.edge
+                if is_boundary(crn, uv):
+                    if crn.edge.seam:
+                        continue
+                    if edge.is_boundary:
+                        continue
+                elif not edge.smooth:
+                    sharps_counter += 1
+                elif edge.calc_face_angle() >= angle:
+                    angle_counter += 1
+                elif edge.seam:
+                    seam_counter += 1
+                elif pair_crn.face.material_index != crn.face.material_index:
+                    mtl_counter += 1
                 else:
-                    utils.select_crn_uv_edge(crn, uv)
+                    continue
+                to_select.add(crn)
 
-            if update_tag := (local_non_seam_counter or
-                              local_angle_counter or
-                              local_sharps_counter or
-                              local_seam_counter or
-                              local_mtl_counter):
-                umesh.bm.select_flush_mode()
-                non_seam_counter += local_non_seam_counter
-                angle_counter += local_angle_counter
-                sharps_counter += local_sharps_counter
-                seam_counter += local_seam_counter
-                mtl_counter += local_mtl_counter
+            umesh.sequence = to_select
+            umesh.update_tag |= bool(to_select)
 
-            umesh.update_tag = update_tag
+        if any(umesh.sequence for umesh in umeshes):
+            if batch_inspect:
+                # Avoid switch elem mode if all edges selected for batch inspect
+                select_get = utils.edge_select_linked_get_func(sync)
+                all_selected = True
+                for umesh in umeshes:
+                    uv = umesh.uv
+                    if not all(select_get(crn_edge, uv) for crn_edge in umesh.sequence):
+                        all_selected = False
+                        break
+                if all_selected:
+                    return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
+
+            select_set = utils.edge_select_linked_set_func(sync)
+            if umeshes.elem_mode not in ('EDGE', 'VERTEX'):
+                umeshes.elem_mode = 'EDGE'
+
+            for umesh in umeshes:
+                uv = umesh.uv
+                for edge in umesh.sequence:
+                    select_set(edge, True, uv)
+
         return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
     @staticmethod
