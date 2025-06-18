@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 29),
+    "version": (3, 7, 30),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -67,6 +67,8 @@ def load_register_types():
             checker.UNIV_OT_Checker,
             checker.UNIV_OT_CheckerCleanup,
             # Inspect
+            inspect.UNIV_OT_BatchInspectFlags,
+            inspect.UNIV_OT_BatchInspect,
             inspect.UNIV_OT_Check_Zero,
             inspect.UNIV_OT_Check_Flipped,
             inspect.UNIV_OT_Check_Non_Splitted,
@@ -153,6 +155,7 @@ def load_register_types():
             ui.UNIV_PT_General,
             ui.UNIV_PT_GlobalSettings,
             ui.UNIV_PT_PackSettings,
+            ui.UNIV_PT_BatchInspectSettings,
             # Pie Menus
             ui.IMAGE_MT_PIE_univ_edit,
             ui.IMAGE_MT_PIE_univ_align,

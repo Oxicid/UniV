@@ -211,6 +211,10 @@ class UNIV_Settings(bpy.types.PropertyGroup):
         ('VERTEX', 'Vertex', '', 'VERTEXSEL', 2)
     ))
 
+    batch_inspect_flags: IntProperty(name="Batch Inspect Tags", min=0,
+                                     default=__import__(__package__.replace('preferences', '')+'.operators.inspect', fromlist=['inspect']).Inspect.default_value_for_settings()
+                                     )
+
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 

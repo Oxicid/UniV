@@ -19,16 +19,23 @@ from .. import types
 
 class Inspect(enum.IntFlag):
     Overlap = enum.auto()
+    OverlapInexact = enum.auto()
+    OverlapSelf = enum.auto()
+    OverlapTroubleFace = enum.auto()
+    OverlapByMaterial = enum.auto()
     OverlapWithModifier = enum.auto()
-    InexactOverlap = enum.auto()
-    SelfOverlap = enum.auto()
-    TroubleOverlapFace = enum.auto()
-    OverlapByPadding = enum.auto()
-    DoubleVertices3D = enum.auto()
+    __pass1 = enum.auto()
     __pass2 = enum.auto()
 
+    AllOverlapFlags = (Overlap | OverlapWithModifier | OverlapInexact |
+                       OverlapSelf | OverlapTroubleFace | OverlapByMaterial)
     Zero = enum.auto()
     __pass3 = enum.auto()
+
+    OverlapByPadding = enum.auto()
+    DoubleVertices3D = enum.auto()
+    TileIsect = enum.auto()
+
 
     Flipped = enum.auto()
     Flipped3D = enum.auto()
@@ -38,22 +45,22 @@ class Inspect(enum.IntFlag):
 
     NonManifold = enum.auto()
     NonSplitted = enum.auto()
-    TileIsect = enum.auto()
-    __pass5 = enum.auto()
-    __pass6 = enum.auto()
 
     OverScaled = enum.auto()
     OverStretched = enum.auto()
     AngleStretch = enum.auto()
-    __pass7 = enum.auto()
+    __pass5 = enum.auto()
 
     Concave = enum.auto()
     DeduplicateUVLayers = enum.auto()
     RepairAfterJoin = enum.auto()
-    __pass8 = enum.auto()
+    __pass6 = enum.auto()
     IncorrectBMeshTags = enum.auto()
     Other = enum.auto()
 
+    @classmethod
+    def default_value_for_settings(cls):
+        return cls.Overlap | cls.Zero | cls.Flipped | cls.NonSplitted
 
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
@@ -76,7 +83,8 @@ class UNIV_OT_Check_Zero(Operator):
         umeshes.update_tag = False
         bpy.ops.uv.select_all(action='DESELECT')
 
-        total_counter = self.zero(self.precision, umeshes)
+        total_counter = self.zero(umeshes, self.precision)
+        umeshes.update()
 
         if not total_counter:
             self.report({'INFO'}, 'Degenerate triangles not found')
@@ -86,7 +94,7 @@ class UNIV_OT_Check_Zero(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def zero(precision, umeshes, batch_inspect=False):
+    def zero(umeshes, precision=1e-6):
         sync = umeshes.sync
         if sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
@@ -111,9 +119,6 @@ class UNIV_OT_Check_Zero(Operator):
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
-
-        if not batch_inspect:
-            umeshes.update()
         return total_counter
 
 
@@ -134,6 +139,7 @@ class UNIV_OT_Check_Flipped(Operator):
         bpy.ops.uv.select_all(action='DESELECT')
 
         total_counter = self.flipped(umeshes)
+        umeshes.update()
 
         if not total_counter:
             self.report({'INFO'}, 'Flipped faces not found')
@@ -143,7 +149,7 @@ class UNIV_OT_Check_Flipped(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def flipped(umeshes, batch_inspect=False):
+    def flipped(umeshes):
         sync = umeshes.sync
         if sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
@@ -171,8 +177,6 @@ class UNIV_OT_Check_Flipped(Operator):
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
-        if batch_inspect is False:
-            umeshes.update()
         return total_counter
 
 
@@ -204,7 +208,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             max_angle_from_obj_smooth = max(umesh.smooth_angle for umesh in umeshes)
             self.user_angle = bl_math.clamp(self.user_angle, 0.0, max_angle_from_obj_smooth)
 
-        result = self.select_inner(umeshes, self.use_auto_smooth, self.user_angle)
+        result = self.non_splitted(umeshes, self.use_auto_smooth, self.user_angle)
         if formatted_text := self.data_formatting(result):
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
@@ -214,7 +218,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def select_inner(umeshes, use_auto_smooth, user_angle, batch_inspect=False):
+    def non_splitted(umeshes, use_auto_smooth, user_angle, batch_inspect=False):
         non_seam_counter = 0
         angle_counter = 0
         sharps_counter = 0
@@ -268,6 +272,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         all_selected = False
                         break
                 if all_selected:
+                    for umesh in umeshes:
+                        umesh.sequence = []
                     return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
             select_set = utils.edge_select_linked_set_func(sync)
@@ -278,7 +284,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                 uv = umesh.uv
                 for edge in umesh.sequence:
                     select_set(edge, True, uv)
-
+                umesh.sequence = []
         return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
     @staticmethod
@@ -308,7 +314,7 @@ class UNIV_OT_Check_Overlap(Operator):
                      "Unlike the default operator, this one informs about the number of faces with conflicts"
     bl_options = {'REGISTER', 'UNDO'}
 
-    check_mode: EnumProperty(name='Check Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('INEXACT', 'Inexact', '')))
+    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
@@ -380,3 +386,130 @@ class UNIV_OT_Check_Overlap(Operator):
                     count += len(utils.calc_selected_uv_edge_corners(umesh))
 
         return count
+
+class UNIV_OT_BatchInspectFlags(Operator):
+    bl_idname = 'uv.univ_batch_inspect_flags'
+    bl_label = 'Flags'
+    bl_description = "Inspect Flags"
+
+    flag: IntProperty(name='Flag', default=0, min=0)
+
+    def execute(self, context):
+        from ..preferences import univ_settings
+        tag = Inspect(self.flag)
+
+        # Turn off the old (all) overlap flag if it doesn't match the new one.
+        if tag in Inspect.AllOverlapFlags:
+            if tag not in Inspect(univ_settings().batch_inspect_flags):
+                univ_settings().batch_inspect_flags &= ~Inspect.AllOverlapFlags
+
+        univ_settings().batch_inspect_flags ^= tag
+        return {'FINISHED'}
+
+INSPECT_INFO = {}
+
+class UNIV_OT_BatchInspect(Operator):
+    bl_idname = 'uv.univ_batch_inspect'
+    bl_label = 'Inspect'
+    bl_description = "Batch Inspect by Enabled tags"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    inspect_all: BoolProperty(name='Inspect All', default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        if 'Hidden' in INSPECT_INFO:
+            box = col.box()
+            box.label(text='Hidden faces found — the result may be incorrect', icon='INFO')
+            col.separator()
+
+        for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Non-Splitted'):
+            if info := INSPECT_INFO.get(inspect_flag):
+                box = col.box()
+                box.label(text=f'{inspect_flag}: ' + info)
+
+    def invoke(self, context, event):
+        if event.value == 'PRESS':
+            return self.execute(context)
+
+        self.inspect_all = event.alt
+        return self.execute(context)
+
+    def execute(self, context):
+        from ..preferences import univ_settings
+        flags = Inspect(univ_settings().batch_inspect_flags)
+        global INSPECT_INFO
+        INSPECT_INFO.clear()
+        if not flags:
+            self.report({'WARNING'}, 'Not found enabled flags')
+            return {'CANCELLED'}
+
+        umeshes = types.UMeshes()
+        umeshes.update_tag = False
+
+        umeshes.fix_context()
+
+        if not umeshes:
+            has_uv_maps = any(obj.data.uv_layers for obj in bpy.context.selected_objects if obj.type == 'MESH')
+            self.report({'WARNING'}, 'Not found meshes with polygons' if has_uv_maps else 'Not found meshes with UV maps')
+            return {'CANCELLED'}
+
+        if (flags & Inspect.AllOverlapFlags) or self.inspect_all:
+            if Inspect.Overlap in flags or (self.inspect_all and not (flags & Inspect.AllOverlapFlags)):
+                if count := UNIV_OT_Check_Overlap.overlap_check(umeshes, 'ALL'):
+                    INSPECT_INFO['Overlap'] = UNIV_OT_Check_Overlap.get_info_from_count(count, 'ALL')[1]
+
+            elif Inspect.OverlapInexact in flags:
+                if count := UNIV_OT_Check_Overlap.overlap_check(umeshes, 'INEXACT'):
+                    INSPECT_INFO['Overlap'] = UNIV_OT_Check_Overlap.get_info_from_count(count, 'INEXACT')[1]
+
+
+        if Inspect.Zero in flags or self.inspect_all:
+            if count := UNIV_OT_Check_Zero.zero(umeshes):
+                INSPECT_INFO['Zero'] = f'Detected {count} degenerate triangles'
+
+        if Inspect.Flipped in flags or self.inspect_all:
+            if count := UNIV_OT_Check_Flipped.flipped(umeshes):
+                INSPECT_INFO['Flipped'] = f'Detected {count} flipped faces'
+
+        if Inspect.NonSplitted in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
+            result = UNIV_OT_Check_Non_Splitted.non_splitted(umeshes, use_auto_smooth=True, user_angle=180, batch_inspect=True)
+            if info := UNIV_OT_Check_Non_Splitted.data_formatting(result):
+                INSPECT_INFO['Non-Splitted'] = info
+
+
+        has_hidden_faces = False
+        for umesh in umeshes:
+            if has_hidden_faces:
+                break
+            if umesh.is_full_face_selected:
+                continue
+
+            if umeshes.sync:
+                for f in umesh.bm.faces:
+                    if f.hide:
+                        has_hidden_faces = True
+                        break
+            else:
+                for f in umesh.bm.faces:
+                    if not f.select:
+                        has_hidden_faces = True
+                        break
+        if has_hidden_faces:
+            if not INSPECT_INFO:
+                self.report({'WARNING'}, 'No problems detected, but hidden faces could lead to incorrect results.')
+                return {'FINISHED'}
+            INSPECT_INFO['Hidden'] = True
+
+        if not INSPECT_INFO:
+            self.report({'INFO'}, 'No errors detected.')
+        else:
+            umeshes.silent_update()
+            self.report({'WARNING'}, f'Detected {len(INSPECT_INFO)} errors.')
+            return context.window_manager.invoke_popup(self, width=400)
+        return {'FINISHED'}

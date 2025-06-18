@@ -253,18 +253,6 @@ class UNIV_PT_General(Panel):
         row.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
         row.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
 
-        # Inspect
-        col_align = col.column(align=True)
-        col_align.label(text='Inspect')
-
-        split = col_align.split(align=True)
-        split.operator('uv.univ_check_zero', icon_value=icons.zero)
-        split.operator('uv.univ_check_flipped', icon_value=icons.flipped)
-
-        split = col_align.split(align=True)
-        split.operator('uv.univ_check_non_splitted', icon_value=icons.non_splitted)
-        split.operator('uv.univ_check_overlap', icon_value=icons.overlap)
-
         # Mark
         col_align = col.column(align=True)
         col_align.label(text='Mark')
@@ -277,8 +265,16 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_cut', icon_value=icons.cut)
         split.operator('uv.univ_seam_border', icon_value=icons.border_seam)
 
-        layout.label(text='Texture')
-        row = layout.row(align=True)
+        # Other
+        split = col_align.column(align=False)
+        split.label(text='Other')
+
+        row = split.row(align=True)
+        row.scale_y = 1.35
+        row.operator('uv.univ_batch_inspect', icon_value=icons.zero)
+        row.popover(panel='UNIV_PT_BatchInspectSettings', text='', icon_value=icons.settings_a)
+
+        row = split.row(align=True)
         row.scale_y = 1.35
         row.operator('mesh.univ_checker', icon_value=icons.checker)
         row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
@@ -492,6 +488,70 @@ class UNIV_PT_PackSettings(Panel):
 
         layout.prop(uvpm_settings.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
 
+class UNIV_PT_BatchInspectSettings(Panel):
+    bl_idname = 'UNIV_PT_BatchInspectSettings'
+    bl_label = 'Batch Inspect Settings'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
+
+    def draw(self, context):
+        from .operators.inspect import Inspect
+        settings = univ_settings()
+        flags = settings.batch_inspect_flags
+
+        def draw_tag_button(flag):
+            is_enabled = bool(flags & flag)
+            row.operator('uv.univ_batch_inspect_flags',
+                         text='',
+                         icon='CHECKBOX_HLT' if is_enabled else 'CHECKBOX_DEHLT',  # noqa
+                         depress=is_enabled).flag = flag
+
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+        col = layout.column(align=True)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_check_overlap', icon_value=icons.overlap).check_mode = 'ALL'
+        draw_tag_button(Inspect.Overlap)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_check_overlap', text='Inexact', icon_value=icons.overlap).check_mode = 'INEXACT'
+        draw_tag_button(Inspect.OverlapInexact)
+
+        # row = col.row(align=True)
+        # row.operator('uv.univ_check_overlap', text='Self', icon_value=icons.overlap)  # .check_mode = 'SELF'
+        # draw_tag_button(Inspect.OverlapSelf)
+        #
+        # row = col.row(align=True)
+        # row.operator('uv.univ_check_overlap', text='Trouble', icon_value=icons.overlap)  # .check_mode = 'TROUBLE'
+        # draw_tag_button(Inspect.OverlapTroubleFace)
+        #
+        # row = col.row(align=True)
+        # row.operator('uv.univ_check_overlap', text='By Material', icon_value=icons.overlap)  # .check_mode = 'MATERIAL'
+        # draw_tag_button(Inspect.OverlapByMaterial)
+        #
+        # row = col.row(align=True)
+        # row.operator('uv.univ_check_overlap', text='With Modifier', icon_value=icons.overlap)  # .check_mode = 'MODIFIER'
+        # draw_tag_button(Inspect.OverlapWithModifier)
+
+        col.separator()
+
+        row = col.row(align=True)
+        row.operator('uv.univ_check_zero', icon_value=icons.zero)
+        draw_tag_button(Inspect.Zero)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_check_non_splitted', icon_value=icons.non_splitted)
+        draw_tag_button(Inspect.NonSplitted)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_check_flipped', icon_value=icons.flipped)
+        draw_tag_button(Inspect.Flipped)
+
+
+
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
@@ -611,7 +671,6 @@ class UNIV_PT_TD_LayersManager(Panel):
         row.prop(settings, 'copy_to_layers_to', text='')
         row.separator(factor=0.35)
         row.operator('uv.univ_copy_to_layer')
-
 
 
 class IMAGE_MT_PIE_univ_edit(Menu):
