@@ -488,6 +488,7 @@ class UNIV_PT_PackSettings(Panel):
 
         layout.prop(uvpm_settings.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
 
+
 class UNIV_PT_BatchInspectSettings(Panel):
     bl_idname = 'UNIV_PT_BatchInspectSettings'
     bl_label = 'Batch Inspect Settings'
@@ -553,8 +554,6 @@ class UNIV_PT_BatchInspectSettings(Panel):
         row = col.row(align=True)
         row.operator('uv.univ_check_other', icon_value=icons.random)
         draw_tag_button(Inspect.Other)
-
-
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
@@ -892,6 +891,39 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.loop_multi_select", text='Loop').ring=False
         # Right Bottom
         pie.operator("mesh.loop_multi_select", text='Ring').ring = True
+
+class IMAGE_MT_PIE_univ_inspect(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator("uv.univ_check_overlap", icon_value=icons.overlap)
+        # Right
+        pie.operator("uv.univ_check_non_splitted", icon_value=icons.non_splitted)
+
+        # Bottom
+        pie.split()
+
+        # Upper
+        pie.operator("uv.univ_batch_inspect", icon_value=icons.zero)
+
+        # Left Upper
+        pie.operator("uv.univ_check_zero", icon_value=icons.zero)
+
+        # Right Upper
+        pie.operator("uv.univ_check_other", icon_value=icons.random)
+        # Left Bottom
+        pie.split()
+        # Right Bottom
+        pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
 class UNIV_WT_object_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'

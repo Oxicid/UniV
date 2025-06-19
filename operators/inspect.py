@@ -247,6 +247,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         continue
                     if edge.is_boundary:
                         continue
+                    non_seam_counter += 1
                 elif not edge.smooth:
                     sharps_counter += 1
                 elif edge.calc_face_angle() >= angle:
@@ -394,14 +395,14 @@ class UNIV_OT_Check_Other(Operator):
     bl_label = 'Other'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = """This operator includes a number of small but important checks:\n
-1) Checks for the presence of polygons
-2) Checks for the presence of UV maps
-3) Fixes the operator call context (many operators stop working when the active object has no polygons or UVs)
-4) Checks for object scaling
-5) Checks for a valid aspect ratio
-6) Checks for a valid UV Map node name in Shader
-7) Check optimal UV smoothing method in subdivision modifier"""
-# 6) Checks handlers and various flags"""
+1. Verifies that the object contains polygons.
+2. Verifies the presence of UV maps.
+3. Corrects the operator call context (since many operators fail when the active object lacks polygons or UV maps).
+4. Checks for applied or non-uniform object scaling.
+5. Ensures a valid aspect ratio.
+6. Verifies that the UV Map node in the shader has a valid name.
+7. Checks whether the optimal UV smoothing method is selected in the Subdivision Surface modifier."""
+# 8. Checks handlers and various flags"""
 
     check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
