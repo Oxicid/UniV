@@ -610,3 +610,84 @@ class UNIV_OT_ModifiersToggle(Operator):
                 mod.show_viewport = show_status
         return {'FINISHED'}
 
+
+class UNIV_OT_WorkspaceToggle(Operator):
+    bl_idname = 'wm.univ_workspace_toggle'
+    bl_label = 'Toggle Workspace'
+
+    def execute(self, context):
+        if context.mode not in ('EDIT_MESH', 'OBJECT') or context.area.type != 'VIEW_3D':
+            return {'PASS_THROUGH'}
+
+        tools = bpy.context.workspace.tools
+        active_tool_name = tools.from_space_view3d_mode(context.mode).idname
+
+        if not ToggleHandlers.owners:
+            ToggleHandlers.subscribe_to_tool()
+
+        if active_tool_name == 'tool.univ':
+            if ToggleHandlers.last_tool not in ('', 'tool.univ') and self.contain_tool_by_name(ToggleHandlers.last_tool):
+                bpy.ops.wm.tool_set_by_id(name=ToggleHandlers.last_tool)
+            else:
+                bpy.ops.wm.tool_set_by_id(name='builtin.select_box')
+        else:
+            bpy.ops.wm.tool_set_by_id(name='tool.univ')
+        return {'FINISHED'}
+
+    @staticmethod
+    def contain_tool_by_name(name, space_type: str='VIEW_3D'):
+        from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
+        tool_helper_cls = ToolSelectPanelHelper._tool_class_from_space_type(space_type)  # noqa
+
+        for item in ToolSelectPanelHelper._tools_flatten(  # noqa
+                tool_helper_cls.tools_from_context(bpy.context, mode=bpy.context.mode)):
+            if getattr(item, 'idname', None) == name:
+                return True
+        return False
+
+class ToggleHandlers:
+    last_tool = ''
+    owners = []
+    @staticmethod
+    def univ_toggle_rna_callback(workspace):
+        for tool in reversed(workspace.tools):
+            if tool.space_type == 'VIEW_3D':
+                idname = tool.idname
+                if idname != ToggleHandlers.last_tool and idname != 'tool.univ':
+                    ToggleHandlers.last_tool = idname
+                break
+
+    @classmethod
+    def subscribe_to_tool(cls):
+        cls.owners.clear()
+        for ws in bpy.data.workspaces:
+            owner = ('UniV', ws)
+            cls.owners.append(owner)
+            bpy.msgbus.subscribe_rna(
+                key=ws.path_resolve("tools", False),
+                owner=owner,
+                args=(ws,),
+                notify=cls.univ_toggle_rna_callback)
+
+    @classmethod
+    def unsubscribe_from_tool(cls):
+        for owner in cls.owners:
+            bpy.msgbus.clear_by_owner(owner)
+        cls.owners.clear()
+
+    @staticmethod
+    @bpy.app.handlers.persistent
+    def univ_tool_load_handler(_):
+        ToggleHandlers.subscribe_to_tool()
+
+    @classmethod
+    def register_handler(cls):
+        cls.unregister_handler()
+        bpy.app.handlers.load_post.append(cls.univ_tool_load_handler)
+
+    @classmethod
+    def unregister_handler(cls):
+        cls.unsubscribe_from_tool()
+        for handler in reversed(bpy.app.handlers.load_post):
+            if handler.__name__ == 'univ_tool_load_handler':
+                bpy.app.handlers.load_post.remove(handler)

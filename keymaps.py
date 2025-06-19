@@ -81,6 +81,9 @@ def add_keymaps():
     kmi.properties.mode = 'SPLIT'
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('wm.univ_workspace_toggle', 'T', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
     ### UV Editor
     km = kc.keymaps.new(name='UV Editor')
 
@@ -302,7 +305,7 @@ def add_keymaps_ws():
         keys_ws.append((km_, kmi_))
 
         if univ_pro:
-            kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', alt=True)
+            kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', ctrl=True)
             keys_ws.append((km_, kmi_))
 
     # Edit Mode

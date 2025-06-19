@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 31),
+    "version": (3, 7, 32),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -124,6 +124,7 @@ def load_register_types():
             toggle.UNIV_OT_SyncUVToggle,
             toggle.UNIV_OT_StretchUVToggle,
             toggle.UNIV_OT_ShowModifiedUVEdgeToggle,
+            toggle.UNIV_OT_WorkspaceToggle,
             # Modifier Toggle
             toggle.UNIV_OT_ModifiersToggle,
 
@@ -297,6 +298,7 @@ def register():
         traceback.print_exc()
 
     preferences.update_panel(None, None)
+    toggle.ToggleHandlers.register_handler()
 
 
 def unregister():
@@ -333,6 +335,8 @@ def unregister():
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
     texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
+
+    toggle.ToggleHandlers.unregister_handler()
 
 
 if __name__ == "__main__":
