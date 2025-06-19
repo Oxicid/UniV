@@ -9,6 +9,7 @@ import bpy
 import math
 import enum
 import bl_math
+import textwrap
 
 from mathutils.geometry import area_tri
 from bpy.props import *
@@ -60,7 +61,7 @@ class Inspect(enum.IntFlag):
 
     @classmethod
     def default_value_for_settings(cls):
-        return cls.Overlap | cls.Zero | cls.Flipped | cls.NonSplitted
+        return cls.Overlap | cls.Zero | cls.Flipped | cls.NonSplitted | cls.Other
 
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
@@ -387,6 +388,235 @@ class UNIV_OT_Check_Overlap(Operator):
 
         return count
 
+
+class UNIV_OT_Check_Other(Operator):
+    bl_idname = 'uv.univ_check_other'
+    bl_label = 'Other'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = """This operator includes a number of small but important checks:\n
+1) Checks for the presence of polygons
+2) Checks for the presence of UV maps
+3) Fixes the operator call context (many operators stop working when the active object has no polygons or UVs)
+4) Checks for object scaling
+5) Checks for a valid aspect ratio
+6) Checks for a valid UV Map node name in Shader
+7) Check optimal UV smoothing method in subdivision modifier"""
+# 6) Checks handlers and various flags"""
+
+    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
+    threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
+
+    @classmethod
+    def poll(cls, context):
+        return (obj := context.active_object) and obj.type == 'MESH'
+
+    def draw(self, context):
+
+        layout = self.layout
+        col = layout.column()
+        global INSPECT_INFO
+
+        if info_list := INSPECT_INFO.get('Other'):
+            for check_type, info in info_list:
+                box = col.box()
+                wrapped_lines = textwrap.wrap(check_type+': '+info, width=72)
+                for line in wrapped_lines:
+                    box.label(text=line)
+
+    def execute(self, context):
+        global INSPECT_INFO
+        INSPECT_INFO.clear()
+
+        umeshes = types.UMeshes()
+        umeshes.update_tag = False
+
+        if info := self.check_other(umeshes):
+            INSPECT_INFO['Other'] = info
+            # umeshes.silent_update()
+            return context.window_manager.invoke_popup(self, width=420)
+        else:
+            self.report({'INFO'}, 'Errors not found')
+        return {'FINISHED'}
+
+    @staticmethod
+    def check_other(umeshes: types.UMeshes):
+        info: list[tuple[str, str]] = []
+
+        # Check context error
+        faces = bpy.context.active_object.data.polygons
+        uvs = bpy.context.active_object.data.uv_layers
+        if not faces or not uvs:
+            umeshes.fix_context()
+            error_description = 'The active object has '
+            if not faces:
+                error_description += 'no polygons'
+            if not uvs:
+                if not faces:
+                    error_description += ' and '
+                error_description += 'no UV maps'
+
+            error_id = 'Context Error'
+            if not bpy.context.active_object.data.polygons or not bpy.context.active_object.data.uv_layers:
+                info.append((error_id, error_description))
+                return info
+            else:
+                error_description += '. (Fixed)'
+                info.append((error_id, error_description))
+
+        selected_objects = utils.calc_any_unique_obj()
+
+        # Check unapplied scale
+        counter = 0
+        error_id = 'Unapplied Scales'
+        error_description = ''
+        for obj in selected_objects:
+            _, _, scale = obj.matrix_world.decompose()
+            if not utils.umath.vec_isclose_to_uniform(scale, abs_tol=0.01):
+                counter += 1
+                if counter == 1:
+                    error_description = f"The {obj.name!r} hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}"
+        if counter:
+            if counter != 1:
+                error_description = f'Found {counter} objects without applied scales.'
+            info.append((error_id, error_description))
+
+        # Check UV maps exist
+        uv_names: set[tuple[str, ...]] = set()
+        uv_active: set[tuple[bool, ...]] = set()
+        uv_active_render: set[tuple[bool, ...]] = set()
+        min_uv_maps = 100
+        max_uv_maps = 0
+        missed_uvs_counter = 0
+
+        error_id = 'UV Maps'
+        for obj in selected_objects:
+            uvs = obj.data.uv_layers
+            if not len(uvs):
+                missed_uvs_counter += 1  # TODO: HP check
+                continue
+            max_uv_maps = max(max_uv_maps, len(uvs))
+            min_uv_maps = min(min_uv_maps, len(uvs))
+            uv_names.add(tuple(uv.name for uv in uvs))
+            uv_active.add(tuple(uv.active for uv in uvs))
+            uv_active_render.add(tuple(uv.active_render for uv in uvs))
+
+        error_description = ''
+        if missed_uvs_counter:
+            error_description += f'Found {missed_uvs_counter} meshes with missed UV maps. '
+        if min_uv_maps != max_uv_maps:
+            error_description += 'Meshes have different numbers of UVs'
+        else:
+            if len(uv_names) >= 2:
+                error_description += 'Meshes have different names.'
+            if len(uv_active) >= 2 or len(uv_active_render) >= 2:
+                error_description += 'Meshes have different '
+                if len(uv_active) >= 2:
+                    error_description += 'active layers'
+                if len(uv_active_render) >= 2:
+                    if len(uv_active) >= 2:
+                        error_description += 'and different active render layers'
+                    else:
+                        error_description += 'active render layers'
+        if error_description:
+            info.append((error_id, error_description))
+
+        # Check missed faces
+        counter = 0
+        error_id = 'Missed Faces'
+        error_description = ''
+        for obj in selected_objects:
+            if not obj.data.polygons:
+                counter += 1
+                if counter == 1:
+                    error_description += f"{obj.name!r}"
+                else:
+                    error_description += f", {obj.name!r}"
+
+        if counter:
+            info.append((error_id, f"{error_description} meshes hasn't faces."))
+
+        if umeshes.is_edit_mode:
+            counter = 0
+            mode = utils.get_select_mode_mesh_reversed()
+            if mode == 'VERTEX':
+                mode = 'VERT'
+            for umesh in umeshes:
+                if mode not in umesh.bm.select_mode:
+                    counter += 1
+                    umesh.bm.select_mode = {mode}
+            if counter:
+                info.append(('Elem Mode', f"Select Mode at {counter} meshes doesn't match scene with mesh. (Fixed)"))
+
+
+        # Check Heterogeneous Aspect Ratio
+        aspects = {}
+        def get_aspects_ratio(u):
+            if modifiers := [m for m in u.obj.modifiers if m.name.startswith('UniV Checker')]:
+                socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
+                if mtl := modifiers[0][socket]:
+                    for node in mtl.node_tree.nodes:
+                        if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
+                            image_width, image_height = image.size
+                            if image_height:
+                                aspects[image_width / image_height] = modifiers[0][socket].name
+                            else:
+                                aspects[1.0] = mtl.name
+                            return
+                aspects[1.0] = 'Default'
+
+            # Aspect from material
+            elif u.obj.material_slots:
+                for slot in u.obj.material_slots:
+                    mtl = slot.material
+                    if not slot.material:
+                        aspects[1.0] = 'Default'
+                        continue
+                    if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
+                        if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
+                            image_width, image_height = image.size
+                            if image_height:
+                                aspects[image_width / image_height] = mtl.name
+                                continue
+                    aspects[1.0] = mtl.name
+            else:
+                aspects[1.0] = 'Default'
+
+        for umesh in umeshes:
+            get_aspects_ratio(umesh)
+        if len(aspects) >= 2:
+            info.append(('Aspect Ratio', f'Found heterogeneous aspect ratio: ' + ', '.join(f"{v!r}" for v in aspects.values())))
+
+        # Check non valid UV Map node
+        error_description = ''
+        for umesh in umeshes:
+            uv_maps_names = {uv.name for uv in umesh.obj.data.uv_layers}
+            uv_maps_names.add('')
+            for slot in umesh.obj.material_slots:
+                if (mtl := slot.material) and mtl.use_nodes:
+                    if non_valid_names := {f'{node.uv_map!r}' for node in mtl.node_tree.nodes
+                                       if node.type == 'UVMAP' and node.uv_map not in uv_maps_names}:
+                        error_description += f'Material {mtl.name!r} in {umesh.obj.name!r} object has non-valid UV Map name: '
+                        error_description += ', '.join(non_valid_names) + '.\n'
+        if error_description:
+            info.append(('UV Map None Name', error_description))
+
+        # Check SubDiv optimal method for UV
+        names = []
+        for u in umeshes:
+            for mod in u.obj.modifiers:
+                if isinstance(mod, bpy.types.SubsurfModifier):
+                    if mod.uv_smooth in ('PRESERVE_BOUNDARIES', 'NONE'):
+                        names.append(repr(u.obj.name))
+                        break
+        if names:
+            error_description = 'The following objects use a non-optimal UV smoothing method in subdivision modifier: ' + ', '.join(names)
+            error_description += '. Use Keep Corners or All Method'
+            info.append(('UV Smooth', error_description))
+
+        return info
+
+
+
 class UNIV_OT_BatchInspectFlags(Operator):
     bl_idname = 'uv.univ_batch_inspect_flags'
     bl_label = 'Flags'
@@ -433,6 +663,13 @@ class UNIV_OT_BatchInspect(Operator):
                 box = col.box()
                 box.label(text=f'{inspect_flag}: ' + info)
 
+        if info_list := INSPECT_INFO.get('Other'):
+            for check_type, info in info_list:
+                box = col.box()
+                wrapped_lines = textwrap.wrap(check_type+': '+info, width=72)
+                for line in wrapped_lines:
+                    box.label(text=line)
+
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -452,7 +689,11 @@ class UNIV_OT_BatchInspect(Operator):
         umeshes = types.UMeshes()
         umeshes.update_tag = False
 
-        umeshes.fix_context()
+        if (Inspect.Other in flags) or self.inspect_all:
+            if info := UNIV_OT_Check_Other.check_other(umeshes):
+                INSPECT_INFO['Other'] = info
+                if not umeshes:
+                    return context.window_manager.invoke_popup(self, width=420)
 
         if not umeshes:
             has_uv_maps = any(obj.data.uv_layers for obj in bpy.context.selected_objects if obj.type == 'MESH')
@@ -510,6 +751,5 @@ class UNIV_OT_BatchInspect(Operator):
             self.report({'INFO'}, 'No errors detected.')
         else:
             umeshes.silent_update()
-            self.report({'WARNING'}, f'Detected {len(INSPECT_INFO)} errors.')
-            return context.window_manager.invoke_popup(self, width=400)
+            return context.window_manager.invoke_popup(self, width=420)
         return {'FINISHED'}

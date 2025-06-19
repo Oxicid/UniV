@@ -550,6 +550,10 @@ class UNIV_PT_BatchInspectSettings(Panel):
         row.operator('uv.univ_check_flipped', icon_value=icons.flipped)
         draw_tag_button(Inspect.Flipped)
 
+        row = col.row(align=True)
+        row.operator('uv.univ_check_other', icon_value=icons.random)
+        draw_tag_button(Inspect.Other)
+
 
 
 

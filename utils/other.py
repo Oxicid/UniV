@@ -14,11 +14,13 @@ def get_aspect_ratio(umesh=None):
         # Aspect from checker
         if modifiers := [m for m in umesh.obj.modifiers if m.name.startswith('UniV Checker')]:
             socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
-            for node in modifiers[0][socket].node_tree.nodes:
-                if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
-                    image_width, image_height = image.size
-                    if image_height:
-                        return image_width / image_height
+
+            if mtl := modifiers[0][socket]:
+                for node in mtl.node_tree.nodes:
+                    if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
+                        image_width, image_height = image.size
+                        if image_height:
+                            return image_width / image_height
         # Aspect from material
         elif mtl := umesh.obj.active_material:
             if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
@@ -100,7 +102,7 @@ def get_select_mode_mesh() -> T_mesh_select_modes:
 
 def get_select_mode_mesh_reversed() -> T_mesh_select_modes:
     if bpy.context.tool_settings.mesh_select_mode[0]:
-        return 'VERTEX'
+        return 'VERTEX'  # TODO: Rename to VERT
     elif bpy.context.tool_settings.mesh_select_mode[1]:
         return 'EDGE'
     else:

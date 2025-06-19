@@ -76,7 +76,7 @@ class UMesh:
         _, _, scale = self.obj.matrix_world.decompose()
         if not utils.umath.vec_isclose_to_uniform(scale, threshold):
             if report:
-                report({'WARNING'}, f"The '{self.obj.name}' hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}")
+                report({'WARNING'}, f"The {self.obj.name!r} hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}")
             return scale
         return None
 
