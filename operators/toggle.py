@@ -359,16 +359,16 @@ class UNIV_OT_SyncUVToggle(Operator):
     @staticmethod
     def sync_uv_selection_mode(sync):
         if sync:
-            if utils.get_select_mode_uv() == 'VERTEX':
-                utils.set_select_mode_mesh('VERTEX')
+            if utils.get_select_mode_uv() == 'VERT':
+                utils.set_select_mode_mesh('VERT')
             elif utils.get_select_mode_uv() == 'EDGE':
                 utils.set_select_mode_mesh('EDGE')
             else:
                 utils.set_select_mode_mesh('FACE')
 
         else:
-            if utils.get_select_mode_mesh() == 'VERTEX':
-                utils.set_select_mode_uv('VERTEX')
+            if utils.get_select_mode_mesh() == 'VERT':
+                utils.set_select_mode_uv('VERT')
             elif utils.get_select_mode_mesh() == 'EDGE':
                 utils.set_select_mode_uv('EDGE')
             else:
@@ -464,7 +464,7 @@ class UNIV_OT_SyncUVToggle(Operator):
             for face in umesh.bm.faces:
                 face.select = all(loop[uv].select_edge or loop[uv].select for loop in face.loops)
 
-        elif utils.get_select_mode_uv() == 'VERTEX':
+        elif utils.get_select_mode_uv() == 'VERT':
             for vert in umesh.bm.verts:
                 if hasattr(vert, 'link_loops'):
                     vert.select = any(loop[uv].select for loop in vert.link_loops)

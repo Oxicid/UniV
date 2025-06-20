@@ -796,7 +796,7 @@ class UNIV_OT_Weld(Operator, Stitch):
 
             if init_corners := utils.calc_selected_uv_vert_corners(umesh) if selected else utils.calc_visible_uv_corners(umesh):
                 # Tagging
-                is_face_mesh_mode = (umesh.sync and utils.get_select_mode_mesh() == 'FACE')
+                is_face_mesh_mode = (umesh.sync and umesh.elem_mode == 'FACE')
                 if not is_face_mesh_mode:
                     umesh.set_corners_tag(False)
 

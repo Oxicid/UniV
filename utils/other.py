@@ -91,18 +91,10 @@ def is_island_mode():
     return selection_mode in ('FACE', 'ISLAND')
 
 
-T_mesh_select_modes = typing.Literal["VERTEX", "EDGE", "FACE"]
+T_mesh_select_modes = typing.Literal["VERT", "EDGE", "FACE"]
 def get_select_mode_mesh() -> T_mesh_select_modes:
-    if bpy.context.tool_settings.mesh_select_mode[2]:
-        return 'FACE'
-    elif bpy.context.tool_settings.mesh_select_mode[1]:
-        return 'EDGE'
-    else:
-        return 'VERTEX'
-
-def get_select_mode_mesh_reversed() -> T_mesh_select_modes:
     if bpy.context.tool_settings.mesh_select_mode[0]:
-        return 'VERTEX'  # TODO: Rename to VERT
+        return 'VERT'
     elif bpy.context.tool_settings.mesh_select_mode[1]:
         return 'EDGE'
     else:
@@ -111,23 +103,27 @@ def get_select_mode_mesh_reversed() -> T_mesh_select_modes:
 def set_select_mode_mesh(mode: T_mesh_select_modes):
     if get_select_mode_mesh() == mode:
         return
-    if mode == 'VERTEX':
+    if mode == 'VERT':
         bpy.context.tool_settings.mesh_select_mode[:] = True, False, False
     elif mode == 'EDGE':
         bpy.context.tool_settings.mesh_select_mode[:] = False, True, False
     elif mode == 'FACE':
         bpy.context.tool_settings.mesh_select_mode[:] = False, False, True
     else:
-        raise TypeError(f"Mode: '{mode}' not found in ('VERTEX', 'EDGE', 'FACE')")
+        raise TypeError(f"Mode: '{mode}' not found in ('VERT', 'EDGE', 'FACE')")
 
 
-T_uv_select_modes = typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']
+T_uv_select_modes = typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']
 def get_select_mode_uv() -> T_uv_select_modes:
-    return bpy.context.scene.tool_settings.uv_select_mode
+    if (mode := bpy.context.scene.tool_settings.uv_select_mode) == 'VERTEX':
+        return 'VERT'
+    return mode  # noqa
 
 def set_select_mode_uv(mode: T_uv_select_modes):
     if get_select_mode_uv() == mode:
         return
+    if mode == 'VERT':
+        mode = 'VERTEX'
     bpy.context.scene.tool_settings.uv_select_mode = mode
 
 def blf_size(font_id, font_size):

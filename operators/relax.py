@@ -103,7 +103,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     def relax_sync_verts_edges(self):
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
-            if self.umeshes.elem_mode == 'VERTEX':
+            if self.umeshes.elem_mode == 'VERT':
                 selected_elem = utils.calc_selected_verts(umesh)
             else:
                 selected_elem = utils.calc_selected_edges(umesh)
@@ -340,7 +340,6 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()
-        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
 
         from ..preferences import univ_settings
         self.texel = univ_settings().texel_density

@@ -54,7 +54,7 @@ class UNIV_OT_Pin(Operator):
             if self.umeshes.sync:
                 has_selected = any(u.total_vert_sel for u in self.umeshes)
             else:
-                utils.set_select_mode_uv('VERTEX')
+                utils.set_select_mode_uv('VERT')
                 has_selected = any(any(utils.calc_selected_uv_vert_corners_iter(u)) for u in self.umeshes)
 
             if has_selected:
@@ -312,15 +312,16 @@ class UNIV_OT_Hide(Operator):
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
-        is_incorrect_hide_mod_for_non_sync = not utils.sync() and utils.get_select_mode_mesh_reversed() != 'FACE'
-        if is_incorrect_hide_mod_for_non_sync:
-            utils.set_select_mode_mesh('FACE')
-
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
+        if not self.umeshes.sync:
+            # Fix incorrect for hide in non-sync mode
+            if utils.get_select_mode_mesh() != 'FACE':
+                self.umeshes.sync = True
+                self.umeshes.elem_mode = 'FACE'
+                utils.update_area_by_type('VIEW_3D')
+            self.umeshes.sync = False
 
-        if self.umeshes:
-            self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -338,7 +339,7 @@ class UNIV_OT_Hide(Operator):
                 # TODO: Implement hide by view box
                 return bpy.ops.uv.hide(unselected=False)
 
-            if self.umeshes.elem_mode == 'VERTEX':
+            if self.umeshes.elem_mode == 'VERT':
                 self.vert_hide_sync_preprocessing()
             elif self.umeshes.elem_mode == 'EDGE':
                 self.edge_hide_sync_preprocessing()
@@ -357,8 +358,6 @@ class UNIV_OT_Hide(Operator):
             # bpy.ops.uv.hide sometimes works incorrectly in 'FACE' mode too,
             # maybe it's something to do with not updating bm.select_mode
             for umesh in self.umeshes:
-                if is_incorrect_hide_mod_for_non_sync:
-                    umesh.bm.select_mode = {'FACE'}
                 uv = umesh.uv
                 update_tag = False
                 for f in utils.calc_visible_uv_faces(umesh):
@@ -509,7 +508,7 @@ class UNIV_OT_SetCursor2D(Operator):
                             pt = face_center
                             min_dist = dist
 
-                elif umeshes.elem_mode == 'VERTEX':
+                elif umeshes.elem_mode == 'VERT':
                     for f in utils.calc_visible_uv_faces(umesh):
                         for crn in f.loops:
                             uv_co = crn[uv].uv
@@ -1389,7 +1388,6 @@ class UNIV_OT_Flatten(Operator):
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
         self.umeshes.set_sync()
-        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
         if not self.umeshes:
             return self.umeshes.update()
         if self.use_correct_aspect:

@@ -118,7 +118,7 @@ class UNIV_OT_SelectLinked(Operator):
         umeshes = UMeshes(report=self.report)
         umeshes.fix_context()
 
-        if sync and umeshes.elem_mode == 'VERTEX':
+        if sync and umeshes.elem_mode == 'VERT':
             for umesh in umeshes:
                 if types.PyBMesh.is_full_vert_selected(umesh.bm) or types.PyBMesh.is_full_vert_deselected(umesh.bm):
                     umesh.update_tag = False
@@ -127,7 +127,7 @@ class UNIV_OT_SelectLinked(Operator):
                 half_selected = []
                 if islands := Islands.calc_visible(umesh):
                     for island in islands:
-                        select_info = island.info_select(sync)
+                        select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.HALF_SELECTED:
                             half_selected.append(island)
                         elif select_info == types.eInfoSelectFaceIsland.FULL_SELECTED:
@@ -166,7 +166,7 @@ class UNIV_OT_SelectLinked(Operator):
                 half_selected = []
                 if islands := Islands.calc_visible(umesh):
                     for island in islands:
-                        select_info = island.info_select(sync)
+                        select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.HALF_SELECTED:
                             half_selected.append(island)
                         elif select_info == types.eInfoSelectFaceIsland.FULL_SELECTED:
@@ -204,7 +204,7 @@ class UNIV_OT_SelectLinked(Operator):
             is_update = False
             if islands := Islands.calc_visible(umesh):
                 for island in islands:
-                    if update_state := (island.info_select(sync) == types.eInfoSelectFaceIsland.HALF_SELECTED):
+                    if update_state := (island.info_select() == types.eInfoSelectFaceIsland.HALF_SELECTED):
                         island.select = False
                     is_update |= update_state
             umesh.update_tag = is_update
@@ -254,7 +254,6 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
         sync = bpy.context.scene.tool_settings.use_uv_select_sync
         umeshes = UMeshes(report=self.report)
-        elem_mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
 
         tile_co = utils.get_tile_from_cursor()
         view_rect = BBox.init_from_minmax(tile_co, tile_co+Vector((1, 1)))
@@ -265,9 +264,9 @@ class UNIV_OT_Select_By_Cursor(Operator):
         view_island.flat_coords = view_rect.draw_data_tris()
 
         if sync and self.face_mode:
-            utils.set_select_mode_mesh('FACE')
+            umeshes.elem_mode = 'FACE'
 
-        args = (umeshes, elem_mode, self.face_mode, view_island, sync)
+        args = (umeshes, self.face_mode, view_island, sync)
 
         if self.mode == 'ADDITIONAL':
             self._additional(*args)
@@ -281,12 +280,10 @@ class UNIV_OT_Select_By_Cursor(Operator):
         return umeshes.update()
 
     @staticmethod
-    def _additional(umeshes: UMeshes, elem_mode, face_mode, view_island, sync):
+    def _additional(umeshes: UMeshes, face_mode, view_island, sync):
         for umesh in umeshes:
             if sync:
-                if elem_mode == 'VERTEX' and types.PyBMesh.is_full_vert_selected(umesh.bm) \
-                        or elem_mode == 'EDGE' and types.PyBMesh.is_full_edge_selected(umesh.bm) \
-                        or elem_mode == 'FACE' and types.PyBMesh.is_full_face_selected(umesh.bm):
+                if types.PyBMesh.is_full_face_selected(umesh.bm):
                     umesh.update_tag = False
                     continue
 
@@ -310,24 +307,24 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
             else:
                 has_update = False
-                if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=False):
+                if adv_islands := AdvIslands.calc_visible(umesh):
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
                     for island in adv_islands:
-                        select_info = island.info_select(sync, elem_mode)
+                        select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.FULL_SELECTED:
                             continue
                         if island.is_overlap(view_island):
                             island.select = True
                             has_update = True
 
-                if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
+                if sync and has_update and umesh.elem_mode in ('VERT', 'EDGE'):
                     umesh.bm.select_flush_mode()
 
                 umesh.update_tag = has_update
 
     @staticmethod
-    def _select(umeshes, elem_mode, face_mode, view_island, sync):
+    def _select(umeshes, face_mode, view_island, sync):
         for umesh in umeshes:
 
             if face_mode:
@@ -365,7 +362,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
 
-                    if sync and elem_mode in ('VERTEX', 'EDGE'):
+                    if sync and umesh.elem_mode in ('VERT', 'EDGE'):
                         for island in adv_islands:
                             island.tag = island.is_overlap(view_island)
 
@@ -385,11 +382,10 @@ class UNIV_OT_Select_By_Cursor(Operator):
                 umesh.update_tag = bool(adv_islands)
 
     @staticmethod
-    def _deselect(umeshes, elem_mode, face_mode, view_island, sync):
+    def _deselect(umeshes, face_mode, view_island, sync):
         for umesh in umeshes:
             sync_elem_mode = utils.get_select_mode_mesh()
-            if sync_elem_mode == 'VERTEX' and types.PyBMesh.is_full_vert_deselected(umesh.bm) \
-                    or sync_elem_mode == 'EDGE' and types.PyBMesh.is_full_edge_deselected(umesh.bm) \
+            if sync_elem_mode != 'FACE' and types.PyBMesh.is_full_vert_deselected(umesh.bm) \
                     or sync_elem_mode == 'FACE' and types.PyBMesh.is_full_face_deselected(umesh.bm):
                 umesh.update_tag = False
                 continue
@@ -416,18 +412,18 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
             else:
                 has_update = False
-                if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=False):
+                if adv_islands := AdvIslands.calc_visible(umesh):
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
                     for island in adv_islands:
-                        select_info = island.info_select(sync, elem_mode)
+                        select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.UNSELECTED:
                             continue
                         if island.is_overlap(view_island):
                             island.select = False
                             has_update = True
 
-                if sync and has_update and elem_mode in ('VERTEX', 'EDGE'):
+                if sync and has_update and umesh.elem_mode in ('VERT', 'EDGE'):
                     umesh.bm.select_flush_mode()
                 umesh.update_tag = has_update
 
@@ -476,7 +472,6 @@ class UNIV_OT_Select_Square_Island(Operator):
 
         if self.umeshes.sync and self.umeshes != 'FACE':
             if self.mode != 'ADDITIONAL':
-                utils.set_select_mode_mesh('FACE')
                 self.umeshes.elem_mode = 'FACE'
 
         if self.mode == 'DESELECT':
@@ -640,7 +635,7 @@ class UNIV_OT_Select_Border(Operator):
 
         if context.scene.tool_settings.use_uv_select_sync:
             bpy.ops.uv.univ_sync_uv_toggle()  # noqa
-        if utils.get_select_mode_uv() not in ('EDGE', 'VERTEX'):
+        if utils.get_select_mode_uv() not in ('EDGE', 'VERT'):
             utils.set_select_mode_uv('EDGE')
 
         self.umeshes = UMeshes(report=self.report)
@@ -1481,7 +1476,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
     def grow_select(self):
         has_updates = False
         linked_crn_to_vert = utils.linked_crn_to_vert_with_seam_3d_iter if self.clamp_on_seam else utils.linked_crn_to_vert_3d_iter
-        if self.umeshes.elem_mode == 'VERTEX':
+        if self.umeshes.elem_mode == 'VERT':
             self.umeshes.filter_by_selected_mesh_verts()
 
             for umesh in self.umeshes:
@@ -1630,7 +1625,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
         has_updates = False
 
         linked_crn_to_vert = utils.linked_crn_to_vert_with_seam_3d_iter if self.clamp_on_seam else utils.linked_crn_to_vert_3d_iter
-        if self.umeshes.elem_mode == 'VERTEX':
+        if self.umeshes.elem_mode == 'VERT':
             self.umeshes.filter_by_selected_mesh_verts()
 
             for umesh in self.umeshes:
@@ -1799,7 +1794,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         self.umeshes = UMeshes(report=self.report)
         self.calc_islands = Islands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else Islands.calc_extended_any_edge
 
-        if self.umeshes.elem_mode not in ('VERTEX', 'EDGE'):
+        if self.umeshes.elem_mode not in ('VERT', 'EDGE'):
             self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
@@ -2109,7 +2104,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
         self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else MeshIslands.calc_extended_any_edge
 
-        if self.umeshes.elem_mode not in ('VERTEX', 'EDGE'):
+        if self.umeshes.elem_mode not in ('VERT', 'EDGE'):
             self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
             return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
@@ -2402,11 +2397,12 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
     def execute(self, context):
         texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
         umeshes = types.UMeshes()
-        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
-            utils.set_select_mode_mesh('FACE')
 
         if not self.bl_idname.startswith('UV'):
             umeshes.set_sync()
+
+        if umeshes.sync:
+            umeshes.elem_mode = 'FACE'
 
         has_elem = False
         counter = 0
@@ -2593,8 +2589,8 @@ class UNIV_OT_SelectByArea(Operator):
 
     def execute(self, context):
         umeshes = types.UMeshes()
-        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
-            utils.set_select_mode_mesh('FACE')
+        if umeshes.sync:
+            umeshes.elem_mode = 'FACE'
 
         min_value = float('inf')
         max_value = float('-inf')
@@ -2718,8 +2714,8 @@ class UNIV_OT_Stacked(Operator):
 
     def execute(self, context):
         umeshes = types.UMeshes()
-        if umeshes.sync and utils.get_select_mode_mesh() != 'FACE':
-            utils.set_select_mode_mesh('FACE')
+        if umeshes.sync:
+            umeshes.elem_mode = 'FACE'
 
         all_islands = []
         for umesh in reversed(umeshes):
@@ -2838,10 +2834,7 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(Operator):
             island_type = MeshIslands.calc_visible_with_mark_seam
             umeshes.set_sync()
 
-        if utils.get_select_mode_mesh_reversed() != 'FACE':
-            utils.set_select_mode_mesh('FACE')
-            for u in umeshes:
-                u.bm.select_mode = {'FACE'}
+        if umeshes.sync:
             umeshes.elem_mode = 'FACE'
 
         counter = 0

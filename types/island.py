@@ -5,7 +5,7 @@ if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
 
-import bpy
+import bpy  # noqa
 import bmesh
 import math
 import mathutils
@@ -98,7 +98,7 @@ class SaveTransform:
         corners = []
         pinned_corners = []
         if island.umesh.sync:
-            if utils.get_select_mode_mesh_reversed() == 'FACE':
+            if island.umesh.elem_mode == 'FACE':
                 for f in island:
                     if f.select:
                         for crn in f.loops:
@@ -112,7 +112,7 @@ class SaveTransform:
                             else:
                                 # crn_uv.pin_uv = True
                                 corners.append(crn)
-            elif utils.get_select_mode_mesh_reversed() == 'EDGE':
+            elif island.umesh.elem_mode == 'EDGE':
                 for f in island:
                     for crn in f.loops:
                         crn_uv = crn[uv]
@@ -127,7 +127,6 @@ class SaveTransform:
                     for crn in f.loops:
                         crn_uv = crn[uv]
                         if not crn.vert.select:
-                            # crn_uv.pin_uv = True
                             corners.append(crn)
                         elif crn_uv.pin_uv:
                             pinned_corners.append(crn)
@@ -136,7 +135,6 @@ class SaveTransform:
                 for crn in f.loops:
                     crn_uv = crn[uv]
                     if not crn_uv.select:
-                        # crn_uv.pin_uv = True
                         corners.append(crn)
                     elif crn_uv.pin_uv:
                         pinned_corners.append(crn)
@@ -532,32 +530,6 @@ class FaceIsland:
         points = [crn[uv].uv for f in self.faces for crn in f.loops]  # Warning: points referenced to uv
         return [points[i] for i in mathutils.geometry.convex_hull_2d(points)]
 
-    # def _select_ex(self, state, sync, mode):
-    #     if sync:
-    #         if mode == 'FACE':
-    #             for face in self.faces:
-    #                 face.select = state
-    #         elif mode == 'VERTEX':
-    #             for face in self.faces:
-    #                 for v in face.verts:
-    #                     v.select = state
-    #         else:
-    #             for face in self.faces:
-    #                 for e in face.edges:
-    #                     e.select = state
-    #     else:
-    #         uv = self.umesh.uv
-    #         if mode == 'VERTEX':
-    #             for face in self.faces:
-    #                 for crn in face.loops:
-    #                     crn[uv].select = state
-    #         else:
-    #             for face in self.faces:
-    #                 for crn in face.loops:
-    #                     crn_uv = crn[uv]
-    #                     crn_uv.select = state
-    #                     crn_uv.select_edge = state
-
     @property
     def select(self):
         raise NotImplementedError()
@@ -587,8 +559,7 @@ class FaceIsland:
     def hide_second(self):
         if self.umesh.sync:
             fast_find_faces = set(self.faces)
-            mode = utils.get_select_mode_mesh()
-            if mode in ('FACE', 'EDGE'):
+            if self.umesh.elem_mode in ('FACE', 'EDGE'):
                 for face in self.faces:
                     face.hide_set(True)
                     for e in face.edges:
@@ -773,20 +744,16 @@ class FaceIsland:
         else:
             return eInfoSelectFaceIsland.HALF_SELECTED
 
-    def info_select(self, sync=None, mode=None) -> eInfoSelectFaceIsland:
-        if sync is None:
-            sync = bpy.context.scene.tool_settings.use_uv_select_sync
-        if mode is None:
-            mode = utils.get_select_mode_mesh() if sync else utils.get_select_mode_uv()
-        if not sync:
-            if mode == 'VERTEX':
+    def info_select(self) -> eInfoSelectFaceIsland:
+        if not self.umesh.sync:
+            if self.umesh.elem_mode == 'VERT':
                 return self.__info_vertex_select()
             else:
                 return self.__info_crn_select()
         else:
-            if mode == 'VERTEX':
+            if self.umesh.elem_mode == 'VERT':
                 return self.__info_vertex_select_sync()
-            elif mode == 'EDGE':
+            elif self.umesh.elem_mode == 'EDGE':
                 return self.__info_edge_select_sync()
             else:
                 return self.__info_face_select_sync()
@@ -810,13 +777,13 @@ class FaceIsland:
     @property
     def has_any_elem_select(self):
         if self.umesh.sync:
-            if utils.get_select_mode_mesh_reversed() == 'FACE':
+            if self.umesh.elem_mode == 'FACE':
                 return any(f.select for f in self)
             else:
                 return any(v.select for f in self for v in f.verts)
         else:
             uv = self.umesh.uv
-            if utils.get_select_mode_uv() == 'EDGE':
+            if self.umesh.elem_mode == 'EDGE':
                 for f in self:
                     for crn in f.loops:
                         if crn[uv].select_edge:
@@ -1241,7 +1208,7 @@ class IslandsBaseTagFilterPre:
                 for face in umesh.bm.faces:
                     face.tag = True
                 return
-            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            if umesh.elem_mode == 'VERT':
                 for face in umesh.bm.faces:
                     face.tag = all(crn[uv].select for crn in face.loops)
             else:
@@ -1253,7 +1220,7 @@ class IslandsBaseTagFilterPre:
             for face in umesh.bm.faces:
                 face.tag = face.select
             return
-        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        if umesh.elem_mode == 'VERT':
             for face in umesh.bm.faces:
                 face.tag = all(crn[uv].select for crn in face.loops) and face.select
         else:
@@ -1273,14 +1240,14 @@ class IslandsBaseTagFilterPre:
         else:
             uv = umesh.uv
             if umesh.is_full_face_selected:
-                if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+                if umesh.elem_mode == 'VERT':
                     for face in umesh.bm.faces:
                         face.tag = not all(l[uv].select for l in face.loops)
                 else:
                     for face in umesh.bm.faces:
                         face.tag = not all(l[uv].select_edge for l in face.loops)
             else:
-                if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+                if umesh.elem_mode == 'VERT':
                     for face in umesh.bm.faces:
                         face.tag = not all(l[uv].select for l in face.loops) and face.select
                 else:
@@ -1622,11 +1589,10 @@ class Islands(IslandsBase):
             if umesh.is_full_face_deselected:
                 return cls()
         else:
-            elem_mode = utils.get_select_mode_mesh()
-            if elem_mode == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
-            elif elem_mode == 'VERTEX':
+            elif umesh.elem_mode == 'VERT':
                 if umesh.is_full_vert_deselected:
                     return cls()
             else:
@@ -1657,11 +1623,10 @@ class Islands(IslandsBase):
     @classmethod
     def calc_extended_any_elem_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.sync:
-            elem_mode = utils.get_select_mode_mesh()
-            if elem_mode == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
-            elif elem_mode == 'VERTEX':
+            elif umesh.elem_mode == 'VERT':
                 if umesh.is_full_vert_deselected:
                     return cls()
             else:
@@ -1683,11 +1648,10 @@ class Islands(IslandsBase):
     def calc_extended_any_vert_non_manifold(cls, umesh: _umesh.UMesh):
         """Calc any verts selected islands"""
         if umesh.sync:
-            elem_mode = utils.get_select_mode_mesh()
-            if elem_mode == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
-            elif elem_mode == 'VERTEX':
+            elif umesh.elem_mode == 'VERT':
                 if umesh.is_full_vert_deselected:
                     return cls()
             else:
@@ -1709,10 +1673,10 @@ class Islands(IslandsBase):
     def calc_extended_any_edge_non_manifold(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         if umesh.sync:
-            if (elem_mode := utils.get_select_mode_mesh()) == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
-            elif elem_mode == 'VERTEX':
+            elif umesh.elem_mode == 'VERT':
                 if umesh.is_full_vert_deselected:
                     return cls()
             else:
@@ -1734,7 +1698,7 @@ class Islands(IslandsBase):
     def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         if umesh.sync:
-            if utils.get_select_mode_mesh() == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
             else:
@@ -1756,7 +1720,7 @@ class Islands(IslandsBase):
     def calc_extended_any_edge_with_markseam(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands, with markseam"""
         if umesh.sync:
-            if utils.get_select_mode_mesh() == 'FACE':
+            if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
                     return cls()
             else:

@@ -81,11 +81,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        if context.area.ui_type != 'UV':  # TODO: Implement 3D version
-            self.umeshes.set_sync(True)
-        if self.umeshes.sync:
-            self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()  # TODO: Implement reversed by default
-
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
         if not self.umeshes:
@@ -275,7 +270,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     e.select = sum(v.select for v in e.verts) == 2
 
             if self.unwrap == 'MINIMUM_STRETCH':
-                if utils.get_select_mode_mesh_reversed() != 'FACE':
+                if self.umeshes.elem_mode != 'FACE':
                     # It might be worth bug reporting this moment when SLIM causes a "grow effect"
                     ud.umesh.bm.select_flush(False)
 
@@ -455,7 +450,6 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()
-        self.umeshes.elem_mode = utils.get_select_mode_mesh_reversed()
 
         from ..preferences import univ_settings
         self.texel = univ_settings().texel_density
@@ -575,7 +569,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
             else:
                 umesh.verify_uv()
                 meshes_with_uvs.append(umesh)
-                if self.umeshes.elem_mode == 'VERTEX':
+                if self.umeshes.elem_mode == 'VERT':
                     if umesh.total_face_sel:
                         unique_number += self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
                     else:
@@ -599,7 +593,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
 
     def unwrap_selected_faces_preprocess_vert_edge_mode(self, umesh):
         assert umesh.total_face_sel
-        assert self.umeshes.elem_mode in ('VERTEX', 'EDGE')
+        assert self.umeshes.elem_mode in ('VERT', 'EDGE')
         mesh_islands = types.MeshIslands.calc_visible_with_mark_seam(umesh)
         unique_number = 0
         pinned = []
@@ -635,7 +629,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
                     pinned.append(crn_uv)
 
         expected_total_selected_faces = umesh.total_face_sel + len(to_select)
-        if self.umeshes.elem_mode == 'VERTEX':
+        if self.umeshes.elem_mode == 'VERT':
             to_deselect_elements = [v for f in to_select for v in f.verts if not v.select]
         else:
             to_deselect_elements = [e for f in to_select for e in f.edges if not e.select]
@@ -659,7 +653,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, types.RayCast):
 
     def unwrap_selected_verts(self, umesh):
         assert not umesh.total_face_sel
-        assert self.umeshes.elem_mode == 'VERTEX'
+        assert self.umeshes.elem_mode == 'VERT'
         mesh_islands = types.MeshIslands.calc_visible_with_mark_seam(umesh)
         unique_number = 0
         pinned = []

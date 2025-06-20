@@ -24,6 +24,7 @@ class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True, verify_uv=True):
         self.bm: bmesh.types.BMesh | FakeBMesh = bm
         self.obj: bpy.types.Object = obj
+        self.elem_mode = utils.NoInit()
         # TODO: Remove Vector from annotation (pycharm moment)
         self.uv: bmesh.types.BMLayerItem | mathutils.Vector = bm.loops.layers.uv.verify() if verify_uv else None
         self.is_edit_bm: bool = is_edit_bm
@@ -343,7 +344,7 @@ class UMesh:
                 for crn in corners:
                     crn.tag = True
             else:
-                if utils.other.get_select_mode_mesh() == 'FACE':
+                if self.elem_mode == 'FACE':
                     if self.is_full_face_deselected:
                         for crn in corners:
                             crn.tag = False
@@ -527,8 +528,7 @@ class UMeshes:
         self.report_obj = report
         self._cancel = False
         self.sync: bool = utils.sync()
-        self._elem_mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND'] = \
-            utils.get_select_mode_mesh_reversed() if self.sync else utils.get_select_mode_uv()
+        self._elem_mode: typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND'] = self._elem_mode_init()
         self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
 
     def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
@@ -565,7 +565,7 @@ class UMeshes:
         return self._elem_mode
 
     @elem_mode.setter
-    def elem_mode(self, mode: typing.Literal['VERTEX', 'EDGE', 'FACE', 'ISLAND']):
+    def elem_mode(self, mode: typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']):
         if self._elem_mode != mode:
             self._elem_mode = mode
             if self.sync:
@@ -574,6 +574,14 @@ class UMeshes:
                     umesh.bm.select_mode = {mode}
             else:
                 utils.set_select_mode_uv(mode)
+            for umesh in self.umeshes:
+                umesh.elem_mode = mode
+
+    def _elem_mode_init(self):
+        mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()
+        for umesh in self.umeshes:
+            umesh.elem_mode = mode
+        return mode
 
     def silent_update(self):
         for umesh in self:
@@ -904,7 +912,7 @@ class UMeshes:
         self.umeshes = selected
 
     def filter_by_selected_uv_elem_by_mode(self) -> 'typing.NoReturn':
-        if self.elem_mode == 'VERTEX':
+        if self.elem_mode == 'VERT':
             self.filter_by_selected_uv_verts()
         elif self.elem_mode == 'EDGE':
             self.filter_by_selected_uv_edges()

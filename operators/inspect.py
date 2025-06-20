@@ -279,7 +279,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                     return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
             select_set = utils.edge_select_linked_set_func(sync)
-            if umeshes.elem_mode not in ('EDGE', 'VERTEX'):
+            if umeshes.elem_mode not in ('EDGE', 'VERT'):
                 umeshes.elem_mode = 'EDGE'
 
             for umesh in umeshes:
@@ -538,9 +538,7 @@ class UNIV_OT_Check_Other(Operator):
 
         if umeshes.is_edit_mode:
             counter = 0
-            mode = utils.get_select_mode_mesh_reversed()
-            if mode == 'VERTEX':
-                mode = 'VERT'
+            mode = utils.get_select_mode_mesh()
             for umesh in umeshes:
                 if mode not in umesh.bm.select_mode:
                     counter += 1

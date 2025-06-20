@@ -30,7 +30,7 @@ class MeshIsland:
         if mode == 'FACE':
             for face in self.faces:
                 face.select = state
-        elif mode == 'VERTEX':
+        elif mode == 'VERT':
             for face in self.faces:
                 for v in face.verts:
                     v.select = state
@@ -54,7 +54,7 @@ class MeshIsland:
 
     @property
     def has_any_elem_select(self):
-        if utils.get_select_mode_mesh_reversed() == 'FACE':
+        if self.umesh.elem_mode == 'FACE':
             return any(f.select for f in self)
         else:
             return any(v.select for f in self for v in f.verts)
@@ -259,7 +259,7 @@ class MeshIslands(MeshIslandsBase):
     def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         assert umesh.sync
-        if utils.get_select_mode_mesh() == 'FACE':
+        if umesh.elem_mode == 'FACE':
             if umesh.is_full_face_deselected:
                 return cls([], umesh)
         else:
@@ -278,7 +278,7 @@ class MeshIslands(MeshIslandsBase):
     def calc_extended_any_edge_with_markseam(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands, with markseam"""
         assert umesh.sync
-        if utils.get_select_mode_mesh() == 'FACE':
+        if umesh.elem_mode == 'FACE':
             if umesh.is_full_face_deselected:
                 return cls([], umesh)
         else:

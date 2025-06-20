@@ -411,8 +411,8 @@ class LoopGroup:
     def calc_dirt_loop_groups(cls, umesh):
         uv = umesh.uv
         # Tagging
-        if utils.sync():
-            assert utils.get_select_mode_mesh() != 'FACE'
+        if umesh.sync:
+            assert umesh.elem_mode != 'FACE'
             umesh.tag_selected_corners()
         else:
             umesh.tag_selected_corners()

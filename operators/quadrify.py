@@ -186,7 +186,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                 else:
                     static_faces.append(f)
         else:
-            if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+            if umesh.elem_mode == 'VERT':
                 for f in island:
                     corners = f.loops
                     if all(crn[uv].select for crn in corners):

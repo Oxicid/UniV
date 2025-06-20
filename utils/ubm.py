@@ -5,7 +5,7 @@ if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
 
-import bpy
+import bpy  # noqa
 import typing
 
 from bmesh.types import BMesh, BMFace, BMEdge, BMVert, BMLoop, BMLayerItem
@@ -954,11 +954,11 @@ def calc_selected_uv_faces(umesh: 'types.UMesh') -> list[BMFace] | typing.Sequen
 
     uv = umesh.uv
     if umesh.is_full_face_selected:
-        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        if umesh.elem_mode == 'VERT':
             return [f for f in umesh.bm.faces if all(crn[uv].select for crn in f.loops)]
         else:
             return [f for f in umesh.bm.faces if all(crn[uv].select_edge for crn in f.loops)]
-    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+    if umesh.elem_mode == 'VERT':
         return [f for f in umesh.bm.faces if all(crn[uv].select for crn in f.loops) and f.select]
     else:
         return [f for f in umesh.bm.faces if all(crn[uv].select_edge for crn in f.loops) and f.select]
@@ -974,11 +974,11 @@ def calc_selected_uv_faces_iter(umesh: 'types.UMesh') -> 'typing.Generator[BMFac
 
     uv = umesh.uv
     if umesh.is_full_face_selected:
-        if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+        if umesh.elem_mode == 'VERT':
             return (f for f in umesh.bm.faces if all(crn[uv].select for crn in f.loops))
         else:
             return (f for f in umesh.bm.faces if all(crn[uv].select_edge for crn in f.loops))
-    if bpy.context.scene.tool_settings.uv_select_mode == 'VERTEX':
+    if umesh.elem_mode == 'VERT':
         return (f for f in umesh.bm.faces if all(crn[uv].select for crn in f.loops) and f.select)
     else:
         return (f for f in umesh.bm.faces if all(crn[uv].select_edge for crn in f.loops) and f.select)
