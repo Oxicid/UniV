@@ -626,10 +626,18 @@ class UNIV_OT_WorkspaceToggle(Operator):
             ToggleHandlers.subscribe_to_tool()
 
         if active_tool_name == 'tool.univ':
-            if ToggleHandlers.last_tool not in ('', 'tool.univ') and self.contain_tool_by_name(ToggleHandlers.last_tool):
-                bpy.ops.wm.tool_set_by_id(name=ToggleHandlers.last_tool)
+            if bpy.context.mode == 'EDIT_MESH':
+                if ToggleHandlers.last_tool_edit not in ('', 'tool.univ') and \
+                        self.contain_tool_by_name(ToggleHandlers.last_tool_edit):
+                    bpy.ops.wm.tool_set_by_id(name=ToggleHandlers.last_tool_edit)
+                else:
+                    bpy.ops.wm.tool_set_by_id(name='builtin.select_box')
             else:
-                bpy.ops.wm.tool_set_by_id(name='builtin.select_box')
+                if ToggleHandlers.last_tool_object not in ('', 'tool.univ') and \
+                        self.contain_tool_by_name(ToggleHandlers.last_tool_object):
+                    bpy.ops.wm.tool_set_by_id(name=ToggleHandlers.last_tool_object)
+                else:
+                    bpy.ops.wm.tool_set_by_id(name='builtin.select_box')
         else:
             bpy.ops.wm.tool_set_by_id(name='tool.univ')
         return {'FINISHED'}
@@ -646,16 +654,24 @@ class UNIV_OT_WorkspaceToggle(Operator):
         return False
 
 class ToggleHandlers:
-    last_tool = ''
+    last_tool_object = ''
+    last_tool_edit = ''
     owners = []
+
     @staticmethod
     def univ_toggle_rna_callback(workspace):
-        for tool in reversed(workspace.tools):
-            if tool.space_type == 'VIEW_3D':
+        tools = bpy.context.workspace.tools
+
+        if (mode := bpy.context.mode) == 'EDIT_MESH':
+            if tool := tools.from_space_view3d_mode(mode):
                 idname = tool.idname
-                if idname != ToggleHandlers.last_tool and idname != 'tool.univ':
-                    ToggleHandlers.last_tool = idname
-                break
+                if idname != 'tool.univ':
+                    ToggleHandlers.last_tool_edit = idname
+        elif mode == 'OBJECT':
+            if tool := tools.from_space_view3d_mode(mode):
+                idname = tool.idname
+                if idname != 'tool.univ':
+                    ToggleHandlers.last_tool_object = idname
 
     @classmethod
     def subscribe_to_tool(cls):
