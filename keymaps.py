@@ -265,6 +265,11 @@ def add_keymaps():
 
     # Hide
     kmi = km.keymap_items.new('uv.univ_hide', 'H', 'PRESS')
+    kmi.properties.unselected = False
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_hide', 'H', 'PRESS', shift=True)
+    kmi.properties.unselected = True
     keys.append((km, kmi))
 
     # Set Cursor 2D

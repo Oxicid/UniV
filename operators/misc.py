@@ -288,8 +288,9 @@ class UNIV_OT_Hide(Operator):
     bl_idname = "uv.univ_hide"
     bl_label = 'Hide'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = f"Hide selected UV"
+    bl_description = f"Hide selected or unselected UV"
 
+    unselected: BoolProperty(name='Unselected', default=False)
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
@@ -330,6 +331,23 @@ class UNIV_OT_Hide(Operator):
         if not selected_umeshes and self.mouse_pos:
             return self.pick_hide()
 
+        # Unselected
+        if self.unselected:
+            self.umeshes.umeshes.extend(visible_umeshes)
+            for umesh in self.umeshes:
+                unselected_faces = utils.calc_unselected_uv_faces(umesh)
+                if umesh.sync:
+                    for f in unselected_faces:
+                        f.hide = True
+                else:
+                    for f in unselected_faces:
+                        f.select = False
+                umesh.update_tag = bool(unselected_faces)
+                if unselected_faces:
+                    umesh.bm.select_flush(True)
+            self.umeshes.update(info='Not found unselected faces')
+            return {'FINISHED'}
+        # Selected
         if self.umeshes.sync:
             if self.umeshes.elem_mode == 'FACE':
                 return bpy.ops.uv.hide(unselected=False)
@@ -369,16 +387,32 @@ class UNIV_OT_Hide(Operator):
 
     def pick_hide(self):
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        all_islands = []
         for umesh in self.umeshes:
             for isl in types.AdvIslands.calc_visible_with_mark_seam(umesh):
+                if self.unselected:
+                    all_islands.append(isl)
                 hit.find_nearest_island_by_crn(isl)
 
         if not hit:
             self.report({'INFO'}, 'Island not found within a given radius')
             return {'CANCELLED'}
 
-        hit.island.hide_first()
-        hit.island.umesh.update()
+        if self.unselected:
+            if len(all_islands) == 1:
+                self.report({'INFO'}, 'No found unpicked islands for hiding')
+                return {'FINISHED'}
+
+            hit.island.tag = False
+            hit.island.umesh.update_tag = False
+            for isl in all_islands:
+                if isl.tag:
+                    isl.hide_first()
+                    isl.umesh.update_tag = True
+            return self.umeshes.update()
+        else:
+            hit.island.hide_first()
+            hit.island.umesh.update()
         return {'FINISHED'}
 
     def vert_hide_sync_preprocessing(self):
