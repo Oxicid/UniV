@@ -67,7 +67,7 @@ class Stitch:
                 t_isl.select_state = True
 
             exclude_indexes = {-1}
-
+            bpy.ops.consoleclear.clear()
             for ref_isl in target_islands:
                 if not ref_isl.tag:
                     continue
@@ -231,7 +231,7 @@ class Stitch:
                 trans.scale_simple(Vector((1, -1)))
 
         elif (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
-            trans_is_flipped ^= 1
+            # trans_is_flipped ^= 1
             trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
@@ -340,7 +340,13 @@ class Stitch:
             if orto == Vector((0, 0)):
                 orto = Vector((self.padding, 0))
             orto *= aspect_vec
-            delta = (pt_a1 - pt_b1) + orto
+
+            correct_flipped_islands =  (ref_is_flipped and not trans_is_flipped or
+                                        ref_is_flipped and trans_is_flipped)
+            if correct_flipped_islands:
+                delta = (pt_a1 - pt_b1) - orto
+            else:
+                delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
 
     def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
@@ -1027,7 +1033,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
-    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=-4, soft_max=4, max=32)
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=10, min=-32, soft_min=-4, soft_max=4, max=32)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
