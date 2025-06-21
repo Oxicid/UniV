@@ -421,7 +421,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
     all_channels: BoolProperty(name='All Channels', default=False)
     addition: BoolProperty(name='Addition', default=False)
-    selected: BoolProperty(name='Selected Islands', default=False)
+    selected: BoolProperty(name='Selected Faces', default=False)
     mtl: BoolProperty(name='Mtl', default=True)
     by_sharps: BoolProperty(name='By Sharps', default=False)
 
@@ -461,21 +461,16 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
                 umesh.update_tag = False
                 continue
 
-            uv = umesh.uv
             is_pair = utils.is_pair
-            uv_layers = umesh.obj.data.uv_layers
-            if _all_channels := self.all_channels and len(uv_layers) > 1:
-                prev_index = uv_layers.active_index
-                indexes = list(range(len(uv_layers)))
-                del indexes[prev_index]
-                indexes.append(prev_index)
+            uv_layers_size = len(umesh.obj.data.uv_layers)
+            if _all_channels := self.all_channels and uv_layers_size > 1:
                 seams = [False] * umesh.total_corners
-
                 corners = [crn for f in faces for crn in f.loops]
-                for first_loop_check, active_index in enumerate(indexes):
-                    uv_layers.active_index = active_index
 
-                    if first_loop_check == 0:
+                for layer_idx in range(uv_layers_size):
+                    uv = umesh.bm.loops.layers.uv[layer_idx]
+
+                    if layer_idx == 0:
                         for idx, crn in enumerate(corners):
                             crn_edge = crn.edge
                             pair = crn.link_loop_radial_prev
@@ -501,9 +496,8 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
                 for idx, crn in enumerate(corners):
                     crn.edge.seam = seams[idx]
 
-                uv_layers.active_index = prev_index
-
             else:
+                uv = umesh.uv
                 for f in faces:
                     for crn in f.loops:
                         crn_edge = crn.edge
