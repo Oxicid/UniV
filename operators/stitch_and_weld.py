@@ -117,6 +117,8 @@ class Stitch:
                                     stack.append(trans_isl)
 
                                 if self.padding:
+                                    # NOTE: ref_isl is not the island from which ref_lg(lg) is derived
+                                    # TODO: Check to pass balance_isl
                                     self.reorient_to_target_with_padding(ref_isl, trans_isl, lg, trans_lg)
                                 else:
                                     self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg)
@@ -222,10 +224,6 @@ class Stitch:
     def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
 
-        # print()
-        # print(f'{trans_lg.is_flipped_3d = }')
-        # print(f'{ref_lg.calc_signed_face_area() = }')
-        # print(f'{trans_lg.calc_signed_face_area() = }')
         is_flipped_3d = trans_lg.is_flipped_3d
         if trans_lg.is_flipped_3d:
             if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) == (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
@@ -235,9 +233,6 @@ class Stitch:
         elif (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
             trans_is_flipped ^= 1
             trans.scale_simple(Vector((1, -1)))
-
-        # print(f'{ref_is_flipped = }')
-        # print(f'{trans_is_flipped = }')
 
         if ref_lg.is_cyclic:
             bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(ref_lg, uv)
@@ -294,31 +289,21 @@ class Stitch:
                     min_length = length_a
                 pad_scale = bl_math.clamp((min_length-self.padding * 2) / min_length, 0.5, 1.5)
 
-                # Change inner scale to outer, if ref is inner-island
-                # TODO: We need to calculate all LGs in order to determine Outer and Inner LGs.
-                #  And then work backwards from there.
-                #  ??? Need calc LG (loops) area for diff inner - outer LG
-                # Incorrect Code
-                # if trans_lg.is_flipped_3d:
-                #     if not ref_is_flipped and trans_is_flipped:
-                #         if ref_lg.calc_signed_face_area() >= 0:
-                #             if trans_lg.calc_signed_face_area() < 0:
-                #                 pad_scale = 1 / pad_scale
-                #     elif ref_is_flipped and not trans_is_flipped:
-                #         if ref_lg.calc_signed_face_area() < 0:
-                #             if trans_lg.calc_signed_face_area() >= 0:
-                #                 pad_scale = 1 / pad_scale
-                # else:
-                #     if ref_is_flipped and trans_is_flipped:
-                #         # If ref has signed area and flipped -> need unsigned trans
-                #         if ref_lg.calc_signed_corners_area() < 0:
-                #             if trans_lg.calc_signed_corners_area() >= 0:
-                #                 pad_scale = 1 / pad_scale
-                #     else:
-                #         # If ref has unsigned area and not flipped -> need signed trans
-                #         if ref_lg.calc_signed_corners_area() >= 0:
-                #             if trans_lg.calc_signed_corners_area() < 0:
-                #                 pad_scale = 1 / pad_scale
+                # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
+                trans.set_boundary_tag()
+                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags(trans):
+                    trans_lg_is_basic_boundary = False
+                    if len(loop_groups) != 1:
+                        longest_border_lg = max(loop_groups, key = lambda lg: lg.length_uv)
+                        vert = longest_border_lg[0].vert
+                        if (len(longest_border_lg) == len(trans_lg) and
+                                any(trans_crn.vert == vert for trans_crn in trans_lg)):
+                            trans_lg_is_basic_boundary = True
+
+                    else:
+                        trans_lg_is_basic_boundary = True
+                    if not trans_lg_is_basic_boundary:
+                        pad_scale = 1 / pad_scale  # scale negative (inner)
 
                 scale *= pad_scale
                 trans.scale(Vector((scale, scale)), center_ref)
