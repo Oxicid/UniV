@@ -67,7 +67,6 @@ class Stitch:
                 t_isl.select_state = True
 
             exclude_indexes = {-1}
-            bpy.ops.consoleclear.clear()
             for ref_isl in target_islands:
                 if not ref_isl.tag:
                     continue
@@ -1033,7 +1032,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
-    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=10, min=-32, soft_min=-4, soft_max=4, max=32)
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=-4, soft_max=4, max=32)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
