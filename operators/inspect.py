@@ -221,6 +221,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     @staticmethod
     def non_splitted(umeshes, use_auto_smooth, user_angle, batch_inspect=False):
         non_seam_counter = 0
+        non_manifold_counter = 0
         angle_counter = 0
         sharps_counter = 0
         seam_counter = 0
@@ -250,8 +251,11 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                     non_seam_counter += 1
                 elif not edge.smooth:
                     sharps_counter += 1
-                elif edge.calc_face_angle() >= angle:
-                    angle_counter += 1
+                elif (face_angle := edge.calc_face_angle(1000.0)) >= angle:
+                    if face_angle == 1000.0:
+                        non_manifold_counter += 1  # TODO: Check if batch_inspect disabled, after implement non manifold
+                    else:
+                        angle_counter += 1
                 elif edge.seam:
                     seam_counter += 1
                 elif pair_crn.face.material_index != crn.face.material_index:
@@ -276,7 +280,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                 if all_selected:
                     for umesh in umeshes:
                         umesh.sequence = []
-                    return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
+                    return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
             select_set = utils.edge_select_linked_set_func(sync)
             if umeshes.elem_mode not in ('EDGE', 'VERT'):
@@ -287,14 +291,16 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                 for edge in umesh.sequence:
                     select_set(edge, True, uv)
                 umesh.sequence = []
-        return non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
+        return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
     @staticmethod
     def data_formatting(counters):
-        non_seam_counter, angle_counter, sharps_counter, seam_counter, mtl_counter = counters
+        non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter = counters
         r_text = ''
         if non_seam_counter:
             r_text += f'Non-Seam - {non_seam_counter}. '
+        if non_manifold_counter:
+            r_text += f'Non-Manifolds - {non_manifold_counter}. '
         if angle_counter:
             r_text += f'Sharp Angles - {angle_counter}. '
         if sharps_counter:
