@@ -713,7 +713,8 @@ class UNIV_OT_BatchInspect(Operator):
             elif Inspect.OverlapInexact in flags:
                 if count := UNIV_OT_Check_Overlap.overlap_check(umeshes, 'INEXACT'):
                     INSPECT_INFO['Overlap'] = UNIV_OT_Check_Overlap.get_info_from_count(count, 'INEXACT')[1]
-
+        else:
+            bpy.ops.uv.select_all(action='DESELECT')
 
         if Inspect.Zero in flags or self.inspect_all:
             if count := UNIV_OT_Check_Zero.zero(umeshes):
