@@ -1531,6 +1531,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
 
                 if to_select:
                     has_updates = True
+                    umesh.bm.select_flush(True)
                     umesh.update()
 
         elif self.umeshes.elem_mode == 'EDGE':
@@ -1592,6 +1593,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
 
                 if to_select:
                     has_updates = True
+                    umesh.bm.select_flush(True)
                     umesh.update()
         else:
             self.umeshes.filter_by_selected_mesh_faces()
