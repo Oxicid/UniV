@@ -396,7 +396,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
-            row.operator('wm.univ_keymaps_config', text='Refresh').mode = 'DEFAULT'
+            row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
             row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
             row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
             row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'

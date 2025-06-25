@@ -72,6 +72,10 @@ def add_keymaps():
     kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
+    kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
+    keys.append((km, kmi))
+
     add_mesh_keymaps(km, univ_pro)
 
     ### Window
@@ -79,9 +83,6 @@ def add_keymaps():
 
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
     kmi.properties.mode = 'SPLIT'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('wm.univ_workspace_toggle', 'T', 'PRESS', alt=True)
     keys.append((km, kmi))
 
     ### UV Editor
@@ -674,14 +675,14 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
     bl_idname = 'wm.univ_keymaps_config'
     bl_label = 'Keymaps Config'
     bl_description = 'Keymaps Config\n\n' \
-                     'Default - Resets properties and assigned keys, enable keymaps (doesn`t restore deleted keymaps)\n' \
+                     'Restore - Resets properties and assigned keys, enable keymaps (doesn`t restore deleted keymaps)\n' \
                      'Off/On - Enable/disable keymaps\n' \
                      'Delete User - Remove manually installed UniV keymaps\n' \
                      'Resolve Conflicts - Resolve all conflicts with UniV keymaps (except in cases where the UniV keymap is disabled)'
 
-    mode: bpy.props.EnumProperty(name='Mode', default='DEFAULT',
+    mode: bpy.props.EnumProperty(name='Mode', default='RESTORE',
                                  items=(
-                                     ('DEFAULT', 'Default', ''),
+                                     ('RESTORE', 'Restore', ''),
                                      ('TOGGLE', 'Off/On', ''),
                                      ('DELETE_USER', 'Delete User', ''),
                                      ('RESOLVE_ALL', 'Resolve Conflicts', '')

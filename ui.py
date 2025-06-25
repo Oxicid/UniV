@@ -796,6 +796,40 @@ class IMAGE_MT_PIE_univ_misc(Menu):
         # Right Bottom
         pie.operator('uv.univ_stitch', icon_value=icons.stitch)
 
+class VIEW3D_MT_PIE_univ_misc(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator('mesh.univ_relax', icon_value=icons.relax)
+        # Right
+        pie.operator('mesh.univ_unwrap', icon_value=icons.unwrap)
+        # Bottom
+        pie.operator('mesh.univ_stack', icon_value=icons.stack)
+
+        # Upper
+        pie.split()
+
+        # Left Upper
+        pie.split()
+        # pie.operator('uv.univ_quadrify', icon_value=icons.quadrify)
+        # Right Upper
+        pie.split()
+        # pie.operator('uv.univ_straight', icon_value=icons.straight)
+        # Left Bottom
+        pie.operator('mesh.univ_weld', icon_value=icons.weld)
+        # Right Bottom
+        pie.operator('mesh.univ_stitch', icon_value=icons.stitch)
+
+
 class VIEW3D_MT_PIE_univ_obj(Menu):
     bl_label = 'UniV Pie'
 
@@ -817,6 +851,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         # Bottom
         split = pie.split()
         col = split.column(align=True)
+        col.separator(factor=18)
         row = col.row(align=True)
         row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
         row.operator('uv.univ_normalize', icon_value=icons.normalize)
@@ -834,6 +869,8 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
 
         # Left Bottom
         pie.split()
+        # Right Bottom
+        pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
 class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
@@ -890,7 +927,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         else:
             pie.operator("mesh.loop_multi_select", text='Loop').ring=False
         # Right Bottom
-        pie.operator("mesh.loop_multi_select", text='Ring').ring = True
+        pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
 class IMAGE_MT_PIE_univ_inspect(Menu):
     bl_label = 'UniV Pie'
