@@ -1620,7 +1620,6 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
             self.report({'INFO'}, 'Not found faces for grow select')
         return {'FINISHED'}
 
-    @utils.timer()
     def shrink(self):
         has_updates = False
 
