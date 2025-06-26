@@ -568,4 +568,15 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                 layout.separator(factor=0.35)
                 layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
                              icon_value=icons.stack)
+                layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
                 layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
+
+class UNIV_OT_ShowAddonPreferences(bpy.types.Operator):
+    bl_idname = 'wm.univ_show_addon_preferences'
+    bl_label = 'Addon Preferences'
+
+    def execute(self, context):
+        bpy.ops.screen.userpref_show()
+        context.preferences.active_section = 'ADDONS'
+        context.window_manager.addon_search = 'UniV'
+        return {'FINISHED'}

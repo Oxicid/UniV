@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 43),
+    "version": (3, 7, 44),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -62,6 +62,7 @@ def load_register_types():
             preferences.UNIV_UV_Layers,
             preferences.UNIV_TexelPreset,
             preferences.UNIV_Settings,
+            preferences.UNIV_OT_ShowAddonPreferences,
             keymaps.UNIV_RestoreKeymaps,
             # Checker System
             checker.UNIV_OT_Checker,
