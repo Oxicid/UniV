@@ -929,6 +929,106 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
+class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator("mesh.univ_weld", icon_value=icons.weld)
+        # Right
+        pie.operator("mesh.univ_cut", icon_value=icons.cut)
+
+        # Bottom
+        split = pie.split()
+        col = split.column(align=True)
+        col.separator(factor=18)
+        col.menu_contents("SCREEN_MT_user_menu")
+
+        # Upper
+        pie.operator("mesh.univ_gravity", icon_value=icons.gravity)
+        # Left Upper
+        pie.operator("mesh.univ_relax", icon_value=icons.relax)
+        # Right Upper
+        pie.operator("mesh.univ_unwrap", icon_value=icons.unwrap)
+        # Left Bottom
+        pie.operator("mesh.univ_stack", icon_value=icons.stack)
+        # Right Bottom
+        pie.operator("mesh.univ_angle", icon_value=icons.border_by_angle)
+
+class IMAGE_MT_PIE_univ_favorites_edit(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator("uv.univ_weld", icon_value=icons.weld)
+        # Right
+        pie.operator("uv.univ_cut", icon_value=icons.cut)
+
+        # Bottom
+        split = pie.split()
+        col = split.column(align=True)
+        col.separator(factor=18)
+        col.menu_contents("SCREEN_MT_user_menu")
+
+        # Upper
+        pie.operator("uv.univ_orient", icon_value=icons.orient)
+        # Left Upper
+        pie.operator("uv.univ_relax", icon_value=icons.relax)
+        # Right Upper
+        pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)
+        # Left Bottom
+        pie.operator("uv.univ_stack", icon_value=icons.stack)
+        # Right Bottom
+        pie.operator("uv.univ_pin", icon_value=icons.pin)
+
+class VIEW3D_MT_PIE_univ_projection(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator("mesh.univ_normal", icon_value=icons.normal)
+        # Right
+        pie.operator("mesh.univ_box_project", icon_value=icons.box)
+
+        # Bottom
+        pie.split()
+        # Upper
+        if univ_pro:
+            pie.operator("mesh.univ_transfer", icon_value=icons.transfer)
+        else:
+            pie.split()
+
+        # Left Upper
+        pie.operator("mesh.univ_smart_project", icon_value=icons.smart)
+        # Right Upper
+        pie.operator("mesh.univ_view_project", icon_value=icons.view)
+        # Left Bottom
+        # Right Bottom
+
 class IMAGE_MT_PIE_univ_inspect(Menu):
     bl_label = 'UniV Pie'
 

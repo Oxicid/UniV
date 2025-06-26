@@ -12,8 +12,6 @@ other_conflict_areas = ['Frames']  # NOTE: not actual after delete keymaps for a
 
 
 def add_mesh_keymaps(km, univ_pro):
-
-
     # Grow
     kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
     kmi.properties.grow = True
@@ -72,10 +70,6 @@ def add_keymaps():
     kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
     keys.append((km, kmi))
 
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
-    keys.append((km, kmi))
-
     add_mesh_keymaps(km, univ_pro)
 
     ### Window
@@ -103,6 +97,10 @@ def add_keymaps():
 
     kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
     kmi.properties.name = "IMAGE_MT_PIE_univ_misc"
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS')
+    kmi.properties.name = "IMAGE_MT_PIE_univ_favorites_edit"
     keys.append((km, kmi))
 
     # Select
@@ -305,21 +303,25 @@ def add_keymaps_ws():
         kmi_ = km_.keymap_items.new("mesh.univ_adjust_td", 'A', 'PRESS', alt=True)
         keys_ws.append((km_, kmi_))
 
-        kmi_ = km_.keymap_items.new("mesh.univ_box_project", 'B', 'PRESS')
-        keys_ws.append((km_, kmi_))
-
-        kmi_ = km_.keymap_items.new("mesh.univ_normal", 'N', 'PRESS')
-        keys_ws.append((km_, kmi_))
-
-        kmi_ = km_.keymap_items.new("mesh.univ_view_project", 'V', 'PRESS', ctrl=True)
-        keys_ws.append((km_, kmi_))
-
         if univ_pro:
             kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', ctrl=True)
             keys_ws.append((km_, kmi_))
 
+        kmi_ = km_.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS', shift=True)
+        kmi_.properties.name = "VIEW3D_MT_PIE_univ_projection"
+        keys_ws.append((km_, kmi_))
+
     # Edit Mode
     km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
+
+
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
+    kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS')
+    kmi.properties.name = "VIEW3D_MT_PIE_univ_favorites_edit"
+    keys.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
     keys_ws.append((km, kmi))

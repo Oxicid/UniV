@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 7, 42),
+    "version": (3, 7, 43),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -160,12 +160,15 @@ def load_register_types():
             ui.UNIV_PT_BatchInspectSettings,
             # Pie Menus
             ui.IMAGE_MT_PIE_univ_inspect,
-            ui.IMAGE_MT_PIE_univ_edit,
             ui.IMAGE_MT_PIE_univ_align,
             ui.IMAGE_MT_PIE_univ_misc,
             ui.VIEW3D_MT_PIE_univ_misc,
             ui.VIEW3D_MT_PIE_univ_obj,
+            ui.IMAGE_MT_PIE_univ_edit,
             ui.VIEW3D_MT_PIE_univ_edit,
+            ui.VIEW3D_MT_PIE_univ_favorites_edit,
+            ui.IMAGE_MT_PIE_univ_favorites_edit,
+            ui.VIEW3D_MT_PIE_univ_projection,
             icons.UNIV_OT_IconsGenerator,
             # Seam
             seam.UNIV_OT_Cut_VIEW2D,
