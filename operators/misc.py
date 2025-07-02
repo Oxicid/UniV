@@ -910,14 +910,11 @@ class UNIV_OT_MoveUpDownBase(Operator):
         mesh = obj.data
         bm = bmesh.from_edit_mesh(mesh)
         uv = bm.loops.layers.uv.verify()
+        other_uv = bm.loops.layers.uv[other_idx]
         layers = mesh.uv_layers
 
-        if layers.active_index != idx:
-            layers.active_index = idx
-
         coords = [crn[uv].uv.copy() for f in bm.faces for crn in f.loops]
-        layers.active_index = other_idx
-        it = (crn[uv].uv for f in bm.faces for crn in f.loops)
+        it = (crn[other_uv].uv for f in bm.faces for crn in f.loops)
 
         for uv_a_copy, uv_b in zip(coords, it):
             uv_b_copy = uv_b.copy()
