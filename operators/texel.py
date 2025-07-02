@@ -961,11 +961,11 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
     bl_idname = "uv.univ_texel_density_from_texture"
     bl_label = 'TD From Texture'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Extracts dimensions from the texture name:" \
-                    "Name_30cm_Albedo → 0.3m" \
+    bl_description = "Extracts dimensions from texture name or metadata.\n\n" \
+                    "Name_30cm_Albedo → 0.3m\n" \
                     "Name_2.5Mx2.5M_Albedo → 2.5 x 2.5 m\n" \
                     "Supported units: mm, cm, m, km, in, ft, yd, mi\n\n" \
-                    "Quixel Megascans textures are supported if the original " \
+                    "Quixel Megascans textures are supported if the original \n" \
                     "filenames are intact and the texture path contains the corresponding JSON file. \n\n" \
                     "Poliigon textures are supported if the naming convention with the texture ID is preserved." \
 
@@ -1177,7 +1177,8 @@ class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
     bl_idname = "uv.univ_calc_udims_from_3d_area"
     bl_label = 'Calc UDIMs from 3D Area'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Calc required UDIMs count coefficient from 3d area"
+    bl_description = f"Calculates the required UDIMs count coefficient from the 3D area \n" \
+                      "relative to the global texture resolution and texel size."
 
     @classmethod
     def poll(cls, context):

@@ -494,6 +494,7 @@ STRETCH_SPACE_DATA: bpy.types.Space | None = None
 class UNIV_OT_StretchUVToggle(Operator):
     bl_idname = 'uv.univ_stretch_uv_toggle'
     bl_label = 'Stretch UV Toggle'
+    bl_description = "A single press toggles Stretch type on and off. Double press switches the Stretch type"
 
     swap: BoolProperty(name='Swap', default=False)
 

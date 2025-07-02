@@ -3178,8 +3178,8 @@ class UNIV_OT_Pack(Operator):
             time_in_sec = 4
         else:
             time_in_sec = 2
-        uvpm_settings.heuristic_max_wait_time = time_in_sec * 4
-        uvpm_settings.heuristic_search_time = time_in_sec
+        uvpm_settings.heuristic_max_wait_time = time_in_sec
+        uvpm_settings.heuristic_search_time = time_in_sec * 4
 
         if size := utils.get_active_image_size():
             uvpm_settings.tex_ratio = size[0] != size[1]
