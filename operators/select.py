@@ -14,7 +14,7 @@ from bl_math import lerp
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
-from bmesh.types import BMFace, BMLoop, BMLayerItem
+from bmesh.types import BMFace, BMLoop
 from gpu_extras.batch import batch_for_shader
 from time import perf_counter as time
 from collections.abc import Callable
@@ -26,8 +26,6 @@ from ..types import Islands, AdvIslands, AdvIsland, BBox, UMeshes, MeshIslands
 
 from ..utils import (
     face_centroid_uv,
-    select_linked_crn_uv_vert,
-    deselect_linked_crn_uv_vert,
     is_boundary_non_sync,
 )
 
@@ -252,8 +250,11 @@ class UNIV_OT_Select_By_Cursor(Operator):
             self.report({'INFO'}, f"UV area not found")
             return {'CANCELLED'}
 
-        sync = bpy.context.scene.tool_settings.use_uv_select_sync
         umeshes = UMeshes(report=self.report)
+        if umeshes.sync:
+            umeshes.elem_mode = 'FACE'
+
+        umeshes.filter_by_visible_uv_faces()
 
         tile_co = utils.get_tile_from_cursor()
         view_rect = BBox.init_from_minmax(tile_co, tile_co+Vector((1, 1)))
@@ -263,53 +264,52 @@ class UNIV_OT_Select_By_Cursor(Operator):
         view_island._bbox = view_rect
         view_island.flat_coords = view_rect.draw_data_tris()
 
-        if sync and self.face_mode:
-            umeshes.elem_mode = 'FACE'
-
-        args = (umeshes, self.face_mode, view_island, sync)
 
         if self.mode == 'ADDITIONAL':
-            self._additional(*args)
+            self.additional(umeshes, view_island)
         elif self.mode == 'DESELECT':
-            self._deselect(*args)
+            self.deselect(umeshes, view_island)
         else:
-            self._select(*args)
+            self.select(umeshes, view_island)
 
         add_draw_rect(view_rect.draw_data_lines())
 
         return umeshes.update()
 
-    @staticmethod
-    def _additional(umeshes: UMeshes, face_mode, view_island, sync):
+    def select(self, umeshes, view_island):
         for umesh in umeshes:
-            if sync:
-                if types.PyBMesh.is_full_face_selected(umesh.bm):
-                    umesh.update_tag = False
-                    continue
-
-            if face_mode:
-                bb = view_island.bbox
+            if self.face_mode:
                 uv = umesh.uv
-                if sync:
-                    for f in umesh.bm.faces:
-                        if not f.select:
-                            if face_centroid_uv(f, uv) in bb:
-                                f.select = True
-                else:
-                    for f in umesh.bm.faces:
-                        if f.select:
-                            if face_centroid_uv(f, uv) in bb:
-                                for _l in f.loops:
-                                    luv = _l[uv]
-                                    luv.select = True
-                                    luv.select_edge = True
-                umesh.bm.select_flush_mode()
-
+                bb = view_island.bbox
+                face_select_set = utils.face_select_set_func(umesh)
+                for f in utils.calc_visible_uv_faces_iter(umesh):
+                    face_select_set(f, face_centroid_uv(f, uv) in bb)
             else:
-                has_update = False
-                if adv_islands := AdvIslands.calc_visible(umesh):
+                adv_islands = AdvIslands.calc_visible(umesh)
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_coords()
+
+                for island in adv_islands:
+                    island.select = island.is_overlap(view_island)
+                umesh.update_tag = bool(adv_islands)
+
+    def additional(self, umeshes: UMeshes, view_island):
+        for umesh in umeshes:
+            has_update = False
+            if not umesh.has_full_selected_uv_faces():
+                if self.face_mode:
+                    uv = umesh.uv
+                    bb = view_island.bbox
+                    face_select_set = utils.face_select_set_func(umesh)
+                    for f in utils.calc_unselected_uv_faces_iter(umesh):
+                        if face_centroid_uv(f, uv) in bb:
+                            face_select_set(f, True)
+                            has_update = True
+                else:
+                    adv_islands = AdvIslands.calc_visible(umesh)
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
+
                     for island in adv_islands:
                         select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.FULL_SELECTED:
@@ -318,103 +318,26 @@ class UNIV_OT_Select_By_Cursor(Operator):
                             island.select = True
                             has_update = True
 
-                if sync and has_update and umesh.elem_mode in ('VERT', 'EDGE'):
-                    umesh.bm.select_flush_mode()
+            umesh.update_tag = has_update
 
-                umesh.update_tag = has_update
-
-    @staticmethod
-    def _select(umeshes, face_mode, view_island, sync):
+    def deselect(self, umeshes, view_island):
+        has_update = False
         for umesh in umeshes:
+            if umesh.has_selected_uv_faces():
+                if self.face_mode:
+                    uv = umesh.uv
+                    bb = view_island.bbox
+                    face_select_set = utils.face_select_set_func(umesh)
 
-            if face_mode:
-                bb = view_island.bbox
-                uv = umesh.uv
-                if sync:
-                    for f in umesh.bm.faces:
+                    for f in utils.calc_visible_uv_faces_iter(umesh):
                         if face_centroid_uv(f, uv) in bb:
-                            f.select = True
-                        else:
-                            f.select = False
-                            for v in f.verts:
-                                v.select = False
-
-                            for e in f.edges:
-                                e.select = False
-
+                            face_select_set(f, False)
+                            has_update = True
                 else:
-                    for f in umesh.bm.faces:
-                        if f.select:
-                            if face_centroid_uv(f, uv) in bb:
-                                for crn in f.loops:
-                                    crn_uv = crn[uv]
-                                    crn_uv.select = True
-                                    crn_uv.select_edge = True
-                            else:
-                                for crn in f.loops:
-                                    crn_uv = crn[uv]
-                                    crn_uv.select = False
-                                    crn_uv.select_edge = False
-                umesh.bm.select_flush_mode()
-
-            else:
-                if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=False):
+                    adv_islands = AdvIslands.calc_visible(umesh)
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
 
-                    if sync and umesh.elem_mode in ('VERT', 'EDGE'):
-                        for island in adv_islands:
-                            island.tag = island.is_overlap(view_island)
-
-                        for island in adv_islands:
-                            if not island.tag:
-                                island.select = False
-                        for island in adv_islands:
-                            if island.tag:
-                                island.select = True
-
-                        umesh.bm.select_flush_mode()
-
-                    else:
-                        for island in adv_islands:
-                            island.select = island.is_overlap(view_island)
-
-                umesh.update_tag = bool(adv_islands)
-
-    @staticmethod
-    def _deselect(umeshes, face_mode, view_island, sync):
-        for umesh in umeshes:
-            sync_elem_mode = utils.get_select_mode_mesh()
-            if sync_elem_mode != 'FACE' and types.PyBMesh.is_full_vert_deselected(umesh.bm) \
-                    or sync_elem_mode == 'FACE' and types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
-            if face_mode:
-                bb = view_island.bbox
-                uv = umesh.uv
-                if sync:
-                    for f in umesh.bm.faces:
-                        if f.select:
-                            if face_centroid_uv(f, uv) in bb:
-                                f.select = False
-
-                else:
-                    for f in umesh.bm.faces:
-                        if f.select:
-                            if face_centroid_uv(f, uv) in bb:
-                                for _l in f.loops:
-                                    luv = _l[uv]
-                                    luv.select = False
-                                    luv.select_edge = False
-
-                umesh.bm.select_flush_mode()
-
-            else:
-                has_update = False
-                if adv_islands := AdvIslands.calc_visible(umesh):
-                    adv_islands.calc_tris()
-                    adv_islands.calc_flat_coords()
                     for island in adv_islands:
                         select_info = island.info_select()
                         if select_info == types.eInfoSelectFaceIsland.UNSELECTED:
@@ -422,10 +345,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                         if island.is_overlap(view_island):
                             island.select = False
                             has_update = True
-
-                if sync and has_update and umesh.elem_mode in ('VERT', 'EDGE'):
-                    umesh.bm.select_flush_mode()
-                umesh.update_tag = has_update
+            umesh.update_tag = has_update
 
 
 class UNIV_OT_Select_Square_Island(Operator):
@@ -469,10 +389,10 @@ class UNIV_OT_Select_Square_Island(Operator):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
+        if self.umeshes.sync:
+            self.umeshes.elem_mode = 'FACE'
 
-        if self.umeshes.sync and self.umeshes != 'FACE':
-            if self.mode != 'ADDITIONAL':
-                self.umeshes.elem_mode = 'FACE'
+        self.umeshes.filter_by_visible_uv_faces()
 
         if self.mode == 'DESELECT':
             self.deselect()
@@ -480,42 +400,28 @@ class UNIV_OT_Select_Square_Island(Operator):
             self.addition()
         else:
             self.select()
-
-        return self.umeshes.update()
+        self.umeshes.silent_update()
+        return {'FINISHED'}
 
     def select(self):
         for umesh in self.umeshes:
             if islands := Islands.calc_visible(umesh):
                 for island in islands:
-                    percent, close = self.percent_and_is_square_close(island)
-
-                    if self.shape == 'SQUARE':
-                        island.select = close
-                    elif self.shape == 'HORIZONTAL':
-                        island.select = percent > 0 and not close
-                    else:
-                        island.select = percent < 0 and not close
+                    island.select = self.is_target_island(island)
             umesh.update_tag = bool(islands)
 
     def deselect(self):
+        # TODO: Fix calc_extended_any_elem_with_mark_seam for face/island elem mode
+        if self.umeshes.sync or self.umeshes.elem_mode in ('FACE', 'ISLAND'):
+            island_calc_type = Islands.calc_extended_with_mark_seam
+        else:
+            island_calc_type = Islands.calc_extended_any_elem_with_mark_seam
+
         for umesh in self.umeshes:
             update_tag = False
-            if self.umeshes.sync and umesh.is_full_face_deselected:
-                umesh.update_tag = False
-                continue
-
-            if islands := Islands.calc_visible(umesh):
-                for island in islands:
-                    percent, close = self.percent_and_is_square_close(island)
-
-                    if self.shape == 'SQUARE':
-                        deselect = close
-                    elif self.shape == 'HORIZONTAL':
-                        deselect = percent > 0 and not close
-                    else:
-                        deselect = percent < 0 and not close
-
-                    if deselect:
+            if umesh.has_selected_uv_faces():
+                for island in island_calc_type(umesh):
+                    if self.is_target_island(island):
                         island.select = False
                         update_tag = True
             umesh.update_tag = update_tag
@@ -523,28 +429,23 @@ class UNIV_OT_Select_Square_Island(Operator):
     def addition(self):
         for umesh in self.umeshes:
             update_tag = False
-            if self.umeshes.sync and umesh.is_full_face_selected:
-                umesh.update_tag = False
-                continue
-
-            if islands := Islands.calc_visible(umesh):
-                for island in islands:
-                    percent, close = self.percent_and_is_square_close(island)
-
-                    if self.shape == 'SQUARE':
-                        select = close
-                    elif self.shape == 'HORIZONTAL':
-                        select = percent > 0 and not close
-                    else:
-                        select = percent < 0 and not close
-
-                    if select:
+            if not umesh.has_full_selected_uv_faces():
+                for island in Islands.calc_non_full_selected_with_mark_seam(umesh):
+                    if self.is_target_island(island):
                         island.select = True
                         update_tag = True
-
             umesh.update_tag = update_tag
 
-    def percent_and_is_square_close(self, island):
+    def is_target_island(self, island):
+        percent, close_to_square = self.percent_and_close_to_square(island)
+        if self.shape == 'SQUARE':
+            return close_to_square
+        elif self.shape == 'HORIZONTAL':
+            return percent > 0 and not close_to_square
+        else:
+            return percent < 0 and not close_to_square
+
+    def percent_and_close_to_square(self, island):
         bbox = island.calc_bbox()
         width = bbox.width
         height = bbox.height
@@ -630,72 +531,57 @@ class UNIV_OT_Select_Border(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        if self.border_mode in ('BORDER_EDGE_BY_ANGLE', 'ALL_EDGE_BY_ANGLE'):
-            return self.select_edge_by_angle(context)
-
-        if context.scene.tool_settings.use_uv_select_sync:
+        if context.scene.tool_settings.use_uv_select_sync:  # TODO: Adapt for new sync system
             bpy.ops.uv.univ_sync_uv_toggle()  # noqa
-        if utils.get_select_mode_uv() not in ('EDGE', 'VERT'):
-            utils.set_select_mode_uv('EDGE')
+
+        if self.border_mode in ('BORDER_EDGE_BY_ANGLE', 'ALL_EDGE_BY_ANGLE'):
+            return self.select_edge_by_angle()
 
         self.umeshes = UMeshes(report=self.report)
+        if self.umeshes.elem_mode not in ('EDGE', 'VERT'):
+            self.umeshes.elem_mode = 'EDGE'
+
+        self.umeshes.filter_by_visible_uv_faces()
+
         if self.border_mode == 'BORDER':
             self.select_border()
         else:
             self.select_border_between()
-        return self.umeshes.update()
+        self.umeshes.silent_update()
+        return {'FINISHED'}
 
     def select_border(self):
+        # TODO: Add match by mark seam
         for umesh in self.umeshes:
-            if types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
             uv = umesh.uv
             corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
-            if self.mode == 'SELECT':  # TODO: Add behavior, border by select (not All)
-                to_select_corns = []
+            edge_select_get = utils.edge_select_get_func(umesh)
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
+            if self.mode == 'SELECT':  # TODO: Add behavior, border by selected faces
                 for crn in corners:
-                    if is_boundary_non_sync(crn, uv):
-                        to_select_corns.append(crn)
-                    else:
-                        crn_uv_a = crn[uv]
-                        crn_uv_a.select = False
-                        crn_uv_a.select_edge = False
-                        crn.link_loop_next[uv].select = False
-
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                    edge_select_set(crn, is_boundary_non_sync(crn, uv))
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
                 for crn in _corners:
                     if is_boundary_non_sync(crn, uv):
-                        self.deselect_crn_uv_edge_for_border(crn, uv)
-                for crn in _corners:
-                    crn_uv = crn[uv]
-                    if crn_uv.select_edge:
-                        self.select_crn_uv_edge_sequence([crn], uv)
-
+                        self.deselect_edge_with_linked_edges_for_border(crn, uv, edge_select_set)
             else:  # 'ADDITION'
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    if crn_uv_a.select_edge:
+                    if edge_select_get(crn):
                         continue
                     if is_boundary_non_sync(crn, uv):
-                        select_linked_crn_uv_vert(crn, uv)
-                        select_linked_crn_uv_vert(crn.link_loop_next, uv)
-                        crn_uv_a.select = True
-                        crn_uv_a.select_edge = True
-                        crn.link_loop_next[uv].select = True
+                        edge_select_set(crn, True)
 
     def select_border_between(self):
         # bpy.ops.uv.select_all(action='DESELECT')
         for umesh in self.umeshes:
             uv = umesh.uv
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
             if self.mode == 'SELECT':
                 islands = Islands.calc_extended(umesh)
 
-                for _f in umesh.bm.faces:
+                for _f in umesh.bm.faces:  # TODO: Add deselect method in umesh
                     for _crn in _f.loops:
                         _crn_uv = _crn[uv]
                         _crn_uv.select = False
@@ -708,11 +594,11 @@ class UNIV_OT_Select_Border(Operator):
                             shared_crn: BMLoop
                             if crn == (shared_crn := crn.link_loop_radial_prev):
                                 continue
-                            if not shared_crn.face.tag:
+                            if not shared_crn.face.tag:  # No match hidden faces
                                 continue
                             if shared_crn.face.index != f.index:
-                                self.select_crn_uv_edge(crn, uv)
-                                self.select_crn_uv_edge(shared_crn, uv)
+                                edge_select_set(crn, True)
+                                edge_select_set(shared_crn, True)
 
             elif self.mode == 'DESELECT':
                 islands = Islands.calc_extended(umesh)
@@ -727,13 +613,8 @@ class UNIV_OT_Select_Border(Operator):
                             if not shared_crn.face.tag:
                                 continue
                             if shared_crn.face.index != f.index:
-                                self.deselect_crn_uv_edge_for_border(crn, uv)
-                                self.deselect_crn_uv_edge_for_border(shared_crn, uv)
-                                # Removing the notches
-                                if is_boundary_non_sync(crn.link_loop_next, uv):
-                                    crn_uv_c = crn.link_loop_next[uv]
-                                    crn_uv_c.select = False
-                                    crn_uv_c.select_edge = False
+                                self.deselect_edge_with_linked_edges_for_border(crn, uv, edge_select_set)
+                                self.deselect_edge_with_linked_edges_for_border(shared_crn, uv, edge_select_set)
             else:  # 'ADDITION'
                 islands = Islands.calc_extended(umesh)
 
@@ -747,23 +628,20 @@ class UNIV_OT_Select_Border(Operator):
                             if not shared_crn.face.tag:
                                 continue
                             if shared_crn.face.index != f.index:
-                                self.select_crn_uv_edge(crn, uv)
-                                self.select_crn_uv_edge(shared_crn, uv)
+                                edge_select_set(crn, True)
+                                edge_select_set(shared_crn, True)
                 umesh.update_tag = bool(islands)
 
     # Select Edge by Angle
 
-    def select_edge_by_angle(self, context):
-        if context.scene.tool_settings.use_uv_select_sync:
-            bpy.ops.uv.univ_sync_uv_toggle()  # noqa
-        if utils.get_select_mode_uv() != 'EDGE':
-            utils.set_select_mode_uv('EDGE')
-
-        self.edge_orient = self.x_vec if self.edge_dir == 'HORIZONTAL' else self.y_vec
+    def select_edge_by_angle(self):
         self.umeshes = UMeshes(report=self.report)
+        self.umeshes.elem_mode = 'EDGE'
+
         if self.use_correct_aspect:
             self.umeshes.calc_aspect_ratio(from_mesh=False)
 
+        self.edge_orient = self.x_vec if self.edge_dir == 'HORIZONTAL' else self.y_vec
         self.negative_ange = math.pi - self.angle
 
         if self.border_mode == 'BORDER_EDGE_BY_ANGLE':
@@ -781,223 +659,140 @@ class UNIV_OT_Select_Border(Operator):
 
     def select_hv(self):
         for umesh in self.umeshes:
-            if types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
             uv = umesh.uv
-            corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
             aspect_for_x = umesh.aspect
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
+            corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
             if self.mode == 'SELECT':
-                to_select_corns = []
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    crn_uv_b = crn.link_loop_next[uv]
-
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     a = vec.angle(self.edge_orient, 0)
 
-                    if a <= self.angle or a >= self.negative_ange:
-                        to_select_corns.append(crn)
-                    else:
-                        crn_uv_a.select = False
-                        crn_uv_a.select_edge = False
-                        crn_uv_b.select = False
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                    between_angle = a <= self.angle or a >= self.negative_ange
+                    edge_select_set(crn, between_angle)
 
             elif self.mode == 'DESELECT':
-                to_select_corns = []
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    crn_uv_b = crn.link_loop_next[uv]
-
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     a = vec.angle(self.edge_orient, 0)
 
                     if a <= self.angle or a >= self.negative_ange:
-                        self.deselect_crn_uv_edge(crn, uv)
-                    else:
-                        if crn_uv_a.select_edge:
-                            to_select_corns.append(crn)
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                        edge_select_set(crn, False)
 
             else:  # 'ADDITIONAL'
-                for loop in corners:
-                    crn_uv_a = loop[uv]
-                    if crn_uv_a.select_edge:
+                edge_select_get = utils.edge_select_get_func(umesh)
+                for crn in corners:
+                    if edge_select_get(crn):
                         continue
-                    crn_uv_b = loop.link_loop_next[uv]
 
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     a = vec.angle(self.edge_orient, 0)
 
                     if a <= self.angle or a >= self.negative_ange:
-                        select_linked_crn_uv_vert(loop, uv)
-                        select_linked_crn_uv_vert(loop.link_loop_next, uv)
-                        crn_uv_a.select = True
-                        crn_uv_a.select_edge = True
-                        crn_uv_b.select = True
+                        edge_select_set(crn, True)
 
     def select_both(self):
         for umesh in self.umeshes:
-            if types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
             uv = umesh.uv
             aspect_for_x = umesh.aspect
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
             corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
             if self.mode == 'SELECT':
-                to_select_corns = []
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    crn_uv_b = crn.link_loop_next[uv]
-
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     x_angle = vec.angle(self.x_vec, 0)
                     y_angle = vec.angle(self.y_vec, 0)
 
-                    if x_angle <= self.angle or x_angle >= self.negative_ange or \
-                            y_angle <= self.angle or y_angle >= self.negative_ange:
-                        to_select_corns.append(crn)
-                    else:
-                        crn_uv_a.select = False
-                        crn_uv_a.select_edge = False
-                        crn_uv_b.select = False
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                    between_angle = x_angle <= self.angle or x_angle >= self.negative_ange or \
+                            y_angle <= self.angle or y_angle >= self.negative_ange
+                    edge_select_set(crn, between_angle)
 
             elif self.mode == 'DESELECT':
-                to_select_corns = []
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    crn_uv_b = crn.link_loop_next[uv]
-
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     x_angle = vec.angle(self.x_vec, 0)
                     y_angle = vec.angle(self.y_vec, 0)
 
                     if x_angle <= self.angle or x_angle >= self.negative_ange or \
                             y_angle <= self.angle or y_angle >= self.negative_ange:
-                        self.deselect_crn_uv_edge(crn, uv)
-                    else:
-                        if crn_uv_a.select_edge:
-                            to_select_corns.append(crn)
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                        edge_select_set(crn, False)
 
             else:  # 'ADDITION'
+                edge_select_get = utils.edge_select_get_func(umesh)
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    if crn_uv_a.select_edge:
+                    if edge_select_get(crn):
                         continue
-                    crn_uv_b = crn.link_loop_next[uv]
 
-                    vec = crn_uv_a.uv - crn_uv_b.uv
+                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
                     vec.x *= aspect_for_x
                     x_angle = vec.angle(self.x_vec, 0)
                     y_angle = vec.angle(self.y_vec, 0)
 
                     if x_angle <= self.angle or x_angle >= self.negative_ange or \
                             y_angle <= self.angle or y_angle >= self.negative_ange:
-                        select_linked_crn_uv_vert(crn, uv)
-                        select_linked_crn_uv_vert(crn.link_loop_next, uv)
-                        crn_uv_a.select = True
-                        crn_uv_a.select_edge = True
-                        crn_uv_b.select = True
+                        edge_select_set(crn, True)
 
     def select_both_border(self):
         for umesh in self.umeshes:
-            if types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
             uv = umesh.uv
             aspect_for_x = umesh.aspect
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
             corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
             if self.mode == 'SELECT':
-                to_select_corns = []
                 for crn in corners:
                     if is_boundary_non_sync(crn, uv):
-                        crn_uv_a = crn[uv]
-                        crn_uv_b = crn.link_loop_next[uv]
-
-                        vec = crn_uv_a.uv - crn_uv_b.uv
+                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
                         vec.x *= aspect_for_x
                         x_angle = vec.angle(self.x_vec, 0)
                         y_angle = vec.angle(self.y_vec, 0)
 
                         if x_angle <= self.angle or x_angle >= self.negative_ange or \
                                 y_angle <= self.angle or y_angle >= self.negative_ange:
-                            to_select_corns.append(crn)
-                        else:
-                            crn_uv_a.select = False
-                            crn_uv_a.select_edge = False
-                            crn_uv_b.select = False
-                    else:
-                        crn_uv_a = crn[uv]
-                        crn_uv_a.select = False
-                        crn_uv_a.select_edge = False
-                        crn.link_loop_next[uv].select = False
-
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                            edge_select_set(crn, True)
+                            continue
+                    edge_select_set(crn, False)
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
                 for crn in _corners:
                     if is_boundary_non_sync(crn, uv):
-                        crn_uv_a = crn[uv]
-                        crn_uv_b = crn.link_loop_next[uv]
-
-                        vec = crn_uv_a.uv - crn_uv_b.uv
+                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
                         vec.x *= aspect_for_x
                         x_angle = vec.angle(self.x_vec, 0)
                         y_angle = vec.angle(self.y_vec, 0)
 
                         if x_angle <= self.angle or x_angle >= self.negative_ange or \
                                 y_angle <= self.angle or y_angle >= self.negative_ange:
-                            self.deselect_crn_uv_edge_for_border(crn, uv)
-                # TODO: Refactor
-                for crn in _corners:
-                    crn_uv = crn[uv]
-                    if crn_uv.select_edge:
-                        self.select_crn_uv_edge_sequence([crn], uv)
+                            self.deselect_edge_with_linked_edges_for_border(crn, uv, edge_select_set)
 
             else:  # 'ADDITION'
+                edge_select_get = utils.edge_select_get_func(umesh)
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    if crn_uv_a.select_edge:
+                    if edge_select_get(crn):
                         continue
-                    if is_boundary_non_sync(crn, uv):
-                        crn_uv_b = crn.link_loop_next[uv]
 
-                        vec = crn_uv_a.uv - crn_uv_b.uv
+                    if is_boundary_non_sync(crn, uv):
+                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
                         vec.x *= aspect_for_x
                         x_angle = vec.angle(self.x_vec, 0)
                         y_angle = vec.angle(self.y_vec, 0)
 
                         if x_angle <= self.angle or x_angle >= self.negative_ange or \
                                 y_angle <= self.angle or y_angle >= self.negative_ange:
-                            select_linked_crn_uv_vert(crn, uv)
-                            select_linked_crn_uv_vert(crn.link_loop_next, uv)
-                            crn_uv_a.select = True
-                            crn_uv_a.select_edge = True
-                            crn_uv_b.select = True
+                            edge_select_set(crn, True)
 
     def select_hv_border(self):
         for umesh in self.umeshes:
-            if types.PyBMesh.is_full_face_deselected(umesh.bm):
-                umesh.update_tag = False
-                continue
-
             uv = umesh.uv
             aspect_for_x = umesh.aspect
+            edge_select_set = utils.edge_select_linked_set_func(umesh)
             corners = (crn for face in umesh.bm.faces if face.select for crn in face.loops)
             if self.mode == 'SELECT':
-                to_select_corns = []
                 for crn in corners:
                     if is_boundary_non_sync(crn, uv):
                         crn_uv_a = crn[uv]
@@ -1008,18 +803,9 @@ class UNIV_OT_Select_Border(Operator):
                         a = vec.angle(self.edge_orient, 0)
 
                         if a <= self.angle or a >= self.negative_ange:
-                            to_select_corns.append(crn)
-                        else:
-                            crn_uv_a.select = False
-                            crn_uv_a.select_edge = False
-                            crn_uv_b.select = False
-                    else:
-                        crn_uv_a = crn[uv]
-                        crn_uv_a.select = False
-                        crn_uv_a.select_edge = False
-                        crn.link_loop_next[uv].select = False
-
-                self.select_crn_uv_edge_sequence(to_select_corns, uv)
+                            edge_select_set(crn, True)
+                            continue
+                    edge_select_set(crn, False)
 
             elif self.mode == 'DESELECT':
                 _corners = list(corners)
@@ -1033,104 +819,30 @@ class UNIV_OT_Select_Border(Operator):
                         a = vec.angle(self.edge_orient, 0)
 
                         if a <= self.angle or a >= self.negative_ange:
-                            self.deselect_crn_uv_edge_for_border(crn, uv)
-                            # Removing the notches
-                            if is_boundary_non_sync(crn.link_loop_next, uv):
-                                crn_uv_c = crn.link_loop_next[uv]
-                                crn_uv_c.select = False
-                                crn_uv_c.select_edge = False
-                            if is_boundary_non_sync(crn.link_loop_prev, uv):
-                                crn_uv_d = crn.link_loop_prev[uv]
-                                crn_uv_d.select = False
-                                crn_uv_d.select_edge = False
-
-                # TODO: Refactor
-                for crn in _corners:
-                    crn_uv = crn[uv]
-                    if crn_uv.select_edge:
-                        self.select_crn_uv_edge_sequence([crn], uv)
+                            self.deselect_edge_with_linked_edges_for_border(crn, uv, edge_select_set)
 
             else:  # 'ADDITION'
+                edge_select_get = utils.edge_select_get_func(umesh)  # TODO: add calc_unselected_uv_edges func
                 for crn in corners:
-                    crn_uv_a = crn[uv]
-                    if crn_uv_a.select_edge:
+                    if edge_select_get(crn):
                         continue
                     if is_boundary_non_sync(crn, uv):
-                        crn_uv_b = crn.link_loop_next[uv]
-
-                        vec = crn_uv_a.uv - crn_uv_b.uv
+                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
                         vec.x *= aspect_for_x
                         a = vec.angle(self.edge_orient, 0)
 
                         if a <= self.angle or a >= self.negative_ange:
-                            select_linked_crn_uv_vert(crn, uv)
-                            select_linked_crn_uv_vert(crn.link_loop_next, uv)
-                            crn_uv_a.select = True
-                            crn_uv_a.select_edge = True
-                            crn_uv_b.select = True
+                            edge_select_set(crn, True)
 
     @staticmethod
-    def select_crn_uv_edge_sequence(to_select_corns: list[BMLoop], uv):
-        for crn in to_select_corns:
-            link_crn_next = crn.link_loop_next
-            select_linked_crn_uv_vert(crn, uv)
-            select_linked_crn_uv_vert(link_crn_next, uv)
+    def deselect_edge_with_linked_edges_for_border(crn, uv, select_linked_func):
+        for crn_ in utils.linked_crn_uv_unordered_included(crn, uv):
+            select_linked_func(crn_, False)
+            select_linked_func(crn_.link_loop_prev, False)
 
-            crn_uv_a = crn[uv]
-            crn_uv_b = link_crn_next[uv]
-            crn_uv_a.select = True
-            crn_uv_a.select_edge = True
-            crn_uv_b.select = True
-
-    @staticmethod
-    def select_crn_uv_edge(crn: BMLoop, uv):
-        link_crn_next = crn.link_loop_next
-        select_linked_crn_uv_vert(crn, uv)
-        select_linked_crn_uv_vert(link_crn_next, uv)
-
-        crn_uv_a = crn[uv]
-        crn_uv_b = link_crn_next[uv]
-        crn_uv_a.select = True
-        crn_uv_a.select_edge = True
-        crn_uv_b.select = True
-
-    @staticmethod
-    def deselect_crn_uv_edge(crn: BMLoop, uv: BMLayerItem):
-        link_crn_next = crn.link_loop_next
-        deselect_linked_crn_uv_vert(crn, uv)
-        deselect_linked_crn_uv_vert(link_crn_next, uv)
-
-        crn_uv_a = crn[uv]
-        crn_uv_b = link_crn_next[uv]
-        crn_uv_a.select = False
-        crn_uv_a.select_edge = False
-        crn_uv_b.select = False
-
-    @staticmethod
-    def deselect_crn_uv_edge_for_border(crn: BMLoop, uv):
-        def _deselect_linked_crn_uv_vert(first: BMLoop):
-            bm_iter = first
-            while True:
-                if (bm_iter := bm_iter.link_loop_prev.link_loop_radial_prev) == first:
-                    break
-                crn_uv_bm_iter = bm_iter[uv]
-                if first[uv].uv == crn_uv_bm_iter.uv:
-                    crn_uv_bm_iter.select = False
-                    crn_uv_bm_iter.select_edge = False
-                    bm_iter.link_loop_prev[uv].select = False
-                    bm_iter.link_loop_prev[uv].select_edge = False
-
-        _deselect_linked_crn_uv_vert(crn)
-        link_crn_next = crn.link_loop_next
-        deselect_linked_crn_uv_vert(crn, uv)
-        deselect_linked_crn_uv_vert(link_crn_next, uv)
-
-        crn_uv_a = crn[uv]
-        crn.link_loop_prev[uv].select_edge = False
-        crn_uv_b = link_crn_next[uv]
-        crn_uv_a.select = False
-        crn_uv_a.select_edge = False
-        crn_uv_b.select = False
+        for crn_ in utils.linked_crn_uv_unordered_included(crn.link_loop_next, uv):
+            select_linked_func(crn_, False)
+            select_linked_func(crn_.link_loop_prev, False)
 
 
 class UNIV_OT_Select_Pick(Operator):
@@ -1157,28 +869,24 @@ class UNIV_OT_Select_Pick(Operator):
         return self.pick_select()
 
     def pick_select(self):
-        sync = self.umeshes.sync
-        is_sync_face_mode = self.umeshes.elem_mode == 'FACE'  # TODO: Test with: and sync
+        if self.umeshes.sync and not self.select:
+            self.umeshes.elem_mode = 'FACE'
 
         hit = types.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
             if self.select:
-                # TODO: Use has_non_full_sel (implement)
-                if (sync and umesh.is_full_face_selected) or (not sync and umesh.is_full_face_deselected):
+                if umesh.has_full_selected_uv_faces():
                     continue
             else:
-                if sync:
-                    if (is_sync_face_mode and umesh.is_full_face_deselected) or \
-                            (not is_sync_face_mode and umesh.is_full_vert_deselected):
-                        continue
+                if not umesh.has_selected_uv_verts():
+                    continue
 
             for isl in Islands.calc_visible_with_mark_seam(umesh):
                 if self.select:  # Skip full selected island
-                    if isl.is_full_face_selected:
+                    if isl.is_full_face_selected():
                         continue
                 else:  # Skip full deselected islands
-                    if (is_sync_face_mode and isl.is_full_face_deselected) or \
-                            (not is_sync_face_mode and isl.is_full_vert_deselected):
+                    if not isl.is_full_face_selected():
                         continue
                 hit.find_nearest_island(isl)
 
@@ -1186,31 +894,8 @@ class UNIV_OT_Select_Pick(Operator):
             return {'CANCELLED'}
 
         umesh = hit.island.umesh
-
-        if sync:
-            if self.select:
-                hit.island.select = True
-            else:
-                if self.umeshes.elem_mode == 'FACE':
-                    hit.island.select = False
-                else:
-                    if any(f.select for f in hit.island):
-                        hit.island.select_all_elem = False
-                        for f in utils.calc_selected_uv_faces_iter(umesh):
-                            for v in f.verts:
-                                v.select = True
-                            for e in f.edges:
-                                e.select = True
-                    else:
-                        for f in hit.island:
-                            for v in f.verts:
-                                v.select = False
-                            for e in f.edges:
-                                e.select = False
-                        umesh.bm.select_flush_mode()
-        else:
-            hit.island.select = self.select
-
+        hit.island.select = self.select
+        # TODO:Notify if has extra selection in sync non face mode
         umesh.update()
 
         return {'FINISHED'}
@@ -2435,7 +2120,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
 
                     if self.mode == 'SELECT':
                         if compared_result:
-                            if has_selected and isl.is_full_face_selected:
+                            if has_selected and isl.is_full_face_selected():
                                 counter_skipped += 1
                                 continue
                             counter += 1
@@ -2448,7 +2133,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                             umesh.update_tag = True
                     elif self.mode == 'ADDITION':
                         if compared_result:
-                            if has_selected and isl.is_full_face_selected:
+                            if has_selected and isl.is_full_face_selected():
                                 counter_skipped += 1
                                 continue
                             counter += 1
@@ -2482,7 +2167,7 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         uv = umesh.uv
 
         if False:
-            edge_orient = Vector((0, 1))
+            edge_orient = Vector((0, 1)) # noqa
         else:
             edge_orient = Vector((1, 0))
 
@@ -2641,7 +2326,7 @@ class UNIV_OT_SelectByArea(Operator):
             for isl in islands:
                 if self.mode == 'SELECT':
                     if lower <= isl.value <= higher:
-                        if has_selected and isl.is_full_face_selected:
+                        if has_selected and isl.is_full_face_selected():
                             counter_skipped += 1
                             continue
                         counter += 1
@@ -2654,7 +2339,7 @@ class UNIV_OT_SelectByArea(Operator):
                         umesh.update_tag = True
                 elif self.mode == 'ADDITION':
                     if lower <= isl.value <= higher:
-                        if has_selected and isl.is_full_face_selected:
+                        if has_selected and isl.is_full_face_selected():
                             counter_skipped += 1
                             continue
                         counter += 1
@@ -2732,7 +2417,7 @@ class UNIV_OT_Stacked(Operator):
             if self.mode == 'SELECT':
                 if isinstance(union_isl, types.UnionIslands):
                     for isl in union_isl:
-                        if isl.is_full_face_selected:
+                        if isl.is_full_face_selected():
                             counter_skipped += 1
                             continue
                         counter += 1
@@ -2746,7 +2431,7 @@ class UNIV_OT_Stacked(Operator):
             elif self.mode == 'ADDITION':
                 if isinstance(union_isl, types.UnionIslands):
                     for isl in union_isl:
-                        if isl.is_full_face_selected:
+                        if isl.is_full_face_selected():
                             counter_skipped += 1
                             continue
 

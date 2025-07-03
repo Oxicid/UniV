@@ -102,12 +102,13 @@ class UNIV_OT_Check_Zero(Operator):
 
         precision *= 0.001
         total_counter = 0
-        select_set = utils.face_select_linked_func(sync)
+
         for umesh in umeshes:
             if not sync and umesh.is_full_face_deselected:
                 continue
 
             uv = umesh.uv
+            face_select_set = utils.face_select_linked_func(umesh)
             local_counter = 0
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
@@ -116,7 +117,7 @@ class UNIV_OT_Check_Zero(Operator):
 
                 area = area_tri(tris_a[uv].uv, tris_b[uv].uv, tris_c[uv].uv)
                 if area <= precision:
-                    select_set(face, uv)
+                    face_select_set(face)
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
@@ -156,12 +157,13 @@ class UNIV_OT_Check_Flipped(Operator):
             umeshes.elem_mode = 'FACE'
 
         total_counter = 0
-        select_set = utils.face_select_linked_func(sync)
+
         for umesh in umeshes:
             if not sync and umesh.is_full_face_deselected:
                 continue
 
             uv = umesh.uv
+            face_select_set = utils.face_select_linked_func(umesh)
             local_counter = 0
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
@@ -174,7 +176,7 @@ class UNIV_OT_Check_Flipped(Operator):
 
                 signed_area = a.cross(b) + b.cross(c) + c.cross(a)
                 if signed_area < 0:
-                    select_set(face, uv)
+                    face_select_set(face)
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
@@ -219,7 +221,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def non_splitted(umeshes, use_auto_smooth, user_angle, batch_inspect=False):
+    def non_splitted(umeshes: types.UMeshes, use_auto_smooth, user_angle, batch_inspect=False):
         non_seam_counter = 0
         non_manifold_counter = 0
         angle_counter = 0
@@ -264,17 +266,17 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                     continue
                 to_select.add(crn)
 
-            umesh.sequence = to_select
+            umesh.sequence = to_select  # noqa
             umesh.update_tag |= bool(to_select)
 
         if any(umesh.sequence for umesh in umeshes):
             if batch_inspect:
                 # Avoid switch elem mode if all edges selected for batch inspect
-                select_get = utils.edge_select_linked_get_func(sync)
+
                 all_selected = True
                 for umesh in umeshes:
-                    uv = umesh.uv
-                    if not all(select_get(crn_edge, uv) for crn_edge in umesh.sequence):
+                    edge_select_get = utils.edge_select_get_func(umesh)
+                    if not all(edge_select_get(crn_edge) for crn_edge in umesh.sequence):
                         all_selected = False
                         break
                 if all_selected:
@@ -282,14 +284,14 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         umesh.sequence = []
                     return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
-            select_set = utils.edge_select_linked_set_func(sync)
+
             if umeshes.elem_mode not in ('EDGE', 'VERT'):
                 umeshes.elem_mode = 'EDGE'
 
             for umesh in umeshes:
-                uv = umesh.uv
+                edge_select_set = utils.edge_select_linked_set_func(umesh)
                 for edge in umesh.sequence:
-                    select_set(edge, True, uv)
+                    edge_select_set(edge, True)
                 umesh.sequence = []
         return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 

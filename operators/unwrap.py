@@ -308,7 +308,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             pinned = []
             to_select_groups = []
             for idx, island in enumerate(islands_extended):
-                if island.is_full_face_selected:
+                if island.is_full_face_selected():
                     continue
                 to_select = []
                 for f in island:

@@ -626,7 +626,6 @@ class FaceIsland:
                     luv.select = state
                     luv.select_edge = state
 
-    @property
     def is_full_face_selected(self):
         if self.umesh.sync:
             return all(f.select for f in self)
@@ -1629,6 +1628,8 @@ class Islands(IslandsBase):
 
     @classmethod
     def calc_extended_any_elem_with_mark_seam(cls, umesh: _umesh.UMesh):
+        """Get islands with vertex select."""
+        # TODO: Fix behavior in face mode
         if umesh.sync:
             if umesh.elem_mode == 'FACE':
                 if umesh.is_full_face_deselected:
@@ -1755,6 +1756,19 @@ class Islands(IslandsBase):
     def calc_visible(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_non_full_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
+        if umesh.sync:
+            if umesh.is_full_face_selected:
+                return cls()
+        else:
+            if umesh.is_full_face_deselected:
+                return cls()
+
+        cls.tag_filter_visible(umesh)
+        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh) if not cls.island_filter_is_all_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod

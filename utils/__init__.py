@@ -15,6 +15,7 @@ from .draw import *
 from .other import *
 from .shapes import *
 from .ubm import *
+from .bm_select import *
 from .umath import *
 from .. import types
 

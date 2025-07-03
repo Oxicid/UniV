@@ -11,7 +11,7 @@ import mathutils
 from collections import defaultdict
 from math import pi
 
-from bmesh.types import BMFace
+from bmesh.types import BMFace, BMEdge, BMLoop
 
 from .. import utils
 from ..types import PyBMesh#, AdvIsland
@@ -35,7 +35,7 @@ class UMesh:
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
         self.other = utils.NoInit()
         self.aspect: float = 1.0
-        self.sequence: list[BMFace] | list['AdvIsland'] = []  # noqa
+        self.sequence: list[BMFace | BMEdge | BMLoop] | list['AdvIsland'] = []  # noqa
 
     def update(self, force=False):
         if not self.update_tag:
@@ -128,7 +128,6 @@ class UMesh:
     def total_corners(self):
         return PyBMesh.fields(self.bm).totloop
 
-    @property
     def has_full_selected_uv_faces(self) -> bool:
         if self.sync:
             if self.is_full_face_selected:
@@ -166,6 +165,18 @@ class UMesh:
                 return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
             return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
 
+    def has_partial_selected_uv_faces(self):
+        if self.sync:
+            if self.is_full_face_selected or self.is_full_face_deselected:
+                return False
+        else:
+            if self.is_full_face_deselected:
+                return False
+
+        faces = utils.calc_visible_uv_faces(self)
+        face_select_get = utils.face_select_get_func(self)
+        return not utils.all_equal(faces, face_select_get)
+
     def has_visible_uv_faces(self) -> bool:
         if self.total_face_sel:
             return True
@@ -193,6 +204,24 @@ class UMesh:
             return any(any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
         return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
 
+    def has_partial_selected_uv_edges(self):
+        if self.sync:
+            if self.is_full_face_selected or self.is_full_edge_deselected:
+                return False
+        else:
+            if self.is_full_face_deselected:
+                return False
+
+        corners = utils.calc_visible_uv_corners(self)
+        edge_select_get = utils.edge_select_get_func(self)
+        return not utils.all_equal(corners, edge_select_get)
+
+    def has_partial_selected_3d_edges(self):
+        assert self.sync
+        if self.is_full_edge_selected or self.is_full_edge_deselected:
+            return False
+        return not utils.all_equal((e.select for e in self.bm.edges if not e.hide))
+
     def has_selected_uv_verts(self) -> bool:
         if self.sync:
             if not self.total_vert_sel:
@@ -212,6 +241,18 @@ class UMesh:
         if self.is_full_face_selected:
             return any(any(crn[uv].select for crn in f.loops) for f in self.bm.faces)
         return any(f.select and any(crn[uv].select for crn in f.loops) for f in self.bm.faces)
+
+    def has_partial_selected_uv_verts(self):
+        if self.sync:
+            if self.is_full_face_selected or self.is_full_vert_deselected:
+                return False
+        else:
+            if self.is_full_face_deselected:
+                return False
+
+        corners = utils.calc_visible_uv_corners(self)
+        vert_select_get = utils.vert_select_get_func(self)
+        return not utils.all_equal(corners, vert_select_get)
 
     @property
     def has_any_selected_crn_non_sync(self):
@@ -890,28 +931,28 @@ class UMeshes:
                             return True
         return False
 
-    def filter_by_selected_uv_verts(self) -> 'typing.NoReturn':
+    def filter_by_selected_uv_verts(self) -> None:
         selected = []
         for umesh in self:
             if umesh.has_selected_uv_verts():
                 selected.append(umesh)
         self.umeshes = selected
 
-    def filter_by_selected_uv_edges(self) -> 'typing.NoReturn':
+    def filter_by_selected_uv_edges(self) -> None:
         selected = []
         for umesh in self:
             if umesh.has_selected_uv_edges():
                 selected.append(umesh)
         self.umeshes = selected
 
-    def filter_by_selected_uv_faces(self) -> 'typing.NoReturn':
+    def filter_by_selected_uv_faces(self) -> None:
         selected = []
         for umesh in self:
             if umesh.has_selected_uv_faces():
                 selected.append(umesh)
         self.umeshes = selected
 
-    def filter_by_selected_uv_elem_by_mode(self) -> 'typing.NoReturn':
+    def filter_by_selected_uv_elem_by_mode(self) -> None:
         if self.elem_mode == 'VERT':
             self.filter_by_selected_uv_verts()
         elif self.elem_mode == 'EDGE':
@@ -919,6 +960,37 @@ class UMeshes:
         else:
             self.filter_by_selected_uv_faces()
 
+    def filter_by_partial_selected_uv_elem_by_mode(self) -> None:
+        for umesh in reversed(self):
+            if self.elem_mode == 'VERT':
+                if not umesh.has_partial_selected_uv_verts():
+                    self.umeshes.remove(umesh)
+            elif self.elem_mode == 'EDGE':
+                if not umesh.has_partial_selected_uv_edges():
+                    self.umeshes.remove(umesh)
+            else:
+                if not umesh.has_partial_selected_uv_faces():
+                    self.umeshes.remove(umesh)
+
+    def filter_by_partial_selected_uv_edges(self) -> None:
+        for umesh in reversed(self):
+            if not umesh.has_partial_selected_uv_edges():
+                self.umeshes.remove(umesh)
+
+    def filter_by_partial_selected_3d_edges(self) -> None:
+        for umesh in reversed(self):
+            if not umesh.has_partial_selected_3d_edges():
+                self.umeshes.remove(umesh)
+
+    def filter_by_partial_selected_uv_faces(self) -> None:
+        for umesh in reversed(self):
+            if not umesh.has_partial_selected_uv_faces():
+                self.umeshes.remove(umesh)
+
+    def filter_by_visible_uv_faces(self) -> None:
+        for umesh in reversed(self):
+            if not umesh.has_visible_uv_faces():
+                self.umeshes.remove(umesh)
 
     def filtered_by_selected_and_visible_uv_verts(self) -> tuple['UMeshes', 'UMeshes']:
         selected = []
@@ -996,7 +1068,7 @@ class UMeshes:
         selected = []
         visible = []
         for umesh in self:
-            if umesh.has_full_selected_uv_faces:
+            if umesh.has_full_selected_uv_faces():
                 selected.append(umesh)
             else:
                 if umesh.has_visible_uv_faces():
