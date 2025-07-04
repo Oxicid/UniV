@@ -9,10 +9,9 @@ if 'bpy' in locals():
 
 import bpy
 
-from math import hypot
 from itertools import chain
 from mathutils import Vector
-from bmesh.types import BMLoopUV, BMLoop
+from bmesh.types import BMLoopUV, BMLoop, BMFace
 from collections.abc import Callable
 from mathutils.geometry import area_tri
 
@@ -85,16 +84,21 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         for umesh in self.umeshes:
             umesh.update_tag = False
             if dirt_islands := AdvIslands.calc_extended_with_mark_seam(umesh):
+                uv = umesh.uv
                 umesh.value = umesh.check_uniform_scale(report=self.report)
                 umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
-                uv = umesh.uv
+                edge_lengths = []
                 for d_island in dirt_islands:
                     links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(d_island)
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
-                        set_corner_tag_by_border_and_by_tag(isl)
-                        quad(isl)
+                        set_corner_tag_by_border_and_by_tag(isl)  # TODO: Preserve flipped 3D
+
+                        if not edge_lengths:
+                            edge_lengths = self.init_edge_sequence_from_umesh(umesh)
+
+                        quad(isl, edge_lengths)
                         counter += 1
                         umesh.update_tag = True
 
@@ -113,6 +117,26 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
         self.umeshes.silent_update()
         return {'FINISHED'}
+
+    @staticmethod
+    def init_edge_sequence_from_umesh(umesh: types.UMesh) -> list[None | float]:
+        idx = 0
+        for f in umesh.bm.faces:
+            for crn in f.loops:
+                crn.index = idx
+                idx += 1
+
+        return [None] * umesh.total_corners
+
+    @staticmethod
+    def init_edge_sequence_from_island(island: types.FaceIsland) -> list[None | float]:
+        idx = 0
+        for f in island:
+            for crn in f.loops:
+                crn.index = idx
+                idx += 1
+
+        return [None] * idx
 
     def quad_normalize(self, quad_islands, umesh):
         # adjust and normalize
@@ -151,7 +175,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         for isl in quad_islands:
             utils.set_faces_tag(isl, True)
             set_corner_tag_by_border_and_by_tag(isl)
-            quad(isl)
+            edge_lengths = self.init_edge_sequence_from_island(isl)
+            quad(isl, edge_lengths)
 
         umesh = hit.island.umesh
         uv = umesh.uv
@@ -176,45 +201,26 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         quad_faces = []
         selected_non_quads = []
         static_faces = []
-        if island.umesh.sync:
-            for f in island:
-                if f.select:
-                    if len(f.loops) == 4:
-                        quad_faces.append(f)
-                    else:
-                        selected_non_quads.append(f)
-                else:
-                    static_faces.append(f)
-        else:
-            if umesh.elem_mode == 'VERT':
-                for f in island:
-                    corners = f.loops
-                    if all(crn[uv].select for crn in corners):
-                        if len(corners) == 4:
-                            quad_faces.append(f)
-                        else:
-                            selected_non_quads.append(f)
-                    else:
-                        static_faces.append(f)
-            else:
-                for f in island:
-                    corners = f.loops
-                    if all(crn[uv].select_edge for crn in corners):
-                        if len(corners) == 4:
-                            quad_faces.append(f)
-                        else:
-                            selected_non_quads.append(f)
-                    else:
-                        static_faces.append(f)
+        face_select_get = utils.face_select_get_func(umesh)
 
-        if not (static_faces or selected_non_quads):
+        for f in island:
+            if face_select_get(f):
+                if len(f.loops) == 4:
+                    quad_faces.append(f)
+                else:
+                    selected_non_quads.append(f)
+            else:
+                static_faces.append(f)
+
+        if not (static_faces or selected_non_quads):  # Full quad case
             return [], static_faces, selected_non_quads, [island]
-        elif len(static_faces) + len(selected_non_quads) == len(island):
+        elif len(static_faces) + len(selected_non_quads) == len(island):  # Non quad case
             return [], static_faces, selected_non_quads, []
 
         utils.set_faces_tag(quad_faces)
         links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
+        # Calc sub-islands
         islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
@@ -259,7 +265,7 @@ def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
             continue
         crn.tag = utils.is_pair(crn, prev, uv)
 
-def quad(island: AdvIsland):
+def quad(island: AdvIsland, edge_lengths):
     uv = island.umesh.uv
 
     def max_quad_uv_face_area(f):
@@ -275,7 +281,7 @@ def quad(island: AdvIsland):
     target_face = max(island, key=max_quad_uv_face_area)
     co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, island.umesh.uv)
     shape_face(uv, target_face, co_and_linked_uv_corners)
-    follow_active_uv(target_face, island)
+    follow_active_uv(target_face, island, edge_lengths)
 
 def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector, list[BMLoopUV]]:
     co_and_linked_uv_corners = {}
@@ -329,8 +335,8 @@ def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, ri
     right_down = right_down.uv.copy().freeze()
     left_down = left_down.uv.copy().freeze()
 
-    final_scale_x = hypot_vert(left_up, right_up)
-    final_scale_y = hypot_vert(left_up, left_down)
+    final_scale_x = (left_up - right_up).length
+    final_scale_y = (left_up - left_down).length
     curr_row_x = left_up.x
     curr_row_y = left_up.y
 
@@ -347,10 +353,10 @@ def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, ri
         v.uv[:] = curr_row_x, curr_row_y - final_scale_y
 
 
-def follow_active_uv(f_act, island: AdvIsland):
+def follow_active_uv(f_act, island: AdvIsland, edge_lengths):
     uv = island.umesh.uv  # noqa
 
-    def walk_face(f):  # noqa
+    def walk_face(f: BMFace):  # noqa
         # all faces in this list must be tagged
         f.tag = False
         faces_a = [f]
@@ -376,9 +382,9 @@ def follow_active_uv(f_act, island: AdvIsland):
         l_b_inner[:] = l_a_inner
         l_b_outer[:] = l_a_inner + ((l_a_inner - l_a_outer) * fac)
 
-    def apply_uv(l_prev):
-        l_a = [None, None, None, None]
-        l_b = [None, None, None, None]
+    def apply_uv(l_prev: BMLoop):
+        l_a: list[BMLoop | None] = [None, None, None, None]  # TODO: Array convert to vars
+        l_b: list[BMLoop | None] = [None, None, None, None]
 
         l_a[0] = l_prev
         l_a[1] = l_a[0].link_loop_next
@@ -401,23 +407,18 @@ def follow_active_uv(f_act, island: AdvIsland):
         #  copy from this face to the one above.
 
         # get the other loops
-        l_next = l_prev.link_loop_radial_next
-        if l_next.vert != l_prev.vert:
-            l_b[1] = l_next
-            l_b[0] = l_b[1].link_loop_next
-            l_b[3] = l_b[0].link_loop_next
-            l_b[2] = l_b[3].link_loop_next
-        else:
-            l_b[0] = l_next
-            l_b[1] = l_b[0].link_loop_next
-            l_b[2] = l_b[1].link_loop_next
-            l_b[3] = l_b[2].link_loop_next
+        l_next = l_prev.link_loop_radial_prev
+        assert l_next != l_prev
+        l_b[1] = l_next
+        l_b[0] = l_b[1].link_loop_next
+        l_b[3] = l_b[0].link_loop_next
+        l_b[2] = l_b[3].link_loop_next
 
-        l_a_uv = [l[uv].uv for l in l_a]  # noqa
-        l_b_uv = [l[uv].uv for l in l_b]  # noqa
+        l_a_uv: list[Vector] = [l[uv].uv for l in l_a]  # noqa
+        l_b_uv: list[Vector] = [l[uv].uv for l in l_b]  # noqa
 
         try:
-            fac = edge_lengths[l_b[2].edge.index] / edge_lengths[l_a[1].edge.index]
+            fac = edge_lengths[l_b[2].index] / edge_lengths[l_a[1].index]
         except ZeroDivisionError:
             fac = 1.0
 
@@ -429,55 +430,54 @@ def follow_active_uv(f_act, island: AdvIsland):
                        l_a_uv[2], l_a_uv[1],
                        l_b_uv[2], l_b_uv[1])
 
-    # Calculate average ring length
-    island.umesh.bm.edges.index_update()
-    edge_lengths: list[None | float] = [None] * len(island.umesh.bm.edges)
-
-    for f in island:
-        first_crn = f.loops[0]
-        for ring_crn in (first_crn, first_crn.link_loop_next):
-            if edge_lengths[ring_crn.edge.index] is None:
-                edges = get_ring_edges_from_crn(ring_crn)
-
-                avg_length = sum(e.calc_length() for e in edges) / len(edges)
-                for e in edges:
-                    edge_lengths[e.index] = avg_length
+    calc_avg_ring_length(edge_lengths, island)
 
     f_act.tag = False
     for l_prev_ in walk_face(f_act):
         apply_uv(l_prev_)
 
-def hypot_vert(v1, v2):
-    return hypot(*(v1 - v2))
 
-def get_ring_edges_from_crn(first_crn: BMLoop):
-    first_edge = first_crn.edge
-    is_circular = False
-    edges = [first_edge]
+def calc_avg_ring_length(edge_lengths, island):
+    for f in island:
+        for ring_crn in f.loops:
+            if edge_lengths[ring_crn.index] is None:
+                corners = get_ring_corners_from_crn(ring_crn)
+
+                avg_length = sum(crn.edge.calc_length() for crn in corners) / len(corners)
+                for crn in corners:
+                    edge_lengths[crn.index] = avg_length
+
+
+# TODO: This algorithm does not always pass through all the edges, so we have to pass all 4 edges through this algorithm
+def get_ring_corners_from_crn(first_crn: BMLoop):
+    corners = [first_crn]
 
     # first direction
     iter_crn = first_crn
     while True:
-        ring_crn = iter_crn.link_loop_next.link_loop_next
-        if not ring_crn.tag:
-            edges.append(ring_crn.edge)
+        iter_crn = iter_crn.link_loop_next.link_loop_next
+        corners.append(iter_crn)
+        if not iter_crn.tag:
             break
 
-        if ring_crn.edge == first_edge:
-            is_circular = True
-            break
+        iter_crn = iter_crn.link_loop_radial_prev
+        if iter_crn == first_crn:  # is circular
+            return corners
+        corners.append(iter_crn)
 
-        edges.append(ring_crn.edge)
-        iter_crn = ring_crn.link_loop_radial_prev
 
     # other dir
-    if not is_circular and first_crn.tag:
+    if first_crn.tag:
         iter_crn = first_crn.link_loop_radial_prev
+        if not iter_crn.tag:
+            return corners
+
         while True:
-            ring_crn = iter_crn.link_loop_next.link_loop_next
-            if not ring_crn.tag:
-                edges.append(ring_crn.edge)
+            iter_crn = iter_crn.link_loop_next.link_loop_next
+            corners.append(iter_crn)
+
+            if not iter_crn.tag:
                 break
-            iter_crn = ring_crn.link_loop_radial_prev
-            edges.append(ring_crn.edge)
-    return edges
+            iter_crn = iter_crn.link_loop_radial_prev
+            corners.append(iter_crn)
+    return corners
