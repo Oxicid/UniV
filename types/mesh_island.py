@@ -106,6 +106,9 @@ class MeshIsland:
 
         return island.AdvIslands(adv_islands, self.umesh)
 
+    def calc_selected_edge_corners_iter(self):
+        return (crn for f in self for crn in f.loops if crn.edge.select)
+
     def __iter__(self):
         return iter(self.faces)
 

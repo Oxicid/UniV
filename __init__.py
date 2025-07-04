@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 8, 1),
+    "version": (3, 8, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -212,6 +212,10 @@ def load_register_types():
                 univ_pro.select.UNIV_OT_Select_Flat,
                 univ_pro.select.UNIV_OT_SelectSimilar_VIEW2D,
                 univ_pro.select.UNIV_OT_SelectSimilar_VIEW3D,
+
+                univ_pro.select.UNIV_OT_Select_Loop_Pick_VIEW3D,
+                univ_pro.select.UNIV_OT_Select_Loop_VIEW3D,
+                univ_pro.select.UNIV_OT_Select_Loop_VIEW2D,
                 # Transform
                 univ_pro.drag.UNIV_OT_Drag,
                 # Transfer
@@ -220,13 +224,7 @@ def load_register_types():
                 univ_pro.rectify.UNIV_OT_Rectify,
 
             ))
-            for idx, opt in enumerate(classes):
-                if opt is select.UNIV_OT_Select_Edge_Grow_VIEW2D:
-                    # TODO: Create base class to avoid this problem
-                    classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW3D)
-                    classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_VIEW2D)
-                    classes.insert(idx, univ_pro.select.UNIV_OT_Select_Loop_Pick_VIEW3D)
-                    break
+
         else:
             classes.extend((
                 # Stack

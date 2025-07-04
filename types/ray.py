@@ -430,20 +430,11 @@ class IslandHit:
     @staticmethod
     def closest_pt_to_selected_edge(island: AdvIsland, pt) -> float:
         min_dist = math.inf
-        if island.umesh.sync:
-            uv = island.umesh.uv
-            for f in island:
-                for crn in f.loops:
-                    if crn.edge.select:
-                        closest_pt = utils.closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
-                        min_dist = min(min_dist, (closest_pt - pt).length_squared)
-        else:
-            uv = island.umesh.uv
-            for f in island:
-                for crn in f.loops:
-                    if crn[uv].select_edge:
-                        closest_pt = utils.closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
-                        min_dist = min(min_dist, (closest_pt - pt).length_squared)
+        uv = island.umesh.uv
+        for crn in island.calc_selected_edge_corners_iter():
+            closest_pt = utils.closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
+            min_dist = min(min_dist, (closest_pt - pt).length_squared)
+
         return min_dist
 
     def mouse_to_pos(self, event, view):

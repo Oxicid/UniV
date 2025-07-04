@@ -9,11 +9,6 @@ import bpy  # noqa
 import typing
 
 from bmesh.types import BMFace, BMLoop
-# from math import isclose
-# from mathutils import Vector
-# from mathutils.geometry import area_tri, intersect_point_tri_2d
-# from collections import deque
-# from itertools import chain
 
 from .. import types
 
@@ -90,7 +85,7 @@ def edge_select_linked_set_func(umesh: 'types.UMesh', force=False, clamp_by_seam
     # TODO: Add support clamp by seams
     def inner(uv, sync):
         if sync:
-            def select_set(crn, state):  # noqa
+            def select_set(crn, state):
                 crn.edge.select = state
         else:
             if force or clamp_by_seams:
@@ -164,13 +159,34 @@ def edge_select_linked_set_func(umesh: 'types.UMesh', force=False, clamp_by_seam
 def edge_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], bool]:
     def inner(uv, sync):
         if sync:
-            def select_get(crn):  # noqa
+            def select_get(crn):
                 return crn.edge.select
         else:
             def select_get(crn):
                 return crn[uv].select_edge
         return select_get
     return inner(umesh.uv, umesh.sync)
+
+def edge_deselect_safe_3d_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], None]:
+    """In VERTEX sync mode, deselecting an edge also affects neighboring edges - this preserves that behavior, even for unintended edges."""
+    assert umesh.sync
+    assert umesh.elem_mode in ('VERT', 'EDGE')
+
+    if umesh.elem_mode == 'EDGE':
+        def deselect_edge(crn):
+            crn.edge.select = False
+    else:
+        def deselect_edge(crn):
+            next_vert = crn.link_loop_next.vert
+            more_one_selected_edges_a = sum(e.select for e in crn.vert.link_edges) > 1
+            more_one_selected_edges_b = sum(e.select for e in next_vert.link_edges) > 1
+            if more_one_selected_edges_a and more_one_selected_edges_b:
+                return
+            else:
+                crn.edge.select = False
+                crn.vert.select = more_one_selected_edges_a
+                next_vert.select = more_one_selected_edges_b
+    return deselect_edge
 
 def vert_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], bool]:
     def inner(uv, sync):

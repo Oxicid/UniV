@@ -1442,7 +1442,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
     grow: BoolProperty(name='Select', default=True, description='Grow/Shrink toggle')
     max_angle: FloatProperty(name='Angle', default=math.radians(20), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
-                             description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
+                             description="Max select angle.")
     prioritize_sharps: BoolProperty(name='Prioritize Sharps', default=True,
                                     description='Gives 35% priority to an edge that has a Mark Sharp, works if there are more than 4 linked edges.')
     boundary_by_boundary: BoolProperty(name='Boundary by Boundary', default=True)
@@ -1478,11 +1478,18 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
-        self.calc_islands = Islands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else Islands.calc_extended_any_edge
 
         if self.umeshes.elem_mode not in ('VERT', 'EDGE'):
             self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
+
+        if self.clamp_on_seam:
+            self.calc_islands = Islands.calc_extended_any_edge_with_markseam
+        else:
+            self.calc_islands = Islands.calc_extended_any_edge
+
+        self.umeshes.filter_by_selected_uv_edges()
+        self.umeshes.update_tag = False
 
         if self.grow:
             self.grow_select()
@@ -1490,136 +1497,78 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             return {'FINISHED'}
 
         self.shrink_select()
+        # TODO: Deselect single vert in VERTEX mode when repeat press operator (when prev deselect failed)
         self.umeshes.update(info='Not found edges for shrink select')
         return {'FINISHED'}
 
     def grow_select(self):
+        for umesh in self.umeshes:
+            islands = self.calc_islands(umesh)
+            islands.indexing()
 
-        for umesh in reversed(self.umeshes):
+            grew = []
             uv = umesh.uv
-            update = False
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                grew = []
-                for isl in islands:
-                    if self.umeshes.sync:
-                        corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
-                    else:
-                        corners = (crn_ for f in isl for crn_ in f.loops if crn_[uv].select_edge)
-                    for crn in corners:
+            for isl in islands:
+                for crn in isl.calc_selected_edge_corners_iter():
+                    with_seam = not self.clamp_on_seam or crn.edge.seam
+                    selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
 
-                        with_seam = not self.clamp_on_seam or crn.edge.seam
-                        selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
+                    if grow_prev_crn := self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
+                        if not with_seam:
+                            if grow_prev_crn.edge.seam:
+                                continue  # TODO: Remove continue?
+                        grew.append(grow_prev_crn)
 
-                        if grow_prev_crn := self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
-                            if not with_seam:
-                                if grow_prev_crn.edge.seam:
-                                    continue  # TODO: Remove continue?
-                            grew.append(grow_prev_crn)
+                    if grow_next_crn := self.grow_next(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
+                        if not with_seam:
+                            if grow_next_crn.edge.seam:
+                                continue
+                        grew.append(grow_next_crn)
 
-                        if grow_next_crn := self.grow_next(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
-                            if not with_seam:
-                                if grow_next_crn.edge.seam:
-                                    continue
-                            grew.append(grow_next_crn)
-
-                if self.umeshes.sync:
-                    for grew_crn in grew:
-                        grew_crn.edge.select = True
-                else:
-                    for grew_crn in grew:
-                        utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
-
-                update |= bool(grew)
-
-            if not update:
-                self.umeshes.umeshes.remove(umesh)
+            if umesh.sync:
+                for grew_crn in grew:
+                    grew_crn.edge.select = True
+            else:
+                for grew_crn in grew:
+                    utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
+            umesh.update_tag = bool(grew)
 
     def shrink_select(self):
         for umesh in self.umeshes:
+            islands = self.calc_islands(umesh)
+            islands.indexing()
+
             uv = umesh.uv
-            update = False
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                shrink = []
-                for isl in islands:
-                    if self.umeshes.sync:
-                        corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
-                    else:
-                        corners = (crn_ for f in isl for crn_ in f.loops if crn_[uv].select_edge)
-                    for crn in corners:
-                        with_seam = not self.clamp_on_seam or crn.edge.seam
-                        selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
+            shrink = []
+            for isl in islands:
+                for crn in isl.calc_selected_edge_corners_iter():
+                    # TODO: To avoid confusion, change with_seam to with_seam_clamp
+                    #  (don't forget to change the logic itself, otherwise with_seam is interpreted as a match with seams).
+                    with_seam = not self.clamp_on_seam or crn.edge.seam
+                    selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
 
-                        if grow_prev_crn := self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
-                            if not with_seam and grow_prev_crn.edge.seam:
-                                grow_prev_crn = None
+                    if grow_prev_crn := self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
+                        if not with_seam and grow_prev_crn.edge.seam:
+                            grow_prev_crn = None
 
-                        if grow_next_crn := self.grow_next(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
-                            if not with_seam and grow_next_crn.edge.seam:
-                                grow_next_crn = None
+                    if grow_next_crn := self.grow_next(crn, selected_dir, uv, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
+                        if not with_seam and grow_next_crn.edge.seam:
+                            grow_next_crn = None
 
-                        if grow_prev_crn or grow_next_crn:
-                            shrink.append((crn, grow_prev_crn, grow_next_crn))
+                    if grow_prev_crn or grow_next_crn:
+                        shrink.append(crn)
 
-                self.shrink_ex(shrink, uv)
-
-                update |= bool(shrink)
-                if shrink:
-                    umesh.bm.select_history.validate()
-
-            umesh.update_tag = update
-
-    def shrink_ex(self, shrink: list[tuple[BMLoop, BMLoop, BMLoop]], uv):
-        if self.umeshes.sync:
-            if self.umeshes.elem_mode == 'EDGE':
-                for cur_crn, prev_crn, next_crn in shrink:
-                    cur_crn.edge.select = False
-            else:
-                for cur_crn, prev_crn, next_crn in shrink:
-                    if prev_crn:
-                        more_one_selected_edges = sum(e.select for e in cur_crn.link_loop_next.vert.link_edges) > 1
-                        cur_crn.vert.select = False
-                        cur_crn.edge.select = False
-                        cur_crn.link_loop_next.vert.select = more_one_selected_edges
-                    elif next_crn:
-                        more_one_selected_edges = sum(e.select for e in cur_crn.vert.link_edges) > 1
-                        cur_crn.link_loop_next.vert.select = False
-                        cur_crn.edge.select = False
-                        cur_crn.vert.select = more_one_selected_edges
-                    else:
-                        cur_crn.vert.select = False
-                        cur_crn.link_loop_next.vert.select = False
-                        cur_crn.edge.select = False
-        else:
-            for cur_crn, prev_crn, next_crn in shrink:
-                cur_crn[uv].select_edge = False
-
-                if shared__ := utils.shared_linked_crn_by_idx(cur_crn, uv):
-                    shared__[uv].select_edge = False
-
-                if prev_crn and next_crn:  # case when single selected edge
-                    for deselect_crn in utils.linked_crn_uv_by_idx_unordered_included(cur_crn, uv):
-                        deselect_crn[uv].select = False
-                    for deselect_crn in utils.linked_crn_uv_by_idx_unordered_included(cur_crn.link_loop_next, uv):
-                        deselect_crn[uv].select = False
-                elif prev_crn:
-                    for deselect_crn in utils.linked_crn_uv_by_idx_unordered_included(cur_crn, uv):
-                        deselect_crn[uv].select = False
-
-                    # Deselect if not have selected edges
-                    linked_next = utils.linked_crn_uv_by_idx_unordered_included(cur_crn.link_loop_next, uv)
-                    if not any(crn__[uv].select_edge or crn__.link_loop_prev[uv].select_edge for crn__ in linked_next):
-                        for deselect_crn in linked_next:
-                            deselect_crn[uv].select = False
+            if shrink:
+                if umesh.sync:
+                    edge_deselect = utils.edge_deselect_safe_3d_func(umesh)
+                    for crn in shrink:
+                        edge_deselect(crn)
+                    umesh.bm.select_history.validate()  # Active elem validate
                 else:
-                    for deselect_crn in utils.linked_crn_uv_by_idx_unordered_included(cur_crn.link_loop_next, uv):
-                        deselect_crn[uv].select = False
-
-                    linked_prev = utils.linked_crn_uv_by_idx_unordered_included(cur_crn, uv)
-                    if not any(crn__[uv].select_edge or crn__.link_loop_prev[uv].select_edge for crn__ in linked_prev):
-                        for deselect_crn in linked_prev:
-                            deselect_crn[uv].select = False
+                    edge_select_set = utils.edge_select_linked_set_func(umesh)
+                    for crn in shrink:
+                        edge_select_set(crn, False)
+                umesh.update_tag = True
 
     def grow_prev(self, crn, selected_dir, uv, max_angle, with_seam, is_clamped) -> 'BMLoop | None | False':
         prev_crn = crn.link_loop_prev
@@ -1782,18 +1731,21 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = 'mesh.univ_select_edge_grow'
 
     max_angle: FloatProperty(name='Angle', default=math.radians(40), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
-                             description="Max select angle. If edge topology contain 4 quad faces without border edge, this effect is ignored.")
+                             description="Max select angle.")
 
     def execute(self, context):
         self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
-        self.umeshes.set_sync()
-
-        self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam if self.clamp_on_seam else MeshIslands.calc_extended_any_edge
 
         if self.umeshes.elem_mode not in ('VERT', 'EDGE'):
-            self.report({'INFO'}, f'Edge Grow not work in "{self.umeshes.elem_mode}" mode, run grow instead')
             return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
+        self.umeshes.set_sync()
+        if self.clamp_on_seam:
+            self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam
+        else:
+            self.calc_islands = MeshIslands.calc_extended_any_edge
+
+        self.umeshes.update_tag = False
         if self.grow:
             self.grow_select()
             self.umeshes.update(info='Not found edges for grow select')
@@ -1804,16 +1756,12 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
         return {'FINISHED'}
 
     def grow_select(self):
-
         for umesh in reversed(self.umeshes):
-            update = False
-            if islands := self.calc_islands(umesh):  # noqa
+            if islands := self.calc_islands(umesh):
                 islands.indexing()
                 grew = []
                 for isl in islands:
-                    corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
-                    for crn in corners:
-
+                    for crn in isl.calc_selected_edge_corners_iter():
                         with_seam = not self.clamp_on_seam or crn.edge.seam
                         selected_dir = crn.link_loop_next.vert.co - crn.vert.co
 
@@ -1829,24 +1777,17 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                                     continue
                             grew.append(grow_next_crn)
 
-                if self.umeshes.sync:
-                    for grew_crn in grew:
-                        grew_crn.edge.select = True
-
-                update |= bool(grew)
-
-            if not update:
-                self.umeshes.umeshes.remove(umesh)
+                for grew_crn in grew:
+                    grew_crn.edge.select = True
+                umesh.update_tag = bool(grew)
 
     def shrink_select(self):
         for umesh in self.umeshes:
-            update = False
-            if islands := self.calc_islands(umesh):  # noqa
+            if islands := self.calc_islands(umesh):
                 islands.indexing()
                 shrink = []
                 for isl in islands:
-                    corners = (crn_ for f in isl for crn_ in f.loops if crn_.edge.select)
-                    for crn in corners:
+                    for crn in isl.calc_selected_edge_corners_iter():
                         with_seam = not self.clamp_on_seam or crn.edge.seam
                         selected_dir = crn.link_loop_next.vert.co - crn.vert.co
 
@@ -1859,36 +1800,14 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                                 grow_next_crn = None
 
                         if grow_prev_crn or grow_next_crn:
-                            shrink.append((crn, grow_prev_crn, grow_next_crn))
+                            shrink.append(crn)
 
-                self.shrink_ex(shrink)
-
-                update |= bool(shrink)
                 if shrink:
+                    edge_deselect = utils.edge_deselect_safe_3d_func(umesh)
+                    for crn in shrink:
+                        edge_deselect(crn)
                     umesh.bm.select_history.validate()
-
-            umesh.update_tag = update
-
-    def shrink_ex(self, shrink: list[tuple[BMLoop, BMLoop, BMLoop]]):
-        if self.umeshes.elem_mode == 'EDGE':
-            for cur_crn, prev_crn, next_crn in shrink:
-                cur_crn.edge.select = False
-        else:
-            for cur_crn, prev_crn, next_crn in shrink:
-                if prev_crn:
-                    more_one_selected_edges = sum(e.select for e in cur_crn.link_loop_next.vert.link_edges) > 1
-                    cur_crn.vert.select = False
-                    cur_crn.edge.select = False
-                    cur_crn.link_loop_next.vert.select = more_one_selected_edges
-                elif next_crn:
-                    more_one_selected_edges = sum(e.select for e in cur_crn.vert.link_edges) > 1
-                    cur_crn.link_loop_next.vert.select = False
-                    cur_crn.edge.select = False
-                    cur_crn.vert.select = more_one_selected_edges
-                else:
-                    cur_crn.vert.select = False
-                    cur_crn.link_loop_next.vert.select = False
-                    cur_crn.edge.select = False
+                    umesh.update_tag = True
 
     def grow_prev(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> 'BMLoop | None | False':
         prev_crn = crn.link_loop_prev
@@ -2090,6 +2009,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         if umeshes.sync:
             umeshes.elem_mode = 'FACE'
 
+        umeshes.filter_by_visible_uv_faces()
         has_elem = False
         counter = 0
         counter_skipped = 0
@@ -2277,6 +2197,7 @@ class UNIV_OT_SelectByArea(Operator):
         umeshes = types.UMeshes()
         if umeshes.sync:
             umeshes.elem_mode = 'FACE'
+        umeshes.filter_by_visible_uv_faces()
 
         min_value = float('inf')
         max_value = float('-inf')
