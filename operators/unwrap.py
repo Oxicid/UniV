@@ -38,7 +38,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
                 description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam splitted edges', default=True, description='Marks seams where there are split edges')
+    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Self Borders', default=True, description='Marking seams where there are split edges within the same island.')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod

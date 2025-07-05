@@ -85,15 +85,18 @@ def _update_uv_layers_name(_self, context):
 
 def _update_uv_layers_active_idx(self, context):
     if UV_LAYERS_ENABLE:
-        bpy.ops.uv.univ_layers_manager('INVOKE_DEFAULT')  # noqa
+        if is_edit := bpy.context.mode == 'EDIT_MESH':
+            objects = context.objects_in_mode_unique_data
+        else:
+            objects = (obj_ for obj_ in context.selected_objects if obj_.type == 'MESH')
+
         idx = self.uv_layers_active_idx
-        for obj in context.selected_objects:
-            if obj.type == 'MESH':
-                uvs = obj.data.uv_layers
-                if len(obj.data.uv_layers) >= idx+1:
-                    if not uvs[idx].active:
-                        uvs[idx].active = True
-        if prefs().enable_uv_layers_sync_borders_seam and bpy.context.mode == 'EDIT_MESH':
+        for obj in objects:
+            uvs = obj.data.uv_layers
+            if len(obj.data.uv_layers) >= idx+1:
+                if not uvs[idx].active:
+                    uvs[idx].active = True
+        if prefs().enable_uv_layers_sync_borders_seam and is_edit:
             if area := bpy.context.area:
                 if area.type == 'VIEW_3D':
                     bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa

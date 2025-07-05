@@ -719,21 +719,29 @@ class UNIV_OT_UV_Layers_Manager(Operator):
         settings = univ_settings()
         context = bpy.context
         active_obj = context.active_object
-        if not active_obj or active_obj.type != 'MESH' or not context.selected_objects:
-            if settings.uv_layers_size:
-                settings.uv_layers_size = 0
-                utils.update_univ_panels()
-            return
 
         if context.mode == 'EDIT_MESH':
+            if not active_obj or active_obj.type != 'MESH':
+                if settings.uv_layers_size:
+                    settings.uv_layers_size = 0
+                    utils.update_univ_panels()
+                return
             selected_objects = context.objects_in_mode_unique_data
         else:
+
+            if not active_obj or active_obj.type != 'MESH':
+                if settings.uv_layers_size:
+                    settings.uv_layers_size = 0
+                    utils.update_univ_panels()
+                return
             selected_objects = (obj_ for obj_ in context.selected_objects if obj_.type == 'MESH')
+
+        act_obj_uv_layers = active_obj.data.uv_layers
 
         uv_presets = settings.uv_layers_presets
         UNIV_OT_UV_Layers_Manager.sanitize_size(uv_presets)
 
-        act_obj_uv_layers = active_obj.data.uv_layers
+
         if act_obj_uv_layers:
             act_obj_uv_layers_size = len(act_obj_uv_layers)
             if act_obj_uv_layers_size > 8:
@@ -827,7 +835,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
             settings.uv_layers_size = act_obj_uv_layers_size
             settings.uv_layers_active_idx = act_obj_uv_idx
             settings.uv_layers_active_render_idx = act_obj_uv_render_idx
-        else:
+        elif selected_objects:
             obj_with_max_uv = max(selected_objects, key=lambda ob: len(ob.data.uv_layers))
             uv_layers = obj_with_max_uv.data.uv_layers
             uv_layers_size = len(uv_layers)
@@ -840,6 +848,11 @@ class UNIV_OT_UV_Layers_Manager(Operator):
 
             settings.uv_layers_active_idx = 0
             settings.uv_layers_active_render_idx = -1
+        else:
+            if settings.uv_layers_size:
+                settings.uv_layers_size = 0
+                utils.update_univ_panels()
+            return
         utils.update_univ_panels()
 
     @staticmethod
@@ -857,11 +870,11 @@ class UNIV_OT_UV_Layers_Manager(Operator):
     @staticmethod
     @bpy.app.handlers.persistent
     def univ_uv_layers_update(_, deps):
-        from .. import ui
         for update_obj in deps.updates:
             if update_obj.is_updated_transform:
                 return
             else:
+                from .. import ui
                 ui.REDRAW_UV_LAYERS = True
                 return
 
@@ -871,7 +884,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
             if univ_settings().uv_layers_show:
                 bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
         except Exception as e:
-            print('Failed to add a handler for UV Layer system.', e)
+            print('UniV: Failed to add a handler for UV Layer system.', e)
 
 class UNIV_OT_MoveUpDownBase(Operator):
     bl_options = {'REGISTER', 'UNDO'}
