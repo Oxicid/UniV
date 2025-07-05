@@ -75,11 +75,11 @@ def main(self, umesh):
     selected_corns_edge = [crn for isl in selected_corns_islands for crn in isl if crn[uv].select_edge]
 
     for island, selected_corns in zip(islands, selected_corns_islands):
-        openSegment = get_loops_segments(self, umesh.uv, selected_corns)
-        if not openSegment:
+        open_segment = get_loops_segments(self, umesh.uv, selected_corns)
+        if not open_segment:
             continue
 
-        straighten(self, umesh.uv, island, openSegment)
+        straighten(self, umesh.uv, island, open_segment)
 
     bpy.ops.uv.select_all(action='DESELECT')
 
@@ -242,11 +242,11 @@ def get_loops_segments(self, uv, island_loops_dirty):
                 loopNext, end = get_prev(set(island_nodal_loops).intersection(loop.link_loop_prev.vert.link_loops))  # noqa
 
             if end:
-                openSegments.append(segment)
+                open_segments.append(segment)
 
             return loopNext, end
 
-        openSegments = []
+        open_segments = []
 
         while len(island_nodal_loops) > 0:
 
@@ -271,11 +271,11 @@ def get_loops_segments(self, uv, island_loops_dirty):
                         island_nodal_loops.remove(loop.link_loop_prev)
 
                 if not island_nodal_loops:
-                    openSegments.append(segment)
+                    open_segments.append(segment)
                     break
 
-        if len(openSegments) > 1:
+        if len(open_segments) > 1:
             self.report({'ERROR_INVALID_INPUT'}, "Invalid selection in an island: multiple edge loops. Working in the longest one.")
-            openSegments.sort(key=len, reverse=True)
+            open_segments.sort(key=len, reverse=True)
 
-    return openSegments[0]
+    return open_segments[0]

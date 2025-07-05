@@ -588,32 +588,26 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                 kdmeshes = []
                 move_corners_of_mesh: list[LoopGroup] = []
                 for kdmesh in self.kdmeshes:
-                    kdmesh.umesh.tag_visible_corners()
-
+                    kdmesh.umesh.update_tag = False
                     for f in kdmesh.umesh.bm.faces:
                         for c in f.loops:
                             c.tag = True
 
-                    kdmesh.umesh.update_tag = False
-
                     move_corners = []
-                    uv = kdmesh.umesh.uv
-                    for f in kdmesh.umesh.bm.faces:
-                        if f.select:
-                            for crn in f.loops:
-                                crn_uv = crn[uv]
-                                if crn_uv.select_edge:
-                                    if crn.tag:
-                                        crn.tag = False
-                                        move_corners.append(crn)
-                                    crn_next = crn.link_loop_next
-                                    if crn_next.tag:
-                                        crn_next.tag = False
-                                        move_corners.append(crn_next)
-                                elif crn_uv.select:
-                                    if crn.tag:
-                                        crn.tag = False
-                                        move_corners.append(crn)
+                    edge_select_get = utils.edge_select_get_func(kdmesh.umesh)
+                    for crn in utils.calc_selected_uv_vert_corners_iter(kdmesh.umesh):
+                        if edge_select_get(crn):
+                            if crn.tag:
+                                crn.tag = False
+                                move_corners.append(crn)
+                            crn_next = crn.link_loop_next
+                            if crn_next.tag:
+                                crn_next.tag = False
+                                move_corners.append(crn_next)
+                        else:  # Select Vertex
+                            if crn.tag:
+                                crn.tag = False
+                                move_corners.append(crn)
                     if move_corners:
                         lg = LoopGroup(kdmesh.umesh)
                         lg.corners = move_corners

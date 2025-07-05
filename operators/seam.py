@@ -77,72 +77,32 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         if not selected_umeshes and self.mouse_pos:
             return self.pick_cut()
 
-        if self.umeshes.sync:
-            self.cut_view_2d_sync()
-        else:
-            self.cut_view_2d_no_sync()
+        self.cut_uv_space()
         if self.unwrap != 'NONE':
             self.unwrap_after_cut()
         self.umeshes.update()
 
+        # Flush System
+        visible_umeshes.filter_by_visible_uv_faces()
         self.umeshes.umeshes.extend(visible_umeshes)
         from .. import draw
-        color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
         coords = draw.mesh_extract.extract_seams(self.umeshes)
-        draw.LinesDrawSimple.draw_register(coords, color)
+        draw.LinesDrawSimple.draw_register(coords, seam_color)
         return {'FINISHED'}
 
-    def cut_view_2d_sync(self):
+    def cut_uv_space(self):
         for umesh in self.umeshes:
             uv = umesh.uv
-            shared_is_linked = utils.shared_is_linked
-            if umesh.is_full_edge_selected:
-                for f in umesh.bm.faces:
-                    for crn in f.loops:
-                        if (_shared_crn := crn.link_loop_radial_prev) == crn:
-                            crn.edge.seam = True
-                        elif not shared_is_linked(crn, _shared_crn, uv):
-                            crn.edge.seam = True
-                        elif not self.addition:
-                            crn.edge.seam = False
-            else:
-                for f in umesh.bm.faces:
-                    if f.hide:
-                        continue
-                    for crn in f.loops:
-                        if not crn.edge.select:
-                            continue
-                        elif (_shared_crn := crn.link_loop_radial_prev) == crn:
-                            crn.edge.seam = True
-                        elif not (_shared_crn.face.select and f.select):
-                            crn.edge.seam = True
-                        elif not shared_is_linked(crn, _shared_crn, uv):
-                            crn.edge.seam = True
-                        elif not self.addition:
-                            crn.edge.seam = False
-
-    def cut_view_2d_no_sync(self):
-        for umesh in self.umeshes:
-            if umesh.is_full_face_deselected:
-                self.umeshes.umeshes.remove(umesh)
-                continue
-            umesh.tag_selected_faces()
-
-            uv = umesh.uv
-            for f in umesh.bm.faces:
-                if not f.select:
-                    continue
-                for crn in f.loops:
-                    if not crn[uv].select_edge or not crn[uv].select:
-                        continue
-                    elif (_shared_crn := crn.link_loop_radial_prev) == crn:
-                        crn.edge.seam = True
-                    elif not (_shared_crn.face.tag and f.tag):
-                        crn.edge.seam = True
-                    elif not utils.shared_is_linked(crn, _shared_crn, uv):
-                        crn.edge.seam = True
-                    elif not self.addition:
-                        crn.edge.seam = False
+            face_select_get = utils.face_select_get_func(umesh)
+            for crn in utils.calc_selected_uv_edge_corners_iter(umesh):
+                pair_crn = crn.link_loop_radial_prev
+                if not utils.is_pair(crn, pair_crn, uv):
+                    crn.edge.seam = True
+                elif not (face_select_get(pair_crn.face) and face_select_get(crn.face)):
+                    crn.edge.seam = True
+                elif not self.addition:
+                    crn.edge.seam = False
 
     def unwrap_after_cut(self):
         assert self.unwrap != 'NONE'
@@ -178,9 +138,9 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 hit.umesh.update()
 
             from .. import draw
-            color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+            seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
             coords = draw.mesh_extract.extract_seams(self.umeshes)
-            draw.LinesDrawSimple.draw_register(coords, color)
+            draw.LinesDrawSimple.draw_register(coords, seam_color)
             if coords:
                 bpy.context.area.tag_redraw()
             return {'FINISHED'} if had_seam else {'FINISHED'}

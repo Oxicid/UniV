@@ -34,12 +34,16 @@ def face_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], bool
         else:
             if umesh.elem_mode == 'EDGE':
                 def select_get(f):
+                    if not f.select:
+                        return False
                     for crn in f.loops:
                         if not crn[uv].select_edge:
                             return False
                     return True
             else:
                 def select_get(f):
+                    if not f.select:
+                        return False
                     for crn in f.loops:
                         if not crn[uv].select:
                             return False

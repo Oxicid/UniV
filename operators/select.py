@@ -936,7 +936,14 @@ class UNIV_OT_Select_Grow(UNIV_OT_Select_Grow_Base):
 
     def execute(self, context):
         self.umeshes = UMeshes()
-        self.calc_islands = Islands.calc_visible_with_mark_seam if self.clamp_on_seam else Islands.calc_visible
+        self.umeshes.filter_by_partial_selected_uv_elem_by_mode()
+
+        # TODO: Implement without island calc (use linked with pair iter and mark seam)
+        if self.clamp_on_seam:
+            self.calc_islands = Islands.calc_visible_with_mark_seam
+        else:
+            self.calc_islands = Islands.calc_visible
+
         if self.grow:
             return self.grow_select()
         else:
@@ -944,56 +951,50 @@ class UNIV_OT_Select_Grow(UNIV_OT_Select_Grow_Base):
 
     def grow_select(self):
         sync = self.umeshes.sync
-        is_sync_face_mode = utils.get_select_mode_mesh() == 'FACE' and sync
-
         for umesh in self.umeshes:
-            if (sync and umesh.is_full_face_selected) or (not sync and umesh.is_full_face_deselected):
-                continue
-            if is_sync_face_mode and umesh.is_full_face_deselected:
-                continue
-
             uv = umesh.uv
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                for idx, isl in enumerate(islands):
-                    if sync:
-                        if self.umeshes.elem_mode == 'FACE':
-                            for f in isl:
-                                if not f.select:
-                                    f.tag = any(l_crn.face.select for crn in f.loops for l_crn in utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx))
-                        else:
-                            if umesh.is_full_face_deselected:
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = any(v.select for v in f.verts)
-                            else:
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = self.is_grow_face(f, uv, idx)
-                    else:
-                        if self.umeshes.elem_mode == 'EDGE':
-                            for f in isl:
-                                selected_corners = sum(crn[uv].select_edge for crn in f.loops)
-                                if selected_corners and selected_corners != len(f.loops):
-                                    f.tag = True
-                        else:
-                            for f in isl:
-                                selected_corners = sum(crn[uv].select for crn in f.loops)
-                                if selected_corners and selected_corners != len(f.loops):
-                                    f.tag = True
+            islands = self.calc_islands(umesh)
+            islands.indexing()
+            to_select = []
+            to_select_append = to_select.append
+
+            for idx, isl in enumerate(islands):
                 if sync:
-                    for isl in islands:
+                    if self.umeshes.elem_mode == 'FACE':
+                        # To optimize performance, the logic should be split based on whether there are many selected faces or just a few.
                         for f in isl:
-                            if f.tag:
-                                f.select = True
+                            if not f.select and any(l_crn.face.select for crn in f.loops if crn.vert.select
+                                                    for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(crn, uv, idx)):
+                                to_select_append(f)
+                    else:
+                        if umesh.is_full_face_deselected:  # optimize case when only one vertex/edge selected
+                            for f in isl:
+                                if any(v.select for v in f.verts):
+                                    to_select_append(f)
+                        else:
+                            for f in isl:
+                                if not f.select and self.is_grow_face(f, uv, idx):
+                                    to_select_append(f)
                 else:
-                    for idx, isl in enumerate(islands):
+                    if self.umeshes.elem_mode == 'EDGE':
                         for f in isl:
-                            if not f.tag:
-                                continue
-                            for crn in f.loops:
-                                if crn[uv].select:
-                                    continue
+                            selected_corners = sum(crn[uv].select_edge for crn in f.loops)
+                            if selected_corners and selected_corners != len(f.loops):
+                                to_select_append(f)
+                    else:
+                        for f in isl:
+                            selected_corners = sum(crn[uv].select for crn in f.loops)
+                            if selected_corners and selected_corners != len(f.loops):
+                                to_select_append(f)
+            if to_select:
+                if sync:
+                    for f in to_select:
+                        f.select = True
+                else:
+                    for f in to_select:
+                        idx = f.index
+                        for crn in f.loops:
+                            if not crn[uv].select:
                                 for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
                                     l_crn[uv].select = True
                     for isl in islands:
@@ -1001,86 +1002,75 @@ class UNIV_OT_Select_Grow(UNIV_OT_Select_Grow_Base):
                             for crn in f.loops:
                                 if crn[uv].select and crn.link_loop_next[uv].select:
                                     crn[uv].select_edge = True
-
                 umesh.update()
 
         return {'FINISHED'}
 
     def shrink(self):
         sync = self.umeshes.sync
-        is_sync_face_mode = utils.get_select_mode_mesh() == 'FACE' and sync
-
         for umesh in self.umeshes:
-            if sync:
-                if (is_sync_face_mode and umesh.is_full_face_deselected) or \
-                        (not is_sync_face_mode and umesh.is_full_vert_deselected):
-                    continue
-            else:
-                if umesh.is_full_face_deselected:
-                    continue
-
             uv = umesh.uv
-            if islands := self.calc_islands(umesh):  # noqa
-                islands.indexing()
-                for idx, isl in enumerate(islands):
-                    if sync:
-                        if self.umeshes.elem_mode == 'FACE':
-                            for f in isl:
-                                if f.select:
-                                    f.tag = any(not l_crn.face.select for crn in f.loops
-                                                for l_crn in utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx))
-                        else:
-                            if umesh.is_full_face_deselected:
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = any(v.select for v in f.verts)
-                            else:
-                                for f in isl:
-                                    if not f.select:
-                                        f.tag = self.is_shrink_face(f, uv, idx)
-                    else:
-                        if self.umeshes.elem_mode == 'EDGE':
-                            for f in isl:
-                                selected_corners = sum(crn[uv].select_edge for crn in f.loops)
-                                if selected_corners and selected_corners != len(f.loops):
-                                    f.tag = True
-                        else:
-                            for f in isl:
-                                selected_corners = sum(crn[uv].select for crn in f.loops)
-                                if selected_corners and selected_corners != len(f.loops):
-                                    f.tag = True
+            islands = self.calc_islands(umesh)
+            islands.indexing()
+            to_deselect = []
+            to_deselect_append = to_deselect.append
 
+            for idx, isl in enumerate(islands):
                 if sync:
                     if self.umeshes.elem_mode == 'FACE':
-                        for isl in islands:
-                            for f in isl:
-                                if f.tag:
-                                    f.select = False
-                        # umesh.bm.select_flush_mode()
+                        for f in isl:
+                            if f.select and any(not l_crn.face.select for crn in f.loops
+                                                for l_crn in utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx)):
+                                    to_deselect_append(f)
                     else:
-                        for isl in islands:
+                        if umesh.is_full_face_deselected:
                             for f in isl:
-                                if f.tag:
-                                    f.select = False
-                                    for v in f.verts:
-                                        v.select = False
+                                if not f.select:
+                                    if any(v.select for v in f.verts):
+                                        to_deselect_append(f)
+                        else:
+                            for f in isl:
+                                if not f.select and self.is_shrink_face(f, uv, idx):
+                                    to_deselect_append(f)
+                else:
+                    if self.umeshes.elem_mode == 'EDGE':
+                        for f in isl:
+                            selected_corners = sum(crn[uv].select_edge for crn in f.loops)
+                            if selected_corners and selected_corners != len(f.loops):
+                                to_deselect_append(f)
+                    else:
+                        for f in isl:
+                            selected_corners = sum(crn[uv].select for crn in f.loops)
+                            if selected_corners and selected_corners != len(f.loops):
+                                to_deselect_append(f)
+
+            if to_deselect:
+                if sync:
+                    if self.umeshes.elem_mode == 'FACE':
+                        for f in to_deselect:
+                            f.select = False
+                    else:
+                        for f in to_deselect:
+                            f.select = False
+                            for v in f.verts:
+                                v.select = False
                     umesh.bm.select_flush(False)
                 else:
-                    for idx, isl in enumerate(islands):
-                        for f in isl:
-                            if not f.tag:
-                                continue
-                            for crn in f.loops:
-                                if crn[uv].select:
-                                    for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
-                                        l_crn[uv].select = False
+                    # TODO: Implement face linked deselect with pair check and mark seam
+                    for f in to_deselect:
+                        idx = f.index
+                        for crn in f.loops:
+                            if crn[uv].select:
+                                for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
+                                    l_crn[uv].select = False
+
                     for isl in islands:
                         for f in isl:
                             for crn in f.loops:
                                 if not (crn[uv].select and crn.link_loop_next[uv].select):
                                     crn[uv].select_edge = False
 
-            umesh.update()
+                umesh.update()
 
         return {'FINISHED'}
 
@@ -1152,7 +1142,6 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
 
         self.umeshes.set_sync()
         self.calc_islands = MeshIslands.calc_visible_with_mark_seam if self.clamp_on_seam else MeshIslands.calc_visible
-
         if self.grow:
             return self.grow_select()
         else:
