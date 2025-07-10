@@ -1273,6 +1273,7 @@ class UNIV_OT_CopyToLayer(Operator):
 class UNIV_OT_SetActiveRender(Operator):
     bl_idname = 'mesh.univ_active_render_set'
     bl_label = 'Remove'
+    bl_options = {'REGISTER', 'UNDO'}
 
     idx: IntProperty(name='Set Active', default=0, min=0, max=8, options={'HIDDEN'})
 

@@ -144,7 +144,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     # Texel Settings
     texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
-    active_td_index: IntProperty(min=0, max=8)
+    active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
     texture_physical_size: FloatVectorProperty(name='TD from Physical Size', default=(2.5, 0.0), min=0.0,
                                                     soft_max=6, size=2, subtype='TRANSLATION')
@@ -152,9 +152,9 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     # UV Layer
     uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)
 
-    uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0)
-    uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0, update=_update_uv_layers_active_idx)
-    uv_layers_active_render_idx: IntProperty(name='Active uv render index', min=-1, max=7, default=-1)
+    uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0, options={'SKIP_SAVE'})
+    uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0, update=_update_uv_layers_active_idx, options={'SKIP_SAVE'})
+    uv_layers_active_render_idx: IntProperty(name='Active uv render index', min=-1, max=7, default=-1, options={'SKIP_SAVE'})
     uv_layers_presets: CollectionProperty(name="UV Layers", type=UNIV_UV_Layers, options={'SKIP_SAVE'})
 
     copy_to_layers_from: EnumProperty(name='From', default='0', items=copy_to_layers_uv_channels_items_from)

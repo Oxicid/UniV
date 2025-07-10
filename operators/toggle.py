@@ -494,6 +494,7 @@ STRETCH_SPACE_DATA: bpy.types.Space | None = None
 class UNIV_OT_StretchUVToggle(Operator):
     bl_idname = 'uv.univ_stretch_uv_toggle'
     bl_label = 'Stretch UV Toggle'
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "A single press toggles Stretch type on and off. Double press switches the Stretch type"
 
     swap: BoolProperty(name='Swap', default=False)
@@ -580,6 +581,7 @@ class UNIV_OT_StretchUVToggle(Operator):
 class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
     bl_idname = 'uv.univ_show_modified_uv_edges_toggle'
     bl_label = 'Show Modified UV Edges Toggle'
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         active_area = context.area
@@ -592,6 +594,7 @@ class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
 class UNIV_OT_ModifiersToggle(Operator):
     bl_idname = 'view3d.univ_modifiers_toggle'
     bl_label = 'Toggle Modifiers'
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         active_obj = context.active_object
@@ -615,6 +618,7 @@ class UNIV_OT_ModifiersToggle(Operator):
 class UNIV_OT_WorkspaceToggle(Operator):
     bl_idname = 'wm.univ_workspace_toggle'
     bl_label = 'Toggle Workspace'
+    bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         if context.mode not in ('EDIT_MESH', 'OBJECT') or context.area.type != 'VIEW_3D':

@@ -186,6 +186,15 @@ def true_groupby(seq):
     return sorted_groups
 
 
+def all_contiguous_subgroups(seq):
+    groups = []
+    n = len(seq)
+    for i in range(n):
+        for j in range(i + 1, n + 1):
+            groups.append(seq[i:j])
+    return groups
+
+
 def split_by_similarity(lst, key=None):
     """It differs from Group By in that groups are strictly separated and not reversed.
         true_groupby:        1,0,1,1 -> [1,1,1],[0]
