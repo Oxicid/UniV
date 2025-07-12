@@ -70,6 +70,20 @@ def add_keymaps():
     kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('mesh.univ_select_linked_pick', 'WHEELUPMOUSE', 'PRESS', shift=True)
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_deselect_linked_pick', 'WHEELDOWNMOUSE', 'PRESS', shift=True)
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
+    kmi.properties.select = True
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('mesh.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
+    kmi.properties.select = False
+    keys.append((km, kmi))
+
     add_mesh_keymaps(km, univ_pro)
 
     ### Window
@@ -633,7 +647,7 @@ class ConflictFilter:
                     if kmi_type_test is not None:
                         kmi_type_set.add(kmi_type_test)
                     else:
-                        # print("Unknown Type:", kmi_type)
+                        # print("Unknown Type:", kmi_type_)
 
                         # Partial match
                         for k, v in event_type_map.items():
@@ -641,13 +655,11 @@ class ConflictFilter:
                                 kmi_type_set.add(v)
             return kmi_type_set
 
-        for i, kmi_type in enumerate(filter_text_split):
-            kmi_type_set = kmi_type_set_from_string(kmi_type)
+        for i, kmi_typ in enumerate(filter_text_split):
+            kmi_typ_set = kmi_type_set_from_string(kmi_typ)
 
-            if not kmi_type_set:
-                return False
-
-            kmi_test_type.append(kmi_type_set)
+            if kmi_typ_set:
+                kmi_test_type.append(kmi_typ_set)
         # tiny optimization, sort sets so the smallest is first
         # improve chances of failing early
         kmi_test_type.sort(key=lambda kmi_type_set: len(kmi_type_set))

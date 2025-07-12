@@ -900,6 +900,89 @@ class UNIV_OT_Select_Pick(Operator):
 
         return {'FINISHED'}
 
+class UNIV_OT_SelectLinkedPick_VIEW3D(bpy.types.Macro):
+    bl_idname = 'mesh.univ_select_linked_pick'
+    bl_label = 'Select Linked Pick'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+class UNIV_OT_DeselectLinkedPick_VIEW3D(bpy.types.Macro):
+    bl_idname = 'mesh.univ_deselect_linked_pick'
+    bl_label = 'Deselect Linked Pick'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+
+class UNIV_OT_SelectLinked_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_select_linked'
+    bl_label = 'Select Linked'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    select: BoolProperty(name='Select', default=True)
+    delimit: EnumProperty(name='Delimit', default='NORMAL',
+                          items=(('NORMAL', 'Normal', ''),
+                                   ('MATERIAL', 'Material', ''),
+                                   ('SEAM', 'Seam', ''),
+                                   ('SHARP', 'Sharp', ''),
+                                   ('UV', 'UVs', '')
+    ))
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        self.layout.prop(self, 'select')
+        self.layout.prop(self, 'delimit', expand=True)
+
+    def execute(self, context):
+        if self.select:
+            return bpy.ops.mesh.select_linked(delimit={self.delimit})
+        else:
+            self.deselect()
+            return {'FINISHED'}
+
+    def deselect(self):
+        umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        umeshes.set_sync(True)
+        umeshes.filter_by_partial_selected_uv_faces()
+        umeshes.update_tag = False
+
+        match self.delimit:
+            case 'NORMAL':
+                calc_type = types.MeshIslands.calc_iter_non_manifold_ex
+            case 'MATERIAL':
+                calc_type = types.MeshIslands.calc_by_material_non_manifold_iter_ex
+            case 'SEAM':
+                calc_type = types.MeshIslands.calc_with_markseam_non_manifold_iter_ex
+            case 'SHARP':
+                calc_type = types.MeshIslands.calc_by_sharps_non_manifold_iter_ex
+            case 'UV':
+                calc_type = types.Islands.calc_with_markseam_iter_ex
+            case _:
+                raise
+
+        for umesh in umeshes:
+            if self.delimit == 'UV' and not umesh.obj.data.uv_layers:
+                calc_type_ = types.MeshIslands.calc_with_markseam_non_manifold_iter_ex
+            else:
+                calc_type_ = calc_type
+            types.Islands.tag_filter_visible(umesh)
+            for isl in calc_type_(umesh):
+                if not utils.all_equal((f.select for f in isl)):
+                    umeshes.elem_mode = 'FACE'
+                    for f in isl:
+                        f.select = False
+                    umesh.update_tag = True
+        umeshes.update()
+
+
 # TODO: Grow after 0.3 (within 0.3-1.5 sec) sec and no effect repeat - without seam clamp
 class UNIV_OT_Select_Grow_Base(Operator):
     bl_label = 'Grow'

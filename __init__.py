@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 8, 3),
+    "version": (3, 8, 4),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -131,10 +131,13 @@ def load_register_types():
 
             # Selects
             select.UNIV_OT_SelectLinked,
+            select.UNIV_OT_SelectLinked_VIEW3D,
             select.UNIV_OT_Select_By_Cursor,
             select.UNIV_OT_Select_Square_Island,
             select.UNIV_OT_Select_Border,
             select.UNIV_OT_Select_Pick,
+            select.UNIV_OT_SelectLinkedPick_VIEW3D,
+            select.UNIV_OT_DeselectLinkedPick_VIEW3D,
             select.UNIV_OT_Select_Grow_VIEW3D,
             select.UNIV_OT_Select_Grow,
             select.UNIV_OT_Select_Edge_Grow_VIEW2D,
@@ -265,6 +268,15 @@ def register():
     for c in classes:
         try:
             bpy.utils.register_class(c)
+
+            # Register Macros
+            if c.__name__ == 'UNIV_OT_SelectLinkedPick_VIEW3D':
+                item = c.define("MESH_OT_select_linked_pick")
+                item.properties.deselect = False
+            elif c.__name__ == 'UNIV_OT_DeselectLinkedPick_VIEW3D':
+                item = c.define("MESH_OT_select_linked_pick")
+                item.properties.deselect = True
+
         except Exception:  # noqa
             print(f'UniV: Failed to register a class {c.__name__}')
             traceback.print_exc()

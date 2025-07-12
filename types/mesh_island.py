@@ -138,22 +138,108 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
 
             while stack:  # Blank list == all faces of the island taken
                 for f in stack:
-                    for l in f.loops:  # Running through all the neighboring faces
-                        link_face = l.link_loop_radial_next.face
+                    for crn in f.loops:  # Running through all the neighboring faces
+                        pair_crn = crn.link_loop_radial_prev
+                        link_face = pair_crn.face
                         if not link_face.tag:  # Skip appended
                             continue
 
-                        for ll in link_face.loops:
-                            if not ll.face.tag:
-                                continue
+                        if pair_crn.vert == crn.vert: # Skip flipped
+                            continue
 
-                            if ll.vert != l.vert:
-                                continue
-                            # Skip non-manifold
-                            if (l.link_loop_next.vert == ll.link_loop_prev.vert) or \
-                                    (ll.link_loop_next.vert == l.link_loop_prev.vert):
-                                temp.append(ll.face)
-                                ll.face.tag = False
+                        temp.append(link_face)
+                        link_face.tag = False
+
+                mesh_island.extend(stack)
+                stack = temp
+                temp = []
+
+            yield mesh_island
+            mesh_island = []
+
+    @classmethod
+    def calc_iter_non_manifold_ex(cls, umesh: UMesh):
+        mesh_island: 'list[BMFace]' = []
+
+        for face in umesh.bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            stack = [face]
+            temp = []
+
+            while stack:  # Blank list == all faces of the island taken
+                for f in stack:
+                    for crn in f.loops:  # Running through all the neighboring faces
+                        pair_crn = crn.link_loop_radial_prev
+                        link_face = pair_crn.face
+                        if not link_face.tag:  # Skip appended
+                            continue
+
+                        temp.append(link_face)
+                        link_face.tag = False
+
+                mesh_island.extend(stack)
+                stack = temp
+                temp = []
+
+            yield mesh_island
+            mesh_island = []
+
+    @classmethod
+    def calc_by_material_non_manifold_iter_ex(cls, umesh: UMesh):
+        mesh_island: 'list[BMFace]' = []
+
+        for face in umesh.bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            stack = [face]
+            temp = []
+
+            while stack:  # Blank list == all faces of the island taken
+                for f in stack:
+                    mtl_idx = f.material_index
+                    for crn in f.loops:
+                        link_face = crn.link_loop_radial_next.face
+                        if not link_face.tag or mtl_idx != link_face.material_index:  # Skip appended
+                            continue
+
+                        temp.append(link_face)
+                        link_face.tag = False
+
+                mesh_island.extend(stack)
+                stack = temp
+                temp = []
+
+            yield mesh_island
+            mesh_island = []
+
+    @classmethod
+    def calc_by_sharps_non_manifold_iter_ex(cls, umesh: UMesh):
+        mesh_island: 'list[BMFace]' = []
+
+        for face in umesh.bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            stack = [face]
+            temp = []
+
+            while stack:  # Blank list == all faces of the island taken
+                for f in stack:
+                    for crn in f.loops:
+                        link_face = crn.link_loop_radial_next.face
+                        if not link_face.tag:  # Skip appended
+                            continue
+
+                        if not crn.edge.smooth:
+                            continue
+                        temp.append(link_face)
+                        link_face.tag = False
 
                 mesh_island.extend(stack)
                 stack = temp
@@ -175,13 +261,47 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
 
             while stack:
                 for f in stack:
-                    for l in f.loops:
-                        shared_crn = l.link_loop_radial_prev
+                    for crn in f.loops:
+                        shared_crn = crn.link_loop_radial_prev
                         ff = shared_crn.face
                         if not ff.tag:
                             continue
-                        if l.edge.seam:  # Skip if seam
+                        if crn.edge.seam:  # Skip if seam
                             continue
+                        if shared_crn.vert == crn.vert:  # Skip flipped
+                            continue
+
+                        temp.append(ff)
+                        ff.tag = False
+
+                isl.extend(stack)
+                stack = temp
+                temp = []
+
+            yield isl
+            isl = []
+
+    @classmethod
+    def calc_with_markseam_non_manifold_iter_ex(cls, umesh: UMesh):
+        isl: list[BMFace] = []
+        for face in umesh.bm.faces:
+            if not face.tag:
+                continue
+            face.tag = False
+
+            stack = [face]
+            temp = []
+
+            while stack:
+                for f in stack:
+                    for crn in f.loops:
+                        shared_crn = crn.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
+                            continue
+                        if crn.edge.seam:  # Skip if seam
+                            continue
+
                         temp.append(ff)
                         ff.tag = False
 
