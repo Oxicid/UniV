@@ -24,6 +24,7 @@ AREA_TICKS: bool = False
 class UNIV_OT_SplitUVToggle(Operator):
     bl_idname = 'wm.univ_split_uv_toggle'
     bl_label = 'Split UV Toggle'
+    bl_options = {'UNDO'}
 
     mode: EnumProperty(name='Mode',
                        default='SPLIT',

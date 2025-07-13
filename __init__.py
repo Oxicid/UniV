@@ -155,6 +155,7 @@ def load_register_types():
             ui.UNIV_PT_TD_LayersManager,
             ui.UNIV_UL_TD_PresetsManager,
             ui.UNIV_PT_TD_PresetsManager,
+            ui.UNIV_PT_TD_PresetsManager_VIEW3D,
             ui.UNIV_UL_UV_LayersManager,
             ui.UNIV_UL_UV_LayersManagerV2,
             ui.UNIV_PT_General_VIEW_3D,
@@ -173,6 +174,8 @@ def load_register_types():
             ui.VIEW3D_MT_PIE_univ_favorites_edit,
             ui.IMAGE_MT_PIE_univ_favorites_edit,
             ui.VIEW3D_MT_PIE_univ_projection,
+            ui.IMAGE_MT_PIE_univ_texel,
+            ui.VIEW3D_MT_PIE_univ_texel,
             icons.UNIV_OT_IconsGenerator,
             # Seam
             seam.UNIV_OT_Cut_VIEW2D,

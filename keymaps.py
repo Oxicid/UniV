@@ -196,12 +196,8 @@ def add_keymaps():
     kmi.properties.mode = 'INDIVIDUAL'
     keys.append((km, kmi))
 
-    # Normalize
-    kmi = km.keymap_items.new('uv.univ_normalize', 'A', 'PRESS', shift=True)
-    keys.append((km, kmi))
-
-    # Adjust
-    kmi = km.keymap_items.new('uv.univ_adjust_td', 'A', 'PRESS', alt=True)
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'A', 'PRESS', shift=True)
+    kmi.properties.name = "IMAGE_MT_PIE_univ_texel"
     keys.append((km, kmi))
 
     # Relax
@@ -307,23 +303,17 @@ def add_keymaps_ws():
         univ_pro = None
 
     # Workspace keymaps
-    def workspace_duplicates(km_):
-        kmi_ = km_.keymap_items.new("mesh.univ_gravity", 'O', 'PRESS')
-        keys_ws.append((km_, kmi_))
+    def workspace_duplicates(km_ws):
+        kmi_ws = km_ws.keymap_items.new("mesh.univ_gravity", 'O', 'PRESS')
+        keys_ws.append((km_ws, kmi_ws))
 
-        kmi_ = km_.keymap_items.new("mesh.univ_normalize", 'A', 'PRESS', shift=True)
-        keys_ws.append((km_, kmi_))
+        kmi_ws = km_ws.keymap_items.new("wm.call_menu_pie", 'A', 'PRESS', shift=True)
+        kmi_ws.properties.name = "VIEW3D_MT_PIE_univ_texel"
+        keys_ws.append((km_ws, kmi_ws))
 
-        kmi_ = km_.keymap_items.new("mesh.univ_adjust_td", 'A', 'PRESS', alt=True)
-        keys_ws.append((km_, kmi_))
-
-        if univ_pro:
-            kmi_ = km_.keymap_items.new("mesh.univ_transfer", 'T', 'PRESS', ctrl=True)
-            keys_ws.append((km_, kmi_))
-
-        kmi_ = km_.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS', shift=True)
-        kmi_.properties.name = "VIEW3D_MT_PIE_univ_projection"
-        keys_ws.append((km_, kmi_))
+        kmi_ws = km_ws.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS', shift=True)
+        kmi_ws.properties.name = "VIEW3D_MT_PIE_univ_projection"
+        keys_ws.append((km_ws, kmi_ws))
 
     # Edit Mode
     km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)

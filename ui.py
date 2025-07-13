@@ -67,7 +67,11 @@ class UNIV_PT_General(Panel):
         row.operator(set_idname).custom_texel = -1.0
         row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
-        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
+        if prefix == 'uv':
+            row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
+        else:
+            row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
+
 
         split = layer.split(align=False)
         row = split.row(align=True)
@@ -603,7 +607,10 @@ class UNIV_PT_TD_PresetsManager(Panel):
     bl_category = 'UniV'
 
     def draw(self, context):
-        layout = self.layout
+        self.draw_ex(self.layout)
+
+    @staticmethod
+    def draw_ex(layout, ot_prefix='uv'):
         if prefs().use_csa_mods:
             layout.operator_context = 'INVOKE_DEFAULT'
         else:
@@ -619,9 +626,9 @@ class UNIV_PT_TD_PresetsManager(Panel):
         layout.separator()
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.operator("uv.univ_calc_uv_area")
-        row.operator("uv.univ_calc_uv_coverage")
-        if context.area.type == 'IMAGE_EDITOR':
+        row.operator(ot_prefix + ".univ_calc_uv_area")
+        row.operator(ot_prefix + ".univ_calc_uv_coverage")
+        if ot_prefix == 'uv':
             col.operator("uv.univ_texel_density_from_texture")
         row = col.row(align=True)
         row.operator('uv.univ_texel_density_from_physical_size')
@@ -650,6 +657,17 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
         col.separator()
         col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+
+class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
+    bl_label = 'Texel Density Presets Manager'
+    bl_idname = 'UNIV_PT_td_presets_manager_view_3d'
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_options = {'INSTANCED'}
+    bl_category = 'UniV'
+
+    def draw(self, context):
+        UNIV_PT_TD_PresetsManager.draw_ex(self.layout, 'mesh')
 
 class UNIV_PT_TD_LayersManager(Panel):
     bl_label = 'Layers Manager'
@@ -929,6 +947,112 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.loop_multi_select", text='Loop').ring=False
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
+
+class IMAGE_MT_PIE_univ_texel(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+
+        # Right
+        pie.operator('uv.univ_normalize', icon_value=icons.normalize)
+
+        # Bottom
+        split = pie.split()
+        col = split.column()
+        col.separator(factor=18)
+        row = col.row(align=True)
+        settings = univ_settings()
+        row.prop(settings, 'texel_density')
+        row.operator('uv.univ_select_texel_density', text='', icon_value=icons.arrow)
+        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
+
+        split = col.split(align=False)
+        row = split.row(align=True)
+        for idx, preset in enumerate(settings.texels_presets):
+            if idx and (idx+1) % 4 == 1:
+                split = col.split(align=False)
+                row = split.row(align=True)
+            row.operator('uv.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
+
+
+        # Upper
+        pie.operator('uv.univ_reset_scale', text='Reset', icon_value=icons.reset)
+
+        # Left Upper
+        pie.operator('uv.univ_calc_uv_area')
+
+        # Right Upper
+        pie.operator('uv.univ_calc_uv_coverage')
+
+        # Left Bottom
+        pie.operator('uv.univ_texel_density_get')
+
+        # Right Bottom
+        pie.operator('uv.univ_texel_density_set').custom_texel = -1.0
+
+class VIEW3D_MT_PIE_univ_texel(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
+
+        # Right
+        pie.operator('mesh.univ_normalize', icon_value=icons.normalize)
+
+        # Bottom
+        split = pie.split()
+        col = split.column()
+        col.separator(factor=18)
+        row = col.row(align=True)
+        settings = univ_settings()
+        row.prop(settings, 'texel_density')
+        row.operator('mesh.univ_select_texel_density', text='', icon_value=icons.arrow)
+        row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
+
+        split = col.split(align=False)
+        row = split.row(align=True)
+        for idx, preset in enumerate(settings.texels_presets):
+            if idx and (idx+1) % 4 == 1:
+                split = col.split(align=False)
+                row = split.row(align=True)
+            row.operator('mesh.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
+
+
+        # Upper
+        pie.split()
+        # pie.operator('mesh.univ_reset_scale', text='Reset', icon_value=icons.reset)
+
+        # Left Upper
+        pie.operator('mesh.univ_calc_uv_area')
+
+        # Right Upper
+        pie.operator('mesh.univ_calc_uv_coverage')
+
+        # Left Bottom
+        pie.operator('mesh.univ_texel_density_get')
+
+        # Right Bottom
+        pie.operator('mesh.univ_texel_density_set').custom_texel = -1.0
+
 
 class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
     bl_label = 'UniV Pie'
