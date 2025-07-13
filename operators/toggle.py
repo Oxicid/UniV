@@ -644,7 +644,12 @@ class UNIV_OT_WorkspaceToggle(Operator):
                 else:
                     bpy.ops.wm.tool_set_by_id(name='builtin.select_box')
         else:
+            if bpy.context.mode == 'EDIT_MESH':
+                ToggleHandlers.last_tool_edit = active_tool_name
+            else:
+                ToggleHandlers.last_tool_object = active_tool_name
             bpy.ops.wm.tool_set_by_id(name='tool.univ')
+
         return {'FINISHED'}
 
     @staticmethod
@@ -664,7 +669,7 @@ class ToggleHandlers:
     owners = []
 
     @staticmethod
-    def univ_toggle_rna_callback(workspace):
+    def univ_toggle_rna_callback():
         tools = bpy.context.workspace.tools
 
         if (mode := bpy.context.mode) == 'EDIT_MESH':
@@ -682,12 +687,12 @@ class ToggleHandlers:
     def subscribe_to_tool(cls):
         cls.owners.clear()
         for ws in bpy.data.workspaces:
-            owner = ('UniV', ws)
+            owner = ('UniV', ws.name)
             cls.owners.append(owner)
             bpy.msgbus.subscribe_rna(
                 key=ws.path_resolve("tools", False),
                 owner=owner,
-                args=(ws,),
+                args=(),
                 notify=cls.univ_toggle_rna_callback)
 
     @classmethod

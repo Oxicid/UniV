@@ -245,8 +245,8 @@ class UNIV_PT_General(Panel):
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
-        row.operator('uv.univ_select_square_island', text='',  icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
-        row.operator('uv.univ_select_square_island', text='',  icon_value=icons.vertical_a).shape = 'VERTICAL'
+        row.operator('uv.univ_select_square_island', text='H-Rect',  icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
+        row.operator('uv.univ_select_square_island', text='V-Rect',  icon_value=icons.vertical_a).shape = 'VERTICAL'
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
