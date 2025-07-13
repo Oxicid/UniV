@@ -72,6 +72,9 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
+        if not self.bl_idname.startswith('UV'):
+            self.umeshes.set_sync()
+
         all_islands: list[AdvIsland | UnionIslands] = []
 
         islands_calc_type: Callable[[types.UMesh], AdvIslands]
@@ -203,6 +206,9 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                 new_center *= scale
             isl.umesh.update_tag = True
         return new_center
+
+class UNIV_OT_ResetScale_VIEW3D(UNIV_OT_ResetScale):
+    bl_idname = "mesh.univ_reset_scale"
 
 class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_normalize"

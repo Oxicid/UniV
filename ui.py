@@ -348,6 +348,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         col_align.label(text='Transform')
         col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)
+        col_align.operator('mesh.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
 
         row = col_align.row(align=True)
         row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
@@ -984,9 +985,8 @@ class IMAGE_MT_PIE_univ_texel(Menu):
                 row = split.row(align=True)
             row.operator('uv.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
 
-
         # Upper
-        pie.operator('uv.univ_reset_scale', text='Reset', icon_value=icons.reset)
+        pie.operator('uv.univ_reset_scale', icon_value=icons.reset)
 
         # Left Upper
         pie.operator('uv.univ_calc_uv_area')
@@ -1036,10 +1036,8 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
                 row = split.row(align=True)
             row.operator('mesh.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
 
-
         # Upper
-        pie.split()
-        # pie.operator('mesh.univ_reset_scale', text='Reset', icon_value=icons.reset)
+        pie.operator('mesh.univ_reset_scale', icon_value=icons.reset)
 
         # Left Upper
         pie.operator('mesh.univ_calc_uv_area')

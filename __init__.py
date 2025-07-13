@@ -96,6 +96,7 @@ def load_register_types():
             transform.UNIV_OT_Random,
             transform.UNIV_OT_Pack,
             # Texel
+            texel.UNIV_OT_ResetScale_VIEW3D,
             texel.UNIV_OT_ResetScale,
             texel.UNIV_OT_AdjustScale,
             texel.UNIV_OT_AdjustScale_VIEW3D,
