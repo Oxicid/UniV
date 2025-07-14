@@ -72,6 +72,26 @@ def face_centroid_uv(f: BMFace, uv: BMLayerItem):
         value += l[uv].uv
     return value / len(loops)
 
+def calc_face_area_3d(f, scale) -> float:
+    """newell cross"""
+    n = Vector()
+    corners = f.loops
+    v_prev = corners[-1].vert.co * scale
+    for crn in corners:
+        v_curr = crn.vert.co * scale
+        # inplace optimization ~20%: n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
+        v_prev_yzx = v_prev.yzx
+        v_prev_zxy = v_prev.zxy
+
+        v_prev_yzx -= v_curr.yzx
+        v_prev_zxy += v_curr.zxy
+
+        v_prev_yzx *= v_prev_zxy
+        n += v_prev_yzx
+
+        v_prev = v_curr
+    return n.length
+
 def calc_face_area_uv(f, uv) -> float:
     corners = f.loops
     if (n := len(corners)) == 4:

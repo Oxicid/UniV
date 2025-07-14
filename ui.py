@@ -546,6 +546,10 @@ class UNIV_PT_BatchInspectSettings(Panel):
         col.separator()
 
         row = col.row(align=True)
+        row.operator('uv.univ_check_over', icon_value=icons.gravity)
+        draw_tag_button(Inspect.Over)
+
+        row = col.row(align=True)
         row.operator('uv.univ_check_zero', icon_value=icons.zero)
         draw_tag_button(Inspect.Zero)
 
@@ -1168,20 +1172,16 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         pie.operator("uv.univ_check_overlap", icon_value=icons.overlap)
         # Right
         pie.operator("uv.univ_check_non_splitted", icon_value=icons.non_splitted)
-
         # Bottom
         pie.split()
-
         # Upper
         pie.operator("uv.univ_batch_inspect", icon_value=icons.zero)
-
         # Left Upper
-        pie.operator("uv.univ_check_zero", icon_value=icons.zero)
-
+        pie.operator('uv.univ_check_over', icon_value=icons.gravity)
         # Right Upper
         pie.operator("uv.univ_check_other", icon_value=icons.random)
         # Left Bottom
-        pie.split()
+        pie.operator("uv.univ_check_zero", icon_value=icons.zero)
         # Right Bottom
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 

@@ -1101,10 +1101,17 @@ class AdvIsland(FaceIsland):
         if areas_to_weight:
             assert self.tris, 'Calculate tris'
             if scale:
-                for va, vb, vc in it:
-                    ar = area_tri(va * scale, vb * scale, vc * scale)
-                    weight_append(ar)
-                    area += ar
+                if utils.vec_isclose(scale, scale.xxx):
+                    x_component = abs(scale.x)
+                    for va, vb, vc in it:
+                        ar = area_tri(va, vb, vc) * x_component
+                        weight_append(ar)
+                        area += ar
+                else:
+                    for va, vb, vc in it:
+                        ar = area_tri(va * scale, vb * scale, vc * scale)
+                        weight_append(ar)
+                        area += ar
             else:
                 for va, vb, vc in it:
                     ar = area_tri(va, vb, vc)
@@ -1112,30 +1119,23 @@ class AdvIsland(FaceIsland):
                     area += ar
         elif scale:
             if self.tris:
-                for va, vb, vc in it:
-                    area += area_tri(va * scale, vb * scale, vc * scale)
+                if utils.vec_isclose(scale, scale.xxx):  # Uniform Scale
+                    for va, vb, vc in it:
+                        area += area_tri(va, vb, vc)
+                    area *= (abs(scale.x) ** 2)
+                else:
+                    for va, vb, vc in it:
+                        area += area_tri(va * scale, vb * scale, vc * scale)
             else:
-                # newell_cross
-                for f in self:
-                    n = Vector()
-                    corners = f.loops
-                    v_prev = corners[-1].vert.co * scale
-                    for crn in corners:
-                        v_curr = crn.vert.co * scale
-                        # inplace optimization ~20%: n += (v_prev.yzx - v_curr.yzx) * (v_prev.zxy + v_curr.zxy)
-                        v_prev_yzx = v_prev.yzx
-                        v_prev_zxy = v_prev.zxy
-
-                        v_prev_yzx -= v_curr.yzx
-                        v_prev_zxy += v_curr.zxy
-
-                        v_prev_yzx *= v_prev_zxy
-                        n += v_prev_yzx
-
-                        v_prev = v_curr
-
-                    area += n.length
-                area *= 0.5
+                if utils.vec_isclose(scale, scale.xxx):  # Uniform Scale
+                    for f in self:
+                        area += f.calc_area()
+                    area *= (abs(scale.z) ** 2)
+                else:
+                    from ..utils import calc_face_area_3d
+                    for f in self:
+                        area += calc_face_area_3d(f, scale)
+                    area *= 0.5
         else:
             for f in self:
                 area += f.calc_area()

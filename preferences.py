@@ -261,6 +261,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         default='FOLLOW_MODE',
         description='Default Snap Points for QuickSnap')
 
+    # ----------
     color_mode: EnumProperty(name='Color Mode',
         items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
         default='COLOR',
@@ -271,7 +272,6 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     icon_antialiasing: EnumProperty(name='Anti-Aliasing',
         items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
         default='4')
-    # ----------
     # Mono
     icon_mono_green: FloatVectorProperty(name='Green',
         subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.258181, 0.564712, 0.3564003, 1))  #8bc6a1

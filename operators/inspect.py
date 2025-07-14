@@ -11,7 +11,11 @@ import enum
 import bl_math
 import textwrap
 
+from itertools import chain
+from mathutils import Vector
+from statistics import median_high
 from mathutils.geometry import area_tri
+from bmesh.types import BMFace
 from bpy.props import *
 from bpy.types import Operator
 
@@ -47,21 +51,21 @@ class Inspect(enum.IntFlag):
     NonManifold = enum.auto()
     NonSplitted = enum.auto()
 
-    OverScaled = enum.auto()
-    OverStretched = enum.auto()
+    Over = enum.auto()
+    __pass6 = enum.auto()
     AngleStretch = enum.auto()
-    __pass5 = enum.auto()
+    __pass7 = enum.auto()
 
     Concave = enum.auto()
     DeduplicateUVLayers = enum.auto()
     RepairAfterJoin = enum.auto()
-    __pass6 = enum.auto()
+    __pass8 = enum.auto()
     IncorrectBMeshTags = enum.auto()
     Other = enum.auto()
 
     @classmethod
     def default_value_for_settings(cls):
-        return cls.Overlap | cls.Zero | cls.Flipped | cls.NonSplitted | cls.Other
+        return cls.Overlap | cls.Zero | cls.Flipped | cls.Over | cls.NonSplitted | cls.Other
 
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
@@ -182,6 +186,211 @@ class UNIV_OT_Check_Flipped(Operator):
             total_counter += local_counter
         return total_counter
 
+class UNIV_OT_Check_Over(Operator):
+    bl_idname = 'uv.univ_check_over'
+    bl_label = 'Over'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = """Selects overstretched edges and overscaled faces.\n
+Edge Overstretch is checked individually per face -
+edges from other faces are not taken into account.
+In other words, stretches are calculated relative to the majority 
+of edges with a similar coefficient (Coefficient = 3D Edge Length / UV Edge Length).\n
+This behavior is preferred, as it allows setting a higher 
+Overscaled Face Threshold to intentionally exclude uniformly 
+scaled islands from the calculation, focusing only on actual stretches"""
+
+    edge_over_threshold: FloatProperty(name='Overstretched Edge Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.1,
+                                       description='Selects edge that fall outside this range.')
+    face_over_threshold: FloatProperty(name='Overscaled Face Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.15,
+                                       description='Selects faces that fall outside this range.')
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, 'edge_over_threshold', slider=True)
+        layout.prop(self, 'face_over_threshold', slider=True)
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def execute(self, context):
+        umeshes = types.UMeshes()
+        umeshes.fix_context()
+        umeshes.filter_by_visible_uv_faces()
+        umeshes.calc_aspect_ratio(from_mesh=False)
+        bpy.ops.uv.select_all(action='DESELECT')
+
+        # clamp angle
+        result = self.over(umeshes, edge_threshold=self.edge_over_threshold, face_threshold=self.face_over_threshold)
+
+        if formatted_text := self.data_formatting(result):
+            self.report({'WARNING'}, formatted_text)
+            umeshes.update()
+        else:
+            self.report({'INFO'}, 'No overscales or overstretches found.')
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def overstretched_edges(umesh, faces, edge_threshold):
+        uv = umesh.uv
+        is_pair = utils.is_pair
+        is_visible = utils.is_visible_func(umesh.sync)
+        scale_3d = umesh.check_uniform_scale()
+        if scale_3d and utils.vec_isclose(scale_3d, scale_3d.zzz):
+            # For non-anisotropic scale not need scale correct for calc coef
+            scale_3d = None
+        aspect_scale = Vector((umesh.aspect, 1))
+
+        to_select = []
+        edges_counter = 0
+        for f in faces:
+            edge_coefficients = []
+            if scale_3d:
+                for crn in f.loops:
+                    edge_length_3d = ((crn.vert.co - crn.link_loop_next.vert.co) * scale_3d).length
+                    edge_length_uv = ((crn[uv].uv - crn.link_loop_next[uv].uv) * aspect_scale).length
+                    if not edge_length_uv:
+                        edge_coefficients.append(0.0)
+                    else:
+                        edge_coefficients.append(edge_length_3d / edge_length_uv)
+            else:
+                for crn in f.loops:
+                    edge_length_3d = crn.edge.calc_length()
+                    edge_length_uv = ((crn[uv].uv - crn.link_loop_next[uv].uv) * aspect_scale).length
+                    if not edge_length_uv:
+                        edge_coefficients.append(0.0)
+                    else:
+                        edge_coefficients.append(edge_length_3d / edge_length_uv)
+
+            median = median_high(edge_coefficients)
+
+            if median == 0.0:
+                median = max(edge_coefficients)
+
+            low = median * (bl_math.clamp(1 - edge_threshold, 0.01, 1))
+            high = median * (1 + edge_threshold)
+
+            local_edges_counter = 0
+            for crn, coef in zip(f.loops, edge_coefficients):
+                if coef < low or high < coef:
+                    to_select.append(crn)
+                    pair = crn.link_loop_radial_prev
+                    if is_pair(crn, pair, uv) and is_visible(pair.face):
+                        local_edges_counter += 1
+                    else:
+                        local_edges_counter += 2
+
+            if local_edges_counter:
+                if local_edges_counter >= 2:
+                    local_edges_counter //= 2
+                edges_counter += local_edges_counter
+        return to_select, edges_counter
+
+    @classmethod
+    def over(cls, umeshes: types.UMeshes, edge_threshold=0.1, face_threshold=0.15, batch_inspect=False):
+        from ..utils import calc_face_area_uv, calc_face_area_3d
+        face_seq_coef_by_mesh: list[tuple[types.UMesh, list[BMFace], list[float]]] = []  # noqa
+
+        for umesh in umeshes:
+            uv = umesh.uv
+
+            scale = umesh.check_uniform_scale()
+            face_coef_seq: list[float] = []
+            face_coef_seq_append = face_coef_seq.append
+
+            # Overscaled Faces:
+            if faces := utils.calc_visible_uv_faces(umesh):
+                if scale:
+                    for f in faces:
+                        face_area_3d = calc_face_area_3d(f, scale)
+                        face_area_uv = calc_face_area_uv(f, uv)
+                        if not face_area_uv:
+                            face_coef_seq_append(0.0)
+                        else:
+                            face_coef_seq_append(face_area_3d / face_area_uv)
+                else:
+                    for f in faces:
+                        face_area_3d = f.calc_area()
+                        face_area_uv = calc_face_area_uv(f, uv)
+                        if not face_area_uv:
+                            face_coef_seq_append(0.0)
+                        else:
+                            face_coef_seq_append(face_area_3d / face_area_uv)
+
+                face_seq_coef_by_mesh.append((umesh, faces, face_coef_seq))  # noqa
+
+        edges_counter = 0
+        faces_counter = 0
+
+        if face_seq_coef_by_mesh:
+            median = median_high(chain.from_iterable((face_data[2] for face_data in face_seq_coef_by_mesh)))
+            if median == 0.0:
+                median = max(chain.from_iterable((face_data[2] for face_data in face_seq_coef_by_mesh)))
+
+            low = median * (bl_math.clamp(1 - face_threshold, 0.01, 1))
+            high = median * (1 + face_threshold)
+
+            for umesh, faces, coefficients in face_seq_coef_by_mesh:
+                face_select_set = utils.face_select_linked_func(umesh)
+                local_face_counter = 0
+                for f, coef in zip(faces, coefficients):
+                    if coef < low or high < coef:
+                        face_select_set(f)
+                        local_face_counter += 1
+
+                to_select_edges, local_edge_counter = cls.overstretched_edges(umesh, faces, edge_threshold)
+                umesh.sequence = to_select_edges
+                faces_counter += local_face_counter
+                edges_counter += local_edge_counter
+                umesh.update_tag |= local_face_counter or local_edge_counter
+
+        if edges_counter:
+            if batch_inspect or faces_counter:
+                # Avoid switch elem mode if all edges selected for batch inspect
+                if cls.is_full_edge_selected_in_seq(umeshes):
+                    for umesh in umeshes:
+                        umesh.sequence = []
+                    return edges_counter, faces_counter
+
+            if umeshes.elem_mode not in ('EDGE', 'VERT'):
+                umeshes.elem_mode = 'EDGE'
+
+            for umesh in umeshes:
+                edge_select_set = utils.edge_select_linked_set_func(umesh)
+                for edge in umesh.sequence:
+                    edge_select_set(edge, True)
+                umesh.sequence = []
+
+        return edges_counter, faces_counter
+
+    @staticmethod
+    def data_formatting(counters):
+        edges_counter, faces_counter = counters
+        r_text = ''
+        if edges_counter:
+            r_text += f'Overstretched Edges - {edges_counter}. '
+        if faces_counter:
+            r_text += f'Overscaled Faces - {faces_counter}. '
+
+        if r_text:
+            r_text = f'Found: {r_text}'
+        return r_text
+
+    @staticmethod
+    def is_full_edge_selected_in_seq(umeshes):
+        if umeshes.elem_mode in ('FACE', 'ISLAND'):
+            for umesh in umeshes:
+                face_select_get = utils.face_select_get_func(umesh)
+                if not all(face_select_get(crn_edge.face) and face_select_get(crn_edge.link_loop_radial_prev.face)
+                           for crn_edge in umesh.sequence):
+                    return False
+        else:
+            for umesh in umeshes:
+                edge_select_get = utils.edge_select_get_func(umesh)
+                if not all(edge_select_get(crn_edge) for crn_edge in umesh.sequence):
+                    return False
+        return True
+
 
 class UNIV_OT_Check_Non_Splitted(Operator):
     bl_idname = 'uv.univ_check_non_splitted'
@@ -189,7 +398,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_description = "Selects the edges where seams should be marked and unwrapped without connection"
     bl_options = {'REGISTER', 'UNDO'}
 
-    use_auto_smooth: bpy.props.BoolProperty(name='Use Auto Smooth', default=True)
+    use_auto_smooth: BoolProperty(name='Use Auto Smooth', default=True)
     user_angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
@@ -272,14 +481,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         if any(umesh.sequence for umesh in umeshes):
             if batch_inspect:
                 # Avoid switch elem mode if all edges selected for batch inspect
-
-                all_selected = True
-                for umesh in umeshes:
-                    edge_select_get = utils.edge_select_get_func(umesh)
-                    if not all(edge_select_get(crn_edge) for crn_edge in umesh.sequence):
-                        all_selected = False
-                        break
-                if all_selected:
+                if UNIV_OT_Check_Over.is_full_edge_selected_in_seq(umeshes):
                     for umesh in umeshes:
                         umesh.sequence = []
                     return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
@@ -325,7 +527,7 @@ class UNIV_OT_Check_Overlap(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
-    threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
+    threshold: FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
     def poll(cls, context):
@@ -413,7 +615,7 @@ class UNIV_OT_Check_Other(Operator):
 # 8. Checks handlers and various flags"""
 
     check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
-    threshold: bpy.props.FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
+    threshold: FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
     def poll(cls, context):
@@ -557,10 +759,10 @@ class UNIV_OT_Check_Other(Operator):
 
         # Check Heterogeneous Aspect Ratio
         aspects = {}
-        def get_aspects_ratio(u):
+        def get_aspects_ratio(u):  # noqa
             if modifiers := [m for m in u.obj.modifiers if m.name.startswith('UniV Checker')]:
                 socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
-                if mtl := modifiers[0][socket]:
+                if mtl := modifiers[0][socket]:  # noqa
                     for node in mtl.node_tree.nodes:
                         if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
                             image_width, image_height = image.size
@@ -573,8 +775,8 @@ class UNIV_OT_Check_Other(Operator):
 
             # Aspect from material
             elif u.obj.material_slots:
-                for slot in u.obj.material_slots:
-                    mtl = slot.material
+                for slot in u.obj.material_slots:  # noqa
+                    mtl = slot.material  # noqa
                     if not slot.material:
                         aspects[1.0] = 'Default'
                         continue
@@ -623,7 +825,6 @@ class UNIV_OT_Check_Other(Operator):
         return info
 
 
-
 class UNIV_OT_BatchInspectFlags(Operator):
     bl_idname = 'uv.univ_batch_inspect_flags'
     bl_label = 'Flags'
@@ -665,7 +866,7 @@ class UNIV_OT_BatchInspect(Operator):
             box.label(text='Hidden faces found — the result may be incorrect', icon='INFO')
             col.separator()
 
-        for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Non-Splitted'):
+        for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Over', 'Non-Splitted'):
             if info := INSPECT_INFO.get(inspect_flag):
                 box = col.box()
                 box.label(text=f'{inspect_flag}: ' + info)
@@ -725,6 +926,11 @@ class UNIV_OT_BatchInspect(Operator):
         if Inspect.Flipped in flags or self.inspect_all:
             if count := UNIV_OT_Check_Flipped.flipped(umeshes):
                 INSPECT_INFO['Flipped'] = f'Detected {count} flipped faces'
+
+        if Inspect.Over in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
+            result = UNIV_OT_Check_Over.over(umeshes, batch_inspect=True)
+            if info := UNIV_OT_Check_Over.data_formatting(result):
+                INSPECT_INFO['Over'] = info
 
         if Inspect.NonSplitted in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
             result = UNIV_OT_Check_Non_Splitted.non_splitted(umeshes, use_auto_smooth=True, user_angle=180, batch_inspect=True)
