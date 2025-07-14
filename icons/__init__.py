@@ -14,6 +14,12 @@ from mathutils import Vector, Matrix, Color
 from pathlib import Path
 
 class icons:
+    """
+    Interface for accessing icons.
+
+    NOTE: Icon names must match the names of the corresponding PNG files.
+    NOTE: For properties, methods, and other attributes that don’t contain an icon value, names must start with an underscore.
+    """
     _icons_ = None
     adjust = 0
     arrow = 0
@@ -110,6 +116,7 @@ class icons:
                 _ = icon.icon_pixels[0]  # Need to force load icons, bugreport?
                 setattr(cls, attr, icon.icon_id)
 
+        # Updating icons for workspaces
         from pathlib import Path
         from .. import ui
 
@@ -151,6 +158,7 @@ class icons:
         cls.reset_icon_value_()
 
 class PreviousData:
+    """Save and restore all data, since color changes require importing SVG objects."""
     def __init__(self):
         self.prev_mode = bpy.context.mode
         self.prev_active_obj = bpy.context.view_layer.objects.active
@@ -183,8 +191,27 @@ class PreviousData:
                 bpy.ops.object.mode_set(mode=self.prev_mode)
 
 class WSToolIconsGenerator:
+    """
+    Generates .dat format.
+
+    1) To generate an icon for WST, follow these steps:
+    2) Model the icon as a polygonal mesh.
+    3) The icon mesh must be centered at the origin and fit within the range [-1, -1] ... [1, 1].
+    4) Separate different colors into separate objects.
+    5) For each object, run WSToolIconsGenerator.pprint to print its data to the console, then copy the printed output from the console.
+    6) Create a dedicated method for each part (object) using the printed data — see get_u_tris as an example.
+    7) Insert the generated methods into create_batch_from_tris_and_colors, and assign per-vertex colors for each triangle as shown in that method.
+    8) Adapt WSToolIconsGenerator.update_wst_icon to your specific WST classes.
+    9) Run WSToolIconsGenerator.create_dat_icons to generate the icon.
+
+    This will produce the icon, but you’ll also need to replicate and adapt
+    the operator UNIV_OT_IconsGenerator and the related properties in AddonPreferences,
+    such as color_mode and others tied to icon handling.
+    """
     @classmethod
     def pprint(cls):
+        """Extracts the triangle coordinates and indices.
+        The coordinates are remapped to a more optimized version -1..1 -> 0..255 (float16 to uint8)."""
         obj = bpy.context.object
         mesh = obj.data
 
@@ -238,6 +265,7 @@ class WSToolIconsGenerator:
 
     @classmethod
     def get_u_tris(cls):
+        """Returns an array of triangles - [[(10, 20), (40, 80), (60, 20)], ...]"""
         coords = np.array([111, 159, 95, 159, 95, 107, 96, 101, 99, 95, 105, 92, 111, 91, 147, 91, 153, 92, 159,
                            95, 162, 101, 163, 107, 163, 159, 147, 159, 147, 107, 111, 107], dtype=np.uint8).reshape(-1, 2)
 
@@ -247,7 +275,9 @@ class WSToolIconsGenerator:
 
     @classmethod
     def get_leaf_tris(cls):
-        """Return r up, r bot, l bot, l up tris"""
+        """Return r up, r bot, l bot, l up tris
+        NOTE: This code is specific to UniV - use a simpler method like in get_u_tris.
+        """
         # Right upper leaf
         coords = np.array(
             [143, 198, 149, 200, 155, 204, 160, 209, 176, 225, 225, 176, 209, 160, 204, 155, 201, 149, 198, 143, 183,
@@ -262,19 +292,26 @@ class WSToolIconsGenerator:
         flipped_indexes = indexes[:, ::-1]
 
         r_up_leaf_f16 = cls.remap_uint8_to_f16(coords)
+        # Generate other UniV icon leafs coords
         r_bottom_leaf_f16 =  r_up_leaf_f16 * np.array([1, -1], dtype=np.float16)
         l_bottom_leaf_f16 =  r_up_leaf_f16 * np.array([-1, -1], dtype=np.float16)
         l_up_leaf_f16 =  r_up_leaf_f16 * np.array([-1, 1], dtype=np.float16)
 
         r_u_tris_u8 = coords[indexes]
+        # Get other UniV icon leafs coords from indices
         r_b_tris_u8 = cls.remap_f16_to_uint8(r_bottom_leaf_f16)[flipped_indexes]
         l_b_tris_u8 = cls.remap_f16_to_uint8(l_bottom_leaf_f16)[indexes]
         l_u_tris_u8 = cls.remap_f16_to_uint8(l_up_leaf_f16)[flipped_indexes]
         return r_u_tris_u8, r_b_tris_u8, l_b_tris_u8, l_u_tris_u8
-        # return r_u_tris_u8,#, r_u_tris_u8, r_u_tris_u8, r_u_tris_u8
 
     @classmethod
     def create_batch_from_tris_and_colors(cls):
+        """
+        Creates flat triangle coordinate data, and creates a different color for each vertex of the triangle.
+
+        To make this function easier to understand, remove the code
+        related to leafs_colors and leafs_shape, leave only u_shape and u_co
+        """
         from ..preferences import prefs
         def convert_float_to_srgb_int(col):
             alpha = col[3]
@@ -296,18 +333,21 @@ class WSToolIconsGenerator:
                         ]
 
         u_shape = cls.get_u_tris()
-        u_colors = np.array([u_col], dtype=np.uint8).repeat(len(u_shape)*3, axis=0)
+        # Create a color for each vertex (duplicate one color)
+        u_colors_size = len(u_shape)*3
+        u_colors = np.array([u_col], dtype=np.uint8).repeat(u_colors_size, axis=0)
 
         leafs_shape = cls.get_leaf_tris()
-        colors_size = len(leafs_shape[0])*3
-        leafs_colors = np.array(leaf_col, dtype=np.uint8).repeat(colors_size, axis=0)
+        leafs_colors_size = len(leafs_shape[0])*3
+        leafs_colors = np.array(leaf_col, dtype=np.uint8).repeat(leafs_colors_size, axis=0)
 
-        shapes = [u_shape, *leafs_shape, u_colors, leafs_colors]
+        # Convert to flat data (first write triangles, then colors)
+        shapes = [u_shape, *leafs_shape] + [u_colors, leafs_colors]
         for idx, shape in enumerate(shapes):
             shapes[idx] = shape.reshape(-1)
 
-        union_data = np.concatenate(shapes)
-        return union_data.tobytes()
+        union_flat_data = np.concatenate(shapes)
+        return union_flat_data.tobytes()
 
     @classmethod
     def create_dat_icons(cls):
@@ -322,19 +362,27 @@ class WSToolIconsGenerator:
             fw(bytes((255, 255)))
             # X, Y
             fw(bytes((0, 0)))
-            fw(cls.create_batch_from_tris_and_colors())
+            icon_flat_data = cls.create_batch_from_tris_and_colors()
+            fw(icon_flat_data)
+
         cls.update_wst_icon(str(filename))
 
     @staticmethod
     def update_wst_icon(filename: str):
-        from ..utils import update_area_by_type
+        """ Icons for WST are cached during class registration and remain even after unregister.
+        To update an icon, the old one must be removed and the new one registered.
+
+        This hack is used to avoid restarting Blender."""
+
+        from .. import utils
         from ..ui import UNIV_WT_object_VIEW3D
-        from bl_ui.space_toolsystem_common import _icon_cache as wst_icons  # noqa
+        from bl_ui.space_toolsystem_common import _icon_cache as wst_icons_cache  # noqa
 
         icon_name = UNIV_WT_object_VIEW3D.bl_icon
-        if icon_name in wst_icons:
-            if wst_icons[icon_name] != 0:
-                bpy.app.icons.release(wst_icons[icon_name])
+        if icon_name in wst_icons_cache:
+            if wst_icons_cache[icon_name] != 0:
+                bpy.app.icons.release(wst_icons_cache[icon_name])
+
             try:
                 icon_value = bpy.app.icons.new_triangles_from_file(filename)
             except Exception as e:  # noqa
@@ -342,11 +390,24 @@ class WSToolIconsGenerator:
                 traceback.print_exc()
                 print(f"UniV: WS Tool icon could not be reloaded from {filename!r}")
                 icon_value = 0
-            wst_icons[icon_name] = icon_value
-            update_area_by_type('VIEW_3D')
+            wst_icons_cache[icon_name] = icon_value
+            utils.update_area_by_type('VIEW_3D')
 
 
 class IconsCreator:
+    """
+    1) This class imports SVG files
+    2) Converts them to MESH objects
+    3) Extracts mesh draw data (triangles and their colors)
+    4) Renders to a buffer
+    5) Reads from the buffer and passes it to OpenImageIO
+    6) OIIO performs downscaling to reduce aliasing and saves as .png
+
+    To ensure crisp icons, shape edges should align exactly to pixel boundaries wherever possible,
+    and transforms should be removed to reduce floating-point errors.
+    The Apply Transform add-on in Inkscape can help with this, though it doesn’t always give accurate results,
+    so achieving high quality often requires a lot of manual work."""
+
     @classmethod
     def convert_svg_to_png_builtin(cls, icon_size=32, mono=False, antialiasing=2):
         base_path = Path(__file__).resolve().parent
@@ -456,6 +517,7 @@ class IconsCreator:
         matrix[0][0] = 2
         matrix[1][1] = -2
 
+        # NOTE: The operation order is important to match the SVG converter's float precision quirks - changing it would break proportions.
         svg_matrix = Matrix()
         svg_matrix = svg_matrix @ Matrix.Scale(1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((1.0, 0.0, 0.0)))
         svg_matrix = svg_matrix @ Matrix.Scale(-1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((0.0, 1.0, 0.0)))
@@ -493,6 +555,11 @@ class IconsCreator:
     
     @staticmethod
     def get_color(obj, icon_name):
+        """
+        This is where color matching happens.
+        To ensure correct results, you’ll need to download/open Inkscape, open your icon, then use Save As -> Optimized SVG.
+        This removes metadata, extra characters, and converts RGB to HEX (if the corresponding options are enabled).
+        """
         from ..preferences import prefs
         from ..utils import hex_to_rgb, vec_isclose
 
