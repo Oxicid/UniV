@@ -734,14 +734,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         row.operator('uv.univ_select_by_vertex_count', text='Tris').polygone_type = 'TRIS'
         row.operator('uv.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
         row.operator('uv.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
-        col.separator(factor=0.35)
 
-        row = col.row(align=True)
-        row.scale_y = 1.35
-        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
-        row.operator('uv.univ_normalize', icon_value=icons.normalize)
-
-        UNIV_PT_General.draw_texel_density(col, 'uv')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
@@ -749,7 +742,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         # Left Upper
         pie.split()
         # Right Upper
-        pie.operator("mesh.univ_checker", icon_value=icons.checker)
+        pie.operator("mesh.univ_checker", text='Toggle Checker', icon_value=icons.checker)
         # Left Bottom
         if univ_pro:
             pie.operator("uv.univ_select_loop", icon_value=icons.loop_select)
@@ -876,10 +869,6 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         split = pie.split()
         col = split.column(align=True)
         col.separator(factor=18)
-        row = col.row(align=True)
-        row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
-        row.operator('uv.univ_normalize', icon_value=icons.normalize)
-        UNIV_PT_General.draw_texel_density(col, 'mesh')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
@@ -889,7 +878,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         pie.split()
 
         # Right Upper
-        pie.operator("mesh.univ_checker", icon_value=icons.checker)
+        pie.operator("mesh.univ_checker", text='Toggle Checker', icon_value=icons.checker)
 
         # Left Bottom
         pie.split()
@@ -918,9 +907,14 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         # Bottom
 
-        col = pie.column(align=True)
+        col = pie.column(align=False)
         col.separator(factor=18)
         col.scale_x = 0.8
+
+        row = col.row(align=True)
+        row.scale_y = 1.35
+        row.operator('mesh.loop_multi_select', text='Ring').ring = True
+        row.operator('mesh.loop_to_region', text='Inner')
 
         row = col.row(align=True)
         row.scale_y = 1.35
@@ -928,14 +922,6 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         row.operator('mesh.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
         row.operator('mesh.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
 
-        col.separator(factor=0.35)
-
-        row = col.row(align=True)
-        row.scale_y = 1.35
-        row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
-        row.operator('mesh.univ_normalize', icon_value=icons.normalize)
-
-        UNIV_PT_General.draw_texel_density(col, 'mesh')
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
@@ -944,7 +930,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         # Left Upper
         pie.operator("mesh.select_nth", icon_value=icons.checker).offset = 1
         # Right Upper
-        pie.operator("mesh.univ_checker", icon_value=icons.checker)
+        pie.operator("mesh.univ_checker", text="Toggle Checker", icon_value=icons.checker)
         # Left Bottom
         if univ_pro:
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
