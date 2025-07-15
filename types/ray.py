@@ -10,10 +10,12 @@ import typing
 import bpy
 import math
 import bmesh
+import numpy as np
 from math import inf, isclose
 from bmesh.types import BMFace, BMLoop
 from mathutils import Vector
 from mathutils.kdtree import KDTree
+from mathutils.bvhtree import BVHTree
 from itertools import chain
 from bpy_extras import view3d_utils
 
@@ -612,25 +614,91 @@ class RayCast:
             self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
             self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
 
+    @staticmethod
+    def get_bvh_from_polygon(umesh: UMesh) -> tuple[BVHTree, list[BMFace]] :
+        faces = []
+        faces_append = faces.append
+        flat_tris_coords = []
+        flat_tris_coords_append = flat_tris_coords.append
+
+        for crn_a, crn_b, crn_c in umesh.bm.calc_loop_triangles():
+            face = crn_a.face
+            if face.hide:
+                continue
+            faces_append(face)
+            flat_tris_coords_append(crn_a.vert.co)
+            flat_tris_coords_append(crn_b.vert.co)
+            flat_tris_coords_append(crn_c.vert.co)
+
+        indices = np.arange(len(flat_tris_coords), dtype='uint32').reshape(-1, 3).tolist()
+        bvh = BVHTree.FromPolygons(flat_tris_coords, indices, all_triangles=True)
+        return bvh, faces
+
+    def ray_cast_umeshes(self):
+        ray_target = self.ray_origin + self.ray_direction
+
+        best_length_squared = float('inf')
+        umesh: UMesh | None = None
+        face_index: int = 0
+        for umesh_iter in self.umeshes:
+            world_matrix = umesh_iter.obj.matrix_world
+            matrix_inv = world_matrix.inverted()
+            ray_origin_obj = matrix_inv @ self.ray_origin
+            ray_target_obj = matrix_inv @ ray_target
+            ray_direction_obj = ray_target_obj - ray_origin_obj
+
+            bvh = BVHTree.FromBMesh(umesh_iter.bm)
+            hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj)
+
+            if not hit:
+                continue
+
+            hit_world = world_matrix @ hit
+            length_squared = (hit_world - self.ray_origin).length_squared
+            if length_squared < best_length_squared:
+                umesh_iter.ensure()
+                umesh_iter.bm = bmesh.from_edit_mesh(umesh_iter.obj.data)
+                # If a face is hidden, the BVH is computed using FromPolygons.
+                if umesh_iter.bm.faces[face_index_].hide:
+                    bvh, faces = self.get_bvh_from_polygon(umesh_iter)  # slow
+                    hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj)
+                    if not hit:
+                        continue
+                    hit_world = world_matrix @ hit
+                    length_squared = (hit_world - self.ray_origin).length_squared
+                    if length_squared >= best_length_squared:
+                        continue
+                    umesh_iter.bm.faces.index_update()
+                    face_index_ = faces[face_index_].index
+
+                best_length_squared = length_squared
+                umesh = umesh_iter
+                face_index = face_index_
+
+        return umesh, face_index
+
     def ray_cast(self, max_pick_radius):
-        result, loc, normal, index, obj, matrix = bpy.context.scene.ray_cast(
+        # TODO: Add raycast by radial patterns
+        result, loc, normal, face_index, obj, matrix = bpy.context.scene.ray_cast(
             bpy.context.view_layer.depsgraph,
             origin=self.ray_origin,
             direction=self.ray_direction
         )
         if not (result and obj and obj.type == 'MESH'):
+            # TODO: Add raycast, ignoring objects that are not in Edit Mode
             return
 
         if obj.mode != 'EDIT':
-            # TODO: Pick edit mode objects throw object mode - objects
-            self.report({'WARNING'}, f'Raycast hit non-edit mode object - {obj.name!r}')  # noqa
-            return
-
-        umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
+            # Raycast, ignoring objects that are not in Edit Mode
+            umesh, face_index = self.ray_cast_umeshes()
+            if not umesh:
+                return
+        else:
+            umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
         umesh.ensure()
         umesh.bm = bmesh.from_edit_mesh(umesh.obj.data)
 
-        face = umesh.bm.faces[index]
+        face = umesh.bm.faces[face_index]
         e, dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d)
         if dist < max_pick_radius:
             for crn in e.link_loops:

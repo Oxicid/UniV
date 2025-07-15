@@ -979,6 +979,8 @@ class UNIV_OT_MoveUpDownBase(Operator):
 class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_up'
     bl_label = 'Up'
+    bl_description = ("Move Up UV Layer \n"
+                      "Alt+Click - Moves only the UV layer, keeping name in place.")
 
     def execute(self, context):
         settings = univ_settings()
@@ -995,6 +997,8 @@ class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
 class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_down'
     bl_label = 'Down'
+    bl_description = ("Move Down UV Layer \n"
+                      "Alt+Click - Moves only the UV layer, keeping name in place.")
 
     def execute(self, context):
         settings = univ_settings()
@@ -1012,6 +1016,8 @@ class UNIV_OT_Add(Operator):
     bl_idname = 'mesh.univ_add'
     bl_label = 'Add'
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = ("Add UV Layer \n"
+                      "Alt+Click - Add missed UV layers.")
 
     add_missed: BoolProperty(name='Add with Missed', default=False)
 
@@ -1086,6 +1092,8 @@ class UNIV_OT_Remove(Operator):
     bl_idname = 'mesh.univ_remove'
     bl_label = 'Remove'
     bl_options = {'REGISTER', 'UNDO'}
+    bl_description = ("Remove UV Layer \n"
+                      "Alt+Click - Remove all UV layers.")
 
     remove_all: BoolProperty(name='Remove All', default=False)
 
