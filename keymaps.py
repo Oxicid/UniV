@@ -155,12 +155,31 @@ def add_keymaps():
         kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
         keys.append((km, kmi))
 
+        kmi = km.keymap_items.new('uv.univ_select_similar', 'G', 'PRESS', shift=True)
+        keys.append((km, kmi))
+
     # Flip
     kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
     keys.append((km, kmi))
 
     # Rotate
     ## Default. CW.
+    kmi = km.keymap_items.new('uv.univ_select_mode', 'ONE', 'PRESS')
+    kmi.properties.type = 'VERTEX'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_mode', 'TWO', 'PRESS')
+    kmi.properties.type = 'EDGE'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_mode', 'THREE', 'PRESS')
+    kmi.properties.type = 'FACE'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new('uv.univ_select_mode', 'FOUR', 'PRESS')
+    kmi.properties.type = 'ISLAND'
+    keys.append((km, kmi))
+
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'DEFAULT'
@@ -366,6 +385,10 @@ def add_keymaps_ws():
 
     kmi = km.keymap_items.new("mesh.univ_angle", 'A', 'PRESS', ctrl=True)
     keys_ws.append((km, kmi))
+
+    if univ_pro:
+        kmi = km.keymap_items.new('mesh.univ_select_similar', 'G', 'PRESS', shift=True)
+        keys.append((km, kmi))
 
     workspace_duplicates(km)
 

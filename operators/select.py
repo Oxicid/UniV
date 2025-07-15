@@ -2667,3 +2667,86 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_VIEW3D):
         ('FACE', 'Face', ''),
         ('ISLAND', 'Island', ''),
     ))
+
+class UNIV_OT_SelectMode(Operator):
+    bl_idname = "uv.univ_select_mode"
+    bl_label = 'Select Mode'
+    bl_description = "Set Select Mode with sticky disabled in Face Mode"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    type: EnumProperty(name='Type', default='VERTEX', items=(
+        ('VERTEX', 'Vertex', ''),
+        ('EDGE', 'Edge', ''),
+        ('FACE', 'Face', ''),
+        ('ISLAND', 'Island', ''),
+    ))
+
+    @classmethod
+    def poll(cls, context):
+        if context.scene.tool_settings.use_uv_select_sync:
+            return bpy.ops.mesh.select_mode.poll()  # noqa
+        else:
+            return bpy.ops.uv.select_mode.poll()  # noqa
+
+    def execute(self, context):
+        if utils.sync():
+            if self.type == 'ISLAND':
+                # TODO: Implement toggle island checkbox for new sync select system
+                return {'CANCELLED'}
+
+            update = False
+            if bpy.app.version >= (4, 5, 0):
+                tool_settings = context.scene.tool_settings
+                sticky_mode = tool_settings.uv_sticky_select_mode
+                if self.type == 'FACE':
+                    if sticky_mode != 'DISABLED':
+                        update = True
+                        tool_settings.uv_sticky_select_mode = 'DISABLED'
+                else:
+                    if sticky_mode != 'SHARED_LOCATION':
+                        update = True
+                        tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+            elem_type = self.type
+            if elem_type == 'VERTEX':
+                elem_type = 'VERT'
+
+            res = bpy.ops.mesh.select_mode(type=elem_type, use_extend=False, use_expand=False)
+            if update or res == {'FINISHED'}:
+                return {'FINISHED'}
+            else:
+                return res
+        else:
+            update = False
+            tool_settings = context.scene.tool_settings
+            sticky_mode = tool_settings.uv_sticky_select_mode
+            if self.type == 'FACE':
+                if sticky_mode != 'DISABLED':
+                    update = True
+                    tool_settings.uv_sticky_select_mode = 'DISABLED'
+            else:
+                if sticky_mode != 'SHARED_LOCATION':
+                    update = True
+                    tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+
+            current_mode = utils.get_select_mode_uv()
+            if self.type == 'ISLAND' and current_mode == 'FACE':
+                # TODO: This behavior needs to be integrated into the Blender source.
+                umeshes = UMeshes()
+                umeshes.filter_by_selected_uv_faces()
+                umeshes.update_tag = False
+
+                for umesh in umeshes:
+                    types.Islands.tag_filter_visible(umesh)
+                    select_get = utils.face_select_get_func(umesh)
+                    for faces in types.Islands.calc_with_markseam_iter_ex(umesh):
+                        if not utils.all_equal(faces, select_get):
+                            types.FaceIsland(faces, umesh).select = False
+                            umesh.update_tag = True
+                update |= umeshes.update_tag
+                umeshes.silent_update()
+
+            res = bpy.ops.uv.select_mode(type=self.type)
+            if update or res == {'FINISHED'}:
+                return {'FINISHED'}
+            else:
+                return res

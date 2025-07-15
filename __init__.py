@@ -150,6 +150,7 @@ def load_register_types():
             select.UNIV_OT_Stacked,
             select.UNIV_OT_SelectByVertexCount_VIEW2D,
             select.UNIV_OT_SelectByVertexCount_VIEW3D,
+            select.UNIV_OT_SelectMode,
             select.UNIV_OT_Tests,
             # QuickSnap
             quick_snap.UNIV_OT_QuickSnap,
