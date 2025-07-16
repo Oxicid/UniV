@@ -738,7 +738,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        pie.split()
+        pie.operator("uv.univ_toggle_pivot", icon='PIVOT_ACTIVE')
         # Left Upper
         pie.split()
         # Right Upper
@@ -965,8 +965,16 @@ class IMAGE_MT_PIE_univ_transform(Menu):
         col.scale_y = 1.35
 
         row = col.row(align=True)
-        row.operator('uv.univ_crop', icon_value=icons.crop)
-        row.operator('uv.univ_fill', text='Fill  ', icon_value=icons.fill)
+        row.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
+        row.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
+
+        row = col.row(align=True)
+        row.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
+        row.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
+
+        col.separator(factor=0.35)
 
         row = col.row(align=True)
         row.operator('uv.univ_home', icon_value=icons.home)

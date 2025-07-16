@@ -586,6 +586,14 @@ class UNIV_OT_SetCursor2D(Operator):
             self.report({'INFO'}, 'Force Set Cursor 2D to Grid')
 
         context.space_data.cursor_location = pt
+        if context.space_data.pivot_point != 'CURSOR':
+            from . import toggle
+            from .. import draw
+            toggle.PREV_PIVOT = context.space_data.pivot_point
+            context.space_data.pivot_point = 'CURSOR'
+
+            draw.TextDraw.max_draw_time = 1.8
+            draw.TextDraw.draw(f"Switch Pivot to 'Cursor'")
         return {'FINISHED'}
 
 

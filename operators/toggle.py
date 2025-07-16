@@ -371,6 +371,65 @@ class UNIV_OT_TogglePanelsByCursor(Operator):
                     return bpy.ops.wm.context_toggle(data_path='space_data.show_region_toolbar')
         return {'CANCELLED'}
 
+PREV_PIVOT = ''
+PREV_PIVOT_TIME = 0.0
+class UNIV_OT_TogglePivot(Operator):
+    bl_idname = 'uv.univ_toggle_pivot'
+    bl_label = 'Toggle Pivot'
+    bl_options = {'UNDO'}
+    bl_description = ('Toggles the pivot between Bounding Box and Individual Origins. \n'
+                      'If toggled again within 1.8 seconds, it switches from Bounding Box or Individual to Cursor.')
+
+
+    def execute(self, context):
+        from time import perf_counter
+        from .. import draw
+        global PREV_PIVOT
+        global PREV_PIVOT_TIME
+        curr_time = perf_counter()
+        curr_pivot = context.space_data.pivot_point  # noqa
+
+        draw_time = 1.8
+        draw.TextDraw.max_draw_time = draw_time
+        readable_text = {'INDIVIDUAL_ORIGINS': 'Individual',
+                         'CENTER': 'Boundary Box',
+                         'MEDIAN': 'Median',
+                         'CURSOR': 'Cursor' }
+
+        if (curr_time - PREV_PIVOT_TIME) <= draw_time:
+            if PREV_PIVOT == 'CENTER' and curr_pivot == 'INDIVIDUAL_ORIGINS':
+                context.space_data.pivot_point = 'CURSOR'
+            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == 'CENTER':
+                context.space_data.pivot_point = 'CURSOR'
+            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == 'MEDIAN':
+                context.space_data.pivot_point = 'CURSOR'
+            elif PREV_PIVOT == 'CENTER' and curr_pivot == 'MEDIAN':
+                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+            elif PREV_PIVOT == 'MEDIAN' and curr_pivot == 'CENTER':
+                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+            else:
+                if curr_pivot == 'CENTER':
+                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+                else:
+                    context.space_data.pivot_point = 'CENTER'
+
+            draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}')
+
+        else:
+            if PREV_PIVOT == '' or PREV_PIVOT == curr_pivot:
+                if curr_pivot == 'CENTER':
+                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+                else:
+                    context.space_data.pivot_point = 'CENTER'
+            else:
+                draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}')
+                context.space_data.pivot_point = PREV_PIVOT
+
+        PREV_PIVOT = curr_pivot
+        PREV_PIVOT_TIME = curr_time
+        return {'FINISHED'}
+
+
 class UNIV_OT_SyncUVToggle(Operator):
     bl_idname = 'uv.univ_sync_uv_toggle'
     bl_label = 'Sync UV Toggle'

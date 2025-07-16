@@ -124,6 +124,7 @@ def load_register_types():
             unwrap.UNIV_OT_Unwrap_VIEW3D,
             # Toggles
             toggle.UNIV_OT_SplitUVToggle,
+            toggle.UNIV_OT_TogglePivot,
             toggle.UNIV_OT_TogglePanelsByCursor,
             toggle.UNIV_OT_SyncUVToggle,
             toggle.UNIV_OT_StretchUVToggle,
