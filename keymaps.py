@@ -120,6 +120,10 @@ def add_keymaps():
     kmi.properties.name = "IMAGE_MT_PIE_univ_favorites_edit"
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new("wm.call_menu_pie", 'T', 'PRESS')
+    kmi.properties.name = "IMAGE_MT_PIE_univ_transform"
+    keys.append((km, kmi))
+
     # Select
     kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
     kmi.properties.deselect = False

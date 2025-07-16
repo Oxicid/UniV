@@ -180,6 +180,8 @@ def load_register_types():
             ui.VIEW3D_MT_PIE_univ_projection,
             ui.IMAGE_MT_PIE_univ_texel,
             ui.VIEW3D_MT_PIE_univ_texel,
+            ui.IMAGE_MT_PIE_univ_transform,
+            # Icons Generator
             icons.UNIV_OT_IconsGenerator,
             # Seam
             seam.UNIV_OT_Cut_VIEW2D,

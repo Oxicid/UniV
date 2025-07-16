@@ -1988,7 +1988,7 @@ class UNIV_OT_Home(Operator):
                 self.report({'INFO'}, report_info)
                 return {'FINISHED'}
             else:
-                self.report({'WARNING'}, self.no_change_info)
+                self.report({'INFO'}, self.no_change_info)
                 return {'CANCELLED'}
 
         if not self.umeshes.is_edit_mode:
@@ -2003,7 +2003,7 @@ class UNIV_OT_Home(Operator):
             if report_info:
                 self.report({'INFO'}, report_info)
         else:
-            self.report({'WARNING'}, self.no_change_info)
+            self.report({'INFO'}, self.no_change_info)
         self.umeshes.silent_update()
         self.umeshes.free()
         return {'FINISHED'}

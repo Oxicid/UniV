@@ -939,6 +939,57 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
+class IMAGE_MT_PIE_univ_transform(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        if prefs().use_csa_mods:
+            layout.operator_context = 'INVOKE_DEFAULT'
+        else:
+            layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator('uv.univ_rotate', icon_value=icons.rotate)
+
+        # Right
+        pie.operator('uv.univ_flip', icon_value=icons.flip)
+
+        # Bottom
+        col = pie.column(align=True)
+
+        col.separator(factor=12)
+        col.scale_x = 1.35
+        col.scale_y = 1.35
+
+        row = col.row(align=True)
+        row.operator('uv.univ_crop', icon_value=icons.crop)
+        row.operator('uv.univ_fill', text='Fill  ', icon_value=icons.fill)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_home', icon_value=icons.home)
+        row.operator('uv.univ_shift', icon_value=icons.shift)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_random', icon_value=icons.random)
+
+        # Upper
+        pie.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
+
+        # Left Upper
+        pie.operator('uv.univ_orient', text='H-Orient', icon_value=icons.horizontal_a).edge_dir = 'HORIZONTAL'
+
+        # Right Upper
+        pie.operator('uv.univ_orient', text='V-Orient', icon_value=icons.vertical_a).edge_dir = 'VERTICAL'
+
+        # Left Bottom
+        pie.operator('uv.univ_sort', icon_value=icons.sort)
+
+        # Right Bottom
+        pie.operator('uv.univ_distribute', icon_value=icons.distribute)
+
 class IMAGE_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
 
