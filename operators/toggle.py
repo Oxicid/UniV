@@ -85,6 +85,8 @@ class UNIV_OT_SplitUVToggle(Operator):
         return {'CANCELLED'}
 
     def split_toggle(self, context):
+        # TODO: If there's another editor to the left of the UV window,
+        #  closing the UV window expands the left editor instead of the right one (VIEW 3D).
         active_area = context.area
         if active_area.type == 'VIEW_3D':
             # Close ui_type
@@ -127,7 +129,7 @@ class UNIV_OT_SplitUVToggle(Operator):
             bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
 
             target_area = None
-            mouse_in_right_side = self.mouse_x_pos > ((active_area.x + active_area.width) // 2)
+            mouse_in_right_side = self.mouse_x_pos > (active_area.x + active_area.width // 2)
             if prefs().split_toggle_uv_by_cursor and mouse_in_right_side:
                 target_area = active_area
             else:
@@ -180,7 +182,7 @@ class UNIV_OT_SplitUVToggle(Operator):
             bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
             new_area, = set(context.screen.areas[:]) - old_areas
 
-            mouse_in_right_side = self.mouse_x_pos > ((active_area.x + active_area.width) // 2)
+            mouse_in_right_side = self.mouse_x_pos > (active_area.x + active_area.width // 2)
             if not (prefs().split_toggle_uv_by_cursor and mouse_in_right_side):
                 new_area, active_area = active_area, new_area
 
@@ -332,6 +334,42 @@ class UNIV_OT_SplitUVToggle(Operator):
             if force_debug():
                 traceback.print_exc()
             return False
+
+
+class UNIV_OT_TogglePanelsByCursor(Operator):
+    """Idea inspired by Machin3. Useful for freeing up the T and N keys."""
+    bl_idname = 'wm.univ_toggle_panels_by_cursor'
+    bl_label = 'Toggle Panels By Cursor'
+    bl_options = {'UNDO'}
+
+    def invoke(self, context, event):
+        self.mouse_x_pos = event.mouse_x
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mouse_x_pos = -50_000
+
+    def execute(self, context):
+        if context.area is None:
+            return {'PASS_THROUGH'}
+
+        if self.mouse_x_pos == -50_000:
+            self.report({'WARNING'}, "UniV: The operator 'Toggle Panels By Cursor' should be called via INVOKE_DEFAULT")
+            return {'CANCELLED'}
+
+        active_area = context.area
+        mouse_in_right_side = self.mouse_x_pos > (active_area.x + active_area.width // 2)
+
+        if mouse_in_right_side:
+            for space in context.area.spaces:
+                if hasattr(space, 'show_region_ui'):
+                    return bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
+        else:
+            for space in context.area.spaces:
+                if hasattr(space, 'show_region_toolbar'):
+                    return bpy.ops.wm.context_toggle(data_path='space_data.show_region_toolbar')
+        return {'CANCELLED'}
 
 class UNIV_OT_SyncUVToggle(Operator):
     bl_idname = 'uv.univ_sync_uv_toggle'

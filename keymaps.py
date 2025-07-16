@@ -93,6 +93,9 @@ def add_keymaps():
     kmi.properties.mode = 'SPLIT'
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('wm.univ_toggle_panels_by_cursor', 'T', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
     ### UV Editor
     km = kc.keymaps.new(name='UV Editor')
 
