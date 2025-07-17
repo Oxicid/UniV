@@ -28,8 +28,15 @@ class LoopGroup:
         self._length_uv: float | None = None
         self._length_3d: float | None = None
         self.weights: list[float] | None = None
+        self._is_unpinned_exist: bool | None = None
         self.chain_linked_corners: list[list[BMLoop]] = []
         self.chain_linked_corners_mask: list[bool] = []
+
+    def is_unpinned_exist(self):
+        if self._is_unpinned_exist is None:
+            assert self.chain_linked_corners_mask
+            self._is_unpinned_exist = not all(self.chain_linked_corners_mask)
+        return self._is_unpinned_exist
 
     def is_cyclic_vert(self):
         if len(self.corners) > 1:
@@ -44,6 +51,16 @@ class LoopGroup:
         crn_a = self.corners[0]
         crn_b = self.corners[-1].link_loop_next
         return crn_a.vert == crn_b.vert and crn_a[self.umesh.uv].uv == crn_b[self.umesh.uv].uv
+
+    @property
+    def src(self):
+        """For search short path"""
+        return self.chain_linked_corners[0][0]
+
+    @property
+    def dst(self):
+        """For search short path"""
+        return self.chain_linked_corners[-1][0]
 
     def calc_loop_group(self, crn):
         crn.tag = False

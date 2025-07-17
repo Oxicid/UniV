@@ -429,12 +429,21 @@ class FaceIsland:
             for crn in f.loops:
                 crn.tag = tag
 
-    def set_boundary_tag(self):
+    def set_boundary_tag(self, match_idx=False):
         uv = self.umesh.uv
-        is_boundary = utils.is_boundary_sync if self.umesh.sync else utils.is_boundary_non_sync
-        for f in self:
-            for crn in f.loops:
-                crn.tag = crn.edge.seam or is_boundary(crn, uv)
+        if match_idx:
+            is_pair = utils.is_pair
+            for f in self:
+                idx = f.index
+                for crn in f.loops:
+                    crn.tag = (crn.edge.seam or
+                               (pair_crn := crn.link_loop_radial_prev).face.index != idx  or
+                               not is_pair(crn, pair_crn, uv))  # noqa
+        else:
+            is_boundary = utils.is_boundary_sync if self.umesh.sync else utils.is_boundary_non_sync
+            for f in self:
+                for crn in f.loops:
+                    crn.tag = crn.edge.seam or is_boundary(crn, uv)
 
     def set_selected_crn_edge_tag(self, umesh):
         if umesh.sync:

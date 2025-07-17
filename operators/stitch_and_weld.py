@@ -289,7 +289,7 @@ class Stitch:
                 pad_scale = bl_math.clamp((min_length-self.padding * 2) / min_length, 0.5, 1.5)
 
                 # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
-                trans.set_boundary_tag()
+                trans.set_boundary_tag(match_idx=True)
                 if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags(trans):
                     trans_lg_is_basic_boundary = False
                     if len(loop_groups) != 1:

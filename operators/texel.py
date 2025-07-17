@@ -128,7 +128,8 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         return {'FINISHED'}
 
     @staticmethod
-    def individual_scale(isl: AdvIsland, axis, shear):
+    def individual_scale(isl: AdvIsland, axis, shear, threshold=1e-8):
+        # TODO: The threshold can be made lower if the triangulation (tessellation) is performed using the UV topology.
         from bl_math import clamp
         aspect = isl.umesh.aspect
         new_center = isl.value.copy()
@@ -141,7 +142,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             scale_cross = 0.0
 
             for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
-                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-9):
+                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=threshold):
                     continue
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
                 try:
@@ -318,7 +319,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             scale_cross = 0.0
 
             for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
-                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-9):
+                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-8):
                     continue
                 m = Matrix((uv_a - uv_c, uv_b - uv_c))
                 try:

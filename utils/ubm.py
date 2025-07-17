@@ -1033,11 +1033,11 @@ class ShortPath:
         for l in chain(linked_crn_uv(l_a, uv), [l_a]):  # TODO: Add by index included and mark seam and bi-direct linked?
             #  'l_a' is already tagged, tag all adjacent.
 
-            l.tag = True
+            l.tag = False
             l_b = l.link_loop_next
 
             while True:
-                if not l_b.tag:
+                if l_b.tag:
                     uv_b = l_b[uv].uv
                     # We know 'l_b' is not visited, check it out!
                     l_b_index = l_b.index
@@ -1071,7 +1071,7 @@ class ShortPath:
         i = 0
         for f in isl:
             for crn in f.loops:
-                crn.tag = False
+                crn.tag = True
                 crn.index = i
                 i += 1
 
@@ -1079,12 +1079,13 @@ class ShortPath:
             for exclude_lg in exclude_corners_group:
                 for chain_corners in exclude_lg.chain_linked_corners:
                     for crn in chain_corners:
-                        crn.tag = True
+                        crn.tag = False
 
+            # Restore tags that may have been excluded above.
             dst_corners = exclude_corners_group[0].chain_linked_corners[-1]
             src_corners = exclude_corners_group[2].chain_linked_corners[0]
             for crn in chain(dst_corners, src_corners):
-                crn.tag = False
+                crn.tag = True
 
         # Allocate.
         loops_prev = [None] * i
@@ -1103,9 +1104,9 @@ class ShortPath:
                         break
                 break
 
-            if not l.tag:
+            if l.tag:
                 #  Adjacent loops are tagged while stepping to avoid 2x loops.
-                l.tag = True
+                l.tag = False
                 ShortPath.vert_tag_add_adjacent_uv(heap, l, loops_prev, cost, uv, prioritize_corners, bound_priority_factor)
 
         return list(path)
