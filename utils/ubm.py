@@ -388,6 +388,56 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
     # assert len(linked) == len(set(linked))
     return linked
 
+def linked_crn_to_vert_pair_by_idx_with_seam(crn: BMLoop, uv):
+    """Linked to arg corner by island index with arg corner"""
+    idx = crn.face.index
+    first_vert = crn.vert
+
+    linked = []
+    bm_iter = crn
+    # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
+    iterated = False
+    while True:
+        prev_crn = bm_iter.link_loop_prev
+        pair_ccw = prev_crn.link_loop_radial_prev
+        if pair_ccw == crn and iterated:
+            break
+        iterated = True
+
+        # Finish CCW
+        if (pair_ccw in (prev_crn, crn) or
+                (first_vert != pair_ccw.vert) or
+                pair_ccw.edge.seam or
+                pair_ccw.face.index != idx or
+                not is_pair(prev_crn, pair_ccw, uv)
+        ):
+            bm_iter = crn
+            linked_cw = []
+            while True:
+                pair_cw = bm_iter.link_loop_radial_prev
+                # Skip flipped and boundary
+                if pair_cw == bm_iter:
+                    break
+
+                next_crn = pair_cw.link_loop_next
+                if next_crn == crn:
+                    break
+
+                if ((first_vert != next_crn.vert)
+                        or pair_cw.edge.seam
+                        or next_crn.face.index != idx
+                        or not is_pair(bm_iter, pair_cw, uv)
+                ):
+                    break
+                bm_iter = next_crn
+                linked_cw.append(next_crn)
+            linked.extend(linked_cw[::-1])
+            break
+        bm_iter = pair_ccw
+        linked.append(bm_iter)
+    # assert len(linked) == len(set(linked))
+    return linked
+
 
 def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
     first_co = first[uv].uv
@@ -1058,7 +1108,12 @@ class ShortPath:
                     break
 
     @staticmethod
-    def calc_path_uv_vert(isl, l_src, l_dst, exclude_corners_group, prioritize_corners: set[BMLoop] | tuple = (), bound_priority_factor=0.9):
+    def calc_path_uv_vert(isl: 'types.AdvIsland',
+                          l_src: BMLoop,
+                          l_dst: BMLoop,
+                          exclude_corners_group: 'list[types.LoopGroup] | tuple',
+                          prioritize_corners: set[BMLoop] | tuple = (),
+                          bound_priority_factor=0.9) -> list[BMLoop]:
         import heapq
         from collections import deque
         path = deque()

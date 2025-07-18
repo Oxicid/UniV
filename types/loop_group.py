@@ -22,6 +22,7 @@ class LoopGroup:
         self.umesh: _umesh.UMesh = umesh
         self.corners: list[BMLoop] = []
         self.tag = True
+        self.value: typing.Any | utils.NoInit = utils.NoInit()
         self.dirt = False
         self.is_shared = False
         self.is_flipped_3d = False
@@ -32,7 +33,7 @@ class LoopGroup:
         self.chain_linked_corners: list[list[BMLoop]] = []
         self.chain_linked_corners_mask: list[bool] = []
 
-    def is_unpinned_exist(self):
+    def is_unpinned_exist(self):  # rename to has_unpinned
         if self._is_unpinned_exist is None:
             assert self.chain_linked_corners_mask
             self._is_unpinned_exist = not all(self.chain_linked_corners_mask)
@@ -681,6 +682,13 @@ class AdvCorner:
         return self.crn.vert
 
     @property
+    def edge(self):
+        if self.invert:
+            return self.crn.link_loop_prev.edge
+        else:
+            return self.crn.edge
+
+    @property
     def length(self):
         if self.invert:
             return (self.crn[self.uv].uv - self.crn.link_loop_prev[self.uv].uv).length
@@ -959,6 +967,9 @@ class Segment:
                         seg.is_end_lock = True
 
         return Segments(slices, self.umesh)
+
+    def deepcopy(self):
+        return Segment([adv_crn.copy() for adv_crn in self.seg], self.umesh)
 
     def __iter__(self):
         return iter(self.seg)

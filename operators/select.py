@@ -2155,53 +2155,30 @@ class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
     def test_invoke(self, _event):
+
+        from .. import univ_pro
         umesh = self.umeshes[0]
         uv = umesh.uv
 
-        if False:
-            edge_orient = Vector((0, 1)) # noqa
-        else:
-            edge_orient = Vector((1, 0))
 
-        from math import radians as to_rad
-        angle = to_rad(21)
-        negative_ange = math.pi - angle
-
-        groups = []
         islands = AdvIslands.calc_visible(umesh)
         islands.indexing()
 
+        umesh.set_corners_tag(False)
         isl = AdvIslands.calc_visible(umesh)[0]
+        isl.set_boundary_tag(match_idx=True)
 
-        to_select_corns = []
-        for crn in isl.corners_iter():
-            crn_uv_a = crn[uv]
-            if not crn_uv_a.select_edge:
-                crn.tag = False
-                continue
+        boundary_loop_groups = types.LoopGroups.calc_by_boundary_crn_tags(isl)
 
-            crn_uv_b = crn.link_loop_next[uv]
+        four_groups: 'LoopGroups' = univ_pro.rectify.UNIV_OT_Rectify.two_pt_ring_lg_to_rect_ex(boundary_loop_groups, isl)
 
-            vec = crn_uv_a.uv - crn_uv_b.uv
-            a = vec.angle(edge_orient, 0)
 
-            if a <= angle or a >= negative_ange:
-                to_select_corns.append(crn)
-                crn.tag = True
-            else:
-                crn.tag = False
+        self.calc_from_corners(four_groups, uv)
 
-            groups.append(to_select_corns)
+        umesh.update()
 
-        segments = types.Segments.from_tagged_corners(to_select_corns, umesh)
 
-        segments = segments.break_by_cardinal_dir()
-        segments.segments.sort(key=lambda seg__: seg__.length)
-        segments.segments.sort(key=lambda seg__: seg__.weight_angle, reverse=True)
-        segments.segments.reverse()
-        # from . import transform
-        # new_segments = transform.Align_by_Angle.join_segments_by_angle(transform.Align_by_Angle, segments)
-        self.calc_from_segments(segments)
+
 
 
 class UNIV_OT_SelectByArea(Operator):
