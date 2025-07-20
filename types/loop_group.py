@@ -29,15 +29,15 @@ class LoopGroup:
         self._length_uv: float | None = None
         self._length_3d: float | None = None
         self.weights: list[float] | None = None
-        self._is_unpinned_exist: bool | None = None
+        self.is_unpinned_exist_: bool | None = None
         self.chain_linked_corners: list[list[BMLoop]] = []
         self.chain_linked_corners_mask: list[bool] = []
 
-    def is_unpinned_exist(self):  # rename to has_unpinned
-        if self._is_unpinned_exist is None:
+    def has_unpinned(self):  # rename to has_unpinned
+        if self.is_unpinned_exist_ is None:
             assert self.chain_linked_corners_mask
-            self._is_unpinned_exist = not all(self.chain_linked_corners_mask)
-        return self._is_unpinned_exist
+            self.is_unpinned_exist_ = not all(self.chain_linked_corners_mask)
+        return self.is_unpinned_exist_
 
     def is_cyclic_vert(self):
         if len(self.corners) > 1:

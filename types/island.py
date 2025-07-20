@@ -1017,7 +1017,7 @@ class AdvIsland(FaceIsland):
         self.calc_flat_coords(save_triplet_)
 
     def calc_tris_simple(self):
-        tris_isl = []
+        tris_isl: list[tuple[BMLoop, BMLoop, BMLoop]] = []
         tris_isl_append = tris_isl.append
         for f in self:
             corners = f.loops
