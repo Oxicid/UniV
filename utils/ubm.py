@@ -43,6 +43,14 @@ def is_pair_with_flip(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
     return crn.link_loop_next[uv].uv == _rad_prev[uv].uv and \
            crn[uv].uv == _rad_prev.link_loop_next[uv].uv
 
+def has_pair_with_ms(crn: BMLoop, uv: BMLayerItem):
+    if crn.edge.seam or crn == (pair := crn.link_loop_radial_prev):
+        return False
+    if crn.vert == pair.vert:  # avoid flipped 3d
+        return False
+    return crn.link_loop_next[uv].uv == pair[uv].uv and \
+           crn[uv].uv == pair.link_loop_next[uv].uv
+
 def is_pair_by_idx(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
     if crn == _rad_prev or crn.face.index != _rad_prev.face.index:
         return False
