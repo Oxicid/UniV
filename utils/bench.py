@@ -15,7 +15,7 @@ from dataclasses import dataclass
 @dataclass
 class timer:
     repeats: int = 1
-    text: str = ''
+    text: str = ''  # TODO: Add temp text
 
     def __enter__(self):
         self._fix_args()
@@ -25,6 +25,7 @@ class timer:
 
     def __exit__(self, *exc_info):
         self._print_time_info()
+        self.reset()
 
     def __call__(self, func):
         @functools.wraps(func)
@@ -40,6 +41,7 @@ class timer:
             for i in range(self.repeats):
                 result = func(*args, **kwargs)
             self._print_time_info()
+            self.reset()
             return result
         return wrapper_timer
 
@@ -49,6 +51,7 @@ class timer:
         for _ in range(self.repeats):
             yield
         self._print_time_info()
+        self.reset()
 
     def _fix_args(self):
         if isinstance(self.repeats, str):
@@ -68,6 +71,10 @@ class timer:
             print(f"{self.text}Total time: {elapsed_time:0.4f}. Avg: {(elapsed_time / self.repeats):0.4f}")
         else:
             print(f"{self.text}Elapsed time: {elapsed_time:0.4f} seconds")
+
+    def reset(self):
+        self.repeats=1
+        self.text=''
 
 def profile(func):
     # Source: https://osf.io/upav8

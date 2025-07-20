@@ -12,6 +12,7 @@ import json
 import math
 import bl_math
 import numpy as np
+import itertools
 
 from bpy.props import *
 from pathlib import Path
@@ -19,6 +20,7 @@ from bpy.types import Operator
 from collections.abc import Callable
 
 from math import pi, sqrt, isclose
+from bl_math import clamp
 from mathutils import Vector, Matrix
 from mathutils.geometry import area_tri
 
@@ -134,32 +136,47 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         aspect = isl.umesh.aspect
         new_center = isl.value.copy()
 
-        vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
-        uv_coords_and_3d_vectors_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
-        for j in range(10):
-            scale_cou = 0.0
-            scale_cov = 0.0
+        transform_acc = Matrix.Identity(2)
+        scale_acc = Vector((1.0, 1.0))
+
+        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
+        vec_ac = flat_3d_coords[:, 0] - flat_3d_coords[:, 2]
+        vec_bc = flat_3d_coords[:, 1] - flat_3d_coords[:, 2]
+
+        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
+        weights = np.array(list(isl.weights) if isinstance(isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
+
+        for _ in range(10):
+            m00 = flat_uv_coords[:, 0, 0] - flat_uv_coords[:, 2, 0]
+            m01 = flat_uv_coords[:, 0, 1] - flat_uv_coords[:, 2, 1]
+            m10 = flat_uv_coords[:, 1, 0] - flat_uv_coords[:, 2, 0]
+            m11 = flat_uv_coords[:, 1, 1] - flat_uv_coords[:, 2, 1]
+
+            det = m00 * m11 - m01 * m10
+            mask = np.abs(det) > threshold
+
+            with np.errstate(divide='ignore', invalid='ignore'):
+                inv00, inv01 = m11 / det, -m01 / det
+                inv10, inv11 = -m10 / det, m00 / det
+
+                cou = inv00[:, None] * vec_ac + inv01[:, None] * vec_bc
+                cov = inv10[:, None] * vec_ac + inv11[:, None] * vec_bc
+
+            w = weights
+            if not np.all(mask):
+                if not np.any(mask):
+                    break
+                cou = cou[mask]
+                cov = cov[mask]
+                w = weights[mask]
+
+            scale_cou = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
+            scale_cov = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
             scale_cross = 0.0
-
-            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
-                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=threshold):
-                    continue
-                m = Matrix((uv_a - uv_c, uv_b - uv_c))
-                try:
-                    m.invert()
-                except ValueError:
-                    continue
-
-                cou = m[0][0] * vec_ac + m[0][1] * vec_bc
-                cov = m[1][0] * vec_ac + m[1][1] * vec_bc
-
-                scale_cou += cou.length * weight
-                scale_cov += cov.length * weight
-
-                if shear:
-                    cov.normalize()
-                    cou.normalize()
-                    scale_cross += cou.dot(cov) * weight
+            if shear:
+                cou_n = cou / utils.np_vec_normalized(cou)
+                cov_n = cov / utils.np_vec_normalized(cov)
+                scale_cross = np.sum(utils.np_vec_dot(cou_n, cov_n) * w)
 
             if scale_cou * scale_cov < 1e-10:
                 break
@@ -190,9 +207,8 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                     break
 
                 # Transform
-                for uv_coord in isl.flat_unique_uv_coords:
-                    uv_coord.xy = t @ uv_coord
-                new_center = t @ new_center
+                transform_acc @= t
+                flat_uv_coords = flat_uv_coords @ np.array(t, dtype=np.float32)
             else:
                 if math.isclose(scale_factor_u, 1.0, abs_tol=tolerance):
                     break
@@ -202,11 +218,23 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                 elif axis == 'Y':
                     scale.x = 1
 
+                scale_acc *= scale
+                flat_uv_coords *= np.array(scale, dtype=np.float32)
+
+        if shear:
+            if transform_acc != Matrix.Identity(2):
+                isl.umesh.update_tag = True
                 for uv_coord in isl.flat_unique_uv_coords:
-                    uv_coord *= scale
-                new_center *= scale
-            isl.umesh.update_tag = True
+                    uv_coord.xy = uv_coord @ transform_acc
+                new_center = new_center @ transform_acc
+        else:
+            if scale_acc != Vector((1.0, 1.0)):
+                isl.umesh.update_tag = True
+                for uv_coord in isl.flat_unique_uv_coords:
+                    uv_coord *= scale_acc
+                new_center *= scale_acc
         return new_center
+
 
 class UNIV_OT_ResetScale_VIEW3D(UNIV_OT_ResetScale):
     bl_idname = "mesh.univ_reset_scale"
@@ -305,45 +333,64 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
         return {'FINISHED'}
 
-    def individual_scale(self, isl: AdvIsland):
-        from bl_math import clamp
+    def individual_scale(self, isl: AdvIsland, threshold=1e-8):
+        if not self.shear and not self.xy_scale:
+            return isl.value
+
+        if isinstance(isl.value, Vector):
+            new_center = isl.value.copy()
+        else:
+            new_center = Vector((1,1))
+
         aspect = isl.umesh.aspect
-        shear = self.shear
-        xy_scale = self.xy_scale
+        transform_acc = Matrix.Identity(2)
+        scale_acc = Vector((1.0, 1.0))
 
-        vectors_ac_bc = [(va - vc, vb - vc) for va, vb, vc in isl.flat_3d_coords]
-        uv_coords_and_3d_vectors_and_3d_areas = tuple(zip(isl.flat_coords, vectors_ac_bc, isl.weights))
-        for j in range(10):
-            scale_cou = 0.0
-            scale_cov = 0.0
+        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
+        vec_ac = flat_3d_coords[:, 0] - flat_3d_coords[:, 2]
+        vec_bc = flat_3d_coords[:, 1] - flat_3d_coords[:, 2]
+        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
+        weights = np.array(list(isl.weights) if isinstance(isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
+
+        for _ in range(10):
+            m00 = flat_uv_coords[:, 0, 0] - flat_uv_coords[:, 2, 0]
+            m01 = flat_uv_coords[:, 0, 1] - flat_uv_coords[:, 2, 1]
+            m10 = flat_uv_coords[:, 1, 0] - flat_uv_coords[:, 2, 0]
+            m11 = flat_uv_coords[:, 1, 1] - flat_uv_coords[:, 2, 1]
+
+            det = m00 * m11 - m01 * m10
+            mask = np.abs(det) > threshold
+
+            with np.errstate(divide='ignore', invalid='ignore'):
+                inv00, inv01 = m11 / det, -m01 / det
+                inv10, inv11 = -m10 / det, m00 / det
+
+                cou = inv00[:, None] * vec_ac + inv01[:, None] * vec_bc
+                cov = inv10[:, None] * vec_ac + inv11[:, None] * vec_bc
+
+            w = weights
+            if not np.all(mask):
+                if not np.any(mask):
+                    break
+                cou = cou[mask]
+                cov = cov[mask]
+                w = weights[mask]
+
+            scale_cou = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
+            scale_cov = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
             scale_cross = 0.0
-
-            for (uv_a, uv_b, uv_c), (vec_ac, vec_bc), weight in uv_coords_and_3d_vectors_and_3d_areas:
-                if isclose(area_tri(uv_a, uv_b, uv_c), 0, abs_tol=1e-8):
-                    continue
-                m = Matrix((uv_a - uv_c, uv_b - uv_c))
-                try:
-                    m.invert()
-                except ValueError:
-                    continue
-
-                cou = m[0][0] * vec_ac + m[0][1] * vec_bc
-                cov = m[1][0] * vec_ac + m[1][1] * vec_bc
-
-                scale_cou += cou.length * weight
-                scale_cov += cov.length * weight
-
-                if shear:
-                    cov.normalize()
-                    cou.normalize()
-                    scale_cross += cou.dot(cov) * weight
+            if self.shear:
+                cou_n = cou / utils.np_vec_normalized(cou)
+                cov_n = cov / utils.np_vec_normalized(cov)
+                scale_cross = np.sum(utils.np_vec_dot(cou_n, cov_n) * w)
 
             if scale_cou * scale_cov < 1e-10:
                 break
 
-            scale_factor_u = sqrt(scale_cou / scale_cov / aspect) if xy_scale else 1.0
+            scale_factor_u = sqrt(scale_cou / scale_cov / aspect) if self.xy_scale else 1.0
+
             tolerance = 1e-5  # Trade accuracy for performance.
-            if shear:
+            if self.shear:
                 t = Matrix.Identity(2)
                 t[0][0] = scale_factor_u
                 t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -0.5 * aspect, 0.5 * aspect)
@@ -355,16 +402,28 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                     break
 
                 # Transform
-                for uv_coord in isl.flat_unique_uv_coords:
-                    uv_coord.xy = t @ uv_coord  # TODO: Calc new pivot from old pivot ond save in bbox
+                transform_acc @= t
+                flat_uv_coords = flat_uv_coords @ np.array(t, dtype=np.float32)
             else:
                 if math.isclose(scale_factor_u, 1.0, abs_tol=tolerance):
                     break
                 scale = Vector((scale_factor_u, 1.0/scale_factor_u))
-                for uv_coord in isl.flat_unique_uv_coords:
-                    uv_coord *= scale
+                scale_acc *= scale
+                flat_uv_coords *= np.array(scale, dtype=np.float32)
 
-            isl.umesh.update_tag = True
+        if self.shear:
+            if transform_acc != Matrix.Identity(2):
+                isl.umesh.update_tag = True
+                for uv_coord in isl.flat_unique_uv_coords:
+                    uv_coord.xy = uv_coord @ transform_acc
+                new_center = new_center @ transform_acc
+        else:
+            if scale_acc != Vector((1.0, 1.0)):
+                isl.umesh.update_tag = True
+                for uv_coord in isl.flat_unique_uv_coords:
+                    uv_coord *= scale_acc
+                new_center *= scale_acc
+        return new_center
 
     def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
         if not self.xy_scale and len(islands) <= 1:

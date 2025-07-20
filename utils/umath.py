@@ -156,6 +156,12 @@ def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
         height_half + height_half * (prj.y / prj.w),
     ))
 
+def np_vec_dot(a, b):
+    return np.einsum('ij,ij->i', a, b)
+
+def np_vec_normalized(a, keepdims=True):
+    return np.linalg.norm(a, axis=1, keepdims=keepdims)
+
 # def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
 #     line_vecs = l_b - l_a
 #     pt_vecs = pt - l_a
