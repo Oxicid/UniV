@@ -148,10 +148,12 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         quad_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
         from .texel import UNIV_OT_Normalize_VIEW3D
         for isl in quad_islands:
-            center = isl.bbox.center
-            isl.value = center
-            UNIV_OT_Normalize_VIEW3D.individual_scale(self, isl)  # noqa
-            isl.set_position(center, isl.calc_bbox().center)
+            old_center = isl.bbox.center
+            isl.value = old_center
+            new_center = UNIV_OT_Normalize_VIEW3D.individual_scale(self, isl)  # noqa
+            isl.value = new_center
+            if len(quad_islands) == 1:
+                isl.set_position(old_center, new_center)
         if len(quad_islands) > 1:
             tot_area_uv, tot_area_3d = UNIV_OT_Normalize_VIEW3D.avg_by_frequencies(self, quad_islands)  # noqa
             UNIV_OT_Normalize_VIEW3D.normalize(self, quad_islands, tot_area_uv, tot_area_3d)  # noqa

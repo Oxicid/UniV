@@ -22,7 +22,6 @@ from collections.abc import Callable
 from math import pi, sqrt, isclose
 from bl_math import clamp
 from mathutils import Vector, Matrix
-from mathutils.geometry import area_tri
 
 from .. import utils
 from .. import types
@@ -266,8 +265,6 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         self.draw_overlap()
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
-        if hasattr(self, 'invert'):
-            layout.prop(self, 'invert')
         layout.prop(self, 'use_aspect')
 
     def __init__(self, *args, **kwargs):
@@ -320,7 +317,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                self.individual_scale(isl)
+                isl.value = self.individual_scale(isl)
 
         tot_area_uv, tot_area_3d = self.avg_by_frequencies(all_islands)
         self.normalize(all_islands, tot_area_uv, tot_area_3d)
@@ -446,8 +443,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             scale = math.sqrt(fac / tot_fac)
 
             if self.xy_scale or self.shear:
-                old_pivot = isl.value
-                new_pivot = isl.calc_bbox().center
+                old_pivot = isl.bbox.center
+                new_pivot = isl.value
                 new_pivot_with_scale = new_pivot * scale
 
                 diff1 = old_pivot - new_pivot
@@ -531,10 +528,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Average the size of separate UV islands from unselected islands or objects, based on their area in 3D space\n\n" \
                      "Default - Average Islands Scale\n" \
-                     "Shift - Lock Overlaps\n" \
-                     "Ctrl or Alt - Invert"
-
-    invert: BoolProperty(name='Invert', default=False)
+                     "Shift - Lock Overlaps"
 
     @classmethod
     def poll(cls, context):
@@ -547,7 +541,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if event.value == 'PRESS':
             return self.execute(context)
         self.lock_overlap = event.shift
-        self.invert = event.ctrl or event.alt
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
@@ -589,21 +582,17 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         all_islands.remove(hit.island)
 
         tot_area_uv = tot_area_3d = 0
-        if self.invert:
-            tot_area_uv += hit.island.area_uv
-            tot_area_3d += hit.island.area_3d
-        else:
-            for isl in all_islands:
-                tot_area_uv += isl.area_uv
-                tot_area_3d += isl.area_3d
-            all_islands = [hit.island]
+        for isl in all_islands:
+            tot_area_uv += isl.area_uv
+            tot_area_3d += isl.area_3d
+        all_islands = [hit.island]
 
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                self.individual_scale(isl)
+                isl.value = self.individual_scale(isl)
 
-        self.show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
+        self.normalize_and_show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
         return {'FINISHED'}
 
     def adjust_edit(self):
@@ -620,30 +609,16 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
-        if self.invert:
-            full_selected, not_full_selected = self.umeshes.filtered_by_full_selected_and_visible_uv_faces()
-            if self.max_distance and not full_selected:
-                if not_full_selected and all(not u.has_selected_uv_faces() for u in not_full_selected):
-                    self.umeshes = not_full_selected
-                    return self.pick_adjust_edit()
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        if self.max_distance and not selected_umeshes and unselected_umeshes:
+            self.umeshes = unselected_umeshes
+            return self.pick_adjust_edit()
 
-            unselected_umeshes = full_selected
-            selected_umeshes = not_full_selected
-            self.umeshes = selected_umeshes
-            if not self.umeshes:
-                self.report({'WARNING'}, 'Islands not found')
-                return {'CANCELLED'}
-        else:
-            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-            if self.max_distance and not selected_umeshes and unselected_umeshes:
-                self.umeshes = unselected_umeshes
-                return self.pick_adjust_edit()
+        self.umeshes = selected_umeshes
 
-            self.umeshes = selected_umeshes
-
-            if not self.umeshes:
-                self.report({'WARNING'}, 'Islands not found')
-                return {'CANCELLED'}
+        if not self.umeshes:
+            self.report({'WARNING'}, 'Islands not found')
+            return {'CANCELLED'}
 
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
@@ -659,9 +634,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
             for isl in adv_islands:
                 any_selected = AdvIslands.island_filter_is_any_face_selected(isl, umesh)
-                if self.invert:
-                    any_selected = not any_selected
-
                 if any_selected:
                     all_islands.append(isl)
                 else:
@@ -682,17 +654,14 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                self.individual_scale(isl)
+                isl.value = self.individual_scale(isl)
 
-        self.show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv)
+        self.normalize_and_show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv)
         return {'FINISHED'}
 
-    def show_adjust_result_info_edit(self, all_islands, tot_area_3d, tot_area_uv, sel='selected', unsel='unselected'):
+    def normalize_and_show_adjust_result_info_edit(self, all_islands, tot_area_3d, tot_area_uv, sel='selected', unsel='unselected'):
         info_ = 'All target islands were normalized'
         if isinstance(tot_area_uv, int):
-            if self.invert:
-                sel, unsel = unsel, sel
-
             ret = self.umeshes.update(info=info_)
             if ret == {'FINISHED'}:
                 for isl in all_islands:
@@ -723,9 +692,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.value = umesh.check_uniform_scale(report=self.report)
         unselected_umeshes.set_sync()
 
-        if self.invert:
-            self.umeshes, unselected_umeshes = unselected_umeshes, self.umeshes
-
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
             umesh.ensure()
@@ -754,21 +720,16 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                self.individual_scale(isl)
-
-        sel = 'selected'
-        unsel = 'unselected'
-        if self.invert:
-            sel, unsel = unsel, sel
+                isl.value = self.individual_scale(isl)
 
         self.umeshes.report_obj = None
         if isinstance(tot_area_uv, int):
             if (ret := self.umeshes.update()) == {'FINISHED'}:
                 for isl in all_islands:
                     isl.set_position(isl.value, isl.calc_bbox().center)
-                self.report({'INFO'}, f'{unsel.capitalize()} objects not found, but {sel} was adjusted')
+                self.report({'INFO'}, f'Unselected objects not found, but selected was adjusted')
             else:
-                self.report({'WARNING'}, f"{unsel.capitalize()} objects not found")
+                self.report({'WARNING'}, f"Unselected objects not found")
 
             self.umeshes.free()
             utils.update_area_by_type('VIEW_3D')
@@ -779,11 +740,11 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         if self.umeshes.has_update_mesh:
             if not unselected_umeshes:
-                self.umeshes.update(info=f'{unsel.capitalize()} objects not found, but {sel} was adjusted')
+                self.umeshes.update(info=f'Unselected objects not found, but selected was adjusted')
             else:
                 self.umeshes.update(info='All target islands were adjusted')
         else:
-            self.report({'WARNING'}, f'{unsel.capitalize()} objects not found.')
+            self.report({'WARNING'}, f'Unselected objects not found.')
 
         self.umeshes.free()
         utils.update_area_by_type('VIEW_3D')
