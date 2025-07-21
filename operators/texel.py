@@ -756,7 +756,7 @@ class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
 
 class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_set"
-    bl_label = 'Set TD'
+    bl_label = 'Set'
     bl_description = "Set Texel Density"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -908,7 +908,7 @@ class UNIV_OT_TexelDensitySet(UNIV_OT_TexelDensitySet_VIEW3D):
 
 class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_get"
-    bl_label = 'Get TD'
+    bl_label = 'Get'
     bl_description = "Get Texel Density"
 
     @classmethod

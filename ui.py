@@ -63,8 +63,8 @@ class UNIV_PT_General(Panel):
         split = layer.split(align=True)
         row = split.row(align=True)
         set_idname = prefix + '.univ_texel_density_set'
-        row.operator(prefix + '.univ_texel_density_get')
-        row.operator(set_idname).custom_texel = -1.0
+        row.operator(prefix + '.univ_texel_density_get', icon_value=icons.td_get)
+        row.operator(set_idname, icon_value=icons.td_set).custom_texel = -1.0
         row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
         if prefix == 'uv':
@@ -1044,10 +1044,10 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         pie.operator('uv.univ_calc_uv_coverage')
 
         # Left Bottom
-        pie.operator('uv.univ_texel_density_get')
+        pie.operator('uv.univ_texel_density_get', icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('uv.univ_texel_density_set').custom_texel = -1.0
+        pie.operator('uv.univ_texel_density_set', icon_value=icons.td_set).custom_texel = -1.0
 
 class VIEW3D_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
@@ -1095,10 +1095,10 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         pie.operator('mesh.univ_calc_uv_coverage')
 
         # Left Bottom
-        pie.operator('mesh.univ_texel_density_get')
+        pie.operator('mesh.univ_texel_density_get', icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('mesh.univ_texel_density_set').custom_texel = -1.0
+        pie.operator('mesh.univ_texel_density_set', icon_value=icons.td_set).custom_texel = -1.0
 
 
 class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
