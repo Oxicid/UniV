@@ -709,10 +709,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -754,10 +751,7 @@ class IMAGE_MT_PIE_univ_align(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -785,10 +779,7 @@ class IMAGE_MT_PIE_univ_misc(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -818,10 +809,7 @@ class VIEW3D_MT_PIE_univ_misc(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -852,10 +840,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -890,10 +875,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -944,10 +926,7 @@ class IMAGE_MT_PIE_univ_transform(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1003,10 +982,7 @@ class IMAGE_MT_PIE_univ_texel(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1054,10 +1030,7 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1106,10 +1079,7 @@ class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1140,10 +1110,7 @@ class IMAGE_MT_PIE_univ_favorites_edit(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1174,10 +1141,7 @@ class VIEW3D_MT_PIE_univ_projection(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
@@ -1206,10 +1170,7 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
-        else:
-            layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_DEFAULT'
 
         pie = layout.menu_pie()
 
