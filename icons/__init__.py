@@ -22,6 +22,7 @@ class icons:
     """
     _icons_ = None
     adjust = 0
+    area = 0
     arrow = 0
     arrow_bottom = 0
     arrow_bottom_left = 0
@@ -37,6 +38,7 @@ class icons:
     box = 0
     center = 0
     checker = 0
+    coverage = 0
     crop = 0
     cursor = 0
     cut = 0

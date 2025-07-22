@@ -631,8 +631,8 @@ class UNIV_PT_TD_PresetsManager(Panel):
         layout.separator()
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.operator(ot_prefix + ".univ_calc_uv_area")
-        row.operator(ot_prefix + ".univ_calc_uv_coverage")
+        row.operator(ot_prefix + ".univ_calc_uv_area", icon_value=icons.area)
+        row.operator(ot_prefix + ".univ_calc_uv_coverage", icon_value=icons.coverage)
         if ot_prefix == 'uv':
             col.operator("uv.univ_texel_density_from_texture")
         row = col.row(align=True)
@@ -1038,10 +1038,10 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         pie.operator('uv.univ_reset_scale', icon_value=icons.reset)
 
         # Left Upper
-        pie.operator('uv.univ_calc_uv_area')
+        pie.operator('uv.univ_calc_uv_area', icon_value=icons.area)
 
         # Right Upper
-        pie.operator('uv.univ_calc_uv_coverage')
+        pie.operator('uv.univ_calc_uv_coverage', icon_value=icons.coverage)
 
         # Left Bottom
         pie.operator('uv.univ_texel_density_get', icon_value=icons.td_get)
@@ -1089,10 +1089,10 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         pie.operator('mesh.univ_reset_scale', icon_value=icons.reset)
 
         # Left Upper
-        pie.operator('mesh.univ_calc_uv_area')
+        pie.operator('mesh.univ_calc_uv_area', icon_value=icons.area)
 
         # Right Upper
-        pie.operator('mesh.univ_calc_uv_coverage')
+        pie.operator('mesh.univ_calc_uv_coverage', icon_value=icons.coverage)
 
         # Left Bottom
         pie.operator('mesh.univ_texel_density_get', icon_value=icons.td_get)
