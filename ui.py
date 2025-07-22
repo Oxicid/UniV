@@ -546,7 +546,7 @@ class UNIV_PT_BatchInspectSettings(Panel):
         col.separator()
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_over', icon_value=icons.gravity)
+        row.operator('uv.univ_check_over', icon_value=icons.over)
         draw_tag_button(Inspect.Over)
 
         row = col.row(align=True)
@@ -1183,7 +1183,7 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         # Upper
         pie.operator("uv.univ_batch_inspect", icon_value=icons.zero)
         # Left Upper
-        pie.operator('uv.univ_check_over', icon_value=icons.gravity)
+        pie.operator('uv.univ_check_over', icon_value=icons.over)
         # Right Upper
         pie.operator("uv.univ_check_other", icon_value=icons.random)
         # Left Bottom

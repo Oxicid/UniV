@@ -61,6 +61,7 @@ class icons:
     normal = 0
     normalize = 0
     orient = 0
+    over = 0
     overlap = 0
     pack = 0
     pin = 0
