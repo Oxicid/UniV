@@ -46,6 +46,7 @@ class icons:
     edge_grow = 0
     fill = 0
     flat = 0
+    flatten = 0
     flip = 0
     flipped = 0
     gravity = 0

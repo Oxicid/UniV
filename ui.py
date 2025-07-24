@@ -373,7 +373,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
         col_align.label(text='Other')
         row = col_align.row(align=True)
-        row.operator('mesh.univ_flatten')
+        row.operator('mesh.univ_flatten', icon_value=icons.flatten)
         row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
 
         UNIV_PT_General.draw_uv_layers(layout)
