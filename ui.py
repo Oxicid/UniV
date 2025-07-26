@@ -27,7 +27,7 @@ class UNIV_PT_General(Panel):
         def ly_wide_icon_op(layer, direct, icon):
             row = layer.row(align=True)
             row.ui_units_x = 3
-            row.scale_x = 2.05
+            row.scale_x = 2.1
             row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
 
         def ly_mid_mid_op(layer, direct, icon):

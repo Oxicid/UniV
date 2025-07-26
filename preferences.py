@@ -8,11 +8,6 @@ from . import utils
 from . import keymaps
 from bpy.props import *
 
-try:
-    from . import univ_pro
-except ImportError:
-    univ_pro = None
-
 UV_LAYERS_ENABLE = True
 
 def prefs() -> 'UNIV_AddonPreferences':
@@ -545,33 +540,43 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.operator("wm.url_open", text="GitHub").url = r"https://github.com/Oxicid/UniV"
             row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
 
+            from .icons import icons
+
+            try:
+                from . import univ_pro
+            except ImportError:
+                univ_pro = None
+
             if not univ_pro:
-                from .icons import icons
                 layout.label(text="You have the free version of the addon installed, which does not have some advanced operators and options", icon='INFO')
                 layout.label(text="which does not have some advanced operators and options")
-                layout.label(text="UniV Pro includes such advanced operators as:")
-                layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",
-                             icon_value=icons.rectify)
-                layout.separator(factor=0.35)
-                layout.label(text="Transfer - interactively transfers a UV layer from one object to another.", icon_value=icons.transfer)
-                layout.separator(factor=0.35)
-                layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
-                layout.separator(factor=0.35)
-                layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gone too.",
-                             icon_value=icons.loop_select)
-                layout.separator(factor=0.35)
-                layout.label(text="Drag - this operator is similar to the QuickSnap operator, but has fundamental differences:",
-                             icon_value=icons.fill)
-                layout.label(text="     1) It works only with islands")
-                layout.label(text="     2) Moves only one island")
-                layout.label(text="     3) Unselects all other elements and selects the picked island.")
-                layout.label(text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
-                layout.label(text="     5) Can pull out overlapped flipped islands.")
-                layout.label(text="     6) Snapping is not a key and intrusive feature.")
-                layout.separator(factor=0.35)
-                layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
-                             icon_value=icons.stack)
-                layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
+            else:
+                layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
+
+            layout.label(text="UniV Pro includes such advanced operators as:")
+            layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",
+                         icon_value=icons.rectify)
+            layout.separator(factor=0.35)
+            layout.label(text="Transfer - interactively transfers a UV layer from one object to another.", icon_value=icons.transfer)
+            layout.separator(factor=0.35)
+            layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
+            layout.separator(factor=0.35)
+            layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gone too.",
+                         icon_value=icons.loop_select)
+            layout.separator(factor=0.35)
+            layout.label(text="Drag - this operator is similar to the QuickSnap operator, but has fundamental differences:",
+                         icon_value=icons.fill)
+            layout.label(text="     1) It works only with islands")
+            layout.label(text="     2) Moves only one island")
+            layout.label(text="     3) Unselects all other elements and selects the picked island.")
+            layout.label(text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
+            layout.label(text="     5) Can pull out overlapped flipped islands.")
+            layout.label(text="     6) Snapping is not a key and intrusive feature.")
+            layout.separator(factor=0.35)
+            layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
+                         icon_value=icons.stack)
+            layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
+            if not univ_pro:
                 layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
 
 class UNIV_OT_ShowAddonPreferences(bpy.types.Operator):
