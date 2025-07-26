@@ -245,6 +245,7 @@ class UNIV_BoxProject(bpy.types.Operator):
     move: bpy.props.FloatVectorProperty(name='Move', subtype='XYZ')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
                                                description='Gets Aspect Correct from the active image from the shader node editor')
+    avoid_flip: bpy.props.BoolProperty(name='Avoid Flip', default=True)
 
     @classmethod
     def poll(cls, context):
@@ -256,18 +257,32 @@ class UNIV_BoxProject(bpy.types.Operator):
         col.prop(self, 'scale_individual', expand=True, slider=True)
         col.prop(self, 'rotation', expand=True, slider=True)
         col.prop(self, 'move', expand=True)
+        col.prop(self, 'avoid_flip')
         col.separator()
         col.prop(self, 'use_correct_aspect', toggle=1)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
+        self.has_selected: bool = True
         self.umeshes: types.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report)  # TODO: Make like Normal or View
+        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes.set_sync(True)
         if self.is_edit_mode:
-            self.umeshes.filter_by_selected_mesh_faces()
+            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                self.umeshes = selected
+                self.has_selected = True
+            elif visible:
+                self.umeshes = visible
+                self.has_selected = False
+            else:
+                self.report({'WARNING'}, 'Not found faces for manipulate')
+                return {'CANCELLED'}
+        self.umeshes.verify_uv()
+
         self.box()
         if not self.is_edit_mode:
             self.umeshes.update('No faces for manipulate')
@@ -301,19 +316,66 @@ class UNIV_BoxProject(bpy.types.Operator):
             mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
 
             _, r, _ = umesh.obj.matrix_world.decompose()
-            faces = (f for f in umesh.bm.faces if f.select) if self.is_edit_mode else umesh.bm.faces
-            for f in faces:
-                n = f.normal.copy()
-                n.rotate(r)
-                if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
-                    for crn in f.loops:
-                        crn[uv].uv = (mtx_x @ crn.vert.co).yz
-                elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):  # Y
-                    for crn in f.loops:
-                        crn[uv].uv = (mtx_y @ crn.vert.co).xz
-                else:  # Z
-                    for crn in f.loops:
-                        crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+            if self.is_edit_mode:
+                if self.has_selected:
+                    faces = utils.calc_selected_uv_faces_iter(umesh)
+                else:
+                    faces = utils.calc_visible_uv_faces_iter(umesh)
+            else:
+                faces = umesh.bm.faces
+
+            if not self.avoid_flip:
+                for f in faces:
+                    n = f.normal.copy()
+                    n.rotate(r)
+                    if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_x @ crn.vert.co).yz
+                    elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):  # Y
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_y @ crn.vert.co).xz
+                    else:  # Z
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+            else:
+                mtx_x_neg = (Matrix.Diagonal(Vector((1, -1, 1))).to_4x4()) @ mtx_x
+                mtx_y_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_y
+                mtx_z_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_z
+
+                vec_x = Vector((1, 0, 0))
+                vec_y = Vector((0, 1, 0))
+                vec_z = Vector((0, 0, 1))
+
+                angle_80 = math.radians(80)
+
+                for f in faces:
+                    n = f.normal.copy()
+                    n.rotate(r)
+
+                    # X-axis
+                    if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):
+                        if n.angle(vec_x, 0) <= angle_80:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_x @ crn.vert.co).yz
+                        else:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_x_neg @ crn.vert.co).yz
+                    # Y-axis
+                    elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):
+                        if  n.angle(vec_y, 0) <= angle_80:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_y_neg @ crn.vert.co).xz
+                        else:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_y @ crn.vert.co).xz
+                    # Z-axis
+                    else:
+                        if n.angle(vec_z, 0) <= angle_80:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+                        else:
+                            for crn in f.loops:
+                                crn[uv].uv = (mtx_z_neg @ crn.vert.co).to_2d()
 
 
 class ProjCameraInfo:
