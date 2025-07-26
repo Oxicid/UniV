@@ -110,6 +110,39 @@ class StackIsland:  # TODO: Split for source and target islands
 
         self.np_ngons_with_faces = np_ngons_with_faces[np_ngons_with_faces[:, 0].argsort()]
 
+    @staticmethod
+    def get_unique_start_crn_idx(face_start_pattern_crn: deque[BMLoop]) -> int:
+        eps = 1e-6
+        edge_lengths = np.array([crn.edge.calc_length() for crn in face_start_pattern_crn])
+
+        distance_matrix = np.abs(edge_lengths[:, None] - edge_lengths)
+        mean_dist = distance_matrix.mean(axis=1)
+
+        duplicates_count = (distance_matrix < eps).sum(axis=1)
+
+        # TODO: if 1 not in duplicates_count and case all_eq(edge_lengths)- calculate by BBox3D
+        #  In the first case, need rotate the array, and if there’s no repeating pattern in the lengths,
+        #  then everything is fine; otherwise all_eq(edge_lengths), need calculate the starting index using the BBox3D.
+
+        # TODO: Add option World Align or Local start point
+        all_eq = np.allclose(edge_lengths, edge_lengths[0], rtol=0, atol=eps)
+        if all_eq:
+            from ..types import bbox
+            vert_3d_coords = [crn.vert.co for crn in face_start_pattern_crn]
+            bbox3d_min = bbox.BBox3D.calc_bbox(vert_3d_coords).min
+            min_idx = 0
+            min_dist = float('inf')
+            for idx, co in enumerate(vert_3d_coords):
+                if (dist := (bbox3d_min - co).length) < min_dist:
+                    min_dist = dist
+                    min_idx = idx
+            return min_idx
+
+        mean_dist[duplicates_count > 1] *= 0.7  # Apply 30% penalty for elements with duplicates
+
+        unique_dist_idx = np.argmax(mean_dist)
+        return unique_dist_idx
+
     def calc_linked_corners_pattern(self, idx) -> list[deque[np.ndarray] | deque[BMLoop]]:
         init_face: BMFace = self.unique_faces[idx]
         face_idx = init_face.index
@@ -117,8 +150,8 @@ class StackIsland:  # TODO: Split for source and target islands
         face_start_pattern: deque[np.ndarray] = deque()  # [shared face size, linked face size]
         face_start_pattern_crn: deque[BMLoop] = deque(init_face.loops)
 
-        index_of_max_elem = face_start_pattern_crn.index(max(face_start_pattern_crn, key=lambda _crn: _crn.edge.calc_length()))
-        face_start_pattern_crn.rotate(-index_of_max_elem)
+        unique_dist_idx = self.get_unique_start_crn_idx(face_start_pattern_crn)
+        face_start_pattern_crn.rotate(-unique_dist_idx)
 
         for idx__, crn in enumerate(face_start_pattern_crn):
             linked_crn_face_size = []
