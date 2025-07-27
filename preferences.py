@@ -29,11 +29,11 @@ def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
 def _update_size_x(_self, _context):
-    if univ_settings().lock_size:
+    if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
         univ_settings().size_y = univ_settings().size_x
 
 def _update_size_y(_self, _context):
-    if univ_settings().lock_size:
+    if univ_settings().lock_size and univ_settings().size_x != univ_settings().size_y:
         univ_settings().size_x = univ_settings().size_y
 
 def _update_lock_size(_self, _context):
