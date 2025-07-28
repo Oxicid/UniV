@@ -19,6 +19,7 @@ from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 from ..preferences import univ_settings
 
+# TODO: Add OT suffix
 class UNIV_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
     bl_label = "Normal"
@@ -288,34 +289,14 @@ class UNIV_BoxProject(bpy.types.Operator):
             self.umeshes.update('No faces for manipulate')
             self.umeshes.free()
             bpy.context.area.tag_redraw()
-            return {'FINISHED'}
         else:
-            return self.umeshes.update(info='Not selected face')
+            self.umeshes.update(info='Not selected face')
+        return {'FINISHED'}
 
     def box(self):
-        move = Vector(self.move) * -1
-        scale = Vector(self.scale_individual)*self.scale
         for umesh in self.umeshes:
-            uv = umesh.uv
 
-            mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
-            mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
-            mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
-
-            if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
-                aspect_x_mtx = Matrix.Diagonal((1, 1/aspect, 1))
-                aspect_y_mtx = Matrix.Diagonal((1/aspect, 1, 1))
-                aspect_z_mtx = Matrix.Diagonal((1/aspect, 1, 1))
-            else:
-                aspect_x_mtx = Matrix.Diagonal((1, 1, aspect))
-                aspect_y_mtx = Matrix.Diagonal((1, 1, aspect))
-                aspect_z_mtx = Matrix.Diagonal((1, aspect, 1))
-
-            mtx_x = aspect_x_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_x
-            mtx_y = aspect_y_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_y
-            mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
-
-            _, r, _ = umesh.obj.matrix_world.decompose()
+            mtx_x, mtx_y, mtx_z, r = self.get_box_transforms(umesh)
             if self.is_edit_mode:
                 if self.has_selected:
                     faces = utils.calc_selected_uv_faces_iter(umesh)
@@ -324,58 +305,84 @@ class UNIV_BoxProject(bpy.types.Operator):
             else:
                 faces = umesh.bm.faces
 
-            if not self.avoid_flip:
-                for f in faces:
-                    n = f.normal.copy()
-                    n.rotate(r)
-                    if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
+            self.box_ex(faces, mtx_x, mtx_y, mtx_z, r, umesh.uv)
+
+    def get_box_transforms(self, umesh):
+        move = Vector(self.move) * -1
+        scale = Vector(self.scale_individual) * self.scale
+
+        mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
+        mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
+        mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
+
+        if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
+            aspect_x_mtx = Matrix.Diagonal((1, 1 / aspect, 1))
+            aspect_y_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
+            aspect_z_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
+        else:
+            aspect_x_mtx = Matrix.Diagonal((1, 1, aspect))
+            aspect_y_mtx = Matrix.Diagonal((1, 1, aspect))
+            aspect_z_mtx = Matrix.Diagonal((1, aspect, 1))
+
+        mtx_x = aspect_x_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_x
+        mtx_y = aspect_y_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_y
+        mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
+        _, r, _ = umesh.obj.matrix_world.decompose()
+        return mtx_x, mtx_y, mtx_z, r
+
+    def box_ex(self, faces, mtx_x, mtx_y, mtx_z, r, uv):
+        if not self.avoid_flip:
+            for f in faces:
+                n = f.normal.copy()
+                n.rotate(r)
+                if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):  # X
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_x @ crn.vert.co).yz
+                elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):  # Y
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_y @ crn.vert.co).xz
+                else:  # Z
+                    for crn in f.loops:
+                        crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
+        else:
+            mtx_x_neg = (Matrix.Diagonal(Vector((1, -1, 1))).to_4x4()) @ mtx_x
+            mtx_y_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_y
+            mtx_z_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_z
+
+            vec_x = Vector((1, 0, 0))
+            vec_y = Vector((0, 1, 0))
+            vec_z = Vector((0, 0, 1))
+
+            angle_80 = math.radians(80)
+
+            for f in faces:
+                n = f.normal.copy()
+                n.rotate(r)
+
+                # X-axis
+                if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):
+                    if n.angle(vec_x, 0) <= angle_80:
                         for crn in f.loops:
                             crn[uv].uv = (mtx_x @ crn.vert.co).yz
-                    elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):  # Y
+                    else:
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_x_neg @ crn.vert.co).yz
+                # Y-axis
+                elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):
+                    if n.angle(vec_y, 0) <= angle_80:
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_y_neg @ crn.vert.co).xz
+                    else:
                         for crn in f.loops:
                             crn[uv].uv = (mtx_y @ crn.vert.co).xz
-                    else:  # Z
+                # Z-axis
+                else:
+                    if n.angle(vec_z, 0) <= angle_80:
                         for crn in f.loops:
                             crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
-            else:
-                mtx_x_neg = (Matrix.Diagonal(Vector((1, -1, 1))).to_4x4()) @ mtx_x
-                mtx_y_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_y
-                mtx_z_neg = (Matrix.Diagonal(Vector((-1, 1, 1))).to_4x4()) @ mtx_z
-
-                vec_x = Vector((1, 0, 0))
-                vec_y = Vector((0, 1, 0))
-                vec_z = Vector((0, 0, 1))
-
-                angle_80 = math.radians(80)
-
-                for f in faces:
-                    n = f.normal.copy()
-                    n.rotate(r)
-
-                    # X-axis
-                    if abs(n.x) >= abs(n.y) and abs(n.x) >= abs(n.z):
-                        if n.angle(vec_x, 0) <= angle_80:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_x @ crn.vert.co).yz
-                        else:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_x_neg @ crn.vert.co).yz
-                    # Y-axis
-                    elif abs(n.y) >= abs(n.x) and abs(n.y) >= abs(n.z):
-                        if  n.angle(vec_y, 0) <= angle_80:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_y_neg @ crn.vert.co).xz
-                        else:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_y @ crn.vert.co).xz
-                    # Z-axis
                     else:
-                        if n.angle(vec_z, 0) <= angle_80:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_z @ crn.vert.co).to_2d()
-                        else:
-                            for crn in f.loops:
-                                crn[uv].uv = (mtx_z_neg @ crn.vert.co).to_2d()
+                        for crn in f.loops:
+                            crn[uv].uv = (mtx_z_neg @ crn.vert.co).to_2d()
 
 
 class ProjCameraInfo:

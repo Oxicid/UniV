@@ -324,6 +324,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
         if univ_pro:
             row = col_align.row(align=True)
             row.operator('mesh.univ_transfer', icon_value=icons.transfer)
+
+            # row = col_align.row(align=True)
+            # row.operator('mesh.univ_box_project_test', icon_value=icons.box)
+
         row = col_align.row(align=True)
         row.operator('mesh.univ_normal', icon_value=icons.normal)
         row.operator('mesh.univ_box_project', icon_value=icons.box)

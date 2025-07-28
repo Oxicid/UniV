@@ -2953,7 +2953,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
         if not angles:
             return
-        # TODO: Calculate by convex if the angles are many and have ~ simular distances
+        # TODO: Calculate by convex if the angles are many (organic) and have ~ simular distances
         angle = max(angles, key=angles.get)
 
         bbox = types.BBox.calc_bbox(boundary_coords)

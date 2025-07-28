@@ -234,6 +234,7 @@ def load_register_types():
                 univ_pro.transfer.UNIV_OT_Transfer,
                 # Misc
                 univ_pro.rectify.UNIV_OT_Rectify,
+                univ_pro.projection.UNIV_OT_BoxProject,
 
             ))
 
