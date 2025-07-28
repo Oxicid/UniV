@@ -325,9 +325,6 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row = col_align.row(align=True)
             row.operator('mesh.univ_transfer', icon_value=icons.transfer)
 
-            # row = col_align.row(align=True)
-            # row.operator('mesh.univ_box_project_test', icon_value=icons.box)
-
         row = col_align.row(align=True)
         row.operator('mesh.univ_normal', icon_value=icons.normal)
         row.operator('mesh.univ_box_project', icon_value=icons.box)
@@ -476,27 +473,32 @@ class UNIV_PT_PackSettings(Panel):
         settings = univ_settings()
         uvpm_settings = bpy.context.scene.uvpm3_props
 
+        if hasattr(uvpm_settings, 'default_main_props'):
+            uvpm_main_props = uvpm_settings.default_main_props
+        else:
+            uvpm_main_props = uvpm_settings
+
         row = layout.row(align=True)
         row.prop(settings, 'scale', toggle=True)
-        row.prop(uvpm_settings, 'rotation_enable', text='Rotation', toggle=True)
-        row.prop(uvpm_settings, 'flipping_enable', text='Flip', toggle=True)
+        row.prop(uvpm_main_props, 'rotation_enable', text='Rotation', toggle=True)
+        row.prop(uvpm_main_props, 'flipping_enable', text='Flip', toggle=True)
         if settings.scale:
             row = layout.row(align=True)
-            row.prop(uvpm_settings, 'normalize_scale', text='Normalize', toggle=True)
-            row.prop(uvpm_settings, 'heuristic_allow_mixed_scales', text='Mixed Scale', toggle=True)
-        if uvpm_settings.rotation_enable:
+            row.prop(uvpm_main_props, 'normalize_scale', text='Normalize', toggle=True)
+            row.prop(uvpm_main_props, 'heuristic_allow_mixed_scales', text='Mixed Scale', toggle=True)
+        if uvpm_main_props.rotation_enable:
             row = layout.row(align=True)
-            row.prop(uvpm_settings, 'pre_rotation_disable', text='Pre-Rotation Disable', toggle=True)
+            row.prop(uvpm_main_props, 'pre_rotation_disable', text='Pre-Rotation Disable', toggle=True)
             subrow = row.column()
             subrow.scale_x = 0.8
-            subrow.prop(uvpm_settings, 'rotation_step', text='Step')
+            subrow.prop(uvpm_main_props, 'rotation_step', text='Step')
 
-        layout.prop(uvpm_settings, 'lock_overlapping_enable', text='Lock Overlaps')
-        if uvpm_settings.lock_overlapping_enable:
+        layout.prop(uvpm_main_props, 'lock_overlapping_enable', text='Lock Overlaps')
+        if uvpm_main_props.lock_overlapping_enable:
             row = layout.row(align=True)
-            row.prop(uvpm_settings, 'lock_overlapping_mode', expand=True)
+            row.prop(uvpm_main_props, 'lock_overlapping_mode', expand=True)
 
-        layout.prop(uvpm_settings.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
+        layout.prop(uvpm_main_props.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
 
 
 class UNIV_PT_BatchInspectSettings(Panel):

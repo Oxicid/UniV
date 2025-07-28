@@ -3186,8 +3186,12 @@ class UNIV_OT_Pack(Operator):
         else:
             uvpm_settings.tex_ratio = False
 
-        if uvpm_settings.precision == 500:
-            uvpm_settings.precision = 800
+        if hasattr(uvpm_settings, 'default_main_props'):
+            if uvpm_settings.default_main_props.precision == 500:
+                uvpm_settings.default_main_props.precision = 800
+        else:
+            if uvpm_settings.precision == 500:
+                uvpm_settings.precision = 800
 
         return bpy.ops.uvpackmaster3.pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
 
