@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 8, 9),
+    "version": (3, 8, 10),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -191,10 +191,9 @@ def load_register_types():
             seam.UNIV_OT_SeamBorder,
             seam.UNIV_OT_SeamBorder_VIEW3D,
             # Project
-            project.UNIV_Normal,
-            project.UNIV_BoxProject,
-            project.UNIV_ViewProject,
-            project.UNIV_SmartProject,
+            project.UNIV_OT_Normal,
+            project.UNIV_OT_ViewProject,
+            project.UNIV_OT_SmartProject,
             # Misc
             misc.UNIV_OT_Pin,
             misc.UNIV_OT_Hide,
@@ -240,6 +239,8 @@ def load_register_types():
 
         else:
             classes.extend((
+                # Project
+                project.UNIV_OT_BoxProject,
                 # Stack
                 stack.UNIV_OT_Stack,
                 stack.UNIV_OT_Stack_VIEW3D,

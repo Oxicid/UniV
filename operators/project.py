@@ -19,8 +19,7 @@ from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 from ..preferences import univ_settings
 
-# TODO: Add OT suffix
-class UNIV_Normal(bpy.types.Operator):
+class UNIV_OT_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
     bl_label = "Normal"
     bl_description = "Projection by faces normal.\n\nShift - Individual"
@@ -234,7 +233,7 @@ class UNIV_Normal(bpy.types.Operator):
         return eul.to_matrix().to_4x4()
 
 
-class UNIV_BoxProject(bpy.types.Operator):
+class UNIV_OT_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
     bl_label = "Box"
     bl_description = "Box Projection"
@@ -285,6 +284,9 @@ class UNIV_BoxProject(bpy.types.Operator):
         self.umeshes.verify_uv()
 
         self.box()
+        for u in self.umeshes:
+            u.check_uniform_scale(self.report)
+
         if not self.is_edit_mode:
             self.umeshes.update('No faces for manipulate')
             self.umeshes.free()
@@ -315,6 +317,16 @@ class UNIV_BoxProject(bpy.types.Operator):
         mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
         mtx_from_prop_z = Matrix.LocRotScale(move, Euler((0, 0, self.rotation[2])), scale)
 
+        aspect_x_mtx, aspect_y_mtx, aspect_z_mtx = self.get_aspect_matrix(umesh)
+
+        mtx_x = aspect_x_mtx @ umesh.obj.matrix_world @ mtx_from_prop_x
+        mtx_y = aspect_y_mtx @ umesh.obj.matrix_world @ mtx_from_prop_y
+        mtx_z = aspect_z_mtx @ umesh.obj.matrix_world @ mtx_from_prop_z
+        _, r, _ = umesh.obj.matrix_world.decompose()
+        # TODO: r.rotate(Euler(self.rotation))
+        return mtx_x, mtx_y, mtx_z, r
+
+    def get_aspect_matrix(self, umesh):
         if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
             aspect_x_mtx = Matrix.Diagonal((1, 1 / aspect, 1))
             aspect_y_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
@@ -323,12 +335,7 @@ class UNIV_BoxProject(bpy.types.Operator):
             aspect_x_mtx = Matrix.Diagonal((1, 1, aspect))
             aspect_y_mtx = Matrix.Diagonal((1, 1, aspect))
             aspect_z_mtx = Matrix.Diagonal((1, aspect, 1))
-
-        mtx_x = aspect_x_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_x
-        mtx_y = aspect_y_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_y
-        mtx_z = aspect_z_mtx.to_4x4() @ umesh.obj.matrix_world @ mtx_from_prop_z
-        _, r, _ = umesh.obj.matrix_world.decompose()
-        return mtx_x, mtx_y, mtx_z, r
+        return aspect_x_mtx.to_4x4(), aspect_y_mtx.to_4x4(), aspect_z_mtx.to_4x4()
 
     def box_ex(self, faces, mtx_x, mtx_y, mtx_z, r, uv):
         if not self.avoid_flip:
@@ -434,7 +441,7 @@ class ProjCameraInfo:
         return 2.0 * math.atan((sensor / 2.0) / focal_length)
 
 
-class UNIV_ViewProject(bpy.types.Operator):
+class UNIV_OT_ViewProject(bpy.types.Operator):
     bl_idname = "mesh.univ_view_project"
     bl_label = "View"
     bl_description = "Projection by View"
@@ -704,7 +711,7 @@ class UNIV_ViewProject(bpy.types.Operator):
             co += diff
 
 
-class UNIV_SmartProject(bpy.types.Operator):
+class UNIV_OT_SmartProject(bpy.types.Operator):
     bl_idname = 'mesh.univ_smart_project'
     bl_label = 'Smart'
     bl_description = 'Smart Projection'

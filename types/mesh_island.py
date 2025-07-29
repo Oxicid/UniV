@@ -10,7 +10,6 @@ from . import island
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh
 from bmesh.types import *
-from .. import utils
 
 class MeshIsland:
     def __init__(self, faces: list[BMFace], umesh: UMesh):
@@ -326,6 +325,11 @@ class MeshIslands(MeshIslandsBase):
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
 
     @classmethod
+    def calc_with_hidden(cls, umesh: UMesh):
+        umesh.set_face_tag()
+        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
+
+    @classmethod
     def calc_visible(cls, umesh: UMesh):
         cls.tag_filter_visible(umesh)
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
@@ -371,7 +375,7 @@ class MeshIslands(MeshIslandsBase):
 
     @classmethod
     def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.sync and umesh.is_full_face_selected:  # TODO: Remove umesh.sync (use assert instead)
             return cls([], umesh)
 
         cls.tag_filter_non_selected(umesh)

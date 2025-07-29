@@ -1,8 +1,15 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+if 'np' in locals():
+    from .. import reload
+    reload.reload(globals())
+
+import numpy as np
+from mathutils import Vector, Matrix
 from ... import types
 
-def extract_seams(umeshes: types.UMeshes):
+def extract_seams(umeshes: types.UMeshes) -> list[Vector]:
     coords = []
     coords_append = coords.append
 
@@ -52,4 +59,29 @@ def extract_edges_with_seams(umesh: types.UMesh):
             for e in umesh.bm.edges:
                 if e.seam and hasattr(e, 'link_loops'):
                     edges_append(e)
+    return edges
+
+_local_verts = np.array([
+    [-0.5, -0.5, -0.5, 1.0],
+    [ 0.5, -0.5, -0.5, 1.0],
+    [ 0.5,  0.5, -0.5, 1.0],
+    [-0.5,  0.5, -0.5, 1.0],
+    [-0.5, -0.5,  0.5, 1.0],
+    [ 0.5, -0.5,  0.5, 1.0],
+    [ 0.5,  0.5,  0.5, 1.0],
+    [-0.5,  0.5,  0.5, 1.0],
+], dtype=np.float32)
+
+_edges_indexes = np.array([
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7],
+], dtype=np.uint8)
+
+def extraxt_cube_lines_for_orient_bound(orient_matrix: Matrix, dims):
+    scale_matrix = Matrix.Diagonal(dims).to_4x4()
+    mat = np.array(orient_matrix @ scale_matrix, dtype=np.float32).T
+
+    verts = (_local_verts @ mat)[:, :3]
+    edges = verts[_edges_indexes].reshape(-1, 3)
     return edges
