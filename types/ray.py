@@ -636,7 +636,10 @@ class RayCast:
 
     def ray_cast_umeshes(self):
         ray_target = self.ray_origin + self.ray_direction
+        # from .. import draw
+        # draw.LinesDrawSimple3D.max_draw_time = 5
 
+        max_dist = 50_000
         best_length_squared = float('inf')
         umesh: UMesh | None = None
         face_index: int = 0
@@ -648,10 +651,11 @@ class RayCast:
             ray_direction_obj = ray_target_obj - ray_origin_obj
 
             bvh = BVHTree.FromBMesh(umesh_iter.bm)
-            hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj)
+            hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj, max_dist)
 
             if not hit:
                 continue
+            # draw.LinesDrawSimple3D.draw_register([world_matrix @ ray_origin_obj, world_matrix @ hit])
 
             hit_world = world_matrix @ hit
             length_squared = (hit_world - self.ray_origin).length_squared
@@ -661,7 +665,7 @@ class RayCast:
                 # If a face is hidden, the BVH is computed using FromPolygons.
                 if umesh_iter.bm.faces[face_index_].hide:
                     bvh, faces = self.get_bvh_from_polygon(umesh_iter)  # slow
-                    hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj)
+                    hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj, max_dist)
                     if not hit:
                         continue
                     hit_world = world_matrix @ hit
@@ -679,16 +683,17 @@ class RayCast:
 
     def ray_cast(self, max_pick_radius):
         # TODO: Add raycast by radial patterns
+        deps = bpy.context.view_layer.depsgraph
         result, loc, normal, face_index, obj, matrix = bpy.context.scene.ray_cast(
-            bpy.context.view_layer.depsgraph,
-            origin=self.ray_origin,
-            direction=self.ray_direction
-        )
-        if not (result and obj and obj.type == 'MESH'):
+            deps, origin=self.ray_origin, direction=self.ray_direction)
+
+        if not (result and obj and obj.type == 'MESH'):  # TODO: Fix potential non-mesh overlap object
             # TODO: Add raycast, ignoring objects that are not in Edit Mode
             return
 
-        if obj.mode != 'EDIT':
+        eval_obj = obj.evaluated_get(deps)
+        has_destructive_modifiers = len(obj.data.polygons) != len(eval_obj.data.polygons)
+        if obj.mode != 'EDIT' or has_destructive_modifiers:
             # Raycast, ignoring objects that are not in Edit Mode
             umesh, face_index = self.ray_cast_umeshes()
             if not umesh:
