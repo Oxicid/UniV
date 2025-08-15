@@ -385,12 +385,12 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             col.prop(self, "icon_white_color", text="")
             col.prop(self, "icon_select_arrow_color", text="")
 
-            box_row = box.row()
-            box_row.prop(self, 'icon_size')
-            box_row.prop(self, 'icon_antialiasing', text='AA')
-            box_row = box.row(align=True)
-            box_row.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
-            box_row.operator('wm.univ_icons_generator', text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
+            box_split = box.row()
+            box_split.prop(self, 'icon_size')
+            box_split.prop(self, 'icon_antialiasing', text='AA')
+            box_split = box.row(align=True)
+            box_split.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
+            box_split.operator('wm.univ_icons_generator', text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
@@ -463,14 +463,16 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
                             if config_filtered.default_keys:
-                                box.label(text='\t\tDefault', icon=conflict_state_default_keys)
                                 for (default_km, default_kmi) in config_filtered.default_keys:
-                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
+                                    box_split = box.split(align=True, factor=0.5)
+                                    box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
+                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
 
                             if config_filtered.user_defined:
-                                box.label(text='\t\tUser', icon=conflict_state_user_defined)
                                 for (user_km, user_kmi) in config_filtered.user_defined:
-                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
+                                    box_split = box.split(align=True, factor=0.5)
+                                    box_split.label(text=' ', icon='ERROR' if user_kmi.active else 'BLANK1')
+                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box_split, 0)
 
             if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
                 layout.label(text='Workspace Tool')

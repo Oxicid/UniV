@@ -546,10 +546,10 @@ class TestLLVM(unittest.TestCase):
         array_sum_ = fn.get_c_func(array_sum)
         self.assertEqual(array_sum_(array_ctypes, len(arr)), 15)
 
-    @staticmethod
-    def start():
+    @classmethod
+    def start(cls):
         ll.compile()
-        suite = unittest.TestLoader().loadTestsFromTestCase(TestLLVM)
+        suite = unittest.TestLoader().loadTestsFromTestCase(cls)
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)
         result.wasSuccessful()
