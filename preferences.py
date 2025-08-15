@@ -313,7 +313,14 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         ),
         default='ALL')
 
-    show_only_conflict_keymaps: BoolProperty(name='Only Error', default=False)
+    keymap_conflict_filter: EnumProperty(name='Conflict Filter',
+        items=(
+            ('ALL', 'All', ''),
+            ('ONLY_ERROR', 'Only Error', ''),
+            ('HIDE_ERROR', 'Hide Error', ''),
+
+        ),
+        default='ALL')
 
     keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
     keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
@@ -408,7 +415,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             sub_row = row.row()
             sub_row.scale_x = 0.8
             sub_row.prop(self, 'keymap_spaces_filter', text='')
-            sub_row.prop(self, 'show_only_conflict_keymaps', toggle=True)
+            sub_row.prop(self, 'keymap_conflict_filter', expand=True)
             row.separator()
 
             sub_row = row.row(align=True)
@@ -454,7 +461,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                 if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
                                     conflict_state_user_defined = 'ERROR'
 
-                            if self.show_only_conflict_keymaps:
+                            if self.keymap_conflict_filter == 'ONLY_ERROR':
                                 if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
                                     continue
 
@@ -462,17 +469,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                 box = col.box()
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-                            if config_filtered.default_keys:
-                                for (default_km, default_kmi) in config_filtered.default_keys:
-                                    box_split = box.split(align=True, factor=0.5)
-                                    box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
-                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
-
-                            if config_filtered.user_defined:
-                                for (user_km, user_kmi) in config_filtered.user_defined:
-                                    box_split = box.split(align=True, factor=0.5)
-                                    box_split.label(text=' ', icon='ERROR' if user_kmi.active else 'BLANK1')
-                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box_split, 0)
+                            if self.keymap_conflict_filter != 'HIDE_ERROR':
+                                self.draw_conflict_keymaps(box, config_filtered, kc)
 
             if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
                 layout.label(text='Workspace Tool')
@@ -506,7 +504,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                 if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
                                     conflict_state_user_defined = 'ERROR'
 
-                            if self.show_only_conflict_keymaps:
+                            if self.keymap_conflict_filter == 'ONLY_ERROR':
                                 if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
                                     continue
                                 if univ_kmi.idname == 'view3d.select_box':
@@ -516,19 +514,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                 box = col.box()
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-
                             if univ_kmi.idname == 'view3d.select_box':
                                 continue
 
-                            if config_filtered.default_keys:
-                                box.label(text='\t\tDefault', icon=conflict_state_default_keys)
-                                for (default_km, default_kmi) in config_filtered.default_keys:
-                                    rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box, 1)
-
-                            if config_filtered.user_defined:
-                                box.label(text='\t\tUser', icon=conflict_state_user_defined)
-                                for (user_km, user_kmi) in config_filtered.user_defined:
-                                    rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box, 1)
+                            if self.keymap_conflict_filter != 'HIDE_ERROR':
+                                self.draw_conflict_keymaps(box, config_filtered, kc)
 
         # elif self.tab == 'INFO':
         else:
@@ -580,6 +570,20 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
             if not univ_pro:
                 layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
+
+    @staticmethod
+    def draw_conflict_keymaps(box, config_filtered, kc):
+        if config_filtered.default_keys:
+            for (default_km, default_kmi) in config_filtered.default_keys:
+                box_split = box.split(align=True, factor=0.5)
+                box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
+                rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
+        if config_filtered.user_defined:
+            for (user_km, user_kmi) in config_filtered.user_defined:
+                box_split = box.split(align=True, factor=0.5)
+                box_split.label(text=' ', icon='ERROR' if user_kmi.active else 'BLANK1')
+                rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box_split, 0)
+
 
 class UNIV_OT_ShowAddonPreferences(bpy.types.Operator):
     bl_idname = 'wm.univ_show_addon_preferences'
