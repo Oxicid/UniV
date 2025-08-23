@@ -157,6 +157,9 @@ class UNIV_OT_Check_Flipped(Operator):
     @staticmethod
     def flipped(umeshes):
         sync = umeshes.sync
+        tool_settings = bpy.context.scene.tool_settings
+        sticky_mode = tool_settings.uv_sticky_select_mode
+
         if sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
 
@@ -167,11 +170,17 @@ class UNIV_OT_Check_Flipped(Operator):
                 continue
 
             uv = umesh.uv
-            face_select_set = utils.face_select_linked_func(umesh)
+            is_invisible = utils.face_invisible_get_func(umesh)
+            face_select_get = utils.face_select_get_func(umesh)
+            if sticky_mode == 'DISABLED':
+                face_select_set = utils.face_select_func(umesh)
+            else:
+                face_select_set = utils.face_select_linked_func(umesh)
+
             local_counter = 0
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
-                if face.hide if sync else not face.select:
+                if is_invisible(face) or face_select_get(face):
                     continue
 
                 a = tris_a[uv].uv

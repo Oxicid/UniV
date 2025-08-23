@@ -13,6 +13,19 @@ from bmesh.types import BMFace, BMLoop
 from .. import types
 
 
+def face_select_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def inner(uv, sync):
+        if sync:
+            def select_set(f):
+                f.select = True
+        else:
+            def select_set(f):
+                for crn in f.loops:
+                    crn_uv = crn[uv]
+                    crn_uv.select = True
+                    crn_uv.select_edge = True
+        return select_set
+    return inner(umesh.uv, umesh.sync)
 
 def face_select_set_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace, bool], typing.NoReturn]:  # noqa
     def inner(uv, sync):
@@ -84,6 +97,18 @@ def face_select_linked_func(umesh: 'types.UMesh', force=False, clamp_by_seams=Fa
                                 pair_crn_uv.select_edge = True
         return select_set
     return inner(umesh.uv, umesh.sync)
+
+def face_visible_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+    if umesh.sync:
+        return lambda f: not f.hide
+    else:
+        return BMFace.select.__get__
+
+def face_invisible_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+    if umesh.sync:
+        return BMFace.hide.__get__
+    else:
+        return lambda f: not f.select
 
 def edge_select_linked_set_func(umesh: 'types.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
     # TODO: Add support clamp by seams
