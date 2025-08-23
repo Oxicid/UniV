@@ -2017,7 +2017,8 @@ class UNIV_OT_Home(Operator):
         return tag
 
     def remove_shift_md(self):
-        all_object = set(types.UMeshes.calc_all_objects(verify_uv=False)) - set(self.umeshes)
+        all_object = set(obj for obj in bpy.data.objects if obj.type == 'MESH')
+        all_object = all_object - set(umesh.obj for umesh in self.umeshes)
         mod_counter = 0
         attr_counter = 0
         for umesh in self.umeshes:
@@ -2027,10 +2028,10 @@ class UNIV_OT_Home(Operator):
                     mod_counter += 1
 
             # safe attr for instances if not zero
-            instances = (inst_umesh for inst_umesh in all_object if inst_umesh.obj.data == umesh.obj.data)
+            instances = (inst_obj for inst_obj in all_object if inst_obj.data == umesh.obj.data)
             has_inst_with_shift_mod = False
-            for i_mesh in instances:
-                for mod in i_mesh.obj.modifiers:
+            for inst_obj in instances:
+                for mod in inst_obj.modifiers:
                     if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
                         has_inst_with_shift_mod = True
                         break
@@ -2051,16 +2052,12 @@ class UNIV_OT_Home(Operator):
 
         # Remove modifiers without univ_shift attr
         for other_umesh in all_object:
-            if any(other_umesh.obj.data == umesh.obj.data for umesh in self.umeshes):
-                if self.umeshes.is_edit_mode:
-                    attributes = other_umesh.bm.faces.layers.int.values()
-                else:
-                    attributes = other_umesh.obj.data.attributes
-
+            if any(other_umesh.data == umesh.obj.data for umesh in self.umeshes):
+                attributes = other_umesh.data.attributes
                 if not any(attr.name.startswith('univ_shift') for attr in attributes):
-                    for mod in reversed(other_umesh.obj.modifiers):
+                    for mod in reversed(other_umesh.modifiers):
                         if isinstance(mod, bpy.types.NodesModifier) and mod.name.startswith('UniV Shift'):
-                            other_umesh.obj.modifiers.remove(mod)
+                            other_umesh.modifiers.remove(mod)
                             mod_counter += 1
 
         return mod_counter, attr_counter
