@@ -274,19 +274,48 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                     # It might be worth bug reporting this moment when SLIM causes a "grow effect"
                     ud.umesh.bm.select_flush(False)
 
+    @staticmethod
+    def unwrap_sync_faces_extend_select_and_set_pins(isl):
+        to_select = []
+        unpinned = []
+        uv = isl.umesh.uv
+        sync = isl.umesh.sync
+        for f in isl:
+            if f.select:
+                continue
+
+            has_selected_linked_faces = False
+            temp_static = []
+            for crn in f.loops:
+                linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
+                if any(cc.face.select for cc in linked):
+                    has_selected_linked_faces = True
+                else:
+                    temp_static.append(crn)
+
+            if has_selected_linked_faces:
+                to_select.append(f)
+
+                for crn in temp_static:
+                    crn_uv = crn[uv]
+                    if not crn_uv.pin_uv:
+                        crn_uv.pin_uv = True
+                    unpinned.append(crn_uv)
+        for f in to_select:
+            f.select = True
+        isl.sequence = (unpinned, to_select)
+
     def unwrap_sync_faces(self, **unwrap_kwargs):
         assert self.umeshes.elem_mode == 'FACE'
         unique_number_for_multiply = 0
 
-        unwrap_data: list = []
+        all_transform_islands = []
         for umesh in reversed(self.umeshes):
-            uv = umesh.uv
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands_extended = types.AdvIslands.calc_extended_with_mark_seam(umesh)
             islands_extended.indexing()
 
-            save_transform_islands = []
             for isl in islands_extended:
                 if unwrap_kwargs:
                     unique_number_for_multiply += hash(isl[0])  # multiplayer
@@ -296,76 +325,37 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 else:
                     isl.mark_seam_by_index(additional=True)
 
+                self.unwrap_sync_faces_extend_select_and_set_pins(isl)
+
                 isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
-                save_transform_islands.append(save_t)
+                all_transform_islands.append(save_t)
 
-            if umesh.has_full_selected_uv_faces:
-                unwrap_data.append(([], [], save_transform_islands))
-                continue
-
-            pinned = []
-            to_select_groups = []
-            for idx, island in enumerate(islands_extended):
-                if island.is_full_face_selected():
-                    continue
-                to_select = []
-                for f in island:
-                    if not f.select:
-                        continue
-                    for crn in f.loops:
-                        for linked_crn in linked_crn_uv_by_island_index_unordered(crn, uv, idx):
-                            linked_crn_face = linked_crn.face
-                            if linked_crn_face.select or linked_crn_face.tag:
-                                continue
-                            linked_crn_face.tag = True
-                            # add neighboring non-selected faces
-                            to_select.append(linked_crn_face)
-                to_select_groups.append(to_select)
-
-                island.set_corners_tag(False)
-                for f in to_select:
-                    for crn in f.loops:
-                        if crn.tag:
-                            continue
-                        linked_corners = linked_crn_uv_by_island_index_unordered_included(crn, uv, idx)
-                        for crn_ in linked_corners:
-                            crn_.tag = True
-
-                        if any(linked_crn.face.select for linked_crn in linked_corners):
-                            continue
-
-                        # if linked corners hasn't selected -> set pin
-                        for crn_ in linked_corners:
-                            crn_uv = crn_[uv]
-                            if not crn_uv.pin_uv:
-                                crn_uv.pin_uv = True
-                                pinned.append(crn_uv)
-                            continue
-
-                for f in to_select:
-                    f.select = True
-            unwrap_data.append((pinned, to_select_groups, save_transform_islands))
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
         bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
-        for pinned, faces_groups, islands in unwrap_data:
-            for pin in pinned:
+        for isl in all_transform_islands:
+            unpinned, to_select = isl.island.sequence
+            for pin in unpinned:
                 pin.pin_uv = False
-            for faces in faces_groups:
-                for f in faces:
-                    f.select = False
-            for isl in islands:
-                isl.inplace(self.unwrap_along)
-                isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
-                isl.island.reset_aspect_ratio()
+            for f in to_select:
+                f.select = False
+
+            isl.inplace(self.unwrap_along)
+            isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+            isl.island.reset_aspect_ratio()
 
     def unwrap_non_sync(self, **unwrap_kwargs):
         save_transform_islands = []
         unique_number_for_multiply = 0
+
+        tool_settings = bpy.context.scene.tool_settings
+        is_sticky_mode_disabled = tool_settings.uv_sticky_select_mode == 'DISABLED'
+
         for umesh in reversed(self.umeshes):
+            uv = umesh.uv
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands = types.AdvIslands.calc_extended_any_elem_with_mark_seam(umesh)
@@ -381,11 +371,46 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 else:
                     isl.mark_seam_by_index(additional=True)
 
+            if is_sticky_mode_disabled:
+                face_select_get = utils.face_select_get_func(umesh)
+                crn_select_get = utils.vert_select_get_func(umesh)
+                for isl in islands:
+                    unpin_uvs = set()
+                    corners_to_select = set()
+                    for f in isl:
+                        if face_select_get(f):
+                            continue
+
+                        temp_static = []
+                        has_selected = False
+                        for crn in f.loops:
+                            if crn_select_get(crn):
+                                continue
+                            linked = utils.linked_crn_to_vert_pair_with_seam(crn, umesh.uv, umesh.sync)
+                            if any(crn_select_get(c) for c in linked):
+                                has_selected = True
+                                corners_to_select.add(crn[uv])
+                            else:
+                                temp_static.append(crn)
+                        if has_selected:
+                            for cc in temp_static:
+                                cc_uv = cc[uv]
+                                if not cc_uv.pin_uv:
+                                    unpin_uvs.add(cc_uv)
+                                    corners_to_select.add(cc_uv)
+
+                    for unpin_crn in unpin_uvs:
+                        unpin_crn.pin_uv = True
+                    for unsel_crn in corners_to_select:
+                        unsel_crn.select = True
+                    isl.sequence = (unpin_uvs, corners_to_select)
+
             for isl in islands:
                 isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
                 save_t.save_coords(self.unwrap_along, self.blend_factor)
                 save_transform_islands.append(save_t)
+
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
@@ -395,6 +420,14 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             isl.inplace(self.unwrap_along)
             isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
             isl.island.reset_aspect_ratio()
+
+            if is_sticky_mode_disabled:
+                if isl.island.sequence:
+                    unpin_uvs, corners_to_select = isl.island.sequence
+                    for unpin_crn in unpin_uvs:
+                        unpin_crn.pin_uv = False
+                    for unsel_crn in corners_to_select:
+                        unsel_crn.select = False
 
     @staticmethod
     def multiply_relax(unique_number_for_multiply, unwrap_kwargs):
