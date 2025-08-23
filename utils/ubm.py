@@ -1088,7 +1088,7 @@ class ShortPath:
         uv_a = l_a[uv].uv
 
         # Loop over faces of face, but do so by first looping over loops.
-        for l in chain(linked_crn_uv(l_a, uv), [l_a]):  # TODO: Add by index included and mark seam and bi-direct linked?
+        for l in linked_crn_uv_by_idx_unordered_included(l_a, uv): # TODO: Add mark seam and bi-direct linked
             #  'l_a' is already tagged, tag all adjacent.
 
             l.tag = False
@@ -1124,6 +1124,7 @@ class ShortPath:
                           bound_priority_factor=0.9) -> list[BMLoop]:
         import heapq
         from collections import deque
+        assert l_src.face.index == l_dst.face.index
         path = deque()
         # BM_ELEM_TAG flag is used to store visited edges
         uv = isl.umesh.uv
@@ -1161,6 +1162,7 @@ class ShortPath:
         while heap:
             l = heapq.heappop(heap)[2]
             if (l.vert == l_dst.vert) and l[uv].uv == l_dst[uv].uv:
+                # assert l.face.index == l_dst.face.index
                 while True:
                     path.appendleft(l)
                     if not (l := loops_prev[l.index]):
@@ -1181,7 +1183,7 @@ class ShortPath:
         uv = umesh.uv
         chain_linked_corners = []
         for crn in path:
-            linked = linked_crn_uv(crn, uv)
+            linked = linked_crn_uv_by_idx_unordered(crn, uv)
             linked.insert(0, crn)
             chain_linked_corners.append(linked)
 

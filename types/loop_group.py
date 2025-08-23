@@ -11,7 +11,11 @@ from mathutils import Vector
 from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import prev_disc, linked_crn_uv_by_crn_tag_unordered_included, linked_crn_uv, vec_isclose_to_zero
+from ..utils import (prev_disc,
+                     linked_crn_uv_by_crn_tag_unordered_included,
+                     linked_crn_uv,
+                     vec_isclose_to_zero,
+                     linked_crn_uv_by_idx_unordered)
 from math import pi
 from . import umesh as _umesh
 from . import bbox
@@ -410,7 +414,7 @@ class LoopGroup:
     def calc_chain_linked_corners(self):
         uv = self.umesh.uv
         for crn in chain(self, [self[-1].link_loop_next]):
-            linked = linked_crn_uv(crn, uv)
+            linked = linked_crn_uv_by_idx_unordered(crn, uv)
             linked.insert(0, crn)
             self.chain_linked_corners.append(linked)
 
@@ -529,7 +533,8 @@ class LoopGroups:
                     temp_crn = next_crn
                     group.append(next_crn)
                     continue
-                for linked_crn in reversed(linked_crn_uv(next_crn, uv)):
+
+                for linked_crn in reversed(utils.linked_crn_uv_by_idx_unordered(next_crn, uv)):
                     if linked_crn.tag:
                         linked_crn.tag = False
                         temp_crn = linked_crn

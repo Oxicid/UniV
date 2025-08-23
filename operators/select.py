@@ -2211,7 +2211,7 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
 
         boundary_loop_groups = types.LoopGroups.calc_by_boundary_crn_tags(isl)
 
-        four_groups: 'LoopGroups' = univ_pro.rectify.UNIV_OT_Rectify.two_pt_ring_lg_to_rect_ex(boundary_loop_groups, isl)
+        four_groups = univ_pro.rectify.UNIV_OT_Rectify.two_pt_ring_lg_to_rect_ex(boundary_loop_groups, isl)
 
 
         self.calc_from_corners(four_groups, uv)
