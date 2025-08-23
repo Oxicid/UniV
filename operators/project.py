@@ -456,21 +456,6 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
-    def invoke(self, context, event):
-        self.area = context.area
-        if self.area.type != 'VIEW_3D':
-            self.area = utils.get_area_by_type('VIEW_3D')
-            if not self.area:
-                self.report({'WARNING'}, 'Active area must be 3D View')
-                return {'CANCELLED'}
-
-        self.v3d = self.area.spaces.active
-        self.region = [reg for reg in self.area.regions if reg.type == 'WINDOW'][0]
-        self.rv3d = self.region.data
-
-        self.camera = utils.get_view3d_camera_data(self.v3d, self.rv3d)  # noqa
-        return self.execute(context)
-
     def draw(self, context):
         layout = self.layout
         if not self.use_orthographic and self.camera:
@@ -494,6 +479,19 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
+
+        self.area = context.area
+        if self.area.type != 'VIEW_3D':
+            self.area = utils.get_area_by_type('VIEW_3D')
+            if not self.area:
+                self.report({'WARNING'}, 'Active area must be 3D View')
+                return {'CANCELLED'}
+
+        self.v3d = self.area.spaces.active
+        self.region = next(reg for reg in self.area.regions if reg.type == 'WINDOW')
+        self.rv3d = self.region.data
+        self.camera = utils.get_view3d_camera_data(self.v3d, self.rv3d)  # noqa
+
         if self.umeshes.is_edit_mode:
             selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:

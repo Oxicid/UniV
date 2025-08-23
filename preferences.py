@@ -296,7 +296,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     # ----------
     keymap_workspace_filter: EnumProperty(name='Workspace Filter',
         items=(
-            ('ALL', 'All', ''),
+            ('ALL', 'Show All', ''),
             ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
             ('WORKSPACE', 'Workspace', 'Show keymaps from univ workspaces')
         ),
@@ -304,7 +304,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     keymap_spaces_filter: EnumProperty(name='Space Filter',
         items=(
-            ('ALL', 'All', ''),
+            ('ALL', 'Show All Spaces', ''),
             ('UV Editor', 'UV', ''),
             ('Window', 'Window', ''),
             ('Object', 'Object', ''),
@@ -315,7 +315,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     keymap_conflict_filter: EnumProperty(name='Conflict Filter',
         items=(
-            ('ALL', 'All', ''),
+            ('ALL', 'Show All', ''),
             ('ONLY_ERROR', 'Only Error', ''),
             ('HIDE_ERROR', 'Hide Error', ''),
 
@@ -406,15 +406,19 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
             row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
 
-            row = layout.row(align=True)
+            col = layout.column(align=True)
+            row = col.row(align=True)
             sub_row = row.row(align=True)
-            sub_row.scale_x = 0.45
+            sub_row.scale_x = 0.4
             sub_row.prop(self, 'keymap_workspace_filter', expand=True)
 
             row.separator()
             sub_row = row.row()
-            sub_row.scale_x = 0.8
             sub_row.prop(self, 'keymap_spaces_filter', text='')
+
+            row = col.row(align=True)
+            sub_row = row.row()
+            sub_row.scale_x = 0.8
             sub_row.prop(self, 'keymap_conflict_filter', expand=True)
             row.separator()
 
@@ -426,11 +430,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                 sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA')
                 sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET')
 
-            layout.label(
-                text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
-                icon='INFO')
-
-
+            # Draw Keymaps
             if self.keymap_workspace_filter in ('ALL', 'DEFAULT'):
                 if self.keymap_spaces_filter == 'ALL':
                     areas = keymaps.keys_areas
@@ -519,6 +519,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
                             if self.keymap_conflict_filter != 'HIDE_ERROR':
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
+
+            layout.label(
+                text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
+                icon='INFO')
 
         # elif self.tab == 'INFO':
         else:
