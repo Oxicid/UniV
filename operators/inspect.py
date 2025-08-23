@@ -101,6 +101,8 @@ class UNIV_OT_Check_Zero(Operator):
     @staticmethod
     def zero(umeshes, precision=1e-6):
         sync = umeshes.sync
+        tool_settings = bpy.context.scene.tool_settings
+        sticky_mode = tool_settings.uv_sticky_select_mode
         if sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
 
@@ -112,11 +114,17 @@ class UNIV_OT_Check_Zero(Operator):
                 continue
 
             uv = umesh.uv
-            face_select_set = utils.face_select_linked_func(umesh)
+            is_invisible = utils.face_invisible_get_func(umesh)
+            face_select_get = utils.face_select_get_func(umesh)
+            if sticky_mode == 'DISABLED':
+                face_select_set = utils.face_select_func(umesh)
+            else:
+                face_select_set = utils.face_select_linked_func(umesh)
+
             local_counter = 0
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
-                if face.hide if sync else not face.select:
+                if is_invisible(face) or face_select_get(face):
                     continue
 
                 area = area_tri(tris_a[uv].uv, tris_b[uv].uv, tris_c[uv].uv)
