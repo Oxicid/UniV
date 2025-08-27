@@ -617,9 +617,9 @@ class PyBMesh(StructBase):
     @classmethod
     def is_full_face_selected(cls, bm):
         bm = cls.fields(bm)
-        if not bm.totface:
-            return False
-        return bm.totfacesel == bm.totface
+        if bm.totfacesel:
+            return bm.totfacesel == bm.totface
+        return False
 
     @classmethod
     def is_full_face_deselected(cls, bm):
@@ -628,7 +628,9 @@ class PyBMesh(StructBase):
     @classmethod
     def is_full_edge_selected(cls, bm):
         bm = cls.fields(bm)
-        return bm.totedgesel == bm.totedge
+        if bm.totedgesel:
+            return bm.totedgesel == bm.totedge
+        return False
 
     @classmethod
     def is_full_edge_deselected(cls, bm):
@@ -637,7 +639,9 @@ class PyBMesh(StructBase):
     @classmethod
     def is_full_vert_selected(cls, bm):
         bm = cls.fields(bm)
-        return bm.totvertsel == bm.totvert
+        if bm.totvertsel:
+            return bm.totvertsel == bm.totvert
+        return False
 
     @classmethod
     def is_full_vert_deselected(cls, bm):

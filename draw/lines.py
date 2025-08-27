@@ -29,7 +29,11 @@ class LinesDrawSimple:
         cls.start_time = time()
         cls.color = color
 
-        cls.shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+            cls.shader = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+        else:
+            cls.shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+
         cls.batch = batch_for_shader(cls.shader, 'LINES', {"pos": data})
 
         sima = bpy.types.SpaceImageEditor
@@ -63,16 +67,22 @@ class LinesDrawSimple:
         if bpy.context.area.ui_type != 'UV':
             return
 
+        # Blender Vulkan 4.5 support
+        is_vulkan_enabled = getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN"
         if bpy.app.version < (3, 5, 0):
             import bgl
             bgl.glLineWidth(2)
             bgl.glEnable(bgl.GL_ALPHA)
         else:
-            gpu.state.line_width_set(2)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(2)
             gpu.state.blend_set('ALPHA')
 
         cls.shader.bind()
         cls.shader.uniform_float("color", cls.color)
+        if is_vulkan_enabled:
+            # cls.shader.uniform_float("viewportSize", (bpy.context.area.width, bpy.context.area.height))
+            cls.shader.uniform_float('lineWidth', 2.0)
         cls.batch.draw(cls.shader)
 
         if bpy.app.version < (3, 5, 0):
@@ -80,7 +90,8 @@ class LinesDrawSimple:
             bgl.glLineWidth(1)
             bgl.glDisable(bgl.GL_BLEND)  # noqa
         else:
-            gpu.state.line_width_set(1)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(1)
             gpu.state.blend_set('NONE')
 
 class LinesDrawSimple3D:
@@ -99,7 +110,10 @@ class LinesDrawSimple3D:
         cls.start_time = time()
         cls.color = color
 
-        cls.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+            cls.shader = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+        else:
+            cls.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
         cls.batch = batch_for_shader(cls.shader, 'LINES', {"pos": data})
 
         v3d = bpy.types.SpaceView3D
@@ -132,17 +146,20 @@ class LinesDrawSimple3D:
     def draw_callback_px(cls):
         if bpy.context.area.type != 'VIEW_3D':
             return
-
+        is_vulkan_enabled = getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN"
         if bpy.app.version < (3, 5, 0):
             import bgl
             bgl.glLineWidth(2)
             bgl.glEnable(bgl.GL_ALPHA)
         else:
-            gpu.state.line_width_set(2)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(2)
             gpu.state.blend_set('ALPHA')
 
         cls.shader.bind()
         cls.shader.uniform_float("color", cls.color)
+        if is_vulkan_enabled:
+            cls.shader.uniform_float('lineWidth', 2.0)
         cls.batch.draw(cls.shader)
 
         if bpy.app.version < (3, 5, 0):
@@ -150,7 +167,8 @@ class LinesDrawSimple3D:
             bgl.glLineWidth(1)
             bgl.glDisable(bgl.GL_BLEND)  # noqa
         else:
-            gpu.state.line_width_set(1)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(1)
             gpu.state.blend_set('NONE')
 
 
@@ -214,12 +232,15 @@ class DotLinesDrawSimple:
         if area.ui_type != 'UV':
             return
 
+        is_vulkan_enabled = getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN"
+
         if bpy.app.version < (3, 5, 0):
             import bgl
             bgl.glLineWidth(3)
             bgl.glEnable(bgl.GL_ALPHA)
         else:
-            gpu.state.line_width_set(3)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(3)
             gpu.state.blend_set('ALPHA')
 
         cls.shader.bind()
@@ -239,7 +260,8 @@ class DotLinesDrawSimple:
             bgl.glLineWidth(1)
             bgl.glDisable(bgl.GL_BLEND)  # noqa
         else:
-            gpu.state.line_width_set(1)
+            if not is_vulkan_enabled:
+                gpu.state.line_width_set(1)
             gpu.state.blend_set('NONE')
 
     @classmethod

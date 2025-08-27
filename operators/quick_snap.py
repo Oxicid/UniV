@@ -283,7 +283,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             return {'CANCELLED'}
         self.view = context.region.view2d
         self.sync = utils.sync()
-        self.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+            self.shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+        else:
+            self.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
         self.refresh_draw_points()
         self.register_draw()
 

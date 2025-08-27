@@ -68,7 +68,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
     bl_label = 'Draw Test'
     bl_options = {'REGISTER', 'UNDO'}
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mouse_position = ()
         self.view = None
         self.handler = None
@@ -76,6 +77,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         self.shader = None
         self.shader_smooth_color = None
+        self.shader_smooth_color_vert = None
 
         self.batch = None
         self.batch_smooth_color = None
@@ -88,8 +90,15 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
     def invoke(self, context, event):
         self.area = context.area
         self.view = context.region.view2d
-        self.shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-        self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
+        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+            self.shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+            # self.shader_smooth_color = gpu.shader.from_builtin('POLYLINE_SMOOTH_COLOR')
+            self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
+            self.shader_smooth_color_vert = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+        else:
+            self.shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+            self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
+            self.shader_smooth_color_vert = gpu.shader.from_builtin('SMOOTH_COLOR')
         self.register_draw()
         from .. import types
 
@@ -164,9 +173,11 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
         self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
-        self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2]})
+        else:
+            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
 
     def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['CrnEdgeGrow'] | 'CrnEdgeGrow'):  # noqa
         from gpu_extras.batch import batch_for_shader
@@ -184,7 +195,6 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
         self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
         self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
 
@@ -202,8 +212,10 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         import blf
         from gpu_extras.batch import batch_for_shader
 
+        is_vulkan_enabled = getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN"
         gpu.state.blend_set('ALPHA')
         gpu.state.point_size_set(8)
+        # if not is_vulkan_enabled:
         gpu.state.line_width_set(2)
 
         try:
@@ -216,10 +228,16 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         batch_nearest = batch_for_shader(self.shader, 'POINTS', {"pos": self.points})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)
+
         if self.batch_smooth_color:
             self.shader_smooth_color.bind()
+            if is_vulkan_enabled:
+                try:
+                    self.shader_smooth_color_vert.uniform_float("color", (1, 0.2, 0.1, 1))
+                except:pass
+            # TODO: Implement UNIFORM color with sequence of groups (implement for_each)
             self.batch_smooth_color.draw(self.shader_smooth_color)
-            self.batch_smooth_color_2.draw(self.shader_smooth_color)
+            self.batch_smooth_color_2.draw(self.shader_smooth_color_vert)
 
             blf.size(font_id := 0, 350)
             blf.position(font_id, 0, 0, 0)
