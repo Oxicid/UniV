@@ -36,7 +36,7 @@ from ..types import (
 from ..preferences import prefs, univ_settings
 
 
-class UNIV_OT_Crop(Operator):
+class UNIV_OT_Crop(Operator, utils.PaddingHelper):
     bl_idname = 'uv.univ_crop'
     bl_label = 'Crop'
     bl_description = info.operator.crop_info
@@ -46,7 +46,6 @@ class UNIV_OT_Crop(Operator):
     to_cursor: BoolProperty(name='To Cursor', default=False)
     individual: BoolProperty(name='Individual', default=False)
     inplace: BoolProperty(name='Inplace', default=False)
-    padding: FloatProperty(name='Padding', description='Padding=1/TextureSize (1/256=0.0039)', default=0, soft_min=0, soft_max=1/256*4, max=0.49)
 
     @classmethod
     def poll(cls, context):
@@ -59,7 +58,7 @@ class UNIV_OT_Crop(Operator):
         layout.prop(self, 'individual')
         if not self.to_cursor:
             layout.prop(self, 'inplace')
-        layout.prop(self, 'padding', slider=True)
+        self.draw_padding()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -81,6 +80,8 @@ class UNIV_OT_Crop(Operator):
 
     def execute(self, context):
         self.mode_preprocessing()
+        self.calc_padding()
+        self.report_padding()
         return self.crop(self.mode, self.axis, self.padding, proportional=True, report=self.report)
 
     def mode_preprocessing(self):
@@ -243,6 +244,8 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
 
     def execute(self, context):
         self.mode_preprocessing()
+        self.calc_padding()
+        self.report_padding()
         return self.crop(self.mode, self.axis, self.padding, proportional=False, report=self.report)
 
     @staticmethod
@@ -1425,7 +1428,7 @@ class UNIV_OT_Rotate(Operator):
         return {'FINISHED'}
 
 
-class UNIV_OT_Sort(Operator, utils.OverlapHelper):
+class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     bl_idname = 'uv.univ_sort'
     bl_label = 'Sort'
     bl_description = \
@@ -1436,7 +1439,6 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
-    padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     sub_padding: FloatProperty(name='Sub Padding', default=0.1, min=0, soft_max=0.2,)
     area_subgroups: IntProperty(name='Area Subgroups', default=4, min=1, max=200, soft_max=8)
     reverse: BoolProperty(name='Reverse', default=True)
@@ -1457,7 +1459,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
         layout.prop(self, 'orient')
         if self.subgroup_type == 'NONE':
             self.draw_overlap()
-        layout.prop(self, 'padding', slider=True)
+        self.draw_padding()
         if self.subgroup_type != 'NONE':
             layout.prop(self, 'sub_padding', slider=True)
         if self.subgroup_type == 'AREA':
@@ -1487,6 +1489,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
     def execute(self, context):
         self.update_tag = False
         self.umeshes = UMeshes(report=self.report)
+        self.calc_padding()
+        self.report_padding()
+
         if self.to_cursor:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")
@@ -1669,7 +1674,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper):
             return self.axis == 'X'
 
 
-class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
+class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     bl_idname = 'uv.univ_distribute'
     bl_label = 'Distribute'
     bl_description = "Distribute\n\n" \
@@ -1683,7 +1688,6 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     space: EnumProperty(name='Space', default='ALIGN', items=(('ALIGN', 'Align', ''), ('SPACE', 'Space', '')),
                         description='Distribution of islands at equal distances')
-    padding: FloatProperty(name='Padding', default=1/2048, min=0, soft_max=0.1,)
     to_cursor: BoolProperty(name='To Cursor', default=False)
     break_: BoolProperty(name='Break', default=False)
     angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
@@ -1701,10 +1705,9 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
             layout.prop(self, 'break_')
             layout.prop(self, 'angle', slider=True)
 
-        layout = self.layout
-        layout.prop(self, 'padding', slider=True)
         layout = self.layout.row()
         layout.prop(self, 'axis', expand=True)
+        self.draw_padding()
 
     @classmethod
     def poll(cls, context):
@@ -1727,6 +1730,9 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper):
 
     def execute(self, context):
         self.umeshes = types.UMeshes(report=self.report)
+        self.calc_padding()
+        self.report_padding()
+
         if self.to_cursor and not self.break_:
             if not (cursor_loc := utils.get_cursor_location()):
                 self.report({'INFO'}, "Cursor not found")

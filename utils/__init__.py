@@ -136,6 +136,36 @@ class OverlapHelper:
         threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
         return types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
 
+class PaddingHelper:
+    padding_multiplayer: bpy.props.FloatProperty(name='Padding Multiplayer', default=1, min=-32, soft_min=0, soft_max=4, max=32)
+
+    def __init__(self):
+        self.padding = 0.0
+
+    def draw_padding(self):
+        layout = self.layout  # noqa
+        if self.padding_multiplayer:
+            from .. import preferences
+            settings = preferences.univ_settings()
+            layout.separator(factor=0.35)
+            layout.label(text=f"Global Texture Size = {min(int(settings.size_x), int(settings.size_y))}")
+            layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
+
+        layout.prop(self, "padding_multiplayer", slider=True)
+
+    def calc_padding(self):
+        from .. import preferences
+        settings = preferences.univ_settings()
+        self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
+
+    def report_padding(self):
+        if self.padding and (img_size := get_active_image_size()):  # TODO: Get active image size from material id
+            from .. import preferences
+            settings = preferences.univ_settings()
+            if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
+                self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
+                                         'which will result in incorrect padding.')
+
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 

@@ -1019,7 +1019,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
         self.clear_seams_from_selected_edges(umeshes_without_uv)
         self.umeshes.umeshes.extend(umeshes_without_uv)
 
-class UNIV_OT_Stitch(Operator, Stitch):
+class UNIV_OT_Stitch(Operator, Stitch, utils.PaddingHelper):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
     bl_description = "Stitch selected UV vertices by proximity\n\n" \
@@ -1032,8 +1032,9 @@ class UNIV_OT_Stitch(Operator, Stitch):
 
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
-    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=-4, soft_max=4, max=32)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
+    padding_multiplayer: bpy.props.FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=0,
+                                                 soft_max=4, max=32)
 
     @classmethod
     def poll(cls, context):
@@ -1045,13 +1046,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
         layout.prop(self, "update_seams")
         layout.prop(self, "use_aspect")
         if not self.between:
-            if self.padding_multiplayer:
-                layout.separator(factor=0.35)
-                settings = univ_settings()
-                layout.label(text=f"Global Texture Size = {min(int(settings.size_x), int(settings.size_y))}")
-                layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
-
-            layout.prop(self, "padding_multiplayer", slider=True)
+            self.draw_padding()
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1076,9 +1071,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
             selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
-        settings = univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
-
+        self.calc_padding()
 
         for umesh in chain(selected_umeshes, visible_umeshes):
             umesh.aspect = utils.get_aspect_ratio() if self.use_aspect else 1.0
@@ -1090,10 +1083,7 @@ class UNIV_OT_Stitch(Operator, Stitch):
             if not self.umeshes:
                 return self.umeshes.update()
             if not selected_umeshes and self.mouse_position:
-                if self.padding and (img_size := utils.get_active_image_size()):
-                    if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
-                        self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
-                                                 'which will result in incorrect padding.')
+                self.report_padding()
 
                 hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
                 for umesh in self.umeshes:
