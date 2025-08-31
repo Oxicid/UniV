@@ -448,8 +448,8 @@ class LoopGroup:
             while True:
                 temp = []
                 for sel in temp_group:
-                    it1 = linked_crn_uv_by_crn_tag_unordered_included(sel, uv)
-                    it2 = linked_crn_uv_by_crn_tag_unordered_included(sel.link_loop_next, uv)
+                    it1 = utils.linked_crn_uv_unordered_included(sel, uv)
+                    it2 = utils.linked_crn_uv_unordered_included(sel.link_loop_next, uv)
                     for l in chain(it1, it2):
                         if l.tag:
                             l.tag = False

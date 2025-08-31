@@ -803,7 +803,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 self.align_cursor(general_bbox, cursor_loc)
                 return {'FINISHED'}
 
-            case 'INDIVIDUAL_OR_MOVE':  # OR INDIVIDUAL
+            case 'INDIVIDUAL_OR_MOVE':
                 if self.is_island_mode:
                     if self.direction == 'CENTER':
                         return self.collect_islands()
@@ -813,11 +813,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                         self.move_ex(selected=True)
                 else:
                     self.individual_scale_zero()
+
                 if not self.umeshes.final():
-                    if self.direction in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:  # TODO: Delete???
-                        self.align_ex(selected=False)
-                    else:
-                        self.move_ex(selected=False)
+                    self.move_ex(selected=False)
 
             case _:
                 raise NotImplementedError(self.mode)
@@ -858,21 +856,45 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         self.align_islands(all_groups, target_bbox, invert=True)
 
     def align_cursor_ex(self, selected):
-        all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
-        for umesh in self.umeshes:
-            if corners := utils.calc_uv_corners(umesh, selected=selected):  # TODO: Implement bbox for island and vertex mode
-                all_groups.append((corners, umesh.uv))
-                bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
-                general_bbox.union(bbox)
+        if self.umeshes.sync and selected and any(umesh.total_edge_sel for umesh in self.umeshes):
+            for umesh in self.umeshes:
+                if umesh.elem_mode in ('FACE', 'ISLAND'):
+                    corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
+                else:
+                    corners = utils.calc_selected_uv_edge_corners(umesh)
+                if corners:
+                    uv = umesh.uv
+                    general_bbox.update(crn[uv].uv for crn in corners)
+                    general_bbox.update(crn.link_loop_next[uv].uv for crn in corners)
+        else:
+            for umesh in self.umeshes:
+                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                    uv = umesh.uv
+                    general_bbox.update(crn[uv].uv for crn in corners)
         return general_bbox
+
+    @staticmethod
+    def get_unique_linked_corners_from_crn_edge(umesh, corners):
+        assert umesh.sync
+        uv = umesh.uv
+        unique_linked_corners = set()
+        for crn in corners:
+            if crn not in unique_linked_corners:
+                unique_linked_corners.add(crn)
+                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, True))
+            next_crn = crn.link_loop_next
+            if next_crn not in unique_linked_corners:
+                unique_linked_corners.add(next_crn)
+                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(next_crn, uv, True))
+        return unique_linked_corners
 
     def align_ex(self, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
         if self.is_island_mode or not selected:
             for umesh in self.umeshes:
-                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
+                if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         general_bbox.union(bbox)
@@ -882,57 +904,39 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             self.align_islands(all_groups, general_bbox)
         else:
             for umesh in self.umeshes:
-                if corners := utils.calc_uv_corners(umesh, selected=selected):
-                    bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
-                    general_bbox.union(bbox)
-
-                    all_groups.append((corners, umesh.uv))
-                umesh.update_tag = bool(corners)
-            self.align_corners(all_groups, general_bbox)  # TODO Individual ALign for Vertical and Horizontal or all
+                if umesh.sync and any(umesh.total_edge_sel for umesh in self.umeshes):
+                    if umesh.elem_mode in ('FACE', 'ISLAND'):
+                        corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
+                    else:
+                        corners = utils.calc_selected_uv_edge_corners(umesh)
+                    if corners:
+                        corners = self.get_unique_linked_corners_from_crn_edge(umesh, corners)
+                        bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
+                        general_bbox.union(bbox)
+                        all_groups.append((corners, umesh.uv))
+                else:
+                    if corners := utils.calc_selected_uv_vert_corners(umesh):
+                        bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
+                        general_bbox.union(bbox)
+                        all_groups.append((corners, umesh.uv))
+                    umesh.update_tag = bool(corners)
+            self.align_corners(all_groups, general_bbox)
 
     def move_ex(self, selected=True):
+        assert self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}
+        move_value = Vector(self.get_move_value(self.direction))
         if self.is_island_mode:
             for umesh in self.umeshes:
                 if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
-                    match self.direction:
-                        case 'CENTER':
-                            for island in islands:
-                                bbox = island.calc_bbox()
-                                delta = Vector((0.5, 0.5)) - bbox.center
-                                island.move(delta)  # ToDO: Implement update flags for return state move
-                        case 'HORIZONTAL':
-                            for island in islands:
-                                bbox = island.calc_bbox()
-                                delta_y = 0.5 - bbox.center.y
-                                island.move(Vector((0.0, delta_y)))
-                        case 'VERTICAL':
-                            for island in islands:
-                                bbox = island.calc_bbox()
-                                delta_x = 0.5 - bbox.center.x
-                                island.move(Vector((delta_x, 0.0)))
-                        case _:
-                            move_value = Vector(self.get_move_value(self.direction))
-                            for island in islands:
-                                island.move(move_value)
+                    for island in islands:
+                        island.move(move_value)
                 umesh.update_tag = bool(islands)
         else:
             for umesh in self.umeshes:
                 if corners := utils.calc_uv_corners(umesh, selected=selected):
                     uv = umesh.uv
-                    match self.direction:
-                        case 'CENTER':
-                            for corner in corners:
-                                corner[uv].uv = 0.5, 0.5
-                        case 'HORIZONTAL':
-                            for corner in corners:
-                                corner[uv].uv.x = 0.5
-                        case 'VERTICAL':
-                            for corner in corners:
-                                corner[uv].uv.y = 0.5
-                        case _:
-                            move_value = Vector(self.get_move_value(self.direction))
-                            for corner in corners:
-                                corner[uv].uv += move_value
+                    for corner in corners:
+                        corner[uv].uv += move_value
                 umesh.update_tag = bool(corners)
 
     def individual_scale_zero(self):

@@ -2207,16 +2207,12 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         islands = AdvIslands.calc_visible(umesh)
         islands.indexing()
 
-        # umesh.set_corners_tag(False)
-        # isl = AdvIslands.calc_visible(umesh)[0]
-        # isl.set_boundary_tag(match_idx=True)
-        #
-        # boundary_loop_groups = types.LoopGroups.calc_by_boundary_crn_tags(isl)
-        #
-        # four_groups = univ_pro.rectify.UNIV_OT_Rectify.two_pt_ring_lg_to_rect_ex(boundary_loop_groups, isl)
+        if lgs := types.LoopGroup.calc_dirt_loop_groups(umesh):
+            # umesh.tag_visible_corners()
+            # for lg in lgs:
+            #     lg.extend_from_linked()
 
-
-        self.calc_from_corners(list(islands[0].corners_iter()), uv)
+            self.calc_from_corners(lgs, uv)
 
         umesh.update()
 

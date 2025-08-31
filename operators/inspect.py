@@ -216,9 +216,9 @@ This behavior is preferred, as it allows setting a higher
 Overscaled Face Threshold to intentionally exclude uniformly 
 scaled islands from the calculation, focusing only on actual stretches"""
 
-    edge_over_threshold: FloatProperty(name='Overstretched Edge Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.1,
+    edge_over_threshold: FloatProperty(name='Overstretched Edge Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.2,
                                        description='Selects edge that fall outside this range.')
-    face_over_threshold: FloatProperty(name='Overscaled Face Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.15,
+    face_over_threshold: FloatProperty(name='Overscaled Face Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.25,
                                        description='Selects faces that fall outside this range.')
     def draw(self, context):
         layout = self.layout
@@ -304,7 +304,9 @@ scaled islands from the calculation, focusing only on actual stretches"""
         return to_select, edges_counter
 
     @classmethod
-    def over(cls, umeshes: types.UMeshes, edge_threshold=0.1, face_threshold=0.15, batch_inspect=False):
+    def over(cls, umeshes: types.UMeshes, edge_threshold=0.2, face_threshold=0.25, batch_inspect=False):
+        edge_threshold *= 2
+        face_threshold *= 2
         from ..utils import calc_face_area_uv, calc_face_area_3d
         face_seq_coef_by_mesh: list[tuple[types.UMesh, list[BMFace], list[float]]] = []  # noqa
 
