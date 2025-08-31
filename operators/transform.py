@@ -3168,6 +3168,9 @@ class UNIV_OT_Pack(Operator):
         settings = univ_settings()
         uvpm_settings = bpy.context.scene.uvpm3_props
 
+        if hasattr(uvpm_settings, 'default_main_props'):
+            uvpm_settings = uvpm_settings.default_main_props
+
         if hasattr(uvpm_settings, 'scale_mode'):
             uvpm_settings.scale_mode = '0' if settings.scale else '1'
         else:
@@ -3193,12 +3196,8 @@ class UNIV_OT_Pack(Operator):
         else:
             uvpm_settings.tex_ratio = False
 
-        if hasattr(uvpm_settings, 'default_main_props'):
-            if uvpm_settings.default_main_props.precision == 500:
-                uvpm_settings.default_main_props.precision = 800
-        else:
-            if uvpm_settings.precision == 500:
-                uvpm_settings.precision = 800
+        if uvpm_settings.precision == 500:
+            uvpm_settings.precision = 800
 
         return bpy.ops.uvpackmaster3.pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
 
