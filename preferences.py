@@ -572,6 +572,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
                          icon_value=icons.stack)
             layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
+            layout.label(text="Box Projection Pro- Has an Orient 3D option, which tightly projects cube-shaped elements ", icon_value=icons.box)
             if not univ_pro:
                 layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
 

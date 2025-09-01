@@ -81,6 +81,7 @@ class LinesDrawSimple:
         cls.shader.bind()
         cls.shader.uniform_float("color", cls.color)
         if is_vulkan_enabled:
+            cls.shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
             # cls.shader.uniform_float("viewportSize", (bpy.context.area.width, bpy.context.area.height))
             cls.shader.uniform_float('lineWidth', 2.0)
         cls.batch.draw(cls.shader)
@@ -159,6 +160,7 @@ class LinesDrawSimple3D:
         cls.shader.bind()
         cls.shader.uniform_float("color", cls.color)
         if is_vulkan_enabled:
+            cls.shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
             cls.shader.uniform_float('lineWidth', 2.0)
         cls.batch.draw(cls.shader)
 
