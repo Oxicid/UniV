@@ -73,7 +73,7 @@ class UNIV_OT_Check_Zero(Operator):
     bl_description = "Select degenerate UVs (zero area UV triangles)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    precision: FloatProperty(name='Precision', default=1e-6, min=0, soft_max=0.001, step=0.0001, precision=7)  # noqa
+    precision: FloatProperty(name='Precision', default=1e-5, min=0, soft_max=0.01, step=0.001, precision=6)  # noqa
 
     def draw(self, context):
         self.layout.prop(self, 'precision', slider=True)
@@ -99,14 +99,14 @@ class UNIV_OT_Check_Zero(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def zero(umeshes, precision=1e-6):
+    def zero(umeshes, precision=1e-5):
         sync = umeshes.sync
         tool_settings = bpy.context.scene.tool_settings
         sticky_mode = tool_settings.uv_sticky_select_mode
         if sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
 
-        precision *= 0.001
+        precision *= 0.0001
         total_counter = 0
 
         for umesh in umeshes:
@@ -191,12 +191,14 @@ class UNIV_OT_Check_Flipped(Operator):
                 if is_invisible(face) or face_select_get(face):
                     continue
 
-                a = tris_a[uv].uv
-                b = tris_b[uv].uv
-                c = tris_c[uv].uv
+                ax, ay = tris_a[uv].uv
+                bx, by = tris_b[uv].uv
+                cx, cy = tris_c[uv].uv
 
-                signed_area = a.cross(b) + b.cross(c) + c.cross(a)
-                if signed_area < 0:
+                # NOTE: The signed area calculated via the cross product
+                # has floating-point inaccuracies, so we use the determinant instead.
+                signed_area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+                if signed_area < 0.0:
                     face_select_set(face)
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
