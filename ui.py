@@ -64,7 +64,7 @@ class UNIV_PT_General(Panel):
         row = split.row(align=True)
         set_idname = prefix + '.univ_texel_density_set'
         row.operator(prefix + '.univ_texel_density_get', icon_value=icons.td_get)
-        row.operator(set_idname, icon_value=icons.td_set).custom_texel = -1.0
+        row.operator(set_idname, icon_value=icons.td_set).td_preset_idx = -1
         row.prop(settings, 'texel_density', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
         if prefix == 'uv':
@@ -72,14 +72,13 @@ class UNIV_PT_General(Panel):
         else:
             row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
 
-
-        split = layer.split(align=False)
+        split = layer.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
             if idx and (idx+1) % 4 == 1:
-                split = layer.split(align=False)
+                split = layer.split()
                 row = split.row(align=True)
-            row.operator(set_idname, text=preset.name).custom_texel = preset.texel
+            row.operator(set_idname, text=preset.name).td_preset_idx = idx
 
     @staticmethod
     def draw_uv_layers(layout, ui_list='UNIV_UL_UV_LayersManager'):
@@ -270,7 +269,7 @@ class UNIV_PT_General(Panel):
         split.operator('uv.univ_seam_border', icon_value=icons.border_seam)
 
         # Other
-        split = col_align.column(align=False)
+        split = col_align.column()
         split.label(text='Other')
 
         row = split.row(align=True)
@@ -395,7 +394,7 @@ class UNIV_PT_GlobalSettings(Panel):
     def draw_global_settings(layout):
         settings = univ_settings()
 
-        row = layout.row(align=True, heading='Size')
+        row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
@@ -430,7 +429,7 @@ class UNIV_PT_PackSettings(Panel):
         if uvpm_exist := hasattr(context.scene, 'uvpm3_props'):
             layout.prop(settings, 'use_uvpm')
 
-        row = layout.row(align=True, heading='Size')
+        row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
@@ -574,8 +573,8 @@ class UNIV_PT_BatchInspectSettings(Panel):
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
-        row = layout.row(align=0)
-        row.prop(item, 'name', text=str(index+1), emboss=True)
+        row = layout.row(align=True)
+        row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'texel', text='TD', emboss=False)
 
 
@@ -629,7 +628,7 @@ class UNIV_PT_TD_PresetsManager(Panel):
 
         settings = univ_settings()
         layout.label(text=f"Texel Density: {round(settings.texel_density, 4)}")
-        row = layout.row(align=True, heading='Size')
+        row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
@@ -668,6 +667,20 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
         col.separator()
         col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+
+        td_idx =  univ_settings().active_td_index
+        if td_idx < 0:
+            return
+
+        td_presets = univ_settings().texels_presets
+        if len(td_presets) >= td_idx + 1:
+            preset = td_presets[td_idx]
+            layout.prop(preset, 'texel')
+            row = layout.row(align=True)
+            row.prop(preset, 'size_x')
+            row.prop(preset, 'size_y')
+
+
 
 class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
     bl_label = 'Texel Density Presets Manager'
@@ -895,7 +908,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         # Bottom
 
-        col = pie.column(align=False)
+        col = pie.column()
         col.separator(factor=18)
         col.scale_x = 0.8
 
@@ -1008,13 +1021,13 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         row.operator('uv.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
 
-        split = col.split(align=False)
+        split = col.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
             if idx and (idx+1) % 4 == 1:
-                split = col.split(align=False)
+                split = col.split()
                 row = split.row(align=True)
-            row.operator('uv.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
+            row.operator('uv.univ_texel_density_set', text=preset.name).td_preset_idx = idx
 
         # Upper
         pie.operator('uv.univ_reset_scale', icon_value=icons.reset)
@@ -1029,7 +1042,7 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         pie.operator('uv.univ_texel_density_get', icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('uv.univ_texel_density_set', icon_value=icons.td_set).custom_texel = -1.0
+        pie.operator('uv.univ_texel_density_set', icon_value=icons.td_set).td_preset_idx = -1
 
 class VIEW3D_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
@@ -1056,13 +1069,13 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         row.operator('mesh.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
 
-        split = col.split(align=False)
+        split = col.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
             if idx and (idx+1) % 4 == 1:
-                split = col.split(align=False)
+                split = col.split()
                 row = split.row(align=True)
-            row.operator('mesh.univ_texel_density_set', text=preset.name).custom_texel = preset.texel
+            row.operator('mesh.univ_texel_density_set', text=preset.name).td_preset_idx = idx
 
         # Upper
         pie.operator('mesh.univ_reset_scale', icon_value=icons.reset)
@@ -1077,7 +1090,7 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         pie.operator('mesh.univ_texel_density_get', icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('mesh.univ_texel_density_set', icon_value=icons.td_set).custom_texel = -1.0
+        pie.operator('mesh.univ_texel_density_set', icon_value=icons.td_set).td_preset_idx = -1
 
 
 class VIEW3D_MT_PIE_univ_favorites_edit(Menu):

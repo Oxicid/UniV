@@ -61,11 +61,12 @@ __Weld__ - [W] connects selected vertices by common vertexes, if there is nothin
 <img src="https://github.com/user-attachments/assets/904bf34f-cacc-4ff9-abf1-6c2468de9d68" height="200">
 <img src="https://github.com/user-attachments/assets/7f7f4e74-305d-410c-9ded-58b75de0bd12" height="200">
 
-__Unwrap__ - differs from the built-in operator in that it unwrap inplace.
+__Unwrap__ - [U] differs from the built-in operator in that it unwrap inplace.
 
 <img src="https://github.com/user-attachments/assets/55fd93cf-4ad1-46e6-a2be-df9f4fc861a0" height="200">
+<img src="https://github.com/user-attachments/assets/ad1bc69f-76eb-4d17-b29c-334f86bf36c4" height="200">
 
-__Relax__ - combination of minimize stretch and unwrap borders.
+__Relax__ - [Alt+R] combination of minimize stretch and unwrap borders.
 
 <img src="https://github.com/user-attachments/assets/3a8c8d6c-87ac-4f24-8cdd-722aa4ab84e4" height="200">
 
@@ -83,10 +84,6 @@ __Quadrify__ - [E] align selected UV to rectangular distribution
 __Straight__ - [Shift+E] straighten selected edge-chain and relax the rest of the UV Island
 
 <img src="https://github.com/user-attachments/assets/c724dd15-e949-4529-aa93-5eb6e218fa59" height="200">
-
-__Unwrap__ - [U] inplace unwrap 
-
-<img src="https://github.com/user-attachments/assets/ad1bc69f-76eb-4d17-b29c-334f86bf36c4" height="200">
 
 __Hide__ - [H] improved hide, with a more expected result
 In the `default` Hide, islands that share common vertices are also affected.
@@ -133,9 +130,9 @@ __Crop__ - proportional tile filling
 
 __Fill__ - it is similar in everything with __Crop__, but without preserving the proportions
 
-__Orient__ - orients islands along the axes, maximally filling the area according to the boundbox. In a 3D viewport, it .
+__Orient__ - [O] orients islands along the axes, maximally filling the area according to the boundbox. In a 3D viewport, it .
 
-__Orient3D__ - orients islands according to world coordinates.
+__Gravity__ - orients islands according to world coordinates.
 
 __Align__ - straightens, moves islands or vertices, places a 2D cursor on bound boxes, etc.
 
@@ -153,6 +150,6 @@ __Inner__ - Select inner edges by mark sharps, angle
 
 __Square__ - Select square, horizontal or vertical island
 
-__SyncUVToggle__ - [~] toggle sync mode with element selection preserve
+__SyncUVToggle__ - toggle sync mode with element selection preserve
 
 __SplitUVToggle__ - [Shift+T] open, close, toggle __UV__ or __3D View__  area 

@@ -124,7 +124,9 @@ if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
-    texel: FloatProperty(name='Texel', default=512, min=1, max=10_000)
+    texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
+    size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
+    size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
 class UNIV_UV_Layers(bpy.types.PropertyGroup):
     name: StringProperty(name='UVMap', update=_update_uv_layers_name)

@@ -765,7 +765,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     lock_overlap_mode: bpy.props.EnumProperty(name='Lock Overlaps Mode', default='ANY',
                                               items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
-    custom_texel: FloatProperty(name='Custom Texel', default=-1, options={'HIDDEN'})
+    td_preset_idx: IntProperty(name='TD Preset Index', default=-1, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
@@ -798,10 +798,17 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
 
     def execute(self, context):
         self.texel = univ_settings().texel_density
-        if self.custom_texel != -1.0:
-            self.texel = bl_math.clamp(self.custom_texel, 1, 10_000)
-
         self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
+        if self.td_preset_idx != -1:
+            if self.td_preset_idx+1 > len(univ_settings().texels_presets):
+                self.report({'ERROR'}, 'Texel Density preset not found')
+                return {'FINISHED'}
+
+            td_preset = univ_settings().texels_presets[self.td_preset_idx]
+            self.texel = td_preset.texel
+            self.texture_size = (int(td_preset.size_x) + int(td_preset.size_y)) / 2
+
         self.umeshes = types.UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:

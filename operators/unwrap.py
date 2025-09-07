@@ -10,8 +10,7 @@ from mathutils import Vector
 from .. import types
 from .. import utils
 from ..preferences import prefs
-from ..utils import linked_crn_uv_by_island_index_unordered, \
-    linked_crn_uv_by_island_index_unordered_included
+from ..utils import linked_crn_uv_by_island_index_unordered_included
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
@@ -50,7 +49,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
 
-        col = self.layout.column(align=False)
+        col = self.layout.column()
         split = col.split(factor=0.3, align=True)
         split.label(text='Unwrap Along')
         row = split.row(align=True)
