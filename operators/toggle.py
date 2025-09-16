@@ -19,7 +19,7 @@ from bpy.props import *
 from bpy.types import Operator
 
 AREA: bpy.types.Area | None = None
-AREA_TICKS: bool = False
+AREA_TICKS: int = False
 
 class UNIV_OT_SplitUVToggle(Operator):
     bl_idname = 'wm.univ_split_uv_toggle'
@@ -64,6 +64,13 @@ class UNIV_OT_SplitUVToggle(Operator):
         if context.area is None or context.area.type not in ('VIEW_3D', 'IMAGE_EDITOR'):
             self.report({'WARNING'}, f"Active area must be a 3D Viewport, UV Editor or Image Editor")
             return {'CANCELLED'}
+
+        # Avoid crash if the area object was already deleted (e.g., due to fast double-click)
+        if bpy.app.timers.is_registered(self.univ_split_uv_toggle_timer_register):
+            bpy.app.timers.unregister(self.univ_split_uv_toggle_timer_register)
+            global AREA
+            AREA = None
+
         if context.window.screen.show_fullscreen is True and self.mode != 'SWITCH':
             if self.mode == 'SPLIT':
                 self.report({'INFO'}, "You can't split in full screen mode. Switch Mode is used instead.")
@@ -292,10 +299,10 @@ class UNIV_OT_SplitUVToggle(Operator):
         area.tag_redraw()
         AREA = area
         AREA_TICKS = 0
-        bpy.app.timers.register(self.register_)
+        bpy.app.timers.register(self.univ_split_uv_toggle_timer_register)
 
     @staticmethod
-    def register_():
+    def univ_split_uv_toggle_timer_register():
         global AREA
         global AREA_TICKS
 
