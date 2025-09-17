@@ -254,7 +254,7 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
 
 class Align_by_Angle:
 
-    angle: FloatProperty(name='Angle', default=to_rad(15), min=to_rad(2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
+    angle: FloatProperty(name='Angle', default=to_rad(5), min=to_rad(2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
 
     def align_edge_by_angle(self, x_axis):
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()  # noqa
@@ -474,7 +474,7 @@ class Align_by_Angle:
                 tar_seg.is_end_lock = True
 
             for seg in grow_from_end:
-                seg.value = card_vec.angle_signed(seg[0].vec)
+                seg.value = card_vec.angle_signed(seg[0].vec, 0)
             Align_by_Angle.preserving_identical_oppositely_angles(grow_from_end, start_lock=True)
 
             min_seg = None
@@ -483,7 +483,7 @@ class Align_by_Angle:
             for seg in grow_from_end:
                 if seg.is_start_lock:
                     continue
-                if (min_a := tar_vec.angle(seg[0].vec)) < min_angle:
+                if (min_a := tar_vec.angle(seg[0].vec, 0)) < min_angle:
                     min_angle = min_a
                     min_seg = seg
 
