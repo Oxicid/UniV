@@ -152,14 +152,15 @@ class UNIV_OT_Check_Flipped(Operator):
         umeshes.update_tag = False
         bpy.ops.uv.select_all(action='DESELECT')
 
-        total_counter = self.flipped(umeshes)
+        result = self.flipped(umeshes)
+        warning_info = self.data_formatting(result)
+
         umeshes.update()
 
-        if not total_counter:
+        if warning_info:
+            self.report({'WARNING' if result[0] else 'INFO'}, warning_info)
+        else:
             self.report({'INFO'}, 'Flipped faces not found')
-            return {'FINISHED'}
-
-        self.report({'WARNING'}, f'Detected {total_counter} flipped faces')
         return {'FINISHED'}
 
     @staticmethod
@@ -172,6 +173,7 @@ class UNIV_OT_Check_Flipped(Operator):
             umeshes.elem_mode = 'FACE'
 
         total_counter = 0
+        flipped_tris_counter = 0
 
         for umesh in umeshes:
             if not sync and umesh.is_full_face_deselected:
@@ -199,11 +201,26 @@ class UNIV_OT_Check_Flipped(Operator):
                 # has floating-point inaccuracies, so we use the determinant instead.
                 signed_area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
                 if signed_area < 0.0:
+                    if utils.calc_signed_face_area_uv(face, uv) > 3e-08:
+                        # TODO: Add flash system for flipped triangles
+                        flipped_tris_counter += 1
+                        continue
                     face_select_set(face)
                     local_counter += 1
             umesh.update_tag |= bool(local_counter)
             total_counter += local_counter
-        return total_counter
+        return total_counter, flipped_tris_counter
+
+    @staticmethod
+    def data_formatting(counters: tuple[int, int]) -> str:
+        total_counter, flipped_tris_counter = counters
+        r_text = ''
+        if total_counter:
+            r_text = f'Detected {total_counter} flipped faces'
+        elif flipped_tris_counter:
+            r_text = (f'No flipped face found, but {flipped_tris_counter} triangles within the face were detected '
+                      f'that may become flipped during triangulation.')
+        return r_text
 
 class UNIV_OT_Check_Over(Operator):
     bl_idname = 'uv.univ_check_over'
@@ -890,12 +907,14 @@ class UNIV_OT_BatchInspect(Operator):
         for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Over', 'Non-Splitted'):
             if info := INSPECT_INFO.get(inspect_flag):
                 box = col.box()
-                box.label(text=f'{inspect_flag}: ' + info)
+                wrapped_lines = textwrap.wrap(inspect_flag + ': ' + info, width=72)
+                for line in wrapped_lines:
+                    box.label(text=line)
 
         if info_list := INSPECT_INFO.get('Other'):
             for check_type, info in info_list:
                 box = col.box()
-                wrapped_lines = textwrap.wrap(check_type+': '+info, width=72)
+                wrapped_lines = textwrap.wrap(check_type + ': ' + info, width=72)
                 for line in wrapped_lines:
                     box.label(text=line)
 
@@ -945,8 +964,9 @@ class UNIV_OT_BatchInspect(Operator):
                 INSPECT_INFO['Zero'] = f'Detected {count} degenerate triangles'
 
         if Inspect.Flipped in flags or self.inspect_all:
-            if count := UNIV_OT_Check_Flipped.flipped(umeshes):
-                INSPECT_INFO['Flipped'] = f'Detected {count} flipped faces'
+            result = UNIV_OT_Check_Flipped.flipped(umeshes)
+            if info := UNIV_OT_Check_Flipped.data_formatting(result):
+                INSPECT_INFO['Flipped'] = info
 
         if Inspect.Over in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
             result = UNIV_OT_Check_Over.over(umeshes, batch_inspect=True)
