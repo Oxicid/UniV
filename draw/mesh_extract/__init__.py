@@ -7,9 +7,9 @@ if 'np' in locals():
 
 import numpy as np
 from mathutils import Vector, Matrix
-from ... import types
+from ... import utypes
 
-def extract_seams(umeshes: types.UMeshes) -> list[Vector]:
+def extract_seams(umeshes: utypes.UMeshes) -> list[Vector]:
     coords = []
     coords_append = coords.append
 
@@ -40,7 +40,7 @@ def extract_seams(umeshes: types.UMeshes) -> list[Vector]:
                                 coords_append(crn.link_loop_next[uv].uv)
     return coords
 
-def extract_edges_with_seams(umesh: types.UMesh):
+def extract_edges_with_seams(umesh: utypes.UMesh):
     edges = []
     edges_append = edges.append
 

@@ -16,9 +16,10 @@ from collections.abc import Callable
 from mathutils.geometry import area_tri
 
 from .. import utils
-from .. import types
-from ..types import AdvIslands, AdvIsland
+from .. import utypes
+from ..utypes import AdvIslands, AdvIsland, UMeshes
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
+
 
 class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_idname = "uv.univ_quadrify"
@@ -27,7 +28,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     shear: bpy.props.BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
-    xy_scale: bpy.props.BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
+    xy_scale: bpy.props.BoolProperty(name='Scale Independently', default=True,
+                                     description='Scale U and V independently')
     use_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -56,7 +58,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
         self.mouse_pos: Vector | None = None
         self.max_distance: float | None = None
 
@@ -65,7 +67,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             self.report({'WARNING'}, 'Active area must be UV')
             return {'CANCELLED'}
 
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
         if selected_umeshes:
@@ -89,7 +91,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                 umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
                 edge_lengths = []
                 for d_island in dirt_islands:
-                    links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(d_island)
+                    links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(
+                        d_island)
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
@@ -119,7 +122,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def init_edge_sequence_from_umesh(umesh: types.UMesh) -> list[None | float]:
+    def init_edge_sequence_from_umesh(umesh: utypes.UMesh) -> list[None | float]:
         idx = 0
         for f in umesh.bm.faces:
             for crn in f.loops:
@@ -129,7 +132,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return [None] * umesh.total_corners
 
     @staticmethod
-    def init_edge_sequence_from_island(island: types.FaceIsland) -> list[None | float]:
+    def init_edge_sequence_from_island(island: utypes.FaceIsland) -> list[None | float]:
         idx = 0
         for f in island:
             for crn in f.loops:
@@ -159,7 +162,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             UNIV_OT_Normalize_VIEW3D.normalize(self, quad_islands, tot_area_uv, tot_area_3d)  # noqa
 
     def quadrify_pick(self):
-        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
 
         for umesh in self.umeshes:
             if dirt_islands := AdvIslands.calc_visible_with_mark_seam(umesh):
@@ -169,7 +172,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             self.report({'WARNING'}, "Islands not found")
             return {'CANCELLED'}
 
-        links_static_with_quads, static_faces, quad_islands = self.split_by_static_faces_and_quad_islands_pick(hit.island)
+        links_static_with_quads, static_faces, quad_islands = self.split_by_static_faces_and_quad_islands_pick(
+            hit.island)
         if not quad_islands:
             self.report({'WARNING'}, f"All {len(static_faces)} faces is non-quad")
             return {'CANCELLED'}
@@ -258,6 +262,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 
+
 def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
     uv = island.umesh.uv
     for crn in island.corners_iter():
@@ -266,6 +271,7 @@ def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
             crn.tag = False
             continue
         crn.tag = utils.is_pair(crn, prev, uv)
+
 
 def quad(island: AdvIsland, edge_lengths):
     uv = island.umesh.uv
@@ -285,6 +291,7 @@ def quad(island: AdvIsland, edge_lengths):
     shape_face(uv, target_face, co_and_linked_uv_corners)
     follow_active_uv(target_face, island, edge_lengths)
 
+
 def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector, list[BMLoopUV]]:
     co_and_linked_uv_corners = {}
     for crn in f.loops:
@@ -293,6 +300,7 @@ def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector, list[BMLoopUV]]:
         co_and_linked_uv_corners[co] = [crn[uv] for crn in corners]
 
     return co_and_linked_uv_corners
+
 
 def shape_face(uv, target_face, co_and_linked_uv_corners):
     corners = []
@@ -466,7 +474,6 @@ def get_ring_corners_from_crn(first_crn: BMLoop):
         if iter_crn == first_crn:  # is circular
             return corners
         corners.append(iter_crn)
-
 
     # other dir
     if first_crn.tag:

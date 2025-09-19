@@ -8,6 +8,7 @@ import typing
 from mathutils import Vector, Matrix
 from bmesh.types import BMLoop, BMLayerItem
 
+
 class BBox:
     @classmethod
     def calc_bbox(cls, coords):
@@ -49,7 +50,7 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_with_corners(cls, corners: typing.Sequence[BMLoop] | typing.Any, uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
+    def calc_bbox_with_corners(cls, corners: typing.Iterable[BMLoop] | typing.Any, uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
         first_co: Vector = corners[0][uv].uv
         xmin = xmax = ymin = ymax = first_co
         xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
@@ -417,12 +418,12 @@ class BBox:
 
     def isect_circle(self, xy: Vector, radius: float) -> bool:
         if self.xmin <= xy.x <= self.xmax:
-            dx = 0
+            dx = 0.0
         else:
             dx = (self.xmin - xy.x) if (xy.x < self.xmin) else (xy.x - self.xmax)
 
         if self.ymin <= xy.y <= self.ymax:
-            dy = 0
+            dy = 0.0
         else:
             dy = (self.ymin - xy.y) if (xy.y < self.ymin) else (xy.y - self.ymax)
 
@@ -474,7 +475,7 @@ class BBox:
         bbox_r.ymax = self.ymax * ifac + bbox_b.ymax * fac
         return bbox_r
 
-    def clamp_pt(self, xy: list[float, float]) -> bool:
+    def clamp_pt(self, xy: Vector | tuple[float, float]) -> bool:
         changed = False
         if xy[0] < self.xmin:
             xy[0] = self.xmin
@@ -494,7 +495,7 @@ class BBox:
 
         return changed
 
-    def clamp_other(self, rect_bounds: 'BBox', r_xy: list[float, float]):
+    def clamp_other(self, rect_bounds: 'BBox', r_xy: Vector | list[float]):
         changed = False
 
         r_xy[0] = 0.0
@@ -550,8 +551,9 @@ class BBox:
 
         if xmax >= xmin and ymax >= ymin:
             return BBox(xmin, xmax, ymin, ymax)
+        return None
 
-    def is_isect(self, other: 'BBox') -> 'BBox | None':
+    def is_isect(self, other: 'BBox') -> bool:
         xmin = self.xmin if (self.xmin > other.xmin) else other.xmin
         xmax = self.xmax if (self.xmax < other.xmax) else other.xmax
         ymin = self.ymin if (self.ymin > other.ymin) else other.ymin
@@ -565,6 +567,7 @@ class BBox:
 
         if ymax >= ymin:
             return ymin, ymax
+        return None
 
     def isect_rect_x(self, other: 'BBox') -> 'tuple[float, float] | None':
         xmin = self.xmin if (self.xmin > other.xmin) else other.xmin
@@ -604,6 +607,8 @@ class BBox:
                self.ymin <= y <= self.ymax  # noqa
 
     def __eq__(self, other: 'BBox'):
+        if not isinstance(other, BBox):
+            return NotImplemented
         return self.min == other.min and self.max == other.max
 
     def __and__(self, other: 'BBox'):
@@ -611,6 +616,7 @@ class BBox:
 
     def __or__(self, other: 'BBox'):
         return self.union(other)
+
 
 class BBox3D:
     def __init__(self, xyz_min=Vector((-inf, -inf, -inf)), xyz_max=Vector((inf, inf, inf))):

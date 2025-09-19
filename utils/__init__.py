@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import bpy # noqa
+import bpy  # noqa
 import sys
 import subprocess
 import typing  # noqa
@@ -17,9 +17,10 @@ from .shapes import *
 from .ubm import *
 from .bm_select import *
 from .umath import *
-from .. import types
+from .. import utypes
 
-resolutions = (('256', '256', ''), ('512', '512', ''), ('1024', '1024', ''), ('2048', '2048', ''), ('4096', '4096', ''), ('8192', '8192', ''))
+resolutions = (('256', '256', ''), ('512', '512', ''), ('1024', '1024', ''),
+               ('2048', '2048', ''), ('4096', '4096', ''), ('8192', '8192', ''))
 resolution_name_to_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
 resolution_value_to_name = {256: '256', 512: '512', 1024: '1K', 2048: '2K', 4096: '4K', 8192: '8K'}
 
@@ -39,6 +40,7 @@ class Pip:
     The code was taken and modified from: https://github.com/s-leger/blender-pip/blob/master/blender_pip.py
     Necessary to convert svg to png, used during addon development.
     """
+
     def __init__(self):
         self._ensure_user_site_package()
         self._ensure_pip()
@@ -120,7 +122,8 @@ class Pip:
 
 class OverlapHelper:
     lock_overlap: bpy.props.BoolProperty(name='Lock Overlaps', default=False)
-    lock_overlap_mode: bpy.props.EnumProperty(name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
+    lock_overlap_mode: bpy.props.EnumProperty(
+        name='Lock Overlaps Mode', default='ANY', items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     def draw_overlap(self, toggle=True):
@@ -134,10 +137,12 @@ class OverlapHelper:
     def calc_overlapped_island_groups(self, all_islands):
         assert self.lock_overlap, 'Enable Lock Overlap option'
         threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
-        return types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+        return utypes.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+
 
 class PaddingHelper:
-    padding_multiplayer: bpy.props.FloatProperty(name='Padding Multiplayer', default=1, min=-32, soft_min=0, soft_max=4, max=32)
+    padding_multiplayer: bpy.props.FloatProperty(
+        name='Padding Multiplayer', default=1, min=-32, soft_min=0, soft_max=4, max=32)
 
     def __init__(self):
         self.padding = 0.0
@@ -156,7 +161,8 @@ class PaddingHelper:
     def calc_padding(self):
         from .. import preferences
         settings = preferences.univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
+        self.padding = int(settings.padding * self.padding_multiplayer) / \
+            min(int(settings.size_x), int(settings.size_y))
 
     def report_padding(self):
         if self.padding and (img_size := get_active_image_size()):  # TODO: Get active image size from material id
@@ -166,11 +172,13 @@ class PaddingHelper:
                 self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
                                          'which will result in incorrect padding.')
 
+
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 
+
 def calc_avg_normal():
-    umeshes = types.UMeshes.sel_ob_with_uv()
+    umeshes = utypes.UMeshes.sel_ob_with_uv()
     size = sum(len(umesh.bm.faces) for umesh in umeshes)
 
     normals = np.empty(3 * size).reshape((-1, 3))
@@ -188,11 +196,14 @@ def calc_avg_normal():
 
     return summed_normals / np.linalg.norm(summed_normals)
 
+
 def find_min_rotate_angle(angle):
     return -(round(angle / (pi / 2)) * (pi / 2) - angle)
 
+
 def calc_convex_points(points_append):
     return [points_append[i] for i in mathutils.geometry.convex_hull_2d(points_append)]
+
 
 def calc_min_align_angle(points, aspect=1.0):
     if aspect != 1.0:
@@ -216,12 +227,15 @@ def get_cursor_location() -> Vector | None:
             if area.ui_type == 'UV':
                 return area.spaces.active.cursor_location.copy()
 
+
 def get_mouse_pos(context, event):
     return Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+
 
 def get_tile_from_cursor() -> Vector | None:
     if cursor := get_cursor_location():
         return Vector((math.floor(val) for val in cursor))
+
 
 def set_cursor_location(loc):
     if bpy.context.area.ui_type == 'UV':
@@ -233,6 +247,7 @@ def set_cursor_location(loc):
                 area.spaces.active.cursor_location = loc
                 return
 
+
 def update_area_by_type(area_type: str):
     for window in bpy.context.window_manager.windows:
         screen = window.screen
@@ -240,12 +255,14 @@ def update_area_by_type(area_type: str):
             if area.type == area_type:
                 area.tag_redraw()
 
+
 def get_view3d_camera_data(v3d: bpy.types.SpaceView3D, rv3d: bpy.types.RegionView3D):
     #  establish the camera object,
     #  so we can default to view mapping if anything is wrong with it
     if rv3d.view_perspective == 'CAMERA' and v3d.camera and v3d.camera.type == 'CAMERA':
         return v3d.camera.data
     return None
+
 
 def calc_any_unique_obj() -> list[bpy.types.Object]:
     # Get unique umeshes without uv
@@ -281,5 +298,7 @@ UNIT_CONVERTION = {
 
 UNITS = '(mi|mm|cm|m|km|in|ft|yd)'
 UNITS_T = typing.Literal['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi',]
+
+
 def unit_conversion(value: float, from_type: UNITS_T, to_type: UNITS_T) -> float:
     return value * UNIT_CONVERTION[from_type.lower()][0] * UNIT_CONVERTION[to_type.lower()][1]

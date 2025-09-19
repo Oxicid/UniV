@@ -13,6 +13,7 @@ import numpy as np
 from mathutils import Vector, Matrix, Color
 from pathlib import Path
 
+
 class icons:
     """
     Interface for accessing icons.
@@ -163,8 +164,10 @@ class icons:
 
         cls.reset_icon_value_()
 
+
 class PreviousData:
     """Save and restore all data, since color changes require importing SVG objects."""
+
     def __init__(self):
         self.prev_mode = bpy.context.mode
         self.prev_active_obj = bpy.context.view_layer.objects.active
@@ -195,6 +198,7 @@ class PreviousData:
                 bpy.ops.object.mode_set(mode='EDIT')
             else:
                 bpy.ops.object.mode_set(mode=self.prev_mode)
+
 
 class WSToolIconsGenerator:
     """
@@ -275,8 +279,8 @@ class WSToolIconsGenerator:
         coords = np.array([111, 159, 95, 159, 95, 107, 96, 101, 99, 95, 105, 92, 111, 91, 147, 91, 153, 92, 159,
                            95, 162, 101, 163, 107, 163, 159, 147, 159, 147, 107, 111, 107], dtype=np.uint8).reshape(-1, 2)
 
-        indexes =  np.array([2, 0, 1, 14, 12, 13, 2, 15, 0, 14, 11, 12, 3, 15, 2, 14, 10, 11, 15, 3, 4, 15, 4, 5,
-                             15, 5, 6, 9, 14, 8, 9, 10, 14, 8, 14, 7, 14, 6, 7, 14, 15, 6], dtype=np.uint8).reshape(-1, 3)
+        indexes = np.array([2, 0, 1, 14, 12, 13, 2, 15, 0, 14, 11, 12, 3, 15, 2, 14, 10, 11, 15, 3, 4, 15, 4, 5,
+                            15, 5, 6, 9, 14, 8, 9, 10, 14, 8, 14, 7, 14, 6, 7, 14, 15, 6], dtype=np.uint8).reshape(-1, 3)
         return coords[indexes]
 
     @classmethod
@@ -299,9 +303,9 @@ class WSToolIconsGenerator:
 
         r_up_leaf_f16 = cls.remap_uint8_to_f16(coords)
         # Generate other UniV icon leafs coords
-        r_bottom_leaf_f16 =  r_up_leaf_f16 * np.array([1, -1], dtype=np.float16)
-        l_bottom_leaf_f16 =  r_up_leaf_f16 * np.array([-1, -1], dtype=np.float16)
-        l_up_leaf_f16 =  r_up_leaf_f16 * np.array([-1, 1], dtype=np.float16)
+        r_bottom_leaf_f16 = r_up_leaf_f16 * np.array([1, -1], dtype=np.float16)
+        l_bottom_leaf_f16 = r_up_leaf_f16 * np.array([-1, -1], dtype=np.float16)
+        l_up_leaf_f16 = r_up_leaf_f16 * np.array([-1, 1], dtype=np.float16)
 
         r_u_tris_u8 = coords[indexes]
         # Get other UniV icon leafs coords from indices
@@ -319,6 +323,7 @@ class WSToolIconsGenerator:
         related to leafs_colors and leafs_shape, leave only u_shape and u_co
         """
         from ..preferences import prefs
+
         def convert_float_to_srgb_int(col):
             alpha = col[3]
             col = Color(col[:3])
@@ -333,9 +338,9 @@ class WSToolIconsGenerator:
         else:
             u_col = [int(v*255) for v in prefs().icon_white_color]
             leaf_col = [convert_float_to_srgb_int(prefs().icon_colored_pink),
-                         convert_float_to_srgb_int(prefs().icon_colored_purple),
-                         convert_float_to_srgb_int(prefs().icon_colored_violet),
-                         convert_float_to_srgb_int(prefs().icon_colored_cian),
+                        convert_float_to_srgb_int(prefs().icon_colored_purple),
+                        convert_float_to_srgb_int(prefs().icon_colored_violet),
+                        convert_float_to_srgb_int(prefs().icon_colored_cian),
                         ]
 
         u_shape = cls.get_u_tris()
@@ -421,7 +426,11 @@ class IconsCreator:
         png_folder = base_path / ('png_mono' if mono else 'png')
 
         prev_data = PreviousData()
-        from io_curve_svg import import_svg
+        try:
+            from io_curve_svg import import_svg  # type: ignore[import-untyped]
+        except ImportError:
+            raise ImportError("UniV: Failed to generate icons, possibly the svg module was rewritten in C++")
+
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode='OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
@@ -537,7 +546,7 @@ class IconsCreator:
 
     @classmethod
     def save_pixels(cls, filepath, pixel_data, width, height, antialiasing):
-        import OpenImageIO as oiio
+        import OpenImageIO as oiio  # type: ignore[import-untyped]
         spec = oiio.ImageSpec(width, height, 4, 'uint8')
         # https://github.com/AcademySoftwareFoundation/OpenImageIO/blob/main/src/png.imageio/pngoutput.cpp
         spec.attribute('png:compressionLevel', 9)
@@ -558,7 +567,7 @@ class IconsCreator:
             shader, 'TRIS',
             {"pos": coords, "color": colors})
         batch.draw(shader)
-    
+
     @staticmethod
     def get_color(obj, icon_name):
         """
@@ -572,6 +581,7 @@ class IconsCreator:
         linear_color = obj.active_material.diffuse_color[:]
         srgb_color = Color(linear_color[:3]).from_scene_linear_to_srgb()
         ret_color = *srgb_color, linear_color[-1]
+
         def linear_to_ret_color(lin_color):
             srgb_color_ = Color(lin_color[:3]).from_scene_linear_to_srgb()
             return *srgb_color_, lin_color[-1]
@@ -616,6 +626,7 @@ class IconsCreator:
 
         return ret_color
 
+
 class UNIV_OT_IconsGenerator(bpy.types.Operator):
     bl_idname = 'wm.univ_icons_generator'
     bl_label = 'Generate'
@@ -624,6 +635,7 @@ class UNIV_OT_IconsGenerator(bpy.types.Operator):
                       "It's recommended to adjust them manually for best results.")
 
     generate_only_ws_tool_icon: bpy.props.BoolProperty(name='Tool Icons', default=False)
+
     def execute(self, context):
         if self.generate_only_ws_tool_icon:
             WSToolIconsGenerator.create_dat_icons()

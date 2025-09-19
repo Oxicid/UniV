@@ -11,6 +11,7 @@ from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh
 from bmesh.types import *
 
+
 class MeshIsland:
     def __init__(self, faces: list[BMFace], umesh: UMesh):
         self.faces: list[BMFace] = faces
@@ -95,7 +96,7 @@ class MeshIsland:
                         if ff in all_added:
                             continue
                         if crn[uv].uv == pair_crn.link_loop_next[uv].uv and \
-                            crn.link_loop_next[uv].uv == pair_crn[uv].uv:
+                                crn.link_loop_next[uv].uv == pair_crn[uv].uv:
                             adv_island.add(ff)
                             stack.append(ff)
                 parts_of_island = stack
@@ -143,7 +144,7 @@ class MeshIslandsBase(island.IslandsBaseTagFilterPre, island.IslandsBaseTagFilte
                         if not link_face.tag:  # Skip appended
                             continue
 
-                        if pair_crn.vert == crn.vert: # Skip flipped
+                        if pair_crn.vert == crn.vert:  # Skip flipped
                             continue
 
                         temp.append(link_face)
@@ -429,7 +430,8 @@ class MeshIslands(MeshIslandsBase):
             if umesh.is_full_face_selected:
                 cls([], umesh)
         cls.tag_filter_visible(umesh)
-        islands = [MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
+        islands = [MeshIsland(i, umesh) for i in cls.calc_iter_ex(
+            umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
@@ -441,7 +443,8 @@ class MeshIslands(MeshIslandsBase):
             if umesh.is_full_face_selected:
                 return cls([], umesh)
         cls.tag_filter_visible(umesh)
-        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
+        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                   if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     def indexing(self):

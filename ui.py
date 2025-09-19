@@ -15,6 +15,7 @@ except ImportError:
 
 REDRAW_UV_LAYERS = True
 
+
 class UNIV_PT_General(Panel):
     bl_label = ''
     bl_idname = 'UNIV_PT_General'
@@ -513,7 +514,7 @@ class UNIV_PT_BatchInspectSettings(Panel):
         settings = univ_settings()
         flags = settings.batch_inspect_flags
 
-        def draw_tag_button(flag):
+        def draw_tag_button(flag: Inspect):
             is_enabled = bool(flags & flag)
             row.operator('uv.univ_batch_inspect_flags',
                          text='',
@@ -572,14 +573,13 @@ class UNIV_PT_BatchInspectSettings(Panel):
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         row = layout.row(align=True)
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'texel', text='TD', emboss=False)
 
-
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         # TODO: Redraw if undo???
         settings = univ_settings()
         if index >= settings.uv_layers_size:
@@ -593,8 +593,9 @@ class UNIV_UL_UV_LayersManager(bpy.types.UIList):
         icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
         layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
 
+
 class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):  # noqa
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         settings = univ_settings()
         if index >= settings.uv_layers_size:
             return
@@ -668,7 +669,7 @@ class UNIV_PT_TD_PresetsManager(Panel):
         col.separator()
         col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
 
-        td_idx =  univ_settings().active_td_index
+        td_idx = univ_settings().active_td_index
         if td_idx < 0:
             return
 
@@ -681,7 +682,6 @@ class UNIV_PT_TD_PresetsManager(Panel):
             row.prop(preset, 'size_y')
 
 
-
 class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
     bl_label = 'Texel Density Presets Manager'
     bl_idname = 'UNIV_PT_td_presets_manager_view_3d'
@@ -692,6 +692,7 @@ class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
 
     def draw(self, context):
         UNIV_PT_TD_PresetsManager.draw_ex(self.layout, 'mesh')
+
 
 class UNIV_PT_TD_LayersManager(Panel):
     bl_label = 'Layers Manager'
@@ -765,6 +766,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         else:
             pie.split()
 
+
 class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
 
@@ -792,6 +794,7 @@ class IMAGE_MT_PIE_univ_align(Menu):
         pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
         pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
         pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
+
 
 class IMAGE_MT_PIE_univ_misc(Menu):
     bl_label = 'UniV Pie'
@@ -822,6 +825,7 @@ class IMAGE_MT_PIE_univ_misc(Menu):
         pie.operator('uv.univ_weld', icon_value=icons.weld)
         # Right Bottom
         pie.operator('uv.univ_stitch', icon_value=icons.stitch)
+
 
 class VIEW3D_MT_PIE_univ_misc(Menu):
     bl_label = 'UniV Pie'
@@ -889,6 +893,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
+
 class VIEW3D_MT_PIE_univ_edit(Menu):
     bl_label = 'UniV Pie'
 
@@ -936,9 +941,10 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         if univ_pro:
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
-            pie.operator("mesh.loop_multi_select", text='Loop').ring=False
+            pie.operator("mesh.loop_multi_select", text='Loop').ring = False
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
+
 
 class IMAGE_MT_PIE_univ_transform(Menu):
     bl_label = 'UniV Pie'
@@ -996,6 +1002,7 @@ class IMAGE_MT_PIE_univ_transform(Menu):
         # Right Bottom
         pie.operator('uv.univ_distribute', icon_value=icons.distribute)
 
+
 class IMAGE_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
 
@@ -1043,6 +1050,7 @@ class IMAGE_MT_PIE_univ_texel(Menu):
 
         # Right Bottom
         pie.operator('uv.univ_texel_density_set', icon_value=icons.td_set).td_preset_idx = -1
+
 
 class VIEW3D_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
@@ -1124,6 +1132,7 @@ class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
         # Right Bottom
         pie.operator("mesh.univ_angle", icon_value=icons.border_by_angle)
 
+
 class IMAGE_MT_PIE_univ_favorites_edit(Menu):
     bl_label = 'UniV Pie'
 
@@ -1155,6 +1164,7 @@ class IMAGE_MT_PIE_univ_favorites_edit(Menu):
         # Right Bottom
         pie.operator("uv.univ_pin", icon_value=icons.pin)
 
+
 class VIEW3D_MT_PIE_univ_projection(Menu):
     bl_label = 'UniV Pie'
 
@@ -1184,6 +1194,7 @@ class VIEW3D_MT_PIE_univ_projection(Menu):
         # Left Bottom
         # Right Bottom
 
+
 class IMAGE_MT_PIE_univ_inspect(Menu):
     bl_label = 'UniV Pie'
 
@@ -1210,6 +1221,7 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         # Right Bottom
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
+
 class UNIV_WT_object_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'
     bl_context_mode = 'OBJECT'
@@ -1232,6 +1244,7 @@ class UNIV_WT_object_VIEW3D(WorkSpaceTool):
     #     split = col_align.split(align=True)
     #     split.operator('mesh.univ_cut', icon_value=icons.cut)
     #     split.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
+
 
 class UNIV_WT_edit_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'

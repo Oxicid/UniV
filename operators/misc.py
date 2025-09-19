@@ -12,21 +12,22 @@ from bpy.types import Operator
 from bpy.props import *
 from collections import Counter
 from .. import utils
-from .. import types
-from ..types import UMeshes
+from .. import utypes
+from ..utypes import UMeshes, BBox, BBox3D
 from .. import preferences
 from ..preferences import prefs, univ_settings
 from mathutils import Vector
+
 
 class UNIV_OT_Pin(Operator):
     bl_idname = 'uv.univ_pin'
     bl_label = 'Pin'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n" \
-                     f"With sync mode disabled, Edge mode switches to Vertex since the pins are not visible in edge mode\n\n" \
-                     f"Default - Set Pin \n" \
-                     f"Ctrl or Alt- Clear Pin\n\n" \
-                     f"This button is used to free the 'P' button for the Pack operator"
+        f"With sync mode disabled, Edge mode switches to Vertex since the pins are not visible in edge mode\n\n" \
+        f"Default - Set Pin \n" \
+        f"Ctrl or Alt- Clear Pin\n\n" \
+        f"This button is used to free the 'P' button for the Pack operator"
 
     clear: BoolProperty(name='Clear', default=False)
 
@@ -296,6 +297,7 @@ class UNIV_OT_Hide(Operator):
     bl_description = f"Hide selected or unselected UV"
 
     unselected: BoolProperty(name='Unselected', default=False)
+
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
@@ -338,7 +340,7 @@ class UNIV_OT_Hide(Operator):
 
         # Unselected
         if self.unselected:
-            self.umeshes.umeshes.extend(visible_umeshes)
+            self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
             for umesh in self.umeshes:
                 unselected_faces = utils.calc_unselected_uv_faces(umesh)
                 if umesh.sync:
@@ -391,10 +393,10 @@ class UNIV_OT_Hide(Operator):
             return self.umeshes.update()
 
     def pick_hide(self):
-        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         all_islands = []
         for umesh in self.umeshes:
-            for isl in types.AdvIslands.calc_visible_with_mark_seam(umesh):
+            for isl in utypes.AdvIslands.calc_visible_with_mark_seam(umesh):
                 if self.unselected:
                     all_islands.append(isl)
                 hit.find_nearest_island_by_crn(isl)
@@ -475,6 +477,7 @@ class UNIV_OT_Hide(Operator):
 LAST_MOUSE_POS = -100_000, -100_000
 REPEAT_MOUSE_POS_COUNT = 0
 
+
 class UNIV_OT_SetCursor2D(Operator):
     bl_idname = "uv.univ_set_cursor_2d"
     bl_label = 'Set Cursor 2D'
@@ -512,7 +515,7 @@ class UNIV_OT_SetCursor2D(Operator):
                     pt = grid_pt
                     min_dist = grid_dist
             else:
-                zoom = types.View2D.get_zoom(context.region.view2d)
+                zoom = utypes.View2D.get_zoom(context.region.view2d)
                 divider = 1 / 8 if zoom <= 1600 else 1 / 64
                 divider = divider if zoom <= 12800 else 1 / 64 / 8
 
@@ -612,19 +615,19 @@ class UNIV_OT_Focus(Operator):
             return {'CANCELLED'}
         assert context.mode == 'EDIT_MESH'
 
-        bounds = types.BBox()
+        bounds = BBox()
         umeshes = UMeshes()
-        color = (1,1,0,1)
+        color = (1, 1, 0, 1)
         for umesh in umeshes:
             uv = umesh.uv
             bounds.update(crn[uv].uv for crn in utils.calc_selected_uv_vert_corners_iter(umesh))
-        if bounds == types.BBox():
-            color = (0,1,1,1)
+        if bounds == BBox():
+            color = (0, 1, 1, 1)
             for umesh in umeshes:
                 uv = umesh.uv
                 bounds.update(crn[uv].uv for crn in utils.calc_visible_uv_corners_iter(umesh))
-        if bounds == types.BBox():
-            color = (1,0,0,1)
+        if bounds == BBox():
+            color = (1, 0, 0, 1)
             bounds.xmin = 0.0
             bounds.ymin = 0.0
             bounds.xmax = 1.0
@@ -632,12 +635,11 @@ class UNIV_OT_Focus(Operator):
 
         draw_data = bounds.draw_data_lines()
 
-
         n_panel_width = next(r.width for r in context.area.regions if r.type == 'UI')
         bounds.scale(1.2)  # Add padding
 
         space_data = context.area.spaces.active
-        sima = types.SpaceImage.get_fields(space_data)
+        sima = utypes.SpaceImage.get_fields(space_data)
 
         image_size = [256, 256]
         aspect = [1, 1]
@@ -652,10 +654,10 @@ class UNIV_OT_Focus(Operator):
         image_size[1] *= aspect[1]
 
         # adjust offset and zoom
-        c_region = types.ARegion.get_fields(context.region)
+        c_region = utypes.ARegion.get_fields(context.region)
 
         size_y = c_region.winrct.height / ((bounds.height + 0.00001) * image_size[1])
-        size_x = (c_region.winrct.width - n_panel_width) / ((bounds.width+ 0.00001) * image_size[0])
+        size_x = (c_region.winrct.width - n_panel_width) / ((bounds.width + 0.00001) * image_size[0])
 
         zoom = min(size_x, size_y)
         if zoom > 100.0:
@@ -753,7 +755,6 @@ class UNIV_OT_UV_Layers_Manager(Operator):
 
         uv_presets = settings.uv_layers_presets
         UNIV_OT_UV_Layers_Manager.sanitize_size(uv_presets)
-
 
         if act_obj_uv_layers:
             act_obj_uv_layers_size = len(act_obj_uv_layers)
@@ -899,6 +900,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
         except Exception as e:
             print('UniV: Failed to add a handler for UV Layer system.', e)
 
+
 class UNIV_OT_MoveUpDownBase(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     with_names: BoolProperty(default=False, options={'HIDDEN'})
@@ -989,6 +991,7 @@ class UNIV_OT_MoveUpDownBase(Operator):
             layers[other_idx].name = name_a
             layers[idx].name = name_b
 
+
 class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_up'
     bl_label = 'Up'
@@ -1007,6 +1010,7 @@ class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
         return {'FINISHED'}
 
+
 class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_down'
     bl_label = 'Down'
@@ -1024,6 +1028,7 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
                 if bpy.context.mode == 'EDIT_MESH':
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
         return {'FINISHED'}
+
 
 class UNIV_OT_Add(Operator):
     bl_idname = 'mesh.univ_add'
@@ -1101,6 +1106,7 @@ class UNIV_OT_Add(Operator):
         bm = bm  # noqa
         return counter
 
+
 class UNIV_OT_Remove(Operator):
     bl_idname = 'mesh.univ_remove'
     bl_label = 'Remove'
@@ -1159,6 +1165,7 @@ class UNIV_OT_Remove(Operator):
                         obj.data.update()
 
         return {'FINISHED'}
+
 
 class UNIV_OT_CopyToLayer(Operator):
     bl_idname = 'uv.univ_copy_to_layer'
@@ -1291,6 +1298,7 @@ class UNIV_OT_CopyToLayer(Operator):
             umesh.obj.update_tag()
         return {'FINISHED'}
 
+
 class UNIV_OT_SetActiveRender(Operator):
     bl_idname = 'mesh.univ_active_render_set'
     bl_label = 'Remove'
@@ -1313,6 +1321,7 @@ class UNIV_OT_SetActiveRender(Operator):
                     uv_layers[self.idx].active_render = True
         return {'FINISHED'}
 
+
 class UNIV_OT_FixUVs(UNIV_OT_Join):
     bl_idname = "mesh.univ_fix_uvs"
     bl_label = "Fix UVs"
@@ -1332,7 +1341,7 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
         if not (objects := utils.calc_any_unique_obj()):
@@ -1394,6 +1403,7 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
 
         return {'FINISHED'}
 
+
 class UNIV_OT_Flatten(Operator):
     bl_idname = 'mesh.univ_flatten'
     bl_label = 'Flatten'
@@ -1405,9 +1415,9 @@ class UNIV_OT_Flatten(Operator):
                      "\t\tAlt - Modifier" \
 
     axis: EnumProperty(name="Axis", default='z', items=(
-                                    ('z', 'Bottom', ''),
-                                    ('y', 'Side', ''),
-                                    ('x', 'Front', '')))
+        ('z', 'Bottom', ''),
+        ('y', 'Side', ''),
+        ('x', 'Front', '')))
 
     flatten_type: EnumProperty(name="Flatten Type", default='MESH', items=(
                                     ('MESH', 'Mesh', ''),
@@ -1442,7 +1452,6 @@ class UNIV_OT_Flatten(Operator):
             layout.prop(self, 'mix_factor')
             layout.prop(self, 'weld_distance')
         layout.row(align=True).prop(self, 'flatten_type', expand=True)
-
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1541,7 +1550,7 @@ class UNIV_OT_Flatten(Operator):
 
     def apply_coords(self, faces, umesh):
         uv = umesh.uv
-        bb3d = types.BBox3D.get_from_umesh(umesh)
+        bb3d = BBox3D.get_from_umesh(umesh)
         bb = bb3d.to_bbox_2d(self.axis)
         max_length = bb.max_length
         if umesh.aspect != 1:
@@ -1559,13 +1568,13 @@ class UNIV_OT_Flatten(Operator):
 
         umesh.bm.normal_update()
 
-    def apply_shape_keys(self, faces, umesh: types.UMesh):
+    def apply_shape_keys(self, faces, umesh: utypes.UMesh):
         if not umesh.obj.data.shape_keys:
-            bb3d = types.BBox3D.get_from_umesh(umesh)
+            bb3d = BBox3D.get_from_umesh(umesh)
         else:
             base_sk_data = umesh.obj.data.shape_keys.key_blocks[0].data
             coords = (base_sk_data[i].co for i in range(len(umesh.obj.data.vertices)))
-            bb3d = types.BBox3D.calc_bbox(coords)
+            bb3d = BBox3D.calc_bbox(coords)
 
         bb = bb3d.to_bbox_2d(self.axis)
         max_length = bb.max_length
@@ -1700,7 +1709,8 @@ class UNIV_OT_Flatten(Operator):
         axis_socket.force_non_field = True
 
         # Socket Aspect Ratio
-        aspect_ratio_socket = bb.interface.new_socket(name="Aspect Ratio", in_out='INPUT', socket_type='NodeSocketVector')
+        aspect_ratio_socket = bb.interface.new_socket(
+            name="Aspect Ratio", in_out='INPUT', socket_type='NodeSocketVector')
         aspect_ratio_socket.default_value = (1.0, 1.0, 0.0)
         aspect_ratio_socket.min_value = 0.01
         aspect_ratio_socket.max_value = 10000
@@ -1975,6 +1985,7 @@ class UNIV_OT_Flatten(Operator):
             return Vector((aspect_y, 1, 0))
         else:
             return Vector((1, 1/aspect_y, 0))
+
 
 class UNIV_OT_FlattenCleanup(Operator):
     bl_idname = 'mesh.univ_flatten_clean_up'

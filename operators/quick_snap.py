@@ -17,9 +17,8 @@ from mathutils import Vector
 from bmesh.types import BMFace, BMLoop
 
 from .. import utils
-from .. import types
 from ..preferences import debug, prefs
-from ..types import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup
+from ..utypes import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup, UMeshes
 
 
 class eSnapPointMode(enum.IntFlag):
@@ -28,6 +27,7 @@ class eSnapPointMode(enum.IntFlag):
     EDGE = 1 << 2
     FACE = 1 << 3
     ALL = VERTEX | EDGE | FACE
+
 
 class SnapMode:
     def __init__(self):
@@ -235,6 +235,7 @@ class QuickSnap_KDMeshes:
                 coords = self.kdmeshes.range_to_coords(res)
         return coords
 
+
 class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
     bl_label = "Quick Snap"
@@ -249,7 +250,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
         self.kdmeshes: KDMeshes | None = None
 
         self.area: bpy.types.Area | None = None
@@ -286,13 +287,14 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
             self.shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
         else:
-            self.shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+            self.shader = gpu.shader.from_builtin(
+                '3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
         self.refresh_draw_points()
         self.register_draw()
 
         self.snap_mode_init()
 
-        self.umeshes = types.UMeshes()
+        self.umeshes = UMeshes()
         self.preprocessing()
 
         wm = context.window_manager
@@ -478,7 +480,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     _face = kd_data.elem if isinstance(kd_data.elem, BMFace) else kd_data.elem.face
                     self.move_object = FaceIsland([_face], _kdmesh.umesh)
                     islands = _kdmesh.islands
-                    assert(len(islands) == 1)
+                    assert (len(islands) == 1)
 
                     if isinstance(islands[0].faces, list):
                         islands[0].faces.remove(_face)
@@ -681,8 +683,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.mouse_position = mouse_position.to_3d()
 
     def register_draw(self):
-        self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_ui_draw_callback, (), 'WINDOW', 'POST_PIXEL')
-        self.handler = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_quick_snap_draw_callback, (), 'WINDOW', 'POST_VIEW')
+        self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(
+            self.univ_quick_snap_ui_draw_callback, (), 'WINDOW', 'POST_PIXEL')
+        self.handler = bpy.types.SpaceImageEditor.draw_handler_add(
+            self.univ_quick_snap_draw_callback, (), 'WINDOW', 'POST_VIEW')
         self.area.tag_redraw()
 
     def univ_quick_snap_draw_callback(self):

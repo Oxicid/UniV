@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
-import rna_keymap_ui
+import rna_keymap_ui  # type: ignore[import-untyped]
 
 from . import utils
 from . import keymaps
@@ -10,35 +10,45 @@ from bpy.props import *
 
 UV_LAYERS_ENABLE = True
 
+
 def prefs() -> 'UNIV_AddonPreferences':
     return bpy.context.preferences.addons[__package__].preferences
+
 
 def univ_settings() -> 'UNIV_Settings':
     return bpy.context.scene.univ_settings  # noqa
 
+
 def force_debug():
     return prefs().debug == 'FORCE'
+
 
 def debug():
     return prefs().debug == 'ENABLED'
 
+
 def stable():
     return prefs().mode == 'STABLE'
 
+
 def experimental():
     return prefs().mode == 'EXPERIMENTAL'
+
 
 def _update_size_x(_self, _context):
     if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
         univ_settings().size_y = univ_settings().size_x
 
+
 def _update_size_y(_self, _context):
     if univ_settings().lock_size and univ_settings().size_x != univ_settings().size_y:
         univ_settings().size_x = univ_settings().size_y
 
+
 def _update_lock_size(_self, _context):
     if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
         univ_settings().size_y = univ_settings().size_x
+
 
 def update_panel(_self, _context):
     from .ui import UNIV_PT_General_VIEW_3D as Panel
@@ -52,6 +62,7 @@ def update_panel(_self, _context):
         except Exception as e:
             print(f'UniV: Updating Panel View 3D category has failed:\n{e}')
 
+
 def _update_uv_layers_show(_self, _context):
     from .operators.misc import UNIV_OT_UV_Layers_Manager
     if _self.uv_layers_show:
@@ -63,6 +74,7 @@ def _update_uv_layers_show(_self, _context):
         for handler in reversed(bpy.app.handlers.depsgraph_update_post):
             if handler is UNIV_OT_UV_Layers_Manager.univ_uv_layers_update:
                 bpy.app.handlers.depsgraph_update_post.remove(handler)
+
 
 def _update_uv_layers_name(_self, context):
     if UV_LAYERS_ENABLE:
@@ -77,6 +89,7 @@ def _update_uv_layers_name(_self, context):
                         uvs[idx].name = uv_name
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
+
 
 def _update_uv_layers_active_idx(self, context):
     if UV_LAYERS_ENABLE:
@@ -123,14 +136,17 @@ copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
 if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
+
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
     size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
+
 class UNIV_UV_Layers(bpy.types.PropertyGroup):
     name: StringProperty(name='UVMap', update=_update_uv_layers_name)
     flag: IntProperty(name='Flag', default=0, min=0, max=3)
+
 
 class UNIV_Settings(bpy.types.PropertyGroup):
     # Global Settings
@@ -150,8 +166,10 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)
 
     uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0, options={'SKIP_SAVE'})
-    uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0, update=_update_uv_layers_active_idx, options={'SKIP_SAVE'})
-    uv_layers_active_render_idx: IntProperty(name='Active uv render index', min=-1, max=7, default=-1, options={'SKIP_SAVE'})
+    uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0,
+                                      update=_update_uv_layers_active_idx, options={'SKIP_SAVE'})
+    uv_layers_active_render_idx: IntProperty(name='Active uv render index',
+                                             min=-1, max=7, default=-1, options={'SKIP_SAVE'})
     uv_layers_presets: CollectionProperty(name="UV Layers", type=UNIV_UV_Layers, options={'SKIP_SAVE'})
 
     copy_to_layers_from: EnumProperty(name='From', default='0', items=copy_to_layers_uv_channels_items_from)
@@ -160,7 +178,8 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     # Pack Settings
     use_uvpm: BoolProperty(name='Use UVPackmaster', default=False)
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
-                               items=(('CONCAVE', 'Exact', 'Uses exact geometry'), ('AABB', 'Fast', 'Uses bounding boxes'))
+                               items=(('CONCAVE', 'Exact', 'Uses exact geometry'),
+                                      ('AABB', 'Fast', 'Uses bounding boxes'))
                                )
     scale: BoolProperty(name='Scale', default=True, description="Scale islands to fill unit square")
     rotate: BoolProperty(name='Rotate', default=True, description="Rotate islands to improve layout")
@@ -172,7 +191,8 @@ class UNIV_Settings(bpy.types.PropertyGroup):
 
                                 ))
 
-    pin: BoolProperty(name='Lock Pinned Islands', default=False, description="Constrain islands containing any pinned UV's")
+    pin: BoolProperty(name='Lock Pinned Islands', default=False,
+                      description="Constrain islands containing any pinned UV's")
     pin_method: EnumProperty(name='Lock Method', default='LOCKED',
                              items=(
                                  ('LOCKED', 'All', "Pinned islands are locked in place"),
@@ -212,8 +232,10 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     ))
 
     batch_inspect_flags: IntProperty(name="Batch Inspect Tags", min=0,
-                                     default=__import__(__package__.replace('preferences', '')+'.operators.inspect', fromlist=['inspect']).Inspect.default_value_for_settings()
+                                     default=__import__(__package__.replace('preferences', '')+'.operators.inspect',
+                                                        fromlist=['inspect']).Inspect.default_value_for_settings()
                                      )
+
 
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
@@ -226,103 +248,109 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             ('INFO', 'Info', ''),
         ),
         default='KEYMAPS')
-        # default='INFO')  # noqa
-
+    # default='INFO')  # noqa
 
     debug: EnumProperty(name='Debug',
-        items=(
-            ('DISABLED', 'Disabled', ''),
-            ('ENABLED', 'Enabled', ''),
-            ('FORCE', 'Force', ''),
-        ),
-        default='DISABLED')
+                        items=(
+                            ('DISABLED', 'Disabled', ''),
+                            ('ENABLED', 'Enabled', ''),
+                            ('FORCE', 'Force', ''),
+                        ),
+                        default='DISABLED')
 
     mode: EnumProperty(name='Mode',
-        items=(
-            ('STABLE', 'Stable', ''),
-            ('EXTENDED', 'Extended', ''),
-            ('EXPERIMENTAL', 'Experimental', ''),
-        ),
-        default='EXTENDED')
+                       items=(
+                           ('STABLE', 'Stable', ''),
+                           ('EXTENDED', 'Extended', ''),
+                           ('EXPERIMENTAL', 'Experimental', ''),
+                       ),
+                       default='EXTENDED')
 
     use_csa_mods: bpy.props.BoolProperty(default=True,
-        name="Use Modifier Keys",
-        description="Enable behavior changes based on Ctrl, Shift, and Alt keys when invoking the operator"
-    )
+                                         name="Use Modifier Keys",
+                                         description="Enable behavior changes based on Ctrl, Shift, and Alt keys when invoking the operator"
+                                         )
 
     snap_points_default: EnumProperty(name='Default Snap Points',
-        items=(
-            ('ALL', 'All', ''),
-            ('FOLLOW_MODE', 'Follow Mode', 'Follow the selection mode, VERTEX mode remains always')
-        ),
-        default='FOLLOW_MODE',
-        description='Default Snap Points for QuickSnap')
+                                      items=(
+                                          ('ALL', 'All', ''),
+                                          ('FOLLOW_MODE', 'Follow Mode', 'Follow the selection mode, VERTEX mode remains always')
+                                      ),
+                                      default='FOLLOW_MODE',
+                                      description='Default Snap Points for QuickSnap')
 
     # ----------
     color_mode: EnumProperty(name='Color Mode',
-        items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
-        default='COLOR',
-        update=lambda self, _:__import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
+                             items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
+                             default='COLOR',
+                             update=lambda self, _: __import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
     icon_size: EnumProperty(name='Icon Size',
-        items=(('32', '32', ''), ('64', '64', ''), ('128', '128', ''), ('256', '256', '')),
-        default='32')
+                            items=(('32', '32', ''), ('64', '64', ''), ('128', '128', ''), ('256', '256', '')),
+                            default='32')
     icon_antialiasing: EnumProperty(name='Anti-Aliasing',
-        items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
-        default='4')
+                                    items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
+                                    default='4')
     # Mono
     icon_mono_green: FloatVectorProperty(name='Green',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.258181, 0.564712, 0.3564003, 1))  #8bc6a1
+                                         # 8bc6a1
+                                         subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.258181, 0.564712, 0.3564003, 1))
 
     icon_mono_gray: FloatVectorProperty(name='Grey Color',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.5711, 0.5711, 0.5711, 1))  #c7c7c7
+                                        # c7c7c7
+                                        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.5711, 0.5711, 0.5711, 1))
 
     # Colored
     icon_colored_violet: FloatVectorProperty(name='Violet',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.20505, 0.24228, 1, 1))  #7d87ff
+                                             # 7d87ff
+                                             subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.20505, 0.24228, 1, 1))
 
     icon_colored_cian: FloatVectorProperty(name='Cian',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.1221, 0.6105, 0.9473, 1))  #62cdf9
+                                           # 62cdf9
+                                           subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.1221, 0.6105, 0.9473, 1))
 
     icon_colored_purple: FloatVectorProperty(name='Purple',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.71569, 0.24228, 1, 1))  #dc87ff
+                                             # dc87ff
+                                             subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.71569, 0.24228, 1, 1))
 
     icon_colored_pink: FloatVectorProperty(name='Pink',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 0.24228, 0.396755, 1))  #ff87a9
+                                           # ff87a9
+                                           subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 0.24228, 0.396755, 1))
     # Common
     icon_white_color: FloatVectorProperty(name='White Color',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 1, 1, 1))  #ffffff
+                                          subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 1, 1, 1))  # ffffff
 
     icon_select_arrow_color: FloatVectorProperty(name='Select Arrow Color',
-        subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.83879, 0.83879, 0.83879, 1))  #ececec
+                                                 # ececec
+                                                 subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.83879, 0.83879, 0.83879, 1))
 
     # ----------
     keymap_workspace_filter: EnumProperty(name='Workspace Filter',
-        items=(
-            ('ALL', 'Show All', ''),
-            ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
-            ('WORKSPACE', 'Workspace', 'Show keymaps from univ workspaces')
-        ),
-        default='ALL')
+                                          items=(
+                                              ('ALL', 'Show All', ''),
+                                              ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
+                                              ('WORKSPACE', 'Workspace', 'Show keymaps from univ workspaces')
+                                          ),
+                                          default='ALL')
 
     keymap_spaces_filter: EnumProperty(name='Space Filter',
-        items=(
-            ('ALL', 'Show All Spaces', ''),
-            ('UV Editor', 'UV', ''),
-            ('Window', 'Window', ''),
-            ('Object', 'Object', ''),
-            ('Mesh', 'Mesh', ''),
+                                       items=(
+                                           ('ALL', 'Show All Spaces', ''),
+                                           ('UV Editor', 'UV', ''),
+                                           ('Window', 'Window', ''),
+                                           ('Object', 'Object', ''),
+                                           ('Mesh', 'Mesh', ''),
 
-        ),
-        default='ALL')
+                                       ),
+                                       default='ALL')
 
     keymap_conflict_filter: EnumProperty(name='Conflict Filter',
-        items=(
-            ('ALL', 'Show All', ''),
-            ('ONLY_ERROR', 'Only Error', ''),
-            ('HIDE_ERROR', 'Hide Error', ''),
+                                         items=(
+                                             ('ALL', 'Show All', ''),
+                                             ('ONLY_ERROR', 'Only Error', ''),
+                                             ('HIDE_ERROR', 'Hide Error', ''),
 
-        ),
-        default='ALL')
+                                         ),
+                                         default='ALL')
 
     keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
     keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
@@ -331,7 +359,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
     show_view_3d_panel: BoolProperty(name='Show View 3D Panel', default=True)
     panel_3d_view_category: StringProperty(name="Panel 3D View Category", description="Enter a name for the panel category",
-                             default='UniV', update=update_panel)
+                                           default='UniV', update=update_panel)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
 
@@ -399,7 +427,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             box_split.prop(self, 'icon_antialiasing', text='AA')
             box_split = box.row(align=True)
             box_split.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
-            box_split.operator('wm.univ_icons_generator', text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
+            box_split.operator('wm.univ_icons_generator',
+                               text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
 
         elif self.tab == 'KEYMAPS':
             row = layout.row()
@@ -546,7 +575,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                 univ_pro = None
 
             if not univ_pro:
-                layout.label(text="You have the free version of the addon installed, which does not have some advanced operators and options", icon='INFO')
+                layout.label(
+                    text="You have the free version of the addon installed, which does not have some advanced operators and options", icon='INFO')
                 layout.label(text="which does not have some advanced operators and options")
             else:
                 layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
@@ -555,7 +585,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",
                          icon_value=icons.rectify)
             layout.separator(factor=0.35)
-            layout.label(text="Transfer - interactively transfers a UV layer from one object to another.", icon_value=icons.transfer)
+            layout.label(text="Transfer - interactively transfers a UV layer from one object to another.",
+                         icon_value=icons.transfer)
             layout.separator(factor=0.35)
             layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
             layout.separator(factor=0.35)
@@ -567,14 +598,17 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             layout.label(text="     1) It works only with islands")
             layout.label(text="     2) Moves only one island")
             layout.label(text="     3) Unselects all other elements and selects the picked island.")
-            layout.label(text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
+            layout.label(
+                text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
             layout.label(text="     5) Can pull out overlapped flipped islands.")
             layout.label(text="     6) Snapping is not a key and intrusive feature.")
             layout.separator(factor=0.35)
             layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
                          icon_value=icons.stack)
-            layout.label(text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
-            layout.label(text="Box Projection Pro- Has an Orient 3D option, which tightly projects cube-shaped elements ", icon_value=icons.box)
+            layout.label(
+                text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
+            layout.label(
+                text="Box Projection Pro- Has an Orient 3D option, which tightly projects cube-shaped elements ", icon_value=icons.box)
             if not univ_pro:
                 layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
 

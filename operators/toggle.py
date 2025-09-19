@@ -11,8 +11,7 @@ import traceback
 
 from .. import utils
 from ..preferences import force_debug, prefs, stable
-from .. import types
-from ..types import ARegion
+from ..utypes import UMeshes, ARegion
 
 from collections import defaultdict
 from bpy.props import *
@@ -453,7 +452,7 @@ class UNIV_OT_SyncUVToggle(Operator):
 
         self.sync_uv_selection_mode(convert_to_sync)
 
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         for umesh in umeshes:
             if convert_to_sync:
                 self.to_sync(umesh)
@@ -628,7 +627,7 @@ class UNIV_OT_StretchUVToggle(Operator):
                 uv_editor.display_stretch_type = 'ANGLE'
                 LAST_STRETCH_TYPE = 'ANGLE'
 
-            umeshes = types.UMeshes.calc(verify_uv=False)
+            umeshes = UMeshes.calc(verify_uv=False)
             count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
             umeshes.free()
 
@@ -669,7 +668,7 @@ class UNIV_OT_StretchUVToggle(Operator):
 
         uv_editor.display_stretch_type = LAST_STRETCH_TYPE
 
-        umeshes = types.UMeshes.calc(verify_uv=False)
+        umeshes = UMeshes.calc(verify_uv=False)
         count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
         umeshes.free()
 

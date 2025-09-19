@@ -12,8 +12,8 @@ from math import pi, cos, sin
 from bl_math import clamp
 from . import transform
 from .. import utils
-from .. import types
-from ..types import BBox, MeshIsland, MeshIslands
+from .. import utypes
+from ..utypes import BBox, MeshIsland, MeshIslands
 from bpy.props import *
 from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
@@ -47,10 +47,10 @@ class UNIV_OT_Normal(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
         if self.umeshes.is_edit_mode:
             selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -145,7 +145,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
 
         global_bbox.union(bbox)
 
-    def crop_islands(self, adv_islands_of_mesh: list[types.AdvIsland], bbox):
+    def crop_islands(self, adv_islands_of_mesh: list[utypes.AdvIsland], bbox):
         if not self.crop or not adv_islands_of_mesh:
             return
 
@@ -265,10 +265,10 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.has_selected: bool = True
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync(True)
         if self.is_edit_mode:
             selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -468,7 +468,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: utypes.UMeshes | None = None
         self.region = None
         self.area = None
         self.rv3d = None
@@ -477,7 +477,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         self.camera = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
 
         self.area = context.area
@@ -751,7 +751,7 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
         }
         # TODO: Add normalize and correct aspect by modifier
         if context.mode == 'EDIT_MESH':
-            umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+            umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
             umeshes.fix_context()
             umeshes.set_sync()
 
@@ -775,10 +775,10 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
                 return {'CANCELLED'}
             bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
-            for umesh in types.UMeshes.calc(self.report, verify_uv=False):
+            for umesh in utypes.UMeshes.calc(self.report, verify_uv=False):
                 umesh.check_uniform_scale(report=self.report)
 
-            umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+            umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
             umeshes.fix_context()
 
             bpy.ops.mesh.reveal(select=True)

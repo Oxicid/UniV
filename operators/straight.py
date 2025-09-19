@@ -14,7 +14,8 @@ from mathutils import Vector
 from collections import defaultdict
 from itertools import chain
 
-from .. import types
+from .. import utypes
+
 
 class UNIV_OT_Straight(bpy.types.Operator):
     bl_idname = "uv.univ_straight"
@@ -34,18 +35,20 @@ class UNIV_OT_Straight(bpy.types.Operator):
     def execute(self, context):
         assert (context.area.ui_type == 'UV')
 
-        umeshes = types.UMeshes(report=self.report)
+        umeshes = utypes.UMeshes(report=self.report)
         umeshes.fix_context()
         for umesh in umeshes.loop():
             main(self, umesh)
         return {'FINISHED'}
 
+
 class StraightIsland:
     pass
 
+
 def main(self, umesh):
     uv = umesh.uv
-    _islands = types.Islands.calc_visible(umesh)
+    _islands = utypes.Islands.calc_visible(umesh)
     if not _islands:
         umesh.update_tag = False
         return
@@ -148,6 +151,7 @@ def straighten(self, uv, island, segment_loops):
 
     for nodeLoop in newly_pinned:
         nodeLoop[uv].pin_uv = False
+
 
 def get_loops_segments(self, uv, island_loops_dirty):
     island_loops = set()
@@ -275,7 +279,8 @@ def get_loops_segments(self, uv, island_loops_dirty):
                     break
 
         if len(open_segments) > 1:
-            self.report({'ERROR_INVALID_INPUT'}, "Invalid selection in an island: multiple edge loops. Working in the longest one.")
+            self.report({'ERROR_INVALID_INPUT'},
+                        "Invalid selection in an island: multiple edge loops. Working in the longest one.")
             open_segments.sort(key=len, reverse=True)
 
     return open_segments[0]

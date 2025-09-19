@@ -12,14 +12,15 @@ from collections import namedtuple
 from collections.abc import Callable
 
 try:
-    from llvmlite import ir, binding
-    from llvmlite.ir import Constant
+    from llvmlite import ir, binding  # type: ignore[import-untyped]
+    from llvmlite.ir import Constant  # type: ignore[import-untyped]
 except ImportError:
     ir = None
     binding = None
     Constant = None
 
 version = (0, 0, 3)
+
 
 class ll:
     module: 'ir.Module' = None
@@ -60,6 +61,7 @@ class ll:
         sum_n()
         array_sum()
 
+
 class UniV:
     type = None
 
@@ -73,11 +75,13 @@ class UniV:
         if not issubclass(other, expect):
             raise TypeError(f"Unsupported type: {other}")
 
+
 class int_super_base(UniV):
     type: 'ir.IntType' = None
     signed = True
     var: 'ir.Type | ir.instructions.ICMPInstr | ir.Constant' = None
     _const_to_mutable_int = True
+
     def get_reference(self):
         return self.var.get_reference()  # noqa
 
@@ -116,6 +120,8 @@ class int_super_base(UniV):
         return fn.builder.load(self.var)  # noqa
 
 # base mutable ints
+
+
 class int_base(int_super_base):
     def __init__(self, value, name=''):  # noqa
         if type(value) in (ir.IntType, ir.Argument, ir.instructions.ICMPInstr, ir.PhiInstr):
@@ -143,7 +149,7 @@ class int_base(int_super_base):
             assert value.type == self.type
             self.var = fn.builder.alloca(self.type, name=name)
             fn.builder.store(ir.Constant(self.type, value), self.var)
-        elif type(value) == ir.GEPInstr: # gep
+        elif type(value) == ir.GEPInstr:  # gep
             # WARNING: Stored pointer instead use alloc to avoid stack overflow in loops
             assert value.type == self.type.as_pointer()
             self.var = value
@@ -241,12 +247,14 @@ class int_base(int_super_base):
         self.value = fn.builder.add(self.value, other.value)
         return self
 
+
 class bool_(int_base):
     type = None
 
     @staticmethod
     def get_ctypes_analog():
         return ct.c_bool
+
 
 class i8(int_base):
     type = None
@@ -255,6 +263,7 @@ class i8(int_base):
     def get_ctypes_analog():
         return ct.c_int8
 
+
 class i16(int_base):
     type = None
 
@@ -262,12 +271,14 @@ class i16(int_base):
     def get_ctypes_analog():
         return ct.c_int16
 
+
 class i32(int_base):
     type = None
 
     @staticmethod
     def get_ctypes_analog():
         return ct.c_int32
+
 
 class i64(int_base):
     type = None
@@ -349,9 +360,12 @@ class Array(typing.Generic[typing.T], UniV):
     def __repr__(self):
         return f"<Array of {self.univ_element_type}>"
 
+
 Loop = namedtuple("Loop", ["index", "do_break"])
 
+
 def const(i): return ir.Constant(ir.IntType(32), i)
+
 
 def sizeof(typ: 'ir.Type') -> int:
     if isinstance(typ, ir.IntType):
@@ -363,14 +377,18 @@ def sizeof(typ: 'ir.Type') -> int:
     else:
         raise NotImplementedError(f"sizeof not implemented for {typ}")
 
+
 def increment_index(builder, index):  # TODO: Delete this func
     return builder.add(index.var, const(1), name="incr")  # TODO: Replace const
+
 
 def terminate(builder, target_block):
     builder.branch(target_block)
 
+
 def cbranch(cond: bool_, true_br, false_br):
     return fn.builder.cbranch(cond.var, true_br, false_br)
+
 
 @contextmanager
 def for_range(count: i32):
@@ -403,6 +421,7 @@ def for_range(count: i32):
 
     builder.position_at_end(bb_end)
 
+
 class fn:
     func = None
     type = None
@@ -428,7 +447,8 @@ class fn:
         params = signature.parameters.values()
 
         if len(params) != len(llvm_func.args):
-            raise ValueError(f"Argument count mismatch: {len(params)} (Python) vs {len(llvm_func.args)} (LLVM) in the {pyfunc.__name__!r} function")
+            raise ValueError(
+                f"Argument count mismatch: {len(params)} (Python) vs {len(llvm_func.args)} (LLVM) in the {pyfunc.__name__!r} function")
 
         univ_args: list[UniV] = []
         for param, arg in zip(params, llvm_func.args):
@@ -441,7 +461,8 @@ class fn:
             elif issubclass(univ_type, int_base):
                 univ_args.append(univ_type(arg, param.name))
             else:
-                raise NotImplementedError(f"Unsupported parameter type: {param}: {param.annotation} in the {pyfunc.__name__!r} function")
+                raise NotImplementedError(
+                    f"Unsupported parameter type: {param}: {param.annotation} in the {pyfunc.__name__!r} function")
         assert all(isinstance(typ, UniV) for typ in univ_args)
         assert len(params) == len(univ_args)
         return univ_args
@@ -465,7 +486,8 @@ class fn:
             elif issubclass(univ_type, int_base):
                 arg_types.append(univ_type.type)
             else:
-                raise NotImplementedError(f"Unsupported parameter type: {param.annotation} in the {pyfunc.__name__!r} function")
+                raise NotImplementedError(
+                    f"Unsupported parameter type: {param.annotation} in the {pyfunc.__name__!r} function")
 
         assert isinstance(ret_type, ir.Type)
         assert all(isinstance(typ, ir.Type) for typ in arg_types)
@@ -488,8 +510,10 @@ class fn:
                 arg_types.append(univ_type.get_ctypes_analog())
             else:
                 if univ_type == inspect._empty:  # noqa
-                    raise TypeError(f" Missing type specification for parameter {param.name!r} in the {pyfunc.__name__!r} function")
-                raise NotImplementedError(f"Unsupported parameter type: {param.name}: {univ_type} in the {pyfunc.__name__!r} function")
+                    raise TypeError(
+                        f" Missing type specification for parameter {param.name!r} in the {pyfunc.__name__!r} function")
+                raise NotImplementedError(
+                    f"Unsupported parameter type: {param.name}: {univ_type} in the {pyfunc.__name__!r} function")
 
         ret_univ_elem_type = signature.return_annotation
         if issubclass(ret_univ_elem_type, int_base):
@@ -497,7 +521,8 @@ class fn:
         elif Array.is_array_type(ret_univ_elem_type):
             ret_type = Array.get_ctypes_analog(ret_univ_elem_type)
         else:
-            raise NotImplementedError(f"Unsupported return type: {ret_univ_elem_type} in the {pyfunc.__name__!r} function")
+            raise NotImplementedError(
+                f"Unsupported return type: {ret_univ_elem_type} in the {pyfunc.__name__!r} function")
 
         assert issubclass(ret_type, (ct._SimpleCData, ct._Pointer))  # noqa
         assert all(issubclass(typ, (ct._SimpleCData, ct._Pointer)) for typ in arg_types)  # noqa
@@ -522,18 +547,20 @@ class fn:
 def sum_n(n: i32) -> i32:
     acc = i32(0, name="acc")
     with for_range(n) as loop:
-        acc+=loop.index
+        acc += loop.index
     fn.builder.ret(acc.value)  # TODO: Implement, with return value checks and auto converts
 
     return acc  # for return type warning disable
+
 
 @fn()
 def array_sum(arr: Array[i32], n: i32) -> i32:
     acc = i32(0, name="acc")
     with for_range(n) as loop:
-        acc+=arr[loop.index]
+        acc += arr[loop.index]
     fn.builder.ret(acc.value)
     return acc  # for return type warning disable
+
 
 class TestLLVM(unittest.TestCase):
     def test_sum_n(self):

@@ -41,6 +41,7 @@ def add_mesh_keymaps(km, univ_pro):
         kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
         keys.append((km, kmi))
 
+
 def add_keymaps():
     global keys
 
@@ -52,7 +53,7 @@ def add_keymaps():
     except ImportError:
         univ_pro = None
 
-    ### Object Mode
+    # Object Mode
     km = kc.keymaps.new(name='Object Mode')
     kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
     keys.append((km, kmi))
@@ -62,7 +63,7 @@ def add_keymaps():
     kmi.properties.name = "VIEW3D_MT_PIE_univ_obj"
     keys.append((km, kmi))
 
-    ### Mesh
+    # Mesh
     km = kc.keymaps.new(name='Mesh')
 
     # Pie Menu
@@ -86,7 +87,7 @@ def add_keymaps():
 
     add_mesh_keymaps(km, univ_pro)
 
-    ### Window
+    # Window
     km = kc.keymaps.new(name='Window')
 
     kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
@@ -96,7 +97,7 @@ def add_keymaps():
     kmi = km.keymap_items.new('wm.univ_toggle_panels_by_cursor', 'T', 'PRESS', alt=True)
     keys.append((km, kmi))
 
-    ### UV Editor
+    # UV Editor
     km = kc.keymaps.new(name='UV Editor')
 
     # Pie Menus
@@ -170,7 +171,7 @@ def add_keymaps():
     keys.append((km, kmi))
 
     # Rotate
-    ## Default. CW.
+    # Default. CW.
     kmi = km.keymap_items.new('uv.univ_select_mode', 'ONE', 'PRESS')
     kmi.properties.type = 'VERTEX'
     keys.append((km, kmi))
@@ -192,31 +193,31 @@ def add_keymaps():
     kmi.properties.mode = 'DEFAULT'
     keys.append((km, kmi))
 
-    ## Default. CCW.
+    # Default. CCW.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'DEFAULT'
     keys.append((km, kmi))
 
-    ## Default. CW. By Cursor.
+    # Default. CW. By Cursor.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True)
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'BY_CURSOR'
     keys.append((km, kmi))
 
-    ## Default. CCW. By Cursor.
+    # Default. CCW. By Cursor.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True, alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'BY_CURSOR'
     keys.append((km, kmi))
 
-    ## Default. CW. Individual.
+    # Default. CW. Individual.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True)
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'INDIVIDUAL'
     keys.append((km, kmi))
 
-    ## Default. CCW. Individual.
+    # Default. CCW. Individual.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True, alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'INDIVIDUAL'
@@ -318,6 +319,7 @@ def add_keymaps():
     for _, kmi in keys:
         kmi.active = False
 
+
 def add_keymaps_ws():
     global keys_ws
     if not (kc := bpy.context.window_manager.keyconfigs.addon):
@@ -343,7 +345,6 @@ def add_keymaps_ws():
 
     # Edit Mode
     km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
-
 
     kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
@@ -429,6 +430,7 @@ def remove_keymaps():
                 traceback.print_exc()
     keys.clear()
 
+
 def remove_keymaps_ws():
     global keys_ws
     import traceback
@@ -442,9 +444,11 @@ def remove_keymaps_ws():
                 traceback.print_exc()
     keys_ws.clear()
 
+
 _EVENT_TYPES = set()
 _EVENT_TYPE_MAP = {}
 _EVENT_TYPE_MAP_EXTRA = {}
+
 
 class ConflictFilter:
     def __init__(self):
@@ -494,11 +498,11 @@ class ConflictFilter:
         keymap_name_filter = prefs().keymap_name_filter.strip().lower()
         filter_name_fn = cls.filter_by_name
 
-        keymap_key_filter =  prefs().keymap_key_filter.strip().lower()
+        keymap_key_filter = prefs().keymap_key_filter.strip().lower()
         if keymap_key_filter:
             filter_key_fn = cls.filter_by_key(keymap_key_filter)
         else:
-            filter_key_fn = lambda a: a  # pycharm warning
+            def filter_key_fn(a): return a  # pycharm warning
 
         kc = bpy.context.window_manager.keyconfigs.user
 
@@ -549,11 +553,11 @@ class ConflictFilter:
         keymap_name_filter = prefs().keymap_name_filter.strip().lower()
         filter_name_fn = cls.filter_by_name
 
-        keymap_key_filter =  prefs().keymap_key_filter.strip().lower()
+        keymap_key_filter = prefs().keymap_key_filter.strip().lower()
         if keymap_key_filter:
             filter_key_fn = cls.filter_by_key(keymap_key_filter)
         else:
-            filter_key_fn = lambda a: a  # pycharm warning
+            def filter_key_fn(a): return a  # pycharm warning
 
         kc = bpy.context.window_manager.keyconfigs.user
 
@@ -562,14 +566,14 @@ class ConflictFilter:
 
             conflict_filter = defaultdict(ConflictFilter)
             for kmi in km.keymap_items:
-                    # Filter by name and by key
-                    if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
-                        continue
-                    if keymap_key_filter and not filter_key_fn(kmi):
-                        continue
+                # Filter by name and by key
+                if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
+                    continue
+                if keymap_key_filter and not filter_key_fn(kmi):
+                    continue
 
-                    keymap_name = kmi.to_string()
-                    conflict_filter[keymap_name].univ_keys.append(kmi)
+                keymap_name = kmi.to_string()
+                conflict_filter[keymap_name].univ_keys.append(kmi)
 
             if not conflict_filter:
                 continue
@@ -705,6 +709,7 @@ class ConflictFilter:
             return True
         return filter_func
 
+
 class UNIV_RestoreKeymaps(bpy.types.Operator):
     bl_idname = 'wm.univ_keymaps_config'
     bl_label = 'Keymaps Config'
@@ -741,7 +746,8 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                 if not kmi.is_user_defined:
                     activ_before = kmi.active
                     to_str_before = kmi.to_string()
-                    properties_before = [getattr(kmi.properties, str_props) for str_props in dir(kmi.properties) if not str_props.startswith('__')]
+                    properties_before = [getattr(kmi.properties, str_props)
+                                         for str_props in dir(kmi.properties) if not str_props.startswith('__')]
 
                     km.restore_item_to_default(kmi)
 

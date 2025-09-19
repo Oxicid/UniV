@@ -25,6 +25,7 @@ from .umesh import UMesh, UMeshes
 from .. import utils
 from ..utils import closest_pt_to_line, point_inside_face
 
+
 class KDData:
     def __init__(self, found, elem, kdmesh):
         self.found: tuple[Vector, int, float] = found
@@ -60,6 +61,7 @@ class KDData:
 
     def __bool__(self):
         return bool(self.kdmesh)
+
 
 class KDMesh:
     def __init__(self, umesh, islands=None, loop_groups=None):
@@ -302,6 +304,7 @@ class KDMeshes:
 
     def __str__(self):
         return f'KD Meshes count = {len(self.kdmeshes)}'
+
 
 class IslandHit:
     def __init__(self, pt, min_dist=1e200):
@@ -595,6 +598,7 @@ class CrnEdgeHit:
     def __bool__(self):
         return bool(self.crn)
 
+
 class RayCast:
     def __init__(self):
         self.mouse_pos_from_3d = None
@@ -611,11 +615,13 @@ class RayCast:
             self.mouse_pos_from_3d = event.mouse_region_x, event.mouse_region_y
             self.region = bpy.context.region
             self.rv3d = bpy.context.space_data.region_3d
-            self.ray_origin = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
-            self.ray_direction = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+            self.ray_origin = view3d_utils.region_2d_to_origin_3d(
+                self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+            self.ray_direction = view3d_utils.region_2d_to_vector_3d(
+                self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
 
     @staticmethod
-    def get_bvh_from_polygon(umesh: UMesh) -> tuple[BVHTree, list[BMFace]] :
+    def get_bvh_from_polygon(umesh: UMesh) -> tuple[BVHTree, list[BMFace]]:
         faces = []
         faces_append = faces.append
         flat_tris_coords = []

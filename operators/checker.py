@@ -3,7 +3,7 @@
 
 import bpy
 
-from .. import types
+from .. import utypes
 from .. import utils
 # Patterns for future
 # _ARS-10.5  # Arrow Scale
@@ -368,7 +368,7 @@ class UNIV_OT_CheckerCleanup(bpy.types.Operator):
     @staticmethod
     def remove_modifiers():
         if bpy.context.mode == 'EDIT_MESH':
-            selected_objects = types.UMeshes.loop_for_object_mode_processing(without_selection=True)
+            selected_objects = utypes.UMeshes.loop_for_object_mode_processing(without_selection=True)
         else:
             selected_objects = bpy.context.selected_objects
         # mod_counter = 0

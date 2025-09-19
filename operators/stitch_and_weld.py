@@ -11,19 +11,19 @@ from itertools import chain
 from mathutils import Vector
 
 from bmesh.types import BMLoop
-from bpy.types import Operator
 from bpy.props import *
 
 from .. import draw
 from .. import utils
-from .. import types
-from ..types import (
+from .. import utypes
+from ..utypes import (
     BBox,
     UMeshes,
     Islands,
     AdvIslands,
     AdvIsland,
-    LoopGroup
+    LoopGroup,
+    LoopGroups
 )
 from ..preferences import prefs, univ_settings
 
@@ -57,7 +57,8 @@ class Stitch:
             if self.between:
                 target_islands = adv_islands.islands.copy()
             else:
-                target_islands = [isl for isl in adv_islands if types.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+                target_islands = [
+                    isl for isl in adv_islands if utypes.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
             self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
 
             if not target_islands:
@@ -78,7 +79,7 @@ class Stitch:
                 # TODO: Need adapt to flipped
                 self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, temp_exclude_indexes)
 
-                loop_groups = types.LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
+                loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
                 filtered = self.split_lg_for_stitch_with_padding(loop_groups)
                 if filtered:
                     # An island may not have any selected edges, but it can still be a reoriented island.
@@ -290,10 +291,10 @@ class Stitch:
 
                 # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
                 trans.set_boundary_tag(match_idx=True)
-                if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags(trans):
+                if loop_groups := LoopGroups.calc_by_boundary_crn_tags(trans):
                     trans_lg_is_basic_boundary = False
                     if len(loop_groups) != 1:
-                        longest_border_lg = max(loop_groups, key = lambda lg: lg.length_uv)
+                        longest_border_lg = max(loop_groups, key=lambda lg: lg.length_uv)
                         vert = longest_border_lg[0].vert
                         if (len(longest_border_lg) == len(trans_lg) and
                                 any(trans_crn.vert == vert for trans_crn in trans_lg)):
@@ -340,8 +341,8 @@ class Stitch:
                 orto = Vector((self.padding, 0))
             orto *= aspect_vec
 
-            correct_flipped_islands =  (ref_is_flipped and not trans_is_flipped or
-                                        ref_is_flipped and trans_is_flipped)
+            correct_flipped_islands = (ref_is_flipped and not trans_is_flipped or
+                                       ref_is_flipped and trans_is_flipped)
             if correct_flipped_islands:
                 delta = (pt_a1 - pt_b1) - orto
             else:
@@ -352,7 +353,7 @@ class Stitch:
         """Enhances multi-stitching steps for a more even distribution"""
         if not balance_isl.sequence:
             self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
-            if loop_groups := types.LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl):
+            if loop_groups := LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl):
                 filtered = self.split_lg_for_stitch_with_padding(loop_groups)
                 if len(filtered) == 1:
                     balance_isl.tag = False
@@ -377,10 +378,10 @@ class Stitch:
         return min_lg
 
     @staticmethod
-    def split_lg_for_stitch_with_padding(lgs: types.LoopGroups) -> list[LoopGroup]:
+    def split_lg_for_stitch_with_padding(lgs: LoopGroups) -> list[LoopGroup]:
         filtered_lg = []
         uv = lgs.umesh.uv
-        key = lambda crn_: crn_.link_loop_radial_prev.face.index
+        def key(crn_): return crn_.link_loop_radial_prev.face.index
         for lg in lgs:
             if utils.all_equal(lg, key=key):
                 filtered_lg.append(lg)
@@ -390,7 +391,7 @@ class Stitch:
                 # # Join same index LG, case when border loop circular but with different indexes
                 a_crn = split_lg_groups[0][0]
                 b_crn = split_lg_groups[-1][-1].link_loop_next
-                if a_crn.vert == b_crn.vert and a_crn[uv].uv  == b_crn[uv].uv and key(a_crn) == key(split_lg_groups[-1][-1]):
+                if a_crn.vert == b_crn.vert and a_crn[uv].uv == b_crn[uv].uv and key(a_crn) == key(split_lg_groups[-1][-1]):
                     lg_start = split_lg_groups.pop()
                     lg_end = split_lg_groups[0]
                     del split_lg_groups[0]
@@ -528,7 +529,7 @@ class Stitch:
 
     def sort_by_dist_to_mouse_or_sel_edge_length(self, target_islands, umesh):
         if umesh.sync and self.mouse_position:
-            target_islands.sort(key=lambda isl: types.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
+            target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
         else:
             target_islands.sort(key=lambda isl: isl.calc_edge_length(selected=False), reverse=True)
 
@@ -578,7 +579,8 @@ class Stitch:
                     update_tag = True
             umesh.update_tag = update_tag
 
-class UNIV_OT_Weld(Operator, Stitch):
+
+class UNIV_OT_Weld(bpy.types.Operator, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
     bl_description = "Weld selected UV vertices\n\n" \
@@ -620,7 +622,8 @@ class UNIV_OT_Weld(Operator, Stitch):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
                 self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+                self.mouse_position = Vector(context.region.view2d.region_to_view(
+                    event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
         self.use_by_distance = event.alt
 
@@ -658,7 +661,7 @@ class UNIV_OT_Weld(Operator, Stitch):
                 umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
             if not selected_umeshes and self.mouse_position:
-                hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
+                hit = utypes.CrnEdgeHit(self.mouse_position, self.max_distance)
                 for umesh in self.umeshes:
                     hit.find_nearest_crn_by_visible_faces(umesh)
                 self.pick_weld(hit)
@@ -945,7 +948,7 @@ class UNIV_OT_Weld(Operator, Stitch):
         return
 
 
-class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
+class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
     bl_idname = "mesh.univ_weld"
 
     def invoke(self, context, event):
@@ -958,7 +961,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Stitch.__init__(self)
-        types.RayCast.__init__(self)
+        utypes.RayCast.__init__(self)
         self.update_seams = True
 
     def execute(self, context):
@@ -993,7 +996,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
                 self.weld_by_distance_all(selected=bool(selected_umeshes))
 
         self.clear_seams_from_selected_edges(umeshes_without_uv)
-        self.umeshes.umeshes.extend(umeshes_without_uv)
+        self.umeshes.umeshes.extend(umeshes_without_uv.umeshes.copy())
 
     def weld_by_edge_from_3d(self):
         selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
@@ -1017,9 +1020,10 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, types.RayCast):
         self.umeshes.verify_uv()
         self.weld()
         self.clear_seams_from_selected_edges(umeshes_without_uv)
-        self.umeshes.umeshes.extend(umeshes_without_uv)
+        self.umeshes.umeshes.extend(umeshes_without_uv.umeshes.copy())
 
-class UNIV_OT_Stitch(Operator, Stitch, utils.PaddingHelper):
+
+class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
     bl_description = "Stitch selected UV vertices by proximity\n\n" \
@@ -1052,7 +1056,8 @@ class UNIV_OT_Stitch(Operator, Stitch, utils.PaddingHelper):
         if event.value == 'PRESS':
             if context.area.ui_type == 'UV':
                 self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_position = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+                self.mouse_position = Vector(context.region.view2d.region_to_view(
+                    event.mouse_region_x, event.mouse_region_y))
             return self.execute(context)
         self.between = event.alt
         return self.execute(context)
@@ -1085,7 +1090,7 @@ class UNIV_OT_Stitch(Operator, Stitch, utils.PaddingHelper):
             if not selected_umeshes and self.mouse_position:
                 self.report_padding()
 
-                hit = types.CrnEdgeHit(self.mouse_position, self.max_distance)
+                hit = utypes.CrnEdgeHit(self.mouse_position, self.max_distance)
                 for umesh in self.umeshes:
                     hit.find_nearest_crn_by_visible_faces(umesh)
 
@@ -1144,7 +1149,7 @@ class UNIV_OT_Stitch(Operator, Stitch, utils.PaddingHelper):
             hit.umesh.update()
 
 
-class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
+class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
     bl_idname = "mesh.univ_stitch"
 
     def invoke(self, context, event):
@@ -1167,7 +1172,8 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
         settings = univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / min(int(settings.size_x), int(settings.size_y))
+        self.padding = int(settings.padding * self.padding_multiplayer) / \
+            min(int(settings.size_x), int(settings.size_y))
 
         if self.between:
             self.stitch_between()
@@ -1184,7 +1190,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
         self.stitch()
 
         self.clear_seams_from_selected_edges(without_uv)
-        self.umeshes.umeshes.extend(without_uv)
+        self.umeshes.umeshes.extend(without_uv.umeshes.copy())
 
     def stitch_by_edge(self):
         settings = univ_settings()
@@ -1215,4 +1221,4 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, types.RayCast):
         self.umeshes.verify_uv()
         self.stitch()
         self.clear_seams_from_selected_edges(without_uv)
-        self.umeshes.umeshes.extend(without_uv)
+        self.umeshes.umeshes.extend(without_uv.umeshes.copy())

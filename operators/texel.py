@@ -24,8 +24,9 @@ from bl_math import clamp
 from mathutils import Vector, Matrix
 
 from .. import utils
-from .. import types
-from ..types import (
+from .. import utypes
+from ..utypes import (
+    UMeshes,
     AdvIslands,
     AdvIsland,
     UnionIslands
@@ -33,14 +34,13 @@ from ..types import (
 from ..preferences import prefs, univ_settings
 
 
-
 class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_reset_scale"
     bl_label = 'Reset'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Reset the scale of separate UV islands, based on their area in 3D space\n\n" \
-                     f"Default - Reset islands scale\n" \
-                     f"Shift - Lock Overlaps"
+        f"Default - Reset islands scale\n" \
+        f"Shift - Lock Overlaps"
 
     shear: BoolProperty(name='Shear', default=True, description='Reduce shear within islands')
     axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
@@ -65,10 +65,10 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         for umesh in self.umeshes:
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -78,7 +78,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 
         all_islands: list[AdvIsland | UnionIslands] = []
 
-        islands_calc_type: Callable[[types.UMesh], AdvIslands]
+        islands_calc_type: Callable[[utypes.UMesh], AdvIslands]
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
@@ -138,12 +138,15 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         transform_acc = Matrix.Identity(2)
         scale_acc = Vector((1.0, 1.0))
 
-        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
+        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple())
+                                  for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
         vec_ac = flat_3d_coords[:, 0] - flat_3d_coords[:, 2]
         vec_bc = flat_3d_coords[:, 1] - flat_3d_coords[:, 2]
 
-        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
-        weights = np.array(list(isl.weights) if isinstance(isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
+        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple())
+                                  for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
+        weights = np.array(list(isl.weights) if isinstance(
+            isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
 
         for _ in range(10):
             m00 = flat_uv_coords[:, 0, 0] - flat_uv_coords[:, 2, 0]
@@ -238,13 +241,14 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 class UNIV_OT_ResetScale_VIEW3D(UNIV_OT_ResetScale):
     bl_idname = "mesh.univ_reset_scale"
 
+
 class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_normalize"
     bl_label = 'Normalize'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Average the size of separate UV islands, based on their area in 3D space\n\n" \
-                     f"Default - Average Islands Scale\n" \
-                     f"Shift - Lock Overlaps"
+        f"Default - Average Islands Scale\n" \
+        f"Shift - Lock Overlaps"
 
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
@@ -269,10 +273,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         is_uv_area = context.area.ui_type == 'UV'
         if not is_uv_area:
             self.umeshes.set_sync(True)
@@ -286,7 +290,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
         all_islands: list[AdvIsland | UnionIslands] = []
 
-        islands_calc_type: Callable[[types.UMesh], AdvIslands]
+        islands_calc_type: Callable[[utypes.UMesh], AdvIslands]
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
@@ -337,17 +341,20 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         if isinstance(isl.value, Vector):
             new_center = isl.value.copy()
         else:
-            new_center = Vector((1,1))
+            new_center = Vector((1, 1))
 
         aspect = isl.umesh.aspect
         transform_acc = Matrix.Identity(2)
         scale_acc = Vector((1.0, 1.0))
 
-        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
+        flat_3d_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple())
+                                  for pt_a, pt_b, pt_c in isl.flat_3d_coords], dtype=np.float32)
         vec_ac = flat_3d_coords[:, 0] - flat_3d_coords[:, 2]
         vec_bc = flat_3d_coords[:, 1] - flat_3d_coords[:, 2]
-        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple()) for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
-        weights = np.array(list(isl.weights) if isinstance(isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
+        flat_uv_coords = np.array([(pt_a.to_tuple(), pt_b.to_tuple(), pt_c.to_tuple())
+                                  for pt_a, pt_b, pt_c in isl.flat_coords], dtype=np.float32)
+        weights = np.array(list(isl.weights) if isinstance(
+            isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
 
         for _ in range(10):
             m00 = flat_uv_coords[:, 0, 0] - flat_uv_coords[:, 2, 0]
@@ -424,11 +431,13 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
     def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
         if not self.xy_scale and len(islands) <= 1:
-            self.umeshes.cancel_with_report({'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
+            self.umeshes.cancel_with_report(
+                {'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
             return
         if tot_area_3d == 0.0 or tot_area_uv == 0.0:
             # Prevent divide by zero.
-            self.umeshes.cancel_with_report({'WARNING'}, info=f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
+            self.umeshes.cancel_with_report(
+                {'WARNING'}, info=f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
             return
 
         tot_fac = tot_area_3d / tot_area_uv
@@ -519,8 +528,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         idx = (np.abs(array - value)).argmin()
         return idx
 
+
 class UNIV_OT_Normalize(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "uv.univ_normalize"
+
 
 class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
     bl_idname = "mesh.univ_adjust_td"
@@ -555,7 +566,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
     def pick_adjust_edit(self):
         all_islands = []
-        hit = types.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
             adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
@@ -592,18 +603,20 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                 isl.value = isl.bbox.center  # isl.value == pivot
                 isl.value = self.individual_scale(isl)
 
-        self.normalize_and_show_adjust_result_info_edit(all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
+        self.normalize_and_show_adjust_result_info_edit(
+            all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
         return {'FINISHED'}
 
     def adjust_edit(self):
         all_islands: list[AdvIsland | UnionIslands] = []
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
 
         if self.use_aspect:
-            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))  # TODO: Implement exact aspect for materials (get aspect by face mat id)
+            # TODO: Implement exact aspect for materials (get aspect by face mat id)
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
 
         for umesh in self.umeshes:
             umesh.update_tag = False
@@ -676,7 +689,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
     def adjust_object(self):
         all_islands: list[AdvIsland | UnionIslands] = []
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
@@ -688,7 +701,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
-        for umesh in (unselected_umeshes := types.UMeshes.unselected_with_uv()):
+        for umesh in (unselected_umeshes := UMeshes.unselected_with_uv()):
             umesh.value = umesh.check_uniform_scale(report=self.report)
         unselected_umeshes.set_sync()
 
@@ -751,8 +764,10 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         return {'FINISHED'}
 
+
 class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
     bl_idname = "uv.univ_adjust_td"
+
 
 class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_set"
@@ -794,7 +809,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         self.texture_size: float = 2048.0
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
         self.texel = univ_settings().texel_density
@@ -809,7 +824,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
             self.texel = td_preset.texel
             self.texture_size = (int(td_preset.size_x) + int(td_preset.size_y)) / 2
 
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
@@ -869,14 +884,14 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         if self.grouping_type != 'NONE':
             if self.grouping_type == 'OVERLAP':
                 threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
-                groups_of_islands = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+                groups_of_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
                 for isl in groups_of_islands:
                     if (status := isl.set_texel(self.texel, self.texture_size)) is None:
                         zero_area_islands.append(isl)
                         continue
                     isl.umesh.update_tag |= status
             else:
-                union_islands = types.UnionIslands(all_islands)
+                union_islands = UnionIslands(all_islands)
                 status = union_islands.set_texel(self.texel, self.texture_size)
                 union_islands.umesh.update_tag = status in (True, None)
 
@@ -910,8 +925,10 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         self.umeshes.update(info='All islands adjusted')
         return {'FINISHED'}
 
+
 class UNIV_OT_TexelDensitySet(UNIV_OT_TexelDensitySet_VIEW3D):
     bl_idname = "uv.univ_texel_density_set"
+
 
 class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_get"
@@ -927,12 +944,12 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
         self.texel: float = 1.0
         self.texture_size: float = 2048.0
         self.has_selected = True
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context):
         self.texel = univ_settings().texel_density
         self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
@@ -982,22 +999,26 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
         utils.update_univ_panels()
         return {'FINISHED'}
 
+
 class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):
     bl_idname = "uv.univ_texel_density_get"
 
-POLIIGON_PHYSICAL_SIZES: dict[int | tuple[float, float]] | dict[int | None]| None = None
+
+POLIIGON_PHYSICAL_SIZES: dict[int | tuple[float, float]] | dict[int | None] | None = None
+
 
 class UNIV_OT_TexelDensityFromTexture(Operator):
     bl_idname = "uv.univ_texel_density_from_texture"
     bl_label = 'TD From Texture'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Extracts dimensions from texture name or metadata.\n\n" \
-                    "Name_30cm_Albedo → 0.3m\n" \
-                    "Name_2.5Mx2.5M_Albedo → 2.5 x 2.5 m\n" \
-                    "Supported units: mm, cm, m, km, in, ft, yd, mi\n\n" \
-                    "Quixel Megascans textures are supported if the original \n" \
-                    "filenames are intact and the texture path contains the corresponding JSON file. \n\n" \
-                    "Poliigon textures are supported if the naming convention with the texture ID is preserved." \
+        "Name_30cm_Albedo → 0.3m\n" \
+        "Name_2.5Mx2.5M_Albedo → 2.5 x 2.5 m\n" \
+        "Supported units: mm, cm, m, km, in, ft, yd, mi\n\n" \
+        "Quixel Megascans textures are supported if the original \n" \
+        "filenames are intact and the texture path contains the corresponding JSON file. \n\n" \
+        "Poliigon textures are supported if the naming convention with the texture ID is preserved." \
+
 
     def execute(self, context):
         area = bpy.context.area
@@ -1097,7 +1118,7 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
         return False
 
     def get_physical_size_poligon(self, name: str):
-        import requests
+        import requests  # type: ignore[import-untyped]
         match_poliigon_id = re.search(r'_(\d{4,})_', name)
         if not match_poliigon_id:
             self.report({'WARNING'}, 'Not found id from poliigon texture')
@@ -1164,7 +1185,8 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
         global POLIIGON_PHYSICAL_SIZES
         if POLIIGON_PHYSICAL_SIZES:
             with open(json_path, 'w', encoding='utf-8') as f:
-               json.dump(POLIIGON_PHYSICAL_SIZES, f, sort_keys=True, indent=4, separators=(',', ': '))  # noqa
+                json.dump(POLIIGON_PHYSICAL_SIZES, f, sort_keys=True, indent=4, separators=(',', ': '))  # noqa
+
 
 class TexelDensity_NameExtract_Test:
     @staticmethod
@@ -1182,6 +1204,7 @@ class TexelDensity_NameExtract_Test:
 
         for name in texts:
             UNIV_OT_TexelDensityFromTexture.get_physical_size_from_name(name)
+
 
 class UNIV_OT_TexelDensityFromPhysicalSize(Operator):
     bl_idname = "uv.univ_texel_density_from_physical_size"
@@ -1203,19 +1226,20 @@ class UNIV_OT_TexelDensityFromPhysicalSize(Operator):
         UNIV_OT_TexelDensityFromTexture.update_texel_from_size(size)
         return {'FINISHED'}
 
+
 class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
     bl_idname = "uv.univ_calc_udims_from_3d_area"
     bl_label = 'Calc UDIMs from 3D Area'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Calculates the required UDIMs count coefficient from the 3D area \n" \
-                      "relative to the global texture resolution and texel size."
+        "relative to the global texture resolution and texel size."
 
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def execute(self, context):
-        umeshes = types.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
 
@@ -1254,8 +1278,10 @@ class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
         tile_coverage_m2 = texels_per_tile * texel_area_m2
         return geom_area / tile_coverage_m2 * 1.15
 
+
 class UNIV_OT_CalcUDIMsFrom_3DArea_VIEW3D(UNIV_OT_CalcUDIMsFrom_3DArea):
     bl_idname = "mesh.univ_calc_udims_from_3d_area"
+
 
 class UNIV_OT_Calc_UV_Area(Operator):
     bl_idname = "uv.univ_calc_uv_area"
@@ -1267,7 +1293,7 @@ class UNIV_OT_Calc_UV_Area(Operator):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def execute(self, context):
-        umeshes = types.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
 
@@ -1296,23 +1322,25 @@ class UNIV_OT_Calc_UV_Area(Operator):
         umeshes.free()
         return {'FINISHED'}
 
+
 class UNIV_OT_Calc_UV_Area_VIEW3D(UNIV_OT_Calc_UV_Area):
     bl_idname = "mesh.univ_calc_uv_area"
+
 
 class UNIV_OT_Calc_UV_Coverage(Operator):
     bl_idname = "uv.univ_calc_uv_coverage"
     bl_label = 'Coverage'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Calculates coverage area. Overlaps do not increase the total value. \n\n" \
-                "NOTE: The tiles used for coverage calculation are determined \nby vertex and face center inclusion in a tile.\n\n" \
-                "For example, a plane scaled 10x will result in 6 tiles, not 100."
+        "NOTE: The tiles used for coverage calculation are determined \nby vertex and face center inclusion in a tile.\n\n" \
+        "For example, a plane scaled 10x will result in 6 tiles, not 100."
 
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def execute(self, context):
-        umeshes = types.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
 
@@ -1446,6 +1474,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
         matrix[0][0] = 2
         matrix[1][1] = 2
         return matrix
+
 
 class UNIV_OT_Calc_UV_Coverage_VIEW3D(UNIV_OT_Calc_UV_Coverage):
     bl_idname = "mesh.univ_calc_uv_coverage"

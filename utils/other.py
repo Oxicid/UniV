@@ -8,6 +8,7 @@ import blf
 from mathutils import Vector
 from itertools import groupby
 
+
 def get_aspect_ratio(umesh=None):
     """Aspect Y"""
     if umesh:
@@ -48,6 +49,7 @@ def get_aspect_ratio(umesh=None):
                     return image_width / image_height
     return 1.0
 
+
 def get_active_image_size():
     if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
         space_data = area.spaces.active
@@ -55,6 +57,7 @@ def get_active_image_size():
             image_width, image_height = space_data.image.size
             if image_height:
                 return image_width, image_height
+
 
 def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):
     if obj_.type != 'MESH':
@@ -82,6 +85,7 @@ def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):
                 obj_.modifiers.move(idx, len(obj_.modifiers))
             return
 
+
 def is_island_mode():
     scene = bpy.context.scene
     if scene.tool_settings.use_uv_select_sync:
@@ -92,6 +96,8 @@ def is_island_mode():
 
 
 T_mesh_select_modes = typing.Literal["VERT", "EDGE", "FACE"]
+
+
 def get_select_mode_mesh() -> T_mesh_select_modes:
     if bpy.context.tool_settings.mesh_select_mode[0]:
         return 'VERT'
@@ -99,6 +105,7 @@ def get_select_mode_mesh() -> T_mesh_select_modes:
         return 'EDGE'
     else:
         return 'FACE'
+
 
 def set_select_mode_mesh(mode: T_mesh_select_modes):
     if get_select_mode_mesh() == mode:
@@ -114,10 +121,13 @@ def set_select_mode_mesh(mode: T_mesh_select_modes):
 
 
 T_uv_select_modes = typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']
+
+
 def get_select_mode_uv() -> T_uv_select_modes:
     if (mode := bpy.context.scene.tool_settings.uv_select_mode) == 'VERTEX':
         return 'VERT'
     return mode  # noqa
+
 
 def set_select_mode_uv(mode: T_uv_select_modes):
     if get_select_mode_uv() == mode:
@@ -126,22 +136,27 @@ def set_select_mode_uv(mode: T_uv_select_modes):
         mode = 'VERTEX'
     bpy.context.scene.tool_settings.uv_select_mode = mode
 
+
 def blf_size(font_id, font_size):
     if bpy.app.version > (3, 3):
         blf.size(font_id, font_size)
     else:
         blf.size(font_id, font_size, 72)
 
+
 def get_max_distance_from_px(px_size: int, view: bpy.types.View2D):
     return (Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))).length
 
+
 def get_areas_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
     return (area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
+
 
 def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
     for a in get_areas_by_type(area_type):
         return a
     return None
+
 
 def update_univ_panels():
     import itertools
@@ -153,6 +168,7 @@ def update_univ_panels():
                         reg.tag_redraw()
                 else:
                     reg.tag_redraw()
+
 
 def event_to_string(event, text=''):
     if event.ctrl:

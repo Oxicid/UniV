@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
 from ..utils import (prev_disc,
-                     linked_crn_uv_by_crn_tag_unordered_included,
                      linked_crn_uv,
                      vec_isclose_to_zero,
                      linked_crn_uv_by_idx_unordered)
@@ -20,6 +19,7 @@ from math import pi
 from . import umesh as _umesh
 from . import bbox
 from .. import utils
+
 
 class LoopGroup:
     def __init__(self, umesh: _umesh.UMesh):
@@ -484,7 +484,8 @@ class LoopGroup:
             move_corners = []
             uv = self.umesh.uv
             for crn in self:
-                linked_corners = utils.linked_crn_uv_by_crn_tag_unordered_included(crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
+                linked_corners = utils.linked_crn_uv_by_crn_tag_unordered_included(
+                    crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
                 move_corners.extend(linked_corners)
                 for crn_ in linked_corners:
                     crn_.tag = False
@@ -510,6 +511,7 @@ class LoopGroup:
 
     def __str__(self):
         return f'Corner Edge count = {len(self.corners)}'
+
 
 class LoopGroups:
     def __init__(self, loop_groups, umesh):
@@ -636,9 +638,11 @@ class LoopGroups:
     def __str__(self):
         return f'Loop Groups count = {len(self.loop_groups)}'
 
+
 class UnionLoopGroup(LoopGroups):
     def __init__(self, loop_groups: list[LoopGroup]):
         super().__init__(loop_groups, None)
+
 
 class AdvCorner:
     def __init__(self, crn: BMLoop, uv, invert=False):
@@ -868,7 +872,6 @@ class Segment:
                 self._weight_angle = np.average(self.angles_seq, weights=self.lengths_seq)
             except ZeroDivisionError:
                 self._weight_angle = 0
-
 
         return self._weight_angle
 

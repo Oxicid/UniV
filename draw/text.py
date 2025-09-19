@@ -14,6 +14,7 @@ from time import perf_counter as time
 
 from .. import utils
 
+
 class TextDraw:
     """NOTE: max_draw_time and target_area automatically revert to their default values."""
     start_time = time()

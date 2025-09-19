@@ -248,8 +248,8 @@ class DotLinesDrawSimple:
         cls.shader.bind()
         reg = next(r for r in area.regions if r.type == 'WINDOW')
 
-        from .. import types
-        zoom = types.View2D.get_zoom(reg.view2d)/10
+        from .. import utypes
+        zoom = utypes.View2D.get_zoom(reg.view2d) / 10
 
         matrix = gpu.matrix.get_projection_matrix()
         cls.shader.uniform_float("vpm", matrix)

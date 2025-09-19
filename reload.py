@@ -3,6 +3,7 @@
 import inspect
 import importlib
 
+
 def reload(globals_: dict[str, object]):
     """The reload function simplifies addon development by allowing
     the bpy.ops.preferences.addon_disable(addon_enable) operator

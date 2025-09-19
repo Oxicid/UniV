@@ -6,7 +6,6 @@ import typing  # noqa
 import bpy
 import copy
 import bmesh
-import mathutils
 
 from collections import defaultdict
 from math import pi
@@ -14,19 +13,20 @@ from math import pi
 from bmesh.types import BMFace, BMEdge, BMLoop
 
 from .. import utils
-from ..types import PyBMesh#, AdvIsland
+from ..utypes import PyBMesh
+
 
 class FakeBMesh:
     def __init__(self, isl):
         self.faces = isl
+
 
 class UMesh:
     def __init__(self, bm, obj, is_edit_bm=True, verify_uv=True):
         self.bm: bmesh.types.BMesh | FakeBMesh = bm
         self.obj: bpy.types.Object = obj
         self.elem_mode = utils.NoInit()
-        # TODO: Remove Vector from annotation (pycharm moment)
-        self.uv: bmesh.types.BMLayerItem | mathutils.Vector = bm.loops.layers.uv.verify() if verify_uv else None
+        self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify() if verify_uv else None
         self.is_edit_bm: bool = is_edit_bm
         self.update_tag: bool = True
         self.sync: bool = utils.sync()
@@ -527,7 +527,8 @@ class UMesh:
                     if crn == shared_crn_ or not shared_crn_.face.tag:
                         crn.edge.seam = True
                         continue
-                    seam = not (crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                    seam = not (
+                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -539,7 +540,8 @@ class UMesh:
                     if crn == shared_crn_ or not shared_crn_.face.tag:
                         crn.edge.seam = True
                         continue
-                    seam = not (crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                    seam = not (
+                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -578,7 +580,7 @@ class UMeshes:
             return
         self.report_obj(info_type, info)
 
-    def cancel_with_report(self, info_type: set[str]={'INFO'}, info: str ="No uv for manipulate"): # noqa #pylint: disable=dangerous-default-value
+    def cancel_with_report(self, info_type: set[str] = {'INFO'}, info: str = "No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
         self._cancel = True
         self.report(info_type, info)
         return {'CANCELLED'}

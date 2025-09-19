@@ -8,7 +8,8 @@ from math import floor
 from bl_math import lerp
 from mathutils import Vector
 
-def all_equal(sequence, key: typing.Callable | None=None):
+
+def all_equal(sequence, key: typing.Callable | None = None):
     if key is None:
         sequence_iter = iter(sequence)
         first = next(sequence_iter)
@@ -23,25 +24,33 @@ def all_equal(sequence, key: typing.Callable | None=None):
                 return False
     return True
 
+
 def vec_isclose(a, b, abs_tol: float = 0.00001):
     return all(math.isclose(a1, b1, abs_tol=abs_tol) for a1, b1 in zip(a, b))
+
 
 def vec_isclose_to_uniform(delta: Vector, abs_tol: float = 0.00001):
     return all(math.isclose(component, 1.0, abs_tol=abs_tol) for component in delta)
 
+
 def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
     return all(math.isclose(component, 0.0, abs_tol=abs_tol) for component in delta)
+
 
 def safe_div(a, b):
     return a / b if b != 0 else 0
 
 # Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
+
+
 def inv_lerp(a: float, b: float, v: float) -> float:  # ratio
     ratio_range = b - a
     return ((v - a) / ratio_range) if ratio_range else 0
 
+
 def remap(i_min: float, i_max: float, o_min: float, o_max: float, v: float) -> float:
     return lerp(o_min, o_max, inv_lerp(i_min, i_max, v))
+
 
 def weighted_linear_space(start, stop, w):
     if len(w) == 1:
@@ -57,6 +66,7 @@ def weighted_linear_space(start, stop, w):
     cum_w = np.insert(np.cumsum(nw), 0, 0)  # Create cumulative weight sum
     return start + np.outer(cum_w, stop - start)
 
+
 def vec_to_cardinal(v):
     x, y = v
     if abs(x) >= abs(y):
@@ -64,11 +74,14 @@ def vec_to_cardinal(v):
     else:
         return Vector([0, np.sign(y)])
 
+
 def round_threshold(a, min_clip):
     return round(float(a) / min_clip) * min_clip
 
+
 def fract(a: float) -> float:
     return a - floor(a)
+
 
 def wrap(value, minimum=0, maximum=1):
     wrap_range = maximum - minimum
@@ -84,24 +97,29 @@ def wrap_line(start, width, min_bound, max_bound, default=None):
         else:
             return default
 
+
 def power_of_2_round(val: int) -> int:
     if not val:
         return 0
     return 2 ** round(math.log2(abs(val)))
+
 
 def power_of_2_ceil(val: int) -> int:
     if not val:
         return 0
     return 2 ** math.ceil(math.log2(abs(val)))
 
+
 def power_of_2_floor(val: int) -> int:
     if not val:
         return 0
     return 2 ** floor(math.log2(abs(val)))
 
+
 def is_power_of_2(n: int) -> bool:
     assert (not n <= 0), 'Value error'
     return (n & (n - 1)) == 0
+
 
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     line_vec = l_b - l_a
@@ -115,6 +133,7 @@ def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     elif projection > 1:
         return l_b
     return l_a + projection * line_vec
+
 
 def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
     pt = Vector(mouse_pos)
@@ -156,8 +175,10 @@ def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
         height_half + height_half * (prj.y / prj.w),
     ))
 
+
 def np_vec_dot(a, b):
     return np.einsum('ij,ij->i', a, b)
+
 
 def np_vec_normalized(a, keepdims=True):
     return np.linalg.norm(a, axis=1, keepdims=keepdims)

@@ -31,6 +31,7 @@ from mathutils import Vector
 version = bpy.app.version
 bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
 
+
 def info_(self):
     print('', '=' * 80, '\n', self)
     name_, size_ = 'Name', 'Size'
@@ -41,10 +42,11 @@ def info_(self):
         value = getattr(self, name)
         size = sizeof(*dtype)
         total_size += size
-        print(f"{name[:20] : <20}{size : <6}{ofs : < 6}   {value}")
+        print(f"{name[:20]: <20}{size: <6}{ofs: < 6}   {value}")
         ofs += size
 
     print('\n', f'{total_size=}', '\n', '=' * 80)
+
 
 class StructBase(Structure):
     _subclasses = []
@@ -139,6 +141,7 @@ class BArray(StructBase):
     def info(self):
         info_(self)
 
+
 class BVector(StructBase):
     _fields_ = (("begin", c_void_p),
                 ("end", c_void_p),
@@ -194,6 +197,7 @@ class BVector(StructBase):
     def to_list(self):
         from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
         return [from_address(self.begin + (i * 8)).contents for i in range(len(self))]
+
 
 class ListBase(Structure):
     """Generic linked list used throughout Blender.
@@ -252,6 +256,7 @@ class rctf(StructBase, bbox.BBox):
     ymin: c_float
     ymax: c_float
 
+
 class rcti(StructBase, bbox.BBox):
     xmin: c_int
     xmax: c_int
@@ -260,6 +265,7 @@ class rcti(StructBase, bbox.BBox):
 
     def __str__(self):
         return f"xmin={self.xmin}, xmax={self.xmax}, ymin={self.ymin}, ymax={self.ymax}, width={self.width}, height={self.height}"
+
 
 class View2D(StructBase):
     tot: rctf
@@ -314,6 +320,8 @@ class View2D(StructBase):
         return (v2d.mask.xmax - v2d.mask.xmin) / (v2d.cur.xmax - v2d.cur.xmin)  # noqa
 
 # source/blender/makesdna/DNA_ID.h | rev 362
+
+
 class ID_Runtime_Remap(StructBase):
     status:                 c_int
     skipped_refcounted:     c_int
@@ -332,7 +340,7 @@ class ID(StructBase):
     next:                   c_void_p
     prev:                   c_void_p
 
-    newid:                  lambda: POINTER(ID)
+    newid: lambda: POINTER(ID)
     lib:                    c_void_p  # Library
     asset_data:             c_void_p  # AssetMetaData
 
@@ -349,10 +357,11 @@ class ID(StructBase):
 
     properties:             c_void_p  # IDProperty
     override_library:       c_void_p  # IDOverrideLibrary
-    orig_id:                lambda: POINTER(ID)
+    orig_id: lambda: POINTER(ID)
     py_instance:            c_void_p
     library_weak_reference: c_void_p
     runtime:                ID_Runtime
+
 
 class ImageUser(StructBase):
     scene: c_void_p
@@ -373,8 +382,10 @@ class ImageUser(StructBase):
 class Histogram(StructBase):
     pad: c_char * 5160  # noqa
 
+
 class Scopes(StructBase):
     pad: c_char * 5272  # noqa
+
 
 class SpaceImage(StructBase):
     next: c_void_p
@@ -394,6 +405,7 @@ class SpaceImage(StructBase):
     zoom: c_float
     centx: c_float
     centy: c_float
+
 
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
@@ -499,7 +511,8 @@ class ARegion(StructBase):
 
             # Check for the possibility to set an active category (for the presence of an allocated memory cell)
             if not (category_history := list(category for category in c_region.panels_category_active)):
-                raise AttributeError(f'Unable to set a category because Blender did not allocate memory for active panels')
+                raise AttributeError(
+                    f'Unable to set a category because Blender did not allocate memory for active panels')
 
             # Check that the active panel with the given name is already active
             if category_history[0].idname == name:
@@ -547,6 +560,7 @@ class UndoStep(StructBase):
     use_old_bmain_data: c_bool
     is_applied:         c_bool
 
+
 class UndoStack(StructBase):
     steps: ListBase(ListBase)
     step_active: POINTER(UndoStep)
@@ -555,8 +569,10 @@ class UndoStack(StructBase):
     group_level: c_int
 
 # source/blender/makesdna/DNA_windowmanager_types.h | rev 362
+
+
 class wmWindowManager(StructBase):
-    ID:                         lambda: ID
+    ID: lambda: ID
 
     windrawable:                c_void_p
     winactive:                  c_void_p
@@ -592,6 +608,7 @@ class wmWindowManager(StructBase):
     _pad7:                      c_char * 7  # noqa
     message_bus:                c_void_p  # wmMsgBus
 
+
 class CBMesh(StructBase):
     totvert: c_int
     totedge: c_int
@@ -600,6 +617,7 @@ class CBMesh(StructBase):
     totvertsel: c_int
     totedgesel: c_int
     totfacesel: c_int
+
 
 class PyBMesh(StructBase):
     ob_refcnt: c_long

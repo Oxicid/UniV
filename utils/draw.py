@@ -12,8 +12,8 @@ from bl_math import clamp
 
 def rgb_to_hex(rgb):
     return f"#{int(clamp(rgb[0]) * 255.0):02x}" \
-           f"{int(clamp(rgb[1]) * 255.0):02x}" \
-           f"{int(clamp(rgb[2]) * 255.0):02x}"
+        f"{int(clamp(rgb[1]) * 255.0):02x}" \
+        f"{int(clamp(rgb[2]) * 255.0):02x}"
 
 
 def hex_to_rgb(hexcode):
@@ -21,6 +21,7 @@ def hex_to_rgb(hexcode):
     unhex = binascii.unhexlify(hexcode[1:])
     assert len(unhex) == 3, f"Expected hexcode size - 7, given size - {len(hexcode)}"
     return Color(unhex) / 255
+
 
 def hsv_to_rgb(h, s, v):
     """Saturate is mutable"""
@@ -47,6 +48,7 @@ def hsv_to_rgb(h, s, v):
 
     return rgb.reshape(shape+(3,))
 
+
 def color_for_groups(groups):
     """Return flat colors by group"""
     import numpy as np
@@ -60,7 +62,8 @@ def color_for_groups(groups):
     rgb = hsv_to_rgb(h, s, v)
 
     first_and_end_point = 2
-    return np.repeat(rgb, [len(g)*first_and_end_point for g in groups], axis=0).tolist()  # TODO: Bug report np.ndarray for color, incorrect work
+    # TODO: Bug report np.ndarray for color, incorrect work
+    return np.repeat(rgb, [len(g)*first_and_end_point for g in groups], axis=0).tolist()
 
 
 class UNIV_OT_Draw_Test(bpy.types.Operator):
@@ -100,9 +103,9 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
             self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
             self.shader_smooth_color_vert = gpu.shader.from_builtin('SMOOTH_COLOR')
         self.register_draw()
-        from .. import types
+        from .. import utypes
 
-        self.umeshes = types.UMeshes()
+        self.umeshes = utypes.UMeshes()
         self.umesh = self.umeshes[0]
         self.uv = self.umesh.uv
 
@@ -145,9 +148,9 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def test_invoke(self, _event):
-        from .. import types
+        from .. import utypes
         umesh = self.umeshes[0]
-        groups = types.LoopGroup.calc_dirt_loop_groups(umesh)
+        groups = utypes.LoopGroup.calc_dirt_loop_groups(umesh)
         self.calc_from_corners(groups, umesh.uv)
 
     def test(self, event):
@@ -173,13 +176,16 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {
+                                                   "pos": offset_lines, 'color': color})
         if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
-            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2]})
+            self.batch_smooth_color_2 = batch_for_shader(
+                self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2]})
         else:
-            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {
+                                                         "pos": offset_lines[::2], 'color': color[::2]})
 
-    def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['CrnEdgeGrow'] | 'CrnEdgeGrow'):  # noqa
+    def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['utypes.CrnEdgeGrow'] | 'utypes.CrnEdgeGrow'):  # noqa
         from gpu_extras.batch import batch_for_shader
         if not groups:
             self.mid_points = []
@@ -195,14 +201,17 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
-        self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {
+                                                   "pos": offset_lines, 'color': color})
+        self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {
+                                                     "pos": offset_lines[::2], 'color': color[::2]})
 
     def get_mouse_pos(self, event):
         return Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
 
     def register_draw(self):
-        self.handler = bpy.types.SpaceImageEditor.draw_handler_add(self.univ_test_draw_callback, (), 'WINDOW', 'POST_VIEW')
+        self.handler = bpy.types.SpaceImageEditor.draw_handler_add(
+            self.univ_test_draw_callback, (), 'WINDOW', 'POST_VIEW')
         self.area.tag_redraw()
 
     def univ_test_draw_callback(self):
@@ -234,7 +243,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
             if is_vulkan_enabled:
                 try:
                     self.shader_smooth_color_vert.uniform_float("color", (1, 0.2, 0.1, 1))
-                except:pass
+                except:  # noqa
+                    pass
             # TODO: Implement UNIFORM color with sequence of groups (implement for_each)
             self.batch_smooth_color.draw(self.shader_smooth_color)
             self.batch_smooth_color_2.draw(self.shader_smooth_color_vert)
@@ -378,4 +388,3 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                         area.tag_redraw()
 
         return {'FINISHED'}
-    

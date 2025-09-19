@@ -73,8 +73,9 @@ class timer:
             print(f"{self.text}Elapsed time: {elapsed_time:0.4f} seconds")
 
     def reset(self):
-        self.repeats=1
-        self.text=''
+        self.repeats = 1
+        self.text = ''
+
 
 def profile(func):
     # Source: https://osf.io/upav8

@@ -20,7 +20,9 @@ from bpy.props import *
 from bpy.types import Operator
 
 from .. import utils
-from .. import types
+from .. import utypes
+from ..utypes import UMeshes
+
 
 class Inspect(enum.IntFlag):
     Overlap = enum.auto()
@@ -40,7 +42,6 @@ class Inspect(enum.IntFlag):
     OverlapByPadding = enum.auto()
     DoubleVertices3D = enum.auto()
     TileIsect = enum.auto()
-
 
     Flipped = enum.auto()
     Flipped3D = enum.auto()
@@ -67,6 +68,7 @@ class Inspect(enum.IntFlag):
     def default_value_for_settings(cls):
         return cls.Overlap | cls.Zero | cls.Flipped | cls.Over | cls.NonSplitted | cls.Other
 
+
 class UNIV_OT_Check_Zero(Operator):
     bl_idname = "uv.univ_check_zero"
     bl_label = "Zero"
@@ -83,7 +85,7 @@ class UNIV_OT_Check_Zero(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.fix_context()
         umeshes.update_tag = False
         bpy.ops.uv.select_all(action='DESELECT')
@@ -147,7 +149,7 @@ class UNIV_OT_Check_Flipped(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.fix_context()
         umeshes.update_tag = False
         bpy.ops.uv.select_all(action='DESELECT')
@@ -222,6 +224,7 @@ class UNIV_OT_Check_Flipped(Operator):
                       f'that may become flipped during triangulation.')
         return r_text
 
+
 class UNIV_OT_Check_Over(Operator):
     bl_idname = 'uv.univ_check_over'
     bl_label = 'Over'
@@ -239,6 +242,7 @@ scaled islands from the calculation, focusing only on actual stretches"""
                                        description='Selects edge that fall outside this range.')
     face_over_threshold: FloatProperty(name='Overscaled Face Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.25,
                                        description='Selects faces that fall outside this range.')
+
     def draw(self, context):
         layout = self.layout
         layout.prop(self, 'edge_over_threshold', slider=True)
@@ -249,7 +253,7 @@ scaled islands from the calculation, focusing only on actual stretches"""
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.fix_context()
         umeshes.filter_by_visible_uv_faces()
         umeshes.calc_aspect_ratio(from_mesh=False)
@@ -323,7 +327,7 @@ scaled islands from the calculation, focusing only on actual stretches"""
         return to_select, edges_counter
 
     @classmethod
-    def over(cls, umeshes: types.UMeshes, edge_threshold=0.2, face_threshold=0.25, batch_inspect=False):
+    def over(cls, umeshes: UMeshes, edge_threshold=0.2, face_threshold=0.25, batch_inspect=False):
         edge_threshold *= 2
         face_threshold *= 2
         from ..utils import calc_face_area_uv, calc_face_area_3d
@@ -437,7 +441,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     use_auto_smooth: BoolProperty(name='Use Auto Smooth', default=True)
-    user_angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
+    user_angle: FloatProperty(name='Smooth Angle', default=math.radians(
+        66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
         layout = self.layout
@@ -449,7 +454,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def execute(self, context):
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.fix_context()
         bpy.ops.uv.select_all(action='DESELECT')
 
@@ -468,7 +473,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def non_splitted(umeshes: types.UMeshes, use_auto_smooth, user_angle, batch_inspect=False):
+    def non_splitted(umeshes: UMeshes, use_auto_smooth, user_angle, batch_inspect=False):
         non_seam_counter = 0
         non_manifold_counter = 0
         angle_counter = 0
@@ -524,7 +529,6 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                         umesh.sequence = []
                     return non_seam_counter, non_manifold_counter, angle_counter, sharps_counter, seam_counter, mtl_counter
 
-
             if umeshes.elem_mode not in ('EDGE', 'VERT'):
                 umeshes.elem_mode = 'EDGE'
 
@@ -564,7 +568,8 @@ class UNIV_OT_Check_Overlap(Operator):
                      "Unlike the default operator, this one informs about the number of faces with conflicts"
     bl_options = {'REGISTER', 'UNDO'}
 
-    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
+    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL',
+                             items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
     threshold: FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
@@ -578,7 +583,7 @@ class UNIV_OT_Check_Overlap(Operator):
         layout.row(align=True).prop(self, 'check_mode', expand=True)
 
     def execute(self, context):
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.fix_context()
         umeshes.update_tag = False
 
@@ -611,7 +616,7 @@ class UNIV_OT_Check_Overlap(Operator):
         if check_mode == 'INEXACT':
             all_islands = []
             for umesh in umeshes:
-                adv_islands = types.AdvIslands.calc_extended_with_mark_seam(umesh)
+                adv_islands = utypes.AdvIslands.calc_extended_with_mark_seam(umesh)
                 # The following subdivision is needed to ignore the exact self overlaps that are created from the flipped face
                 for isl in reversed(adv_islands):
                     if isl.has_flip_with_noflip():
@@ -621,9 +626,9 @@ class UNIV_OT_Check_Overlap(Operator):
                         adv_islands.islands.extend(flipped)
                 all_islands.extend(adv_islands)
 
-            overlapped = types.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
+            overlapped = utypes.UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
             for isl in overlapped:
-                if isinstance(isl, types.AdvIsland):
+                if isinstance(isl, utypes.AdvIsland):
                     count += 1
                 else:
                     isl.select = False
@@ -652,7 +657,8 @@ class UNIV_OT_Check_Other(Operator):
 7. Checks whether the optimal UV smoothing method is selected in the Subdivision Surface modifier."""
 # 8. Checks handlers and various flags"""
 
-    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL', items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
+    check_mode: EnumProperty(name='Check Overlaps Mode', default='ALL',
+                             items=(('ALL', 'All', ''), ('INEXACT', 'Inexact', '')))
     threshold: FloatProperty(name='Distance', default=0.0008, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     @classmethod
@@ -676,7 +682,7 @@ class UNIV_OT_Check_Other(Operator):
         global INSPECT_INFO
         INSPECT_INFO.clear()
 
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.update_tag = False
 
         if info := self.check_other(umeshes):
@@ -688,7 +694,7 @@ class UNIV_OT_Check_Other(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def check_other(umeshes: types.UMeshes):
+    def check_other(umeshes: UMeshes):
         info: list[tuple[str, str]] = []
 
         # Check context error
@@ -794,9 +800,9 @@ class UNIV_OT_Check_Other(Operator):
             if counter:
                 info.append(('Elem Mode', f"Select Mode at {counter} meshes doesn't match scene with mesh. (Fixed)"))
 
-
         # Check Heterogeneous Aspect Ratio
         aspects = {}
+
         def get_aspects_ratio(u):  # noqa
             if modifiers := [m for m in u.obj.modifiers if m.name.startswith('UniV Checker')]:
                 socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
@@ -831,7 +837,8 @@ class UNIV_OT_Check_Other(Operator):
         for umesh in umeshes:
             get_aspects_ratio(umesh)
         if len(aspects) >= 2:
-            info.append(('Aspect Ratio', f'Found heterogeneous aspect ratio: ' + ', '.join(f"{v!r}" for v in aspects.values())))
+            info.append(('Aspect Ratio', f'Found heterogeneous aspect ratio: ' +
+                        ', '.join(f"{v!r}" for v in aspects.values())))
 
         # Check non valid UV Map node
         error_description = ''
@@ -841,7 +848,7 @@ class UNIV_OT_Check_Other(Operator):
             for slot in umesh.obj.material_slots:
                 if (mtl := slot.material) and mtl.use_nodes:
                     if non_valid_names := {f'{node.uv_map!r}' for node in mtl.node_tree.nodes
-                                       if node.type == 'UVMAP' and node.uv_map not in uv_maps_names}:
+                                           if node.type == 'UVMAP' and node.uv_map not in uv_maps_names}:
                         error_description += f'Material {mtl.name!r} in {umesh.obj.name!r} object has non-valid UV Map name: '
                         error_description += ', '.join(non_valid_names) + '.\n'
         if error_description:
@@ -856,7 +863,8 @@ class UNIV_OT_Check_Other(Operator):
                         names.append(repr(u.obj.name))
                         break
         if names:
-            error_description = 'The following objects use a non-optimal UV smoothing method in subdivision modifier: ' + ', '.join(names)
+            error_description = 'The following objects use a non-optimal UV smoothing method in subdivision modifier: ' + \
+                ', '.join(names)
             error_description += '. Use Keep Corners or All Method'
             info.append(('UV Smooth', error_description))
 
@@ -882,7 +890,9 @@ class UNIV_OT_BatchInspectFlags(Operator):
         univ_settings().batch_inspect_flags ^= tag
         return {'FINISHED'}
 
+
 INSPECT_INFO = {}
+
 
 class UNIV_OT_BatchInspect(Operator):
     bl_idname = 'uv.univ_batch_inspect'
@@ -934,7 +944,7 @@ class UNIV_OT_BatchInspect(Operator):
             self.report({'WARNING'}, 'Not found enabled flags')
             return {'CANCELLED'}
 
-        umeshes = types.UMeshes()
+        umeshes = UMeshes()
         umeshes.update_tag = False
 
         if (Inspect.Other in flags) or self.inspect_all:
@@ -974,10 +984,10 @@ class UNIV_OT_BatchInspect(Operator):
                 INSPECT_INFO['Over'] = info
 
         if Inspect.NonSplitted in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
-            result = UNIV_OT_Check_Non_Splitted.non_splitted(umeshes, use_auto_smooth=True, user_angle=180, batch_inspect=True)
+            result = UNIV_OT_Check_Non_Splitted.non_splitted(
+                umeshes, use_auto_smooth=True, user_angle=180, batch_inspect=True)
             if info := UNIV_OT_Check_Non_Splitted.data_formatting(result):
                 INSPECT_INFO['Non-Splitted'] = info
-
 
         has_hidden_faces = False
         for umesh in umeshes:

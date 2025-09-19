@@ -10,7 +10,7 @@ import typing
 
 from bmesh.types import BMFace, BMLoop
 
-from .. import types
+from .. import utypes
 
 
 def face_select_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
@@ -27,6 +27,7 @@ def face_select_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.N
         return select_set
     return inner(umesh.uv, umesh.sync)
 
+
 def face_select_set_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace, bool], typing.NoReturn]:  # noqa
     def inner(uv, sync):
         if sync:
@@ -40,7 +41,8 @@ def face_select_set_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace, bool]
         return select_set
     return inner(umesh.uv, umesh.sync)
 
-def face_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], bool]:
+
+def face_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
     def inner(uv, sync):
         if sync:
             select_get = BMFace.select.__get__
@@ -64,6 +66,7 @@ def face_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], bool
 
         return select_get
     return inner(umesh.uv, umesh.sync)
+
 
 def face_select_linked_func(umesh: 'types.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
     def inner(uv, sync):
@@ -98,19 +101,22 @@ def face_select_linked_func(umesh: 'types.UMesh', force=False, clamp_by_seams=Fa
         return select_set
     return inner(umesh.uv, umesh.sync)
 
-def face_visible_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+
+def face_visible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
     if umesh.sync:
         return lambda f: not f.hide
     else:
         return BMFace.select.__get__
 
-def face_invisible_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+
+def face_invisible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
     if umesh.sync:
         return BMFace.hide.__get__
     else:
         return lambda f: not f.select
 
-def edge_select_linked_set_func(umesh: 'types.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
+
+def edge_select_linked_set_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
     # TODO: Add support clamp by seams
     def inner(uv, sync):
         if sync:
@@ -185,7 +191,8 @@ def edge_select_linked_set_func(umesh: 'types.UMesh', force=False, clamp_by_seam
         return select_set
     return inner(umesh.uv, umesh.sync)
 
-def edge_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], bool]:
+
+def edge_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], bool]:
     def inner(uv, sync):
         if sync:
             def select_get(crn):
@@ -196,7 +203,8 @@ def edge_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], bool
         return select_get
     return inner(umesh.uv, umesh.sync)
 
-def edge_deselect_safe_3d_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], None]:
+
+def edge_deselect_safe_3d_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], None]:
     """In VERTEX sync mode, deselecting an edge also affects neighboring edges - this preserves that behavior, even for unintended edges."""
     assert umesh.sync
     assert umesh.elem_mode in ('VERT', 'EDGE')
@@ -217,7 +225,8 @@ def edge_deselect_safe_3d_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop]
                 next_vert.select = more_one_selected_edges_b
     return deselect_edge
 
-def vert_select_get_func(umesh: 'types.UMesh') -> typing.Callable[[BMLoop], bool]:
+
+def vert_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], bool]:
     def inner(uv, sync):
         if sync:
             def select_get(crn):  # noqa

@@ -13,8 +13,8 @@ from bpy.types import Operator
 from bpy.props import *
 
 from .. import utils
-from .. import types
-from ..types import AdvIslands
+from .. import utypes
+from ..utypes import UMeshes, AdvIslands
 from ..preferences import prefs, univ_settings
 
 
@@ -58,12 +58,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
         if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
             self.unwrap = 'ANGLE_BASED'
@@ -84,7 +84,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
         # Flush System
         visible_umeshes.filter_by_visible_uv_faces()
-        self.umeshes.umeshes.extend(visible_umeshes)
+        self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
         from .. import draw
         seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
         coords = draw.mesh_extract.extract_seams(self.umeshes)
@@ -123,7 +123,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 isl.island.reset_aspect_ratio()
 
     def pick_cut(self):
-        hit = types.CrnEdgeHit(self.mouse_pos, self.max_distance)
+        hit = utypes.CrnEdgeHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
             hit.find_nearest_crn_by_visible_faces(umesh)
 
@@ -146,7 +146,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
-class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
+class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
@@ -175,10 +175,10 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = types.UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
 
         selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_edges()
@@ -221,7 +221,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
                 continue
 
             umesh.verify_uv()
-            islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
+            islands = utypes.MeshIslands.calc_selected_with_mark_seam(umesh)
             adv_islands = islands.to_adv_islands()
             for isl in adv_islands:
                 isl.apply_aspect_ratio()
@@ -243,7 +243,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, types.RayCast):
 
             for umesh in umeshes_without_uv:
                 umesh.verify_uv()
-                mesh_islands = types.MeshIslands.calc_selected_with_mark_seam(umesh)
+                mesh_islands = utypes.MeshIslands.calc_selected_with_mark_seam(umesh)
                 adv_islands = mesh_islands.to_adv_islands()
                 adv_islands.calc_area_uv()
                 adv_islands.calc_area_3d(scale=umesh.value)
@@ -308,10 +308,10 @@ class UNIV_OT_Angle(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
 
         # clamp angle
         if self.obj_smooth:
@@ -405,7 +405,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
         return self.execute(context)
 
     def execute(self, context) -> set[str]:
-        umeshes = types.UMeshes(report=self.report)
+        umeshes = UMeshes(report=self.report)
 
         if not self.bl_idname.startswith('UV'):
             umeshes.set_sync()

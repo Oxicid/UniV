@@ -8,13 +8,14 @@ if 'bpy' in locals():
 import bpy
 
 from . import unwrap
-from .. import types
+from .. import utypes
 from .. import utils
 
-from ..types import Islands
+from ..utypes import Islands
+
 
 class RelaxData:
-    def __init__(self, _umesh: types.UMesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
+    def __init__(self, _umesh: utypes.UMesh, _selected_elem, _coords_before, _border_corners, _save_transform_islands):
         self.umesh = _umesh
         self.selected_elem = _selected_elem
         self.coords_before = _coords_before
@@ -26,6 +27,7 @@ class RelaxData:
         for f in self.umesh.bm.faces:
             for crn in f.loops:
                 crn[uv].pin_uv = False
+
 
 class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     bl_idname = "uv.univ_relax"
@@ -59,7 +61,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.unwrap = 'MINIMUM_STRETCH'
 
     def execute(self, context):
-        self.umeshes = types.UMeshes()
+        self.umeshes = utypes.UMeshes()
         self.umeshes.fix_context()
 
         # self.umeshes.elem_mode
@@ -333,10 +335,10 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
     def execute(self, context):
         operators = context.window_manager.operators
         if not operators or operators[-1].name != 'Relax':
-                unwrap.MULTIPLAYER = 1
-                unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
+            unwrap.MULTIPLAYER = 1
+            unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
-        self.umeshes = types.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()

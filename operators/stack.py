@@ -11,8 +11,8 @@ import numpy as np
 
 from .. import utils
 from ..utils import linked_crn_to_vert_by_face_index
-from .. import types
-from ..types import AdvIsland, AdvIslands
+from .. import utypes
+from ..utypes import UMeshes, AdvIsland, AdvIslands
 from collections import deque, defaultdict
 from collections.abc import Callable
 
@@ -20,8 +20,11 @@ from bmesh.types import BMFace, BMLoop
 
 # TODO: Rename target to reference
 T = typing.TypeVar('T')
+
+
 def py_container_with_np_arrays_compare(a: deque[np.array], b: deque[np.array]):
     return len(a) == len(b) and all(np.array_equal(a[i], b[i]) for i in range(len(a)))
+
 
 class FacePattern:
     def __init__(self, f, start_crn, ordered_corners):
@@ -56,6 +59,7 @@ class FacePattern:
 
     def __setitem__(self, key: int, value: int):
         self.shared_crn_face_sizes[key] = value
+
 
 class StackIsland:  # TODO: Split for source and target islands
     def __init__(self, island):
@@ -127,7 +131,7 @@ class StackIsland:  # TODO: Split for source and target islands
         # TODO: Add option World Align or Local start point
         all_eq = np.allclose(edge_lengths, edge_lengths[0], rtol=0, atol=eps)
         if all_eq:
-            from ..types import bbox
+            from ..utypes import bbox
             vert_3d_coords = [crn.vert.co for crn in face_start_pattern_crn]
             bbox3d_min = bbox.BBox3D.calc_bbox(vert_3d_coords).min
             min_idx = 0
@@ -260,7 +264,8 @@ class StackIsland:  # TODO: Split for source and target islands
 
         init_face = self.unique_faces[0]
         # For the future be careful, maybe face_start_pattern_crn should be copied
-        parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn[0], self.face_start_pattern_crn)]  # Container collector of island elements
+        # Container collector of island elements
+        parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn[0], self.face_start_pattern_crn)]
         init_face.tag = False
 
         init_idx = init_face.index
@@ -297,6 +302,7 @@ class StackIsland:  # TODO: Split for source and target islands
     def __eq__(self, other: 'typing.Self'):
         return np.array_equal(self.np_ngons_with_faces, other.np_ngons_with_faces)
 
+
 class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     bl_idname = "mesh.univ_stack"
     bl_label = "Stack"
@@ -317,7 +323,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: types.UMeshes | None = None
+        self.umeshes: UMeshes | None = None
         self.targets: list[StackIsland] = []
         self.source: list[StackIsland] = []
         self.counter: int = 0
@@ -326,7 +332,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def execute(self, context) -> set[str]:
         self.counter = 0
-        self.umeshes = types.UMeshes(report=self.report)
+        self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
         if not self.umeshes.sync and context.area.ui_type != 'UV':
             self.umeshes.set_sync(True)
@@ -369,7 +375,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            if isinstance(selected, types.MeshIslands):
+            if isinstance(selected, utypes.MeshIslands):
                 selected = selected.to_adv_islands()
 
             selected.indexing()
@@ -418,7 +424,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 self.umeshes.umeshes.remove(umesh)
                 continue
 
-            if isinstance(selected, types.MeshIslands):
+            if isinstance(selected, utypes.MeshIslands):
                 selected = selected.to_adv_islands()
                 non_selected = non_selected.to_adv_islands()
 
@@ -464,6 +470,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             if group:
                 sorted_groups.append((tar, group))
         return sorted_groups
+
 
 class UNIV_OT_Stack(UNIV_OT_Stack_VIEW3D):
     bl_idname = "uv.univ_stack"

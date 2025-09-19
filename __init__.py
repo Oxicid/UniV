@@ -12,18 +12,19 @@ bl_info = {
 }
 
 import bpy
+import typing
 import traceback
 
-from . import types        # noqa: F401 # pylint:disable=unused-import
+from . import utypes        # noqa: F401 # pylint:disable=unused-import
 from . import preferences  # noqa: F401 # pylint:disable=unused-import
 from .utils import bench   # noqa: F401 # pylint:disable=unused-import
 from .utils import other   # noqa: F401 # pylint:disable=unused-import
 from .utils import ubm     # noqa: F401 # pylint:disable=unused-import
 from .utils import umath   # noqa: F401 # pylint:disable=unused-import
-from .types import bbox    # noqa: F401 # pylint:disable=unused-import
-from .types import btypes  # noqa: F401 # pylint:disable=unused-import
-from .types import island  # noqa: F401 # pylint:disable=unused-import
-from .types import mesh_island  # noqa: F401 # pylint:disable=unused-import
+from .utypes import bbox    # noqa: F401 # pylint:disable=unused-import
+from .utypes import btypes  # noqa: F401 # pylint:disable=unused-import
+from .utypes import island  # noqa: F401 # pylint:disable=unused-import
+from .utypes import mesh_island  # noqa: F401 # pylint:disable=unused-import
 from .operators import checker
 from .operators import inspect
 from .operators import misc
@@ -45,14 +46,15 @@ from . import icons
 from . import keymaps
 from . import preferences
 
-univ_pro: type(bpy)
+univ_pro: "type[bpy?] | None"
 try:
     from . import univ_pro
 except ImportError:
     univ_pro = None
 
-classes = []
+classes: list[bpy.types.Operator | bpy.types.Panel | bpy.types.Macro | typing.Any] = []
 classes_workspace = []
+
 
 def load_register_types():
     global classes
@@ -248,16 +250,22 @@ def load_register_types():
     except AttributeError:
         traceback.print_exc()
         classes = []
+
+
 load_register_types()
+
 
 def load_workspace_types():
     classes_workspace.extend([
         ui.UNIV_WT_edit_VIEW3D,
         ui.UNIV_WT_object_VIEW3D]
     )
+
+
 load_workspace_types()
 
 is_enabled = False
+
 
 def register():
     global is_enabled
@@ -335,7 +343,6 @@ def unregister():
     for handle in reversed(bpy.app.handlers.depsgraph_update_post):
         if handle.__name__.startswith('univ_'):
             bpy.app.handlers.depsgraph_update_post.remove(handle)
-
 
     del bpy.types.Scene.univ_settings  # noqa
     # for scene in bpy.data.scenes:
