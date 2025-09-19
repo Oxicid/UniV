@@ -157,7 +157,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         pt = self.get_mouse_pos(event)
         self.points = (pt,)
 
-    def calc_from_corners(self, groups: typing.Sequence[typing.Sequence[BMLoop]] | typing.Sequence[BMLoop] | BMLoop, uv=None, exact=False):
+    def calc_from_corners(self, groups: typing.Sequence[typing.Sequence[BMLoop]]
+                          | typing.Sequence[BMLoop] | BMLoop, uv=None, exact=False):
         from gpu_extras.batch import batch_for_shader
         if not groups:
             self.mid_points = []
@@ -272,7 +273,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         gpu.state.blend_set('NONE')
 
     @staticmethod
-    def uv_crn_groups_to_lines_with_offset(groups: typing.Sequence[typing.Sequence[BMLoop]], uv, line_offset=0.008, exact=False):
+    def uv_crn_groups_to_lines_with_offset(
+            groups: typing.Sequence[typing.Sequence[BMLoop]], uv, line_offset=0.008, exact=False):
         """exact - correct line offset for flipped faces"""
         import numpy as np
         from .ubm import is_flipped_uv

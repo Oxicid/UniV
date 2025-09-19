@@ -345,11 +345,11 @@ class WSToolIconsGenerator:
 
         u_shape = cls.get_u_tris()
         # Create a color for each vertex (duplicate one color)
-        u_colors_size = len(u_shape)*3
+        u_colors_size = len(u_shape) * 3
         u_colors = np.array([u_col], dtype=np.uint8).repeat(u_colors_size, axis=0)
 
         leafs_shape = cls.get_leaf_tris()
-        leafs_colors_size = len(leafs_shape[0])*3
+        leafs_colors_size = len(leafs_shape[0]) * 3
         leafs_colors = np.array(leaf_col, dtype=np.uint8).repeat(leafs_colors_size, axis=0)
 
         # Convert to flat data (first write triangles, then colors)
@@ -532,7 +532,8 @@ class IconsCreator:
         matrix[0][0] = 2
         matrix[1][1] = -2
 
-        # NOTE: The operation order is important to match the SVG converter's float precision quirks - changing it would break proportions.
+        # NOTE: The operation order is important to match the SVG converter's
+        # float precision quirks - changing it would break proportions.
         svg_matrix = Matrix()
         svg_matrix = svg_matrix @ Matrix.Scale(1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((1.0, 0.0, 0.0)))
         svg_matrix = svg_matrix @ Matrix.Scale(-1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((0.0, 1.0, 0.0)))

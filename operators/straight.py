@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_straighten_edge_loops.py
+# The code was taken and modified from the TexTools addon:
+# https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_straighten_edge_loops.py
 
 if 'bpy' in locals():
     from .. import reload
@@ -164,7 +165,8 @@ def get_loops_segments(self, uv, island_loops_dirty):
                                    uv].uv}
 
     for loop in island_loops_dirty:
-        if loop.link_loop_next in island_loops_dirty and (loop.edge in boundary_splitted_edges or loop.edge not in processed_edges):
+        if loop.link_loop_next in island_loops_dirty and (
+                loop.edge in boundary_splitted_edges or loop.edge not in processed_edges):
             island_loops.add(loop)
             island_loops_nexts.add(loop.link_loop_next)
             processed_edges.add(loop.edge)

@@ -28,11 +28,11 @@ class UNIV_OT_Cut_VIEW2D(Operator):
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
     unwrap: EnumProperty(name='Unwrap', default='ANGLE_BASED',
                          items=(
-                                ('NONE', 'None', ''),
-                                ('ANGLE_BASED', 'Hard Surface', ''),
-                                ('CONFORMAL', 'Conformal', ''),
-                                ('MINIMUM_STRETCH', 'Organic', '')
-                            ))
+                             ('NONE', 'None', ''),
+                             ('ANGLE_BASED', 'Hard Surface', ''),
+                             ('CONFORMAL', 'Conformal', ''),
+                             ('MINIMUM_STRETCH', 'Organic', '')
+                         ))
 
     @classmethod
     def poll(cls, context):
@@ -156,11 +156,11 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
     unwrap: EnumProperty(name='Unwrap', default='ANGLE_BASED',
                          items=(
-                                ('NONE', 'None', ''),
-                                ('ANGLE_BASED', 'Hard Surface', ''),
-                                ('CONFORMAL', 'Conformal', ''),
-                                ('MINIMUM_STRETCH', 'Organic', '')
-                            ))
+                             ('NONE', 'None', ''),
+                             ('ANGLE_BASED', 'Hard Surface', ''),
+                             ('CONFORMAL', 'Conformal', ''),
+                             ('MINIMUM_STRETCH', 'Organic', '')
+                         ))
 
     @classmethod
     def poll(cls, context):
@@ -256,7 +256,6 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
                         continue
                 umesh.update()
 
-
     def pick_cut(self):
         if hit := self.ray_cast(prefs().max_pick_distance):
             if hit.crn.edge.seam:
@@ -265,6 +264,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
             hit.umesh.update()
             return {'FINISHED'}
         return {'CANCELLED'}
+
 
 class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"

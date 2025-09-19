@@ -232,7 +232,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     ))
 
     batch_inspect_flags: IntProperty(name="Batch Inspect Tags", min=0,
-                                     default=__import__(__package__.replace('preferences', '')+'.operators.inspect',
+                                     default=__import__(__package__.replace('preferences', '') + '.operators.inspect',
                                                         fromlist=['inspect']).Inspect.default_value_for_settings()
                                      )
 

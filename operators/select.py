@@ -263,7 +263,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
         umeshes.filter_by_visible_uv_faces()
 
         tile_co = utils.get_tile_from_cursor()
-        view_rect = BBox.init_from_minmax(tile_co, tile_co+Vector((1, 1)))
+        view_rect = BBox.init_from_minmax(tile_co, tile_co + Vector((1, 1)))
         view_rect.pad(Vector((-2e-08, -2e-08)))
 
         view_island = AdvIsland()
@@ -1069,7 +1069,8 @@ class UNIV_OT_Select_Grow(UNIV_OT_Select_Grow_Base):
                 for idx, isl in enumerate(islands):
                     if sync:
                         if self.umeshes.elem_mode == 'FACE':
-                            # To optimize performance, the logic should be split based on whether there are many selected faces or just a few.
+                            # To optimize performance, the logic should be split based on whether
+                            # there are many selected faces or just a few.
                             for f in isl:
                                 if not f.select and any(l_crn.face.select for crn in f.loops if crn.vert.select
                                                         for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(crn, uv, idx)):
@@ -1917,7 +1918,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                             if not with_seam and grow_prev_crn.edge.seam:
                                 grow_prev_crn = None
 
-                        if grow_next_crn := self.grow_next(crn, selected_dir, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
+                        if grow_next_crn := self.grow_next(
+                                crn, selected_dir, self.max_angle, with_seam, self.is_clamped_by_selected_and_seams):
                             if not with_seam and grow_next_crn.edge.seam:
                                 grow_next_crn = None
 

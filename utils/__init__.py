@@ -24,6 +24,7 @@ resolutions = (('256', '256', ''), ('512', '512', ''), ('1024', '1024', ''),
 resolution_name_to_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
 resolution_value_to_name = {256: '256', 512: '512', 1024: '1K', 2048: '2K', 4096: '4K', 8192: '8K'}
 
+
 class NoInit:
     def __getattribute__(self, item):
         raise AttributeError(f'Object not initialized')

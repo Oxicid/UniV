@@ -232,10 +232,10 @@ class UNIV_OT_Check_Over(Operator):
     bl_description = """Selects overstretched edges and overscaled faces.\n
 Edge Overstretch is checked individually per face -
 edges from other faces are not taken into account.
-In other words, stretches are calculated relative to the majority 
+In other words, stretches are calculated relative to the majority
 of edges with a similar coefficient (Coefficient = 3D Edge Length / UV Edge Length).\n
-This behavior is preferred, as it allows setting a higher 
-Overscaled Face Threshold to intentionally exclude uniformly 
+This behavior is preferred, as it allows setting a higher
+Overscaled Face Threshold to intentionally exclude uniformly
 scaled islands from the calculation, focusing only on actual stretches"""
 
     edge_over_threshold: FloatProperty(name='Overstretched Edge Threshold', min=0.01, soft_min=0.05, max=2, soft_max=0.5, default=0.2,
@@ -617,7 +617,8 @@ class UNIV_OT_Check_Overlap(Operator):
             all_islands = []
             for umesh in umeshes:
                 adv_islands = utypes.AdvIslands.calc_extended_with_mark_seam(umesh)
-                # The following subdivision is needed to ignore the exact self overlaps that are created from the flipped face
+                # The following subdivision is needed to ignore the exact self overlaps
+                # that are created from the flipped face
                 for isl in reversed(adv_islands):
                     if isl.has_flip_with_noflip():
                         adv_islands.islands.remove(isl)
@@ -674,7 +675,7 @@ class UNIV_OT_Check_Other(Operator):
         if info_list := INSPECT_INFO.get('Other'):
             for check_type, info in info_list:
                 box = col.box()
-                wrapped_lines = textwrap.wrap(check_type+': '+info, width=72)
+                wrapped_lines = textwrap.wrap(check_type + ': ' + info, width=72)
                 for line in wrapped_lines:
                     box.label(text=line)
 

@@ -20,13 +20,16 @@ generated_types = (
     ('COLOR_GRID', 'Color Grid', ''),
 )
 
+
 def _update_size_x(self, _context):
     if self.lock_size and self.size_y != self.size_x:
         self.size_y = self.size_x
 
+
 def _update_size_y(self, _context):
     if self.lock_size and self.size_x != self.size_y:
         self.size_x = self.size_y
+
 
 def _update_lock_size(self, _context):
     if self.lock_size and self.size_y != self.size_x:
@@ -109,7 +112,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
         for image in reversed(bpy.data.images):
             if (image_name := image.name).startswith(self.full_pattern_name):
                 image_width, image_height = image.size
-                if self.x_check(image_name) or not image_height or (image_width != self.int_size_x or image_height != self.int_size_y):
+                if self.x_check(image_name) or not image_height or (
+                        image_width != self.int_size_x or image_height != self.int_size_y):
                     if image.users == 0:
                         bpy.data.images.remove(image)
                         print(f"UniV: Checker Image '{image_name}' was removed")
@@ -316,11 +320,18 @@ class UNIV_OT_Checker(bpy.types.Operator):
         raise NotImplementedError(f'Texture {name} not implement')
 
     def _generate_checker_texture(self):
-        full_image_name = f"UniV_{self.get_name_from_gen_type_idname(self.generated_type)}_{self.resolution_values_to_name(self.int_size_x, self.int_size_y)}"
+        idname = self.get_name_from_gen_type_idname(self.generated_type)
+        res_name = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
+        full_image_name = f"UniV_{idname}_{res_name}"
 
         if self.generated_type in ('UV_GRID', 'COLOR_GRID'):
             before = set(bpy.data.images)
-            bpy.ops.image.new(name=full_image_name, width=self.int_size_x, height=self.int_size_y, alpha=False, generated_type=self.generated_type)
+            bpy.ops.image.new(
+                name=full_image_name,
+                width=self.int_size_x,
+                height=self.int_size_y,
+                alpha=False,
+                generated_type=self.generated_type)
             return tuple(set(bpy.data.images) - before)[0]
         else:
             raise NotImplementedError(f'Texture {self.generated_type} not implement')

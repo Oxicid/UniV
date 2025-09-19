@@ -187,7 +187,8 @@ class QuickSnap_KDMeshes:
                     elem = kdmesh.corners_vert[min_res_[1]]
                     r_kdmesh = kdmesh
 
-            if self.snap_points_mode & eSnapPointMode.EDGE and (min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
+            if self.snap_points_mode & eSnapPointMode.EDGE and (
+                    min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
                 if min_res_[2] <= r and min_res_[2] < pt[2]:
                     pt = min_res_
                     elem = kdmesh.corners_center[min_res_[1]]
@@ -476,7 +477,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         if self.sync:
             if bpy.context.tool_settings.mesh_select_mode[2]:  # FACE
                 if self.visible:
-                    # Extract only one face without linked corners, and recalculate the snap points at the current KDMesh
+                    # Extract only one face without linked corners, and recalculate the snap
+                    # points at the current KDMesh
                     _face = kd_data.elem if isinstance(kd_data.elem, BMFace) else kd_data.elem.face
                     self.move_object = FaceIsland([_face], _kdmesh.umesh)
                     islands = _kdmesh.islands
@@ -509,7 +511,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     self.extract_visible_linked_edge_or_face(_kdmesh, kd_data)
                 else:
                     # Edge Mode with preserve boundary
-                    # If the peak group non has_non_sync_crn, we still add it, but all other non has_non_sync_crn groups do not
+                    # If the peak group non has_non_sync_crn, we still add it, but all other
+                    # non has_non_sync_crn groups do not
                     _crn = kd_data.elem.loops[0] if isinstance(kd_data.elem, BMFace) else kd_data.elem
                     lgs = _kdmesh.loop_groups
                     lgs.indexing()

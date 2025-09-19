@@ -733,7 +733,7 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
         counter = 0
 
         def keymap_items():
-            for _area in keys_areas+keys_areas_workspace:
+            for _area in keys_areas + keys_areas_workspace:
                 _km = kc.keymaps[_area]
                 for _kmi in _km.keymap_items:
                     if '.univ_' in _kmi.idname:
@@ -767,7 +767,8 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
             message = f'Reset to default {counter} addon keymaps' if counter else 'All addon keymaps is default'
         elif self.mode == 'RESOLVE_ALL':
 
-            for area, kc, km, filtered_keymaps in ConflictFilter.get_conflict_filtered_keymaps(keys_areas+keys_areas_workspace):
+            for area, kc, km, filtered_keymaps in ConflictFilter.get_conflict_filtered_keymaps(
+                    keys_areas + keys_areas_workspace):
                 for config_filtered in filtered_keymaps.values():
                     if not any(univ_kmi.active for univ_kmi in config_filtered.univ_keys):
                         continue

@@ -6,6 +6,7 @@ if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
 
+import bpy  # noqa: F401
 import typing
 from mathutils import Vector
 from collections import defaultdict, deque

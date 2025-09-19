@@ -358,7 +358,7 @@ class FaceIsland:
             rot_matrix[0][1] = aspect * rot_matrix[0][1]
             rot_matrix[1][0] = rot_matrix[1][0] / aspect
 
-            diff = pivot-(pivot @ rot_matrix)
+            diff = pivot - (pivot @ rot_matrix)
             for face in self.faces:
                 for crn in face.loops:
                     crn_uv = crn[uv]
@@ -516,7 +516,7 @@ class FaceIsland:
         uv = self.umesh.uv
         for f in self.faces:
             area = 0.0
-            uvs = [crn[uv].uv for crn in f.loops]
+            uvs: list[Vector] = [crn[uv].uv for crn in f.loops]
             for i in range(len(uvs)):
                 area += uvs[i - 1].cross(uvs[i])
             if area < 0:
@@ -1916,7 +1916,7 @@ class Islands(IslandsBase):
         return self.scale_simple(scale)
 
     def reset_aspect_ratio(self):
-        scale = Vector((1/self.umesh.aspect, 1))
+        scale = Vector((1 / self.umesh.aspect, 1))
         return self.scale_simple(scale)
 
     @staticmethod

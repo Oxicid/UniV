@@ -13,6 +13,7 @@ import mathutils
 from time import perf_counter as time
 from gpu_extras.batch import batch_for_shader
 
+
 class LinesDrawSimple:
     start_time = time()
     max_draw_time = 1.5
@@ -94,6 +95,7 @@ class LinesDrawSimple:
             if not is_vulkan_enabled:
                 gpu.state.line_width_set(1)
             gpu.state.blend_set('NONE')
+
 
 class LinesDrawSimple3D:
     start_time = time()
@@ -222,7 +224,7 @@ class DotLinesDrawSimple:
         bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, 'WINDOW')
 
         for a in bpy.context.screen.areas:
-            if a.type == 'IMAGE_EDITOR' and a.ui_type == 'UV' :
+            if a.type == 'IMAGE_EDITOR' and a.ui_type == 'UV':
                 a.tag_redraw()
         cls.handler = None
         cls.max_draw_time = 1.5

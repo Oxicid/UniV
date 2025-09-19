@@ -9,6 +9,7 @@ import numpy as np
 from mathutils import Vector, Matrix
 from ... import utypes
 
+
 def extract_seams(umeshes: utypes.UMeshes) -> list[Vector]:
     coords = []
     coords_append = coords.append
@@ -40,6 +41,7 @@ def extract_seams(umeshes: utypes.UMeshes) -> list[Vector]:
                                 coords_append(crn.link_loop_next[uv].uv)
     return coords
 
+
 def extract_edges_with_seams(umesh: utypes.UMesh):
     edges = []
     edges_append = edges.append
@@ -61,6 +63,7 @@ def extract_edges_with_seams(umesh: utypes.UMesh):
                     edges_append(e)
     return edges
 
+
 _local_verts = np.array([
     [-0.5, -0.5, -0.5, 1.0],
     [ 0.5, -0.5, -0.5, 1.0],
@@ -77,6 +80,7 @@ _edges_indexes = np.array([
     [4, 5], [5, 6], [6, 7], [7, 4],
     [0, 4], [1, 5], [2, 6], [3, 7],
 ], dtype=np.uint8)
+
 
 def extraxt_cube_lines_for_orient_bound(orient_matrix: Matrix, dims):
     scale_matrix = Matrix.Diagonal(dims).to_4x4()

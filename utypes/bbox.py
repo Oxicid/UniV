@@ -50,7 +50,10 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_with_corners(cls, corners: typing.Iterable[BMLoop] | typing.Any, uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
+    def calc_bbox_with_corners(
+            cls,
+            corners: typing.Iterable[BMLoop] | typing.Any,
+            uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
         first_co: Vector = corners[0][uv].uv
         xmin = xmax = ymin = ymax = first_co
         xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
@@ -96,7 +99,12 @@ class BBox:
         bbox.sanitize()
         return bbox
 
-    def __init__(self, xmin: float = math.inf, xmax: float = -math.inf, ymin: float = math.inf, ymax: float = -math.inf):
+    def __init__(
+            self,
+            xmin: float = math.inf,
+            xmax: float = -math.inf,
+            ymin: float = math.inf,
+            ymax: float = -math.inf):
         self.xmin = xmin
         self.xmax = xmax
         self.ymin = ymin

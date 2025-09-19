@@ -249,7 +249,7 @@ class UNIV_OT_Join(Operator):
             return 0
 
         if mesh.uv_layers:
-            if active_index > len(mesh.uv_layers)-1:
+            if active_index > len(mesh.uv_layers) - 1:
                 uv = mesh.uv_layers[-1]
             else:
                 uv = mesh.uv_layers[active_index]
@@ -377,7 +377,8 @@ class UNIV_OT_Hide(Operator):
                     umesh.update()
                 if preferences.debug():
                     if umesh.total_face_sel or umesh.total_edge_sel or umesh.total_vert_sel:
-                        self.report({'WARNING'}, 'Undefined Behavior: Has selected elements even after applying Hide operation')
+                        self.report({'WARNING'},
+                                    'Undefined Behavior: Has selected elements even after applying Hide operation')
             return res
         else:
             # bpy.ops.uv.hide sometimes works incorrectly in 'FACE' mode too,
@@ -807,8 +808,8 @@ class UNIV_OT_UV_Layers_Manager(Operator):
                             preset.name = uv.name
                             preset.flag = 2
 
-                    if settings.uv_layers_active_idx >= uv_layers_size-1:
-                        settings.uv_layers_active_idx = uv_layers_size-1  # clamp
+                    if settings.uv_layers_active_idx >= uv_layers_size - 1:
+                        settings.uv_layers_active_idx = uv_layers_size - 1  # clamp
                         settings.uv_layers_active_render_idx = act_obj_uv_render_idx
                     utils.update_univ_panels()
                     return
@@ -836,8 +837,8 @@ class UNIV_OT_UV_Layers_Manager(Operator):
                             preset.flag = 2
 
                     settings.uv_layers_active_render_idx = -1
-                    if settings.uv_layers_active_idx > act_obj_uv_layers_size-1:
-                        settings.uv_layers_active_idx = act_obj_uv_layers_size-1
+                    if settings.uv_layers_active_idx > act_obj_uv_layers_size - 1:
+                        settings.uv_layers_active_idx = act_obj_uv_layers_size - 1
                     utils.update_univ_panels()
                     return
 
@@ -1019,7 +1020,7 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
 
     def execute(self, context):
         settings = univ_settings()
-        if settings.uv_layers_size == settings.uv_layers_active_idx+1:
+        if settings.uv_layers_size == settings.uv_layers_active_idx + 1:
             self.report({'WARNING'}, 'Cannot move down')
             return {'CANCELLED'}
 
@@ -1055,11 +1056,11 @@ class UNIV_OT_Add(Operator):
             self.report({'WARNING'}, 'Objects not found')
             return {'CANCELLED'}
 
-        target_min_size = min(len(obj.data.uv_layers) for obj in objects)+1
+        target_min_size = min(len(obj.data.uv_layers) for obj in objects) + 1
         if self.add_missed:
-            target_max_size = max(len(obj.data.uv_layers) for obj in objects)+1
+            target_max_size = max(len(obj.data.uv_layers) for obj in objects) + 1
             if target_min_size != target_max_size:
-                target_min_size = target_max_size-1
+                target_min_size = target_max_size - 1
 
         if target_min_size > 8:
             self.report({'WARNING'}, 'The limit of 8 channels has been reached.')
@@ -1090,7 +1091,7 @@ class UNIV_OT_Add(Operator):
 
         counter = 0
         uv = bm.loops.layers.uv.verify()
-        if uv_size >= active_index+1:
+        if uv_size >= active_index + 1:
             if mesh.uv_layers.active_index != active_index:
                 mesh.uv_layers.active_index = active_index
 
@@ -1098,7 +1099,7 @@ class UNIV_OT_Add(Operator):
 
         while (len(bm.loops.layers.uv)) < target_size:
             uv = bm.loops.layers.uv.new('UVMap')
-            obj.data.uv_layers.active_index = len(mesh.uv_layers)-1
+            obj.data.uv_layers.active_index = len(mesh.uv_layers) - 1
             corners = (crn for f in bm.faces for crn in f.loops)
             for crn, uv_co in zip(corners, coords):
                 crn[uv].uv = uv_co
@@ -1155,7 +1156,7 @@ class UNIV_OT_Remove(Operator):
                         uv_layers.remove(uv_layer)
                     obj.data.update()
             else:
-                if len(uv_layers) >= target_idx+1:
+                if len(uv_layers) >= target_idx + 1:
                     if bpy.context.mode == 'EDIT_MESH':
                         bm = bmesh.from_edit_mesh(mesh)
                         bm.loops.layers.uv.remove(bm.loops.layers.uv[target_idx])
@@ -1316,7 +1317,7 @@ class UNIV_OT_SetActiveRender(Operator):
         for obj in objects:
             mesh = obj.data
             uv_layers = mesh.uv_layers
-            if len(uv_layers) >= self.idx+1:
+            if len(uv_layers) >= self.idx + 1:
                 if not uv_layers[self.idx].active_render:
                     uv_layers[self.idx].active_render = True
         return {'FINISHED'}

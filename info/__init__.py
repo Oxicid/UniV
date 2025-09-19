@@ -5,5 +5,6 @@
 
 from . import operator
 
-bugreport_info = ("An unexpected error occurred. Please undo the action (Ctrl+Z), save your file, and submit a bug report. "
-                  "Make sure you’re using the latest version, as this issue may have already been fixed.")
+bugreport_info = (
+    "An unexpected error occurred. Please undo the action (Ctrl+Z), save your file, and submit a bug report. "
+    "Make sure you’re using the latest version, as this issue may have already been fixed.")

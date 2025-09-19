@@ -225,7 +225,8 @@ class StackIsland:  # TODO: Split for source and target islands
                         break_ = True
                         break
 
-                    for target_face_size, source_crn in zip(target_face__.shared_crn_face_sizes, source_face__.ordered_corners):
+                    for target_face_size, source_crn in zip(
+                            target_face__.shared_crn_face_sizes, source_face__.ordered_corners):
                         if target_face_size == 0:
                             continue
 

@@ -6,11 +6,11 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import bmesh
 
 from . import unwrap
 from .. import utypes
 from .. import utils
-
 from ..utypes import Islands
 
 
@@ -103,7 +103,9 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         return self.umeshes.update()
 
     def relax_sync_verts_edges(self):
+        crn: bmesh.types.BMLoop
         relax_data: list[RelaxData] = []
+
         for umesh in self.umeshes:
             if self.umeshes.elem_mode == 'VERT':
                 selected_elem = utils.calc_selected_verts(umesh)

@@ -249,8 +249,8 @@ class UNIV_PT_General(Panel):
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
-        row.operator('uv.univ_select_square_island', text='H-Rect',  icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
-        row.operator('uv.univ_select_square_island', text='V-Rect',  icon_value=icons.vertical_a).shape = 'VERTICAL'
+        row.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
+        row.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
 
         row = col_align.row(align=True)
         row.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
@@ -577,6 +577,7 @@ class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
         row = layout.row(align=True)
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'texel', text='TD', emboss=False)
+
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):

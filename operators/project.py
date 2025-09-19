@@ -19,6 +19,7 @@ from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 from ..preferences import univ_settings
 
+
 class UNIV_OT_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
     bl_label = "Normal"
@@ -161,7 +162,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
                     bbox_.scale(Vector((1, island.umesh.aspect)), pivot=pivot)
                 else:
                     bbox_ = bbox.copy()
-                    bbox_.scale(Vector((1/island.umesh.aspect, 1)), pivot=pivot)
+                    bbox_.scale(Vector((1 / island.umesh.aspect, 1)), pivot=pivot)
             else:
                 bbox_ = bbox
             transform.UNIV_OT_Crop.crop_ex('XY', bbox_, inplace=False, islands_of_mesh=[island], offset=Vector((0, 0)), padding=0.001, proportional=True)
@@ -424,9 +425,9 @@ class ProjCameraInfo:
             # also make aspect ratio adjustment factors
             if winx > winy:
                 uci.aspect.x = 1.0
-                uci.aspect.y = winx/winy
+                uci.aspect.y = winx / winy
             else:
-                uci.aspect.x = winy/winx
+                uci.aspect.x = winy / winx
                 uci.aspect.y = 1.0
 
             # include 0.5f here to move the UVs into the center */

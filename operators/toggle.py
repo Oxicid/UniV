@@ -20,6 +20,7 @@ from bpy.types import Operator
 AREA: bpy.types.Area | None = None
 AREA_TICKS: int = False
 
+
 class UNIV_OT_SplitUVToggle(Operator):
     bl_idname = 'wm.univ_split_uv_toggle'
     bl_label = 'Split UV Toggle'
@@ -377,15 +378,17 @@ class UNIV_OT_TogglePanelsByCursor(Operator):
                     return bpy.ops.wm.context_toggle(data_path='space_data.show_region_toolbar')
         return {'CANCELLED'}
 
+
 PREV_PIVOT = ''
 PREV_PIVOT_TIME = 0.0
+
+
 class UNIV_OT_TogglePivot(Operator):
     bl_idname = 'uv.univ_toggle_pivot'
     bl_label = 'Toggle Pivot'
     bl_options = {'UNDO'}
     bl_description = ('Toggles the pivot between Bounding Box and Individual Origins. \n'
                       'If toggled again within 1.8 seconds, it switches from Bounding Box or Individual to Cursor.')
-
 
     def execute(self, context):
         from time import perf_counter
@@ -400,7 +403,7 @@ class UNIV_OT_TogglePivot(Operator):
         readable_text = {'INDIVIDUAL_ORIGINS': 'Individual',
                          'CENTER': 'Boundary Box',
                          'MEDIAN': 'Median',
-                         'CURSOR': 'Cursor' }
+                         'CURSOR': 'Cursor'}
 
         if (curr_time - PREV_PIVOT_TIME) <= draw_time:
             if PREV_PIVOT == 'CENTER' and curr_pivot == 'INDIVIDUAL_ORIGINS':
@@ -585,6 +588,7 @@ def univ_header_sync_btn(self, context):
             layout = self.layout
             layout.operator('uv.univ_sync_uv_toggle', text='', icon='UV_SYNC_SELECT')
 
+
 def univ_header_split_btn(self, _context):
     if prefs().show_split_toggle_uv_button:
         layout = self.layout
@@ -594,6 +598,7 @@ def univ_header_split_btn(self, _context):
 LAST_STRETCH_TYPE: str = ''
 LAST_STRETCH_TIME: float = 0.0
 STRETCH_SPACE_DATA: bpy.types.Space | None = None
+
 
 class UNIV_OT_StretchUVToggle(Operator):
     bl_idname = 'uv.univ_stretch_uv_toggle'
@@ -634,11 +639,11 @@ class UNIV_OT_StretchUVToggle(Operator):
             txt = LAST_STRETCH_TYPE.capitalize()
             if count_non_default_scale:
                 txt = [f'Warning: The scale hasn`t been applied to {count_non_default_scale} objects', txt]
-            from ..  import draw
+            from .. import draw
             draw.TextDraw.draw(txt)
         else:
             STRETCH_SPACE_DATA = context.space_data
-            bpy.app.timers.register(self.register_,  first_interval=0.22)
+            bpy.app.timers.register(self.register_, first_interval=0.22)
 
         return {'FINISHED'}
 
@@ -682,6 +687,7 @@ class UNIV_OT_StretchUVToggle(Operator):
         STRETCH_SPACE_DATA = None
         return None
 
+
 class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
     bl_idname = 'uv.univ_show_modified_uv_edges_toggle'
     bl_label = 'Show Modified UV Edges Toggle'
@@ -694,6 +700,7 @@ class UNIV_OT_ShowModifiedUVEdgeToggle(Operator):
             return {'CANCELLED'}
         context.space_data.uv_editor.show_modified_edges ^= 1
         return {'FINISHED'}
+
 
 class UNIV_OT_ModifiersToggle(Operator):
     bl_idname = 'view3d.univ_modifiers_toggle'
@@ -757,7 +764,7 @@ class UNIV_OT_WorkspaceToggle(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def contain_tool_by_name(name, space_type: str='VIEW_3D'):
+    def contain_tool_by_name(name, space_type: str = 'VIEW_3D'):
         from bl_ui.space_toolsystem_common import ToolSelectPanelHelper
         tool_helper_cls = ToolSelectPanelHelper._tool_class_from_space_type(space_type)  # noqa
 
@@ -766,6 +773,7 @@ class UNIV_OT_WorkspaceToggle(Operator):
             if getattr(item, 'idname', None) == name:
                 return True
         return False
+
 
 class ToggleHandlers:
     last_tool_object = ''

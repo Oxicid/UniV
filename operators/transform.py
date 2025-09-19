@@ -1421,7 +1421,7 @@ class UNIV_OT_Rotate(Operator):
             umesh.update_tag = bool(islands)
         return self.umeshes.update()
 
-    def rotate_individual(self,  extended):
+    def rotate_individual(self, extended):
         for umesh in self.umeshes:
             if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 for island in islands:
@@ -2352,7 +2352,8 @@ class UNIV_OT_Shift(Operator):
         if vector_node.operation != 'ADD':
             return True
 
-        if not (vector_node_a_links := vector_node.inputs[0].links) or not (vector_node_b_links := vector_node.inputs[1].links):
+        if not (vector_node_a_links := vector_node.inputs[0].links) or not (
+                vector_node_b_links := vector_node.inputs[1].links):
             return True
 
         if (uvmap_node := vector_node_a_links[0].from_node).bl_idname != 'GeometryNodeInputNamedAttribute' or \
@@ -3003,7 +3004,8 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
                 island.umesh.update_tag |= island.rotate(final_angle, bbox.center, self.aspect)
 
 
-# The code was taken and modified from the TexTools addon: https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
+# The code was taken and modified from the TexTools addon:
+# https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
 class UNIV_OT_Gravity(Operator):
     bl_idname = 'mesh.univ_gravity'
     bl_label = 'Gravity'

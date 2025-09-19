@@ -116,7 +116,8 @@ def face_invisible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], 
         return lambda f: not f.select
 
 
-def edge_select_linked_set_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
+def edge_select_linked_set_func(umesh: 'utypes.UMesh', force=False,
+                                clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
     # TODO: Add support clamp by seams
     def inner(uv, sync):
         if sync:
