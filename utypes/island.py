@@ -423,13 +423,22 @@ class FaceIsland:
         return True
 
     def set_tag(self, tag=True):
-        for f in self:
-            f.tag = tag
+        if tag:
+            for f in self:
+                f.tag = True
+        else:
+            for f in self:
+                f.tag = False
 
     def set_corners_tag(self, tag=True):
-        for f in self:
-            for crn in f.loops:
-                crn.tag = tag
+        if tag:
+            for f in self:
+                for crn in f.loops:
+                    crn.tag = True
+        else:
+            for f in self:
+                for crn in f.loops:
+                    crn.tag = False
 
     def set_boundary_tag(self, match_idx=False):
         uv = self.umesh.uv

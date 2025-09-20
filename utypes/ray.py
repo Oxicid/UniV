@@ -380,7 +380,7 @@ class IslandHit:
                             min_dist = dist
                             min_face = f
                             # This is necessary for the inequality check to be successful
-                            self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                            self.min_dist = math.nextafter(self.min_dist, self.min_dist+1.0)
                     elif dist < min_dist:
                         min_dist = dist
                         min_face = f

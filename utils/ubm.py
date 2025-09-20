@@ -79,8 +79,12 @@ def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
 
 
 def set_faces_tag(faces, tag=True):
-    for f in faces:
-        f.tag = tag
+    if tag:  # Constant load optimisation
+        for f in faces:
+            f.tag = True
+    else:
+        for f in faces:
+            f.tag = False
 
 
 def face_centroid_uv(f: BMFace, uv: BMLayerItem):

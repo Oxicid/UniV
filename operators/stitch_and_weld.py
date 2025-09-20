@@ -857,7 +857,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
                 compare_index += 1
         return corners_groups
 
-    def pick_weld(self, hit):
+    def pick_weld(self, hit: utypes.CrnEdgeHit):
         if not hit:
             self.report({'WARNING'}, 'Edge not found within a given radius')
             return
@@ -1111,7 +1111,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
         self.umeshes.update(info='Not found islands for stitch')
         return {'FINISHED'}
 
-    def pick_stitch(self, hit):
+    def pick_stitch(self, hit: utypes.CrnEdgeHit):
         sync = hit.umesh.sync
         hit.umesh.update_tag = True
         ref_crn = hit.crn

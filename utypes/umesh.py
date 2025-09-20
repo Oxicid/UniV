@@ -505,8 +505,12 @@ class UMesh:
                 crn.tag = state
 
     def set_face_tag(self, state=True):
-        for f in self.bm.faces:
-            f.tag = state
+        if state:
+            for f in self.bm.faces:
+                f.tag = True
+        else:
+            for f in self.bm.faces:
+                f.tag = False
 
     def calc_selected_faces(self) -> list[bmesh.types.BMFace] or bmesh.types.BMFaceSeq:
         if self.is_full_face_deselected:
