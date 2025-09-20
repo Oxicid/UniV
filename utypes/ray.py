@@ -463,34 +463,70 @@ class CrnEdgeHit:
         self.face: BMFace | None = None  # use for incref
         self.umesh = None
 
-    def find_nearest_crn_by_visible_faces(self, umesh):
+    def find_nearest_crn_by_visible_faces(self, umesh, use_faces_from_umesh_seq=False):
         from .. import utils
+        from math import nextafter, inf
+        from mathutils.geometry import intersect_point_line
+
         pt = self.point
         min_dist = self.min_dist
         min_crn = None
+
         uv = umesh.uv
 
-        for f in utils.calc_visible_uv_faces(umesh):
+        if use_faces_from_umesh_seq:
+            visible_faces = umesh.sequence
+        else:
+            visible_faces = utils.calc_visible_uv_faces_iter(umesh)
+
+        for f in visible_faces:
             corners = f.loops
             v_prev = corners[-1][uv].uv
             for crn in corners:
                 v_curr = crn[uv].uv
 
-                close_pt = closest_pt_to_line(pt, v_prev, v_curr)
+                # +15% faster without call function
+                # close_pt = closest_pt_to_line(pt, v_prev, v_curr)
+                close_pt, percent = intersect_point_line(pt, v_prev, v_curr)
+                if percent < 0.0:
+                    close_pt = v_prev
+                elif percent > 1.0:
+                    close_pt = v_curr
 
-                if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                dist = (close_pt - pt).length
+                if dist < min_dist:
+                    # If the point is inside the face, we add it immediately,
+                    # otherwise, we do nextafter and check again for nearest.
                     if point_inside_face(pt, f, uv):
-                        min_dist = dist
                         min_crn = crn
-                        self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
-                elif dist < min_dist:
-                    min_dist = dist
-                    min_crn = crn
+                        min_dist = dist
+                    else:
+                        # Adding dist after nextafter is necessary for the next for_each loop
+                        # to “hook” another edge (thus avoiding float point errors).
+                        dist = nextafter(dist, inf)
+                        if dist < min_dist:
+                            min_crn = crn
+                            min_dist = dist
+
                 v_prev = v_curr
 
-        if self.min_dist != min_dist:
-            self.min_dist = min_dist
+        if min_crn:
             self.crn = min_crn.link_loop_prev
+            self.min_dist = min_dist
+
+            radial_prev = self.crn.link_loop_radial_prev
+            if (utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and
+                    utils.is_visible_func(umesh.sync)(radial_prev.face)):
+                if not point_inside_face(pt, radial_prev.face, uv):
+                    self.crn = radial_prev
+            else:
+                # Prioritize boundary edges where the point is inside the face,
+                # otherwise lower the priority to find other boundary edges with the point inside the face.
+                if point_inside_face(pt, self.crn.face, uv):
+                    self.min_dist = nextafter(min_dist, -inf)
+                else:
+                    self.min_dist = nextafter(min_dist, inf)
+
             self.umesh = umesh
             return True
         return False
@@ -499,7 +535,7 @@ class CrnEdgeHit:
         assert self.crn, 'Not found picked corner'
 
         uv = self.umesh.uv
-        island: set[BMFace] = {self.crn.face}
+        faces: set[BMFace] = {self.crn.face}
         is_visible = utils.is_visible_func(self.umesh.sync)
 
         stack = []
@@ -511,17 +547,17 @@ class CrnEdgeHit:
                         continue
                     pair_crn = l.link_loop_radial_prev
                     ff = pair_crn.face
-                    if ff in island or not is_visible(ff):
+                    if ff in faces or not is_visible(ff):
                         continue
 
                     if (l[uv].uv == pair_crn.link_loop_next[uv].uv and
                             l.link_loop_next[uv].uv == pair_crn[uv].uv):
-                        island.add(ff)
+                        faces.add(ff)
                         stack.append(ff)
             parts_of_island = stack
             stack = []
 
-        return AdvIsland(list(island), self.umesh), island
+        return AdvIsland(list(faces), self.umesh), faces
 
     def calc_island_non_manifold(self) -> tuple[AdvIsland, set[BMFace]]:
         assert self.crn, 'Not found picked corner'

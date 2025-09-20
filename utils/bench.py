@@ -77,17 +77,22 @@ class timer:
         self.text = ''
 
 
-def profile(func):
-    # Source: https://osf.io/upav8
-    @functools.wraps(func)
-    def inner(*args, **qwargs):
-        pr = cProfile.Profile()
-        pr.enable()
-        retval = func(*args, **qwargs)
-        pr.disable()
-        s = io.StringIO()
-        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
-        ps.print_stats()
-        print(s.getvalue())
-        return retval
-    return inner
+def profile(sort_by: str = "time", lines: int = 15, strip_dirs: bool = True):
+    def decorator(func):
+        @functools.wraps(func)
+        def inner(*args, **kwargs):
+            pr = cProfile.Profile()
+            pr.enable()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                pr.disable()
+                s = io.StringIO()
+                ps = pstats.Stats(pr, stream=s)
+                if strip_dirs:
+                    ps.strip_dirs()
+                ps.sort_stats(sort_by)
+                ps.print_stats(lines)
+                print(s.getvalue())
+        return inner
+    return decorator
