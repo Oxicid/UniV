@@ -7,6 +7,7 @@ import numpy as np
 from math import floor
 from bl_math import lerp
 from mathutils import Vector
+from mathutils.geometry import intersect_point_line
 
 
 def all_equal(sequence, key: typing.Callable | None = None):
@@ -122,17 +123,12 @@ def is_power_of_2(n: int) -> bool:
 
 
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
-    line_vec = l_b - l_a
-    pt_vec = pt - l_a
-    if not (line_len_squared := line_vec.dot(line_vec)):
+    near_pt, percent = intersect_point_line(pt, l_a, l_b)
+    if percent < 0.0:
         return l_a
-
-    projection = pt_vec.dot(line_vec) / line_len_squared
-    if projection < 0:
-        return l_a
-    elif projection > 1:
+    elif percent > 1.0:
         return l_b
-    return l_a + projection * line_vec
+    return near_pt
 
 
 def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):

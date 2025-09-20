@@ -448,6 +448,12 @@ class IslandHit:
     def __bool__(self):
         return bool(self.island)
 
+    def __str__(self):
+        if self.island:
+            return f"{self.island}. Distance={self.min_dist:.5}."
+        else:
+            return f"Island not found. Distance={self.min_dist:.5}."
+
 
 class CrnEdgeHit:
     def __init__(self, pt, min_dist=1e200):

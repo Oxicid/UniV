@@ -891,7 +891,7 @@ class UNIV_OT_Select_Pick(Operator):
                     if isl.is_full_face_selected():
                         continue
                 else:  # Skip full deselected islands
-                    if not isl.is_full_face_selected():
+                    if isl.is_full_face_deselected:
                         continue
                 hit.find_nearest_island(isl)
 
