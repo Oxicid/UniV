@@ -932,13 +932,14 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     select: BoolProperty(name='Select', default=True)
-    delimit: EnumProperty(name='Delimit', default='NORMAL',
+    delimit: EnumProperty(name='Delimit', default=set(),  # noqa
                           items=(('NORMAL', 'Normal', ''),
                                  ('MATERIAL', 'Material', ''),
                                  ('SEAM', 'Seam', ''),
                                  ('SHARP', 'Sharp', ''),
                                  ('UV', 'UVs', '')
-                                 ))
+                                 ),
+                          options={'ENUM_FLAG'})
 
     @classmethod
     def poll(cls, context):
@@ -950,7 +951,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
 
     def execute(self, context):
         if self.select:
-            return bpy.ops.mesh.select_linked(delimit={self.delimit})
+            return bpy.ops.mesh.select_linked(delimit=self.delimit)
         else:
             self.deselect()
             return {'FINISHED'}
@@ -962,18 +963,16 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
         umeshes.update_tag = False
 
         match self.delimit:
-            case 'NORMAL':
-                calc_type = MeshIslands.calc_iter_non_manifold_ex
-            case 'MATERIAL':
-                calc_type = MeshIslands.calc_by_material_non_manifold_iter_ex
-            case 'SEAM':
+            case delimit if "SEAM" in delimit:
                 calc_type = MeshIslands.calc_with_markseam_non_manifold_iter_ex
-            case 'SHARP':
-                calc_type = MeshIslands.calc_by_sharps_non_manifold_iter_ex
-            case 'UV':
+            case delimit if "UV" in delimit:
                 calc_type = Islands.calc_with_markseam_iter_ex
+            case delimit if "MATERIAL" in delimit:
+                calc_type = MeshIslands.calc_by_material_non_manifold_iter_ex
+            case delimit if "SHARP" in delimit:
+                calc_type = MeshIslands.calc_by_sharps_non_manifold_iter_ex
             case _:
-                raise
+                calc_type = MeshIslands.calc_iter_non_manifold_ex
 
         for umesh in umeshes:
             if self.delimit == 'UV' and not umesh.obj.data.uv_layers:
