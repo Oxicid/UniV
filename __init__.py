@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 2),
+    "version": (3, 9, 3),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -42,6 +42,7 @@ from .operators import toggle
 from .operators import transform
 from .operators import unwrap
 from . import ui
+from . import draw
 from . import icons
 from . import keymaps
 from . import preferences
@@ -268,6 +269,10 @@ is_enabled = False
 
 
 def register():
+    if bpy.app.background:
+        print("UniV: Skipping registration in background mode")
+        return
+
     global is_enabled
     if is_enabled or not classes:
         from . import reload
@@ -313,7 +318,11 @@ def register():
     # Perhaps it does not allow to reload operators in a normal way.
     bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
+    bpy.app.timers.register(draw.shaders.Shaders.init_shaders, first_interval=0.09)
     bpy.app.timers.register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay,
+                            first_interval=0.1, persistent=True)
+    if univ_pro:
+        bpy.app.timers.register(draw.Drawer2D.append_handler_with_delay,
                             first_interval=0.1, persistent=True)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
@@ -337,6 +346,9 @@ def register():
 
 
 def unregister():
+    if bpy.app.background:
+        return
+
     keymaps.remove_keymaps()
     keymaps.remove_keymaps_ws()
     icons.icons.unregister_icons_()
@@ -371,6 +383,7 @@ def unregister():
     texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
 
     toggle.ToggleHandlers.unregister_handler()
+    draw.Drawer2D.unregister()
 
 
 if __name__ == "__main__":

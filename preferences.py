@@ -63,6 +63,10 @@ def update_panel(_self, _context):
             print(f'UniV: Updating Panel View 3D category has failed:\n{e}')
 
 
+def _update_drawer_2d_enable(self, context):
+    from . import draw
+    draw.Drawer2D.update_data(self, context)
+
 def _update_uv_layers_show(_self, _context):
     from .operators.misc import UNIV_OT_UV_Layers_Manager
     if _self.uv_layers_show:
@@ -161,6 +165,9 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
     texture_physical_size: FloatVectorProperty(name='TD from Physical Size', default=(2.5, 0.0), min=0.0,
                                                     soft_max=6, size=2, subtype='TRANSLATION')
+
+    # Drawer
+    overlay_2d_enable: BoolProperty(name='Overlay', default=True, update=_update_drawer_2d_enable)
 
     # UV Layer
     uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)

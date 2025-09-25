@@ -25,6 +25,7 @@ from mathutils import Vector, Matrix
 
 from .. import utils
 from .. import utypes
+from ..draw import shaders
 from ..utypes import (
     UMeshes,
     AdvIslands,
@@ -1395,11 +1396,10 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
             return {'CANCELLED'}
 
         from gpu_extras.batch import batch_for_shader
-        shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
-        batch = batch_for_shader(shader, 'TRIS', {"pos": coords})
+        batch = batch_for_shader(shaders.UNIFORM_COLOR, 'TRIS', {"pos": coords})
         umeshes.free()
 
-        self.draw_coverage(tiles, shader, batch)
+        self.draw_coverage(tiles, shaders.UNIFORM_COLOR, batch)
 
         return {'FINISHED'}
 
@@ -1409,11 +1409,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
         offscreen = gpu.types.GPUOffScreen(size_x, size_y)
         offscreen.bind()
 
-        if bpy.app.version < (3, 5, 0):
-            import bgl
-            bgl.glEnable(bgl.GL_ALPHA)
-        else:
-            gpu.state.blend_set('ALPHA')
+        shaders.blend_set_alpha()
 
         total_coverage = 0
         tiles_with_res = {}
@@ -1460,10 +1456,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
             draw.TextDraw.max_draw_time = 4
             bpy.context.area.tag_redraw()
 
-        if bpy.app.version < (3, 5, 0):
-            bgl.glDisable(bgl.GL_BLEND)  # noqa
-        else:
-            gpu.state.blend_set('NONE')
+        shaders.blend_set_none()
 
     @staticmethod
     def get_normalize_uvs_matrix(tile):

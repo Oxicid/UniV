@@ -17,6 +17,7 @@ from mathutils import Vector
 from bmesh.types import BMFace, BMLoop
 
 from .. import utils
+from ..draw import shaders
 from ..preferences import debug, prefs
 from ..utypes import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup, UMeshes
 
@@ -285,11 +286,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             return {'CANCELLED'}
         self.view = context.region.view2d
         self.sync = utils.sync()
-        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
-            self.shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
-        else:
-            self.shader = gpu.shader.from_builtin(
-                '3D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+        self.shader = shaders.POINT_UNIFORM_COLOR
         self.refresh_draw_points()
         self.register_draw()
 
@@ -696,13 +693,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         if bpy.context.area.ui_type != 'UV':
             return
 
-        if bpy.app.version < (3, 5, 0):
-            import bgl
-            bgl.glPointSize(4)
-            bgl.glEnable(bgl.GL_ALPHA)
-        else:
-            gpu.state.point_size_set(4)
-            gpu.state.blend_set('ALPHA')
+        shaders.set_point_size(4)
+        shaders.blend_set_alpha()
 
         self.shader.bind()
         self.shader.uniform_float("color", (1, 1, 0, 0.5))
@@ -714,10 +706,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
         self.area.tag_redraw()
 
-        if bpy.app.version < (3, 5, 0):
-            bgl.glDisable(bgl.GL_BLEND)  # noqa
-        else:
-            gpu.state.blend_set('NONE')
+        shaders.set_point_size(1)
+        shaders.blend_set_none()
 
     def univ_quick_snap_ui_draw_callback(self):
         area = bpy.context.area

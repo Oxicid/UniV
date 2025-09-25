@@ -83,12 +83,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         self.umeshes.update()
 
         # Flush System
-        visible_umeshes.filter_by_visible_uv_faces()
-        self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
         from .. import draw
-        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
-        coords = draw.mesh_extract.extract_seams(self.umeshes)
-        draw.LinesDrawSimple.draw_register(coords, seam_color)
+        if not draw.DrawerSeamsProcessing.is_enable():
+            visible_umeshes.filter_by_visible_uv_faces()
+            self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
+            coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
+            draw.LinesDrawSimple.draw_register(coords, draw.DrawerSeamsProcessing.get_color())
         return {'FINISHED'}
 
     def cut_uv_space(self):
@@ -138,11 +138,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 hit.umesh.update()
 
             from .. import draw
-            seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
-            coords = draw.mesh_extract.extract_seams(self.umeshes)
-            draw.LinesDrawSimple.draw_register(coords, seam_color)
-            if coords:
-                bpy.context.area.tag_redraw()
+            if not draw.DrawerSeamsProcessing.is_enable():
+                seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
+                coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
+                draw.LinesDrawSimple.draw_register(coords, seam_color)
+                if coords:
+                    bpy.context.area.tag_redraw()
             return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
@@ -476,10 +477,11 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
                             crn_edge.seam = False
 
         if self.bl_idname.startswith('UV'):
+            # Flush System
             from .. import draw
-            color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
-            coords = draw.mesh_extract.extract_seams(umeshes)
-            draw.LinesDrawSimple.draw_register(coords, color)
+            if not draw.DrawerSeamsProcessing.is_enable():
+                coords = draw.mesh_extract.extract_seams_umeshes(umeshes)
+                draw.LinesDrawSimple.draw_register(coords, draw.DrawerSeamsProcessing.get_color())
         umeshes.update()
         return {'FINISHED'}
 

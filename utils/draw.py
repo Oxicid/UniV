@@ -160,6 +160,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
     def calc_from_corners(self, groups: typing.Sequence[typing.Sequence[BMLoop]]
                           | typing.Sequence[BMLoop] | BMLoop, uv=None, exact=False):
         from gpu_extras.batch import batch_for_shader
+        from ..draw import shaders
         if not groups:
             self.mid_points = []
             self.texts = []
@@ -177,14 +178,15 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {
-                                                   "pos": offset_lines, 'color': color})
-        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+        self.batch_smooth_color = batch_for_shader(
+            self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+
+        if shaders.VK_ENABLED:
             self.batch_smooth_color_2 = batch_for_shader(
                 self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2]})
         else:
-            self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color_vert, 'POINTS', {
-                                                         "pos": offset_lines[::2], 'color': color[::2]})
+            self.batch_smooth_color_2 = batch_for_shader(
+                self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
 
     def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['utypes.CrnEdgeGrow'] | 'utypes.CrnEdgeGrow'):  # noqa
         from gpu_extras.batch import batch_for_shader
@@ -202,10 +204,10 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         color = color_for_groups(groups)
         self.calc_text_data_from_lines(offset_lines)
 
-        self.batch_smooth_color = batch_for_shader(self.shader_smooth_color, 'LINES', {
-                                                   "pos": offset_lines, 'color': color})
-        self.batch_smooth_color_2 = batch_for_shader(self.shader_smooth_color, 'POINTS', {
-                                                     "pos": offset_lines[::2], 'color': color[::2]})
+        self.batch_smooth_color = batch_for_shader(
+            self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+        self.batch_smooth_color_2 = batch_for_shader(
+            self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
 
     def get_mouse_pos(self, event):
         return Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
@@ -221,12 +223,12 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         import blf
         from gpu_extras.batch import batch_for_shader
+        from ..draw import shaders
 
-        is_vulkan_enabled = getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN"
-        gpu.state.blend_set('ALPHA')
-        gpu.state.point_size_set(8)
+        shaders.blend_set_alpha()
+        shaders.set_point_size(8)
         # if not is_vulkan_enabled:
-        gpu.state.line_width_set(2)
+        shaders.set_line_width(2)
 
         try:
             self.shader.bind()
@@ -241,7 +243,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         if self.batch_smooth_color:
             self.shader_smooth_color.bind()
-            if is_vulkan_enabled:
+            if shaders.VK_ENABLED:
                 try:
                     self.shader_smooth_color_vert.uniform_float("color", (1, 0.2, 0.1, 1))
                 except:  # noqa
@@ -270,7 +272,9 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         self.area.tag_redraw()
 
-        gpu.state.blend_set('NONE')
+        shaders.blend_set_none()
+        shaders.set_point_size(1)
+        shaders.set_line_width(1)
 
     @staticmethod
     def uv_crn_groups_to_lines_with_offset(

@@ -10,35 +10,46 @@ from mathutils import Vector, Matrix
 from ... import utypes
 
 
-def extract_seams(umeshes: utypes.UMeshes) -> list[Vector]:
+def extract_seams_umesh_ex(umesh: utypes.UMesh, coords_append):
+    uv = umesh.uv
+    if umesh.is_full_face_selected:
+        for e in umesh.bm.edges:
+            if e.seam:
+                for crn in getattr(e, 'link_loops', ()):
+                    coords_append(crn[uv].uv)
+                    coords_append(crn.link_loop_next[uv].uv)
+    else:
+        if umesh.sync:
+            for e in umesh.bm.edges:
+                if e.seam:
+                    for crn in getattr(e, 'link_loops', ()):
+                        if not crn.face.hide:
+                            coords_append(crn[uv].uv)
+                            coords_append(crn.link_loop_next[uv].uv)
+        else:
+            if umesh.is_full_face_deselected:
+                return
+            for e in umesh.bm.edges:
+                if e.seam:
+                    for crn in getattr(e, 'link_loops', ()):
+                        if crn.face.select:
+                            coords_append(crn[uv].uv)
+                            coords_append(crn.link_loop_next[uv].uv)
+
+def extract_seams_umesh(umesh: utypes.UMesh):
+    coords = []
+    coords_append = coords.append
+    extract_seams_umesh_ex(umesh, coords_append)
+    return coords
+
+
+def extract_seams_umeshes(umeshes: utypes.UMeshes) -> list[Vector]:
     coords = []
     coords_append = coords.append
 
     for umesh in umeshes:
-        uv = umesh.uv
-        if umesh.is_full_face_selected:
-            for e in umesh.bm.edges:
-                if e.seam and (corners := getattr(e, 'link_loops', None)):
-                    for crn in corners:
-                        coords_append(crn[uv].uv)
-                        coords_append(crn.link_loop_next[uv].uv)
-        else:
-            if umesh.sync:
-                for e in umesh.bm.edges:
-                    if e.seam and (corners := getattr(e, 'link_loops', None)):
-                        for crn in corners:
-                            if not crn.face.hide:
-                                coords_append(crn[uv].uv)
-                                coords_append(crn.link_loop_next[uv].uv)
-            else:
-                if umesh.is_full_face_deselected:
-                    continue
-                for e in umesh.bm.edges:
-                    if e.seam and (corners := getattr(e, 'link_loops', None)):
-                        for crn in corners:
-                            if crn.face.select:
-                                coords_append(crn[uv].uv)
-                                coords_append(crn.link_loop_next[uv].uv)
+        extract_seams_umesh_ex(umesh, coords_append)
+
     return coords
 
 

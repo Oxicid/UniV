@@ -394,6 +394,8 @@ class UNIV_PT_GlobalSettings(Panel):
     @staticmethod
     def draw_global_settings(layout):
         settings = univ_settings()
+        if univ_pro:
+            layout.prop(settings, 'overlay_2d_enable')
 
         row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')

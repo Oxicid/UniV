@@ -634,7 +634,7 @@ class UNIV_OT_Focus(Operator):
             bounds.xmax = 1.0
             bounds.ymax = 1.0
 
-        draw_data = bounds.draw_data_lines()
+        lines = bounds.draw_data_lines()
 
         n_panel_width = next(r.width for r in context.area.regions if r.type == 'UI')
         bounds.scale(1.2)  # Add padding
@@ -681,8 +681,8 @@ class UNIV_OT_Focus(Operator):
             elif c_region.winrct.height <= zoom:
                 sima.zoom = old_zoom
 
-        from .select import add_draw_rect
-        add_draw_rect(draw_data, color)
+        from .. import draw
+        draw.LinesDrawSimple.draw_register(lines, color)
 
         context.region.tag_redraw()
         return {'FINISHED'}

@@ -1,6 +1,110 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
+import bpy
+import gpu
+
+VK_ENABLED = False
+
+UNIFORM_COLOR = None  # Edge Shader with width support
+UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
+
+POLYLINE_UNIFORM_COLOR = None  # Edge Shader with width support
+POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
+
+POINT_UNIFORM_COLOR = None  # Edge Shader with width support
+POINT_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
+
+set_line_width = lambda width: None
+set_line_width_vk = lambda shader: None
+set_point_size = gpu.state.point_size_set
+
+blend_set_alpha = lambda : gpu.state.blend_set('ALPHA')
+blend_set_none = lambda : gpu.state.blend_set('NONE')
+
+class Shaders:
+
+    @classmethod
+    def init_shaders(cls):
+        cls.init_functions()
+
+        global POLYLINE_UNIFORM_COLOR
+        if VK_ENABLED:
+            POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+        else:
+            if bpy.app.version >= (3, 5, 0):
+                POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('UNIFORM_COLOR')
+            else:
+                POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+
+
+        global POLYLINE_UNIFORM_COLOR_3D
+        POLYLINE_UNIFORM_COLOR_3D = POLYLINE_UNIFORM_COLOR
+        if bpy.app.version < (3, 5, 0):
+            POLYLINE_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+
+
+        global POINT_UNIFORM_COLOR
+        if VK_ENABLED:
+            POINT_UNIFORM_COLOR = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+        else:
+            POINT_UNIFORM_COLOR = gpu.shader.from_builtin(
+                '2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+
+
+        global POINT_UNIFORM_COLOR_3D
+        POINT_UNIFORM_COLOR_3D = POINT_UNIFORM_COLOR
+        if bpy.app.version < (3, 5, 0):
+            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+
+
+        global UNIFORM_COLOR
+        if bpy.app.version >= (3, 5, 0):
+            UNIFORM_COLOR = gpu.shader.from_builtin('UNIFORM_COLOR')
+        else:
+            UNIFORM_COLOR = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+
+
+        global UNIFORM_COLOR_3D
+        if bpy.app.version < (3, 5, 0):
+            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+
+
+    @staticmethod
+    def init_functions():
+        global VK_ENABLED
+        if draw_engine_type := getattr(gpu.platform, "backend_type_get", None):
+            VK_ENABLED = draw_engine_type() == "VULKAN"
+
+        if not VK_ENABLED:
+            global set_line_width
+            global set_point_size
+
+            global blend_set_alpha
+            global blend_set_none
+
+            if bpy.app.version >= (3, 5, 0):
+                set_line_width = gpu.state.line_width_set
+            else:
+                import bgl
+                set_line_width = bgl.glLineWidth
+                set_point_size = bgl.glPointSize
+
+                blend_set_alpha = lambda: bgl.glEnable(bgl.GL_ALPHA)
+                blend_set_none = lambda: bgl.glDisable(bgl.GL_BLEND)
+        else:
+            global set_line_width_vk
+
+            def _set_line_width_vk(shader):
+                shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
+                shader.uniform_float('lineWidth', 2.0)
+
+            set_line_width_vk = _set_line_width_vk
+
 
 vertex_shader = """
     uniform mat4 ModelViewProjectionMatrix;

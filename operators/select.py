@@ -21,6 +21,7 @@ from collections.abc import Callable
 
 from .. import utils
 from .. import utypes
+from ..draw import shaders
 from ..preferences import prefs, univ_settings
 from ..utypes import Islands, AdvIslands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands
 
@@ -72,10 +73,7 @@ def add_draw_rect(data, color=(1, 1, 0, 1)):
     global uv_handle
 
     start = time()
-    if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
-        shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
-    else:
-        shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+    shader = shaders.POLYLINE_UNIFORM_COLOR
     batch = batch_for_shader(shader, 'LINES', {"pos": data})
 
     if not (uv_handle is None):
@@ -277,7 +275,9 @@ class UNIV_OT_Select_By_Cursor(Operator):
         else:
             self.select(umeshes, view_island)
 
-        add_draw_rect(view_rect.draw_data_lines())
+        from .. import draw
+        lines = view_rect.draw_data_lines()
+        draw.LinesDrawSimple.draw_register(lines)
 
         return umeshes.update()
 
@@ -957,6 +957,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
             return {'FINISHED'}
 
     def deselect(self):
+        # TODO: Add support wire edge
         umeshes = UMeshes.calc_any_unique(verify_uv=False)
         umeshes.set_sync(True)
         umeshes.filter_by_partial_selected_uv_faces()
