@@ -28,7 +28,7 @@ from ..utils import closest_pt_to_line, point_inside_face
 
 class KDData:
     def __init__(self, found, elem, kdmesh):
-        self.found: tuple[Vector, int, float] = found
+        self.found: tuple[Vector, int, float] = found  # pt, index, distance
         self.elem: BMFace | BMLoop | None = elem
         self.kdmesh: KDMesh | None | bool = kdmesh
 

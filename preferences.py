@@ -461,7 +461,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             row.separator()
 
             sub_row = row.row(align=True)
-            if bpy.app.version >= (3, 3, 0):
+            if bpy.app.version >= (4, 0, 0):
                 sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
                 sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
             else:

@@ -212,10 +212,16 @@ class QuickSnap_KDMeshes:
         pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
         dist = (pos - m_pos).length
 
-        if self.grid_snap \
-                and dist <= self.radius and dist < kd_data.distance:
+        if cursor_loc := utils.get_cursor_location():
+            dist_to_cursor = (cursor_loc - m_pos).length
+            if dist_to_cursor <= self.radius and dist_to_cursor < kd_data.distance:
+                kd_data.found = (cursor_loc, 0, dist_to_cursor)
+                kd_data.kdmesh = True  # for __bool__
+
+        if self.grid_snap and dist <= self.radius and dist < kd_data.distance:
             kd_data.found = (pos, 0, 0.0)
-            kd_data.kdmesh = True
+            kd_data.kdmesh = True  # for __bool__
+
         return kd_data
 
     def find_range(self):
