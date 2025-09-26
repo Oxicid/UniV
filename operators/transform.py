@@ -824,7 +824,12 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     self.individual_scale_zero()
 
                 if not self.umeshes.final():
-                    self.move_ex(selected=False)
+                    if self.direction == 'CENTER':
+                        return self.collect_islands()
+                    elif self.direction in ('HORIZONTAL', 'VERTICAL'):
+                        return self.align_edge_by_angle(x_axis=self.direction == 'VERTICAL')
+                    else:
+                        self.move_ex(selected=False)
 
             case _:
                 raise NotImplementedError(self.mode)
