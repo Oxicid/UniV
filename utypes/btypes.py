@@ -569,8 +569,6 @@ class UndoStack(StructBase):
     group_level: c_int
 
 # source/blender/makesdna/DNA_windowmanager_types.h | rev 362
-
-
 class wmWindowManager(StructBase):
     ID: lambda: ID
 
@@ -608,6 +606,121 @@ class wmWindowManager(StructBase):
     _pad7:                      c_char * 7  # noqa
     message_bus:                c_void_p  # wmMsgBus
 
+
+# source\blender\windowmanager\wm_event_system.h
+class wmEventHandler(StructBase):
+    next: lambda: POINTER(wmEventHandler)
+    prev: lambda: POINTER(wmEventHandler)
+    type: c_int
+    flag: c_char
+    poll: c_void_p
+
+
+# source\blender\makesdna\DNA_windowmanager_types.h
+class wmWindow(StructBase):
+    next: lambda: POINTER(wmWindow)
+    prev: lambda: POINTER(wmWindow)
+
+    ghostwin: c_void_p
+    gpuctx: c_void_p
+
+    parent: lambda: POINTER(wmWindow)
+
+    scene: c_void_p
+    new_scene: c_void_p
+    view_layer_name: c_char * 64
+
+    if version >= (3, 3):
+        unpinned_scene: c_void_p  # Scene
+
+    workspace_hook: c_void_p
+    global_areas: ListBase * 3  # ScrAreaMap
+
+    screen: c_void_p  # bScreen  # (deprecated)
+
+    winid: c_int
+
+    pos: c_short * 2
+    size: c_short * 2
+    windowstate: c_char
+    active: c_char
+
+    cursor: c_short
+    lastcursor: c_short
+    modalcursor: c_short
+    grabcursor: c_short
+
+    if version >= (3, 5, 0):
+        pie_event_type_lock: c_short
+        pie_event_type_last: c_short
+
+    if version < (4, 5, 0):
+        addmousemove: c_char
+    tag_cursor_refresh: c_char
+
+    event_queue_check_click: c_char
+    event_queue_check_drag: c_char
+    event_queue_check_drag_handled: c_char
+
+    if version < (3, 5, 0):
+        _pad0: c_char * 1
+    else:
+        if version < (4, 5, 0):
+            event_queue_consecutive_gesture_type: c_char
+        else:
+            event_queue_consecutive_gesture_type: c_short
+        event_queue_consecutive_gesture_xy: c_int * 2
+        event_queue_consecutive_gesture_data: c_void_p  # wmEvent_ConsecutiveData
+
+    if version < (3, 5, 0):
+        pie_event_type_lock: c_short
+        pie_event_type_last: c_short
+
+    eventstate: c_void_p
+    event_last_handled: c_void_p
+    if version < (4, 5, 0):
+        ime_data: c_void_p  # wmIMEData
+    if version >= (4, 1, 0):
+        if version < (4, 5, 0):
+            ime_data_is_composing: c_char
+        else:
+            addmousemove: c_char
+        _pad1: c_char * 7
+
+    if version < (4, 5, 0):
+        event_queue: ListBase
+    handlers: ListBase(wmEventHandler)
+    modalhandlers: ListBase(wmEventHandler)
+    gesture: ListBase
+    stereo3d_format: c_void_p
+    drawcalls: ListBase
+    cursor_keymap_status: c_void_p
+
+    if version >= (4, 5, 0):
+        _pad2: c_void_p
+
+    if version >= (4, 1, 0):
+        eventstate_prev_press_time_ms: c_size_t
+
+    if version >= (4, 5, 0):
+        runtime: c_void_p
+        _pad3: c_void_p
+
+
+# source\blender\windowmanager\wm_event_system.h
+class wmEventHandler_Op(StructBase):
+    class context(StructBase):  # Anonymous
+        win: lambda: POINTER(wmWindow)
+        area: c_void_p  # ScrArea ptr
+        region: c_void_p  # ARegion ptr
+        region_type: c_short
+
+    head: wmEventHandler
+    op: c_void_p  # wmOperator
+    is_file_select: c_bool
+    context: context
+
+    del context
 
 class CBMesh(StructBase):
     totvert: c_int

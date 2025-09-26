@@ -71,6 +71,23 @@ class DrawCall:
         if self.batch_extend:
             self.draw_fn(self.shader, self.batch_extend, self.color)
 
+def has_crash_modal_running():
+    """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
+    if bpy.app.version >= (4, 2, 0):
+        for op in bpy.context.window.modal_operators:
+            if not op.bl_idname.startswith('UV_OT_univ_'):
+                return True
+        return False
+    else:
+        # In older versions, modal operators cannot be selectively excluded,
+        # so any modal operator interrupts drawing.
+        from .. import utypes
+        win = utypes.wmWindow.get_fields(bpy.context.window)
+        for handle in win.modalhandlers:
+            if handle.type == 3:  # WM_HANDLER_TYPE_OP
+                return True
+        return False
+
 
 class Drawer2D:
     draw_objects: dict[str | list[DrawCall]] = {}
@@ -115,6 +132,10 @@ class Drawer2D:
             cls.dirt = True
 
         if not cls.dirt:
+            return
+
+        if has_crash_modal_running():
+            cls.dirt = True
             return
 
         unique_objects_with_uv = [obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers]
