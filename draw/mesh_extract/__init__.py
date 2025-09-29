@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+import bpy
 
 if 'np' in locals():
     from .. import reload
@@ -8,6 +9,7 @@ if 'np' in locals():
 import numpy as np
 from mathutils import Vector, Matrix
 from ... import utypes
+from ... import utils
 
 
 def extract_seams_umesh_ex(umesh: utypes.UMesh, coords_append):
@@ -41,6 +43,82 @@ def extract_seams_umesh(umesh: utypes.UMesh):
     coords_append = coords.append
     extract_seams_umesh_ex(umesh, coords_append)
     return coords
+
+def extract_non_sync_select_data(umesh: utypes.UMesh):
+    assert not umesh.sync
+    from mathutils.geometry import tessellate_polygon
+
+    verts_or_edges = []
+    verts_or_edges_append = verts_or_edges.append
+    verts_or_edges_extend = verts_or_edges.extend
+
+    flat_tris = []
+    normals = []
+    flat_tris_append = flat_tris.append
+    normals_extend = normals.extend
+
+    uv = umesh.uv
+    match bpy.context.tool_settings.uv_select_mode:
+        case 'VERTEX':
+            for f in utils.calc_visible_uv_faces_iter(umesh):
+                selected_mask = [crn[uv].select for crn in f.loops]
+                if not any(selected_mask):
+                    continue
+
+                if all(selected_mask):
+                    coords = [v.co for v in f.verts]
+                    # verts_or_edges_extend(coords)
+                    tessellated = tessellate_polygon((coords,))
+                    for a, b, c in tessellated:
+                        flat_tris_append(coords[a])
+                        flat_tris_append(coords[b])
+                        flat_tris_append(coords[c])
+                    normals_extend([f.normal] * (len(tessellated) * 3))
+                else:
+                    for select_state, v in zip(selected_mask, f.verts):
+                        if select_state:
+                            verts_or_edges_append(v.co)
+
+
+        case 'EDGE':
+            for f in utils.calc_visible_uv_faces_iter(umesh):
+                selected_mask = [crn[uv].select_edge for crn in f.loops]
+                if not any(selected_mask):
+                    continue
+
+                if all(selected_mask):
+                    coords = [v.co for v in f.verts]
+
+                    # prev_co = coords[-1]
+                    # for curr_co in coords:
+                    #     verts_or_edges_append(prev_co)
+                    #     verts_or_edges_append(curr_co)
+                    #     prev_co = curr_co
+
+                    tessellated = tessellate_polygon((coords,))
+                    for a, b, c in tessellated:
+                        flat_tris_append(coords[a])
+                        flat_tris_append(coords[b])
+                        flat_tris_append(coords[c])
+                    normals_extend([f.normal] * (len(tessellated) * 3))
+                else:
+                    for select_state, crn in zip(selected_mask, f.loops):
+                        if select_state:
+                            verts_or_edges_append(crn.vert.co)
+                            verts_or_edges_append(crn.link_loop_next.vert.co)
+        case _:
+            for f in utils.calc_selected_uv_faces_iter(umesh):
+                coords = [v.co for v in f.verts]
+                tessellated = tessellate_polygon((coords,))
+                for a, b, c in tessellated:
+                    flat_tris_append(coords[a])
+                    flat_tris_append(coords[b])
+                    flat_tris_append(coords[c])
+                normals_extend([f.normal] * (len(tessellated) * 3))
+
+    return verts_or_edges, (flat_tris, normals)
+
+
 
 
 def extract_seams_umeshes(umeshes: utypes.UMeshes) -> list[Vector]:

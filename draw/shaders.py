@@ -10,8 +10,9 @@ import gpu
 
 VK_ENABLED = False
 
-UNIFORM_COLOR = None  # Edge Shader with width support
-UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
+UNIFORM_COLOR = None
+UNIFORM_COLOR_3D = None
+FLAT_SHADING_UNIFORM_COLOR_3D = None
 
 POLYLINE_UNIFORM_COLOR = None  # Edge Shader with width support
 POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
@@ -70,12 +71,13 @@ class Shaders:
 
 
         global UNIFORM_COLOR_3D
+        UNIFORM_COLOR_3D = UNIFORM_COLOR
         if bpy.app.version < (3, 5, 0):
             POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
 
 
-    @staticmethod
-    def init_functions():
+    @classmethod
+    def init_functions(cls):
         global VK_ENABLED
         if draw_engine_type := getattr(gpu.platform, "backend_type_get", None):
             VK_ENABLED = draw_engine_type() == "VULKAN"
@@ -106,27 +108,75 @@ class Shaders:
             set_line_width_vk = _set_line_width_vk
 
 
-vertex_shader = """
-    uniform mat4 ModelViewProjectionMatrix;
-    in vec3 pos;
+        cls.init_flat_shading_uniform_color()
 
-    void main()
-    {
-        gl_Position = ModelViewProjectionMatrix * vec4(pos, 0.999);
-    }
-"""
-# draw a round yellow shape to represent a vertex
-fragment_shader = """
-    void main()
-    {
-        float r = 0.0, delta = 0.0, alpha = 0.0;
-        vec2 cxy = 2.0 * gl_PointCoord - 1.0;
-        r = dot(cxy, cxy);
 
-        if (r > 1.0) {
-            discard;
+    @staticmethod
+    def init_flat_shading_uniform_color():
+        vertex_shader = '''
+        in vec3 pos;
+        in vec3 normal;
+        
+        uniform mat4 mvp;
+        uniform vec4 color;
+        uniform mat3 normal_matrix;
+        uniform vec3 light_dir;
+
+        out vec4 fcolor;
+
+        void main()
+        {
+            vec3 n = normalize(normal_matrix * normal);
+            vec3 offset = pos + (n * 0.01);
+            gl_Position = mvp * vec4(offset, 1.0);
+
+            float lambert_light = max(dot(n, normalize(light_dir)), 0.3);
+            vec3 shaded = color.rgb * lambert_light;
+
+            fcolor = vec4(shaded, color.a);
         }
+        '''
 
-        gl_FragColor = vec4(1.0, 1.0, 0.0, 1);
-    }
-"""
+        fragment_shader = '''
+        in vec4 fcolor;
+        out vec4 fragColor;
+
+        void main()
+        {
+            if (gl_FrontFacing) {
+                fragColor = blender_srgb_to_framebuffer_space(fcolor);
+            } else {
+                fragColor = blender_srgb_to_framebuffer_space(vec4(fcolor.rgb * 1.5, fcolor.a));
+            }
+        }
+        '''
+        global FLAT_SHADING_UNIFORM_COLOR_3D
+        FLAT_SHADING_UNIFORM_COLOR_3D = gpu.types.GPUShader(vertex_shader, fragment_shader)
+
+    @staticmethod
+    def get_round_shape_vertex():
+        vertex_shader = """
+            uniform mat4 ModelViewProjectionMatrix;
+            in vec3 pos;
+    
+            void main()
+            {
+                gl_Position = ModelViewProjectionMatrix * vec4(pos, 0.999);
+            }
+        """
+        # draw a round yellow shape to represent a vertex
+        fragment_shader = """
+            void main()
+            {
+                float r = 0.0, delta = 0.0, alpha = 0.0;
+                vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+                r = dot(cxy, cxy);
+    
+                if (r > 1.0) {
+                    discard;
+                }
+    
+                gl_FragColor = vec4(1.0, 1.0, 0.0, 1);
+            }
+        """
+

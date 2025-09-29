@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 4),
+    "version": (3, 9, 5),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -46,6 +46,8 @@ from . import draw
 from . import icons
 from . import keymaps
 from . import preferences
+
+from bpy.app.timers import register as tm_register
 
 univ_pro: "type[bpy?] | None"
 try:
@@ -318,12 +320,13 @@ def register():
     # Perhaps it does not allow to reload operators in a normal way.
     bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
-    bpy.app.timers.register(draw.shaders.Shaders.init_shaders, first_interval=0.09)
-    bpy.app.timers.register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay,
-                            first_interval=0.1, persistent=True)
+    tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09)
+    tm_register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1, persistent=True)
     if univ_pro:
-        bpy.app.timers.register(draw.Drawer2D.append_handler_with_delay,
-                            first_interval=0.1, persistent=True)
+        tm_register(draw.DrawerSubscribeRNA.register_handler, first_interval=0.1, persistent=True)
+        tm_register(draw.DrawerSubscribeRNA.subscribe, first_interval=0.15)  # NOTE: Call after register_handler
+        tm_register(draw.Drawer2D.append_handler_with_delay, first_interval=0.1, persistent=True)
+        tm_register(draw.Drawer3D.append_handler_with_delay, first_interval=0.1, persistent=True)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -352,6 +355,11 @@ def unregister():
     keymaps.remove_keymaps()
     keymaps.remove_keymaps_ws()
     icons.icons.unregister_icons_()
+
+    draw.DrawerSubscribeRNA.unregister_handler()
+    draw.Drawer2D.unregister()
+    draw.Drawer3D.unregister()
+
     for handle in reversed(bpy.app.handlers.depsgraph_update_post):
         if handle.__name__.startswith('univ_'):
             bpy.app.handlers.depsgraph_update_post.remove(handle)
@@ -383,7 +391,6 @@ def unregister():
     texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
 
     toggle.ToggleHandlers.unregister_handler()
-    draw.Drawer2D.unregister()
 
 
 if __name__ == "__main__":

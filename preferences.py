@@ -67,6 +67,10 @@ def _update_drawer_2d_enable(self, context):
     from . import draw
     draw.Drawer2D.update_data(self, context)
 
+def _update_drawer_3d_enable(self, context):
+    from . import draw
+    draw.Drawer3D.update_data(self, context)
+
 def _update_uv_layers_show(_self, _context):
     from .operators.misc import UNIV_OT_UV_Layers_Manager
     if _self.uv_layers_show:
@@ -167,7 +171,20 @@ class UNIV_Settings(bpy.types.PropertyGroup):
                                                     soft_max=6, size=2, subtype='TRANSLATION')
 
     # Drawer
-    overlay_2d_enable: BoolProperty(name='Overlay', default=True, update=_update_drawer_2d_enable)
+    overlay_2d_enable: BoolProperty(name='Overlay 2D', default=True, update=_update_drawer_2d_enable)
+    overlay_3d_enable: BoolProperty(name='Overlay 3D', default=True, update=_update_drawer_3d_enable)
+
+    overlay_3d_uv_vert_color: FloatVectorProperty(name="UV Select Vert", default=(1.0, 1.0, 1.0, 0.28),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+    overlay_3d_uv_edge_color: FloatVectorProperty(name="UV Select Edge", default=(0.82, 0.82, 0.82, 0.72),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+    overlay_3d_uv_face_color: FloatVectorProperty(name="UV Select Face", default=(0.0, 0.56, 1.0, 0.45),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+    overlay_toggle_xray: BoolProperty(name='Toggle X-Ray', default=False,
+        description="Shows faces through geometry. Vertices and edges are always visible in this mode, otherwise they are not visible.")
 
     # UV Layer
     uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)

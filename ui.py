@@ -396,6 +396,12 @@ class UNIV_PT_GlobalSettings(Panel):
         settings = univ_settings()
         if univ_pro:
             layout.prop(settings, 'overlay_2d_enable')
+            layout.prop(settings, 'overlay_3d_enable')
+            layout.prop(settings, 'overlay_3d_uv_vert_color')
+            layout.prop(settings, 'overlay_3d_uv_edge_color')
+            layout.prop(settings, 'overlay_3d_uv_face_color')
+            layout.prop(settings, 'overlay_toggle_xray')
+            layout.separator()
 
         row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')

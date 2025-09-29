@@ -564,9 +564,7 @@ class IconsCreator:
     def draw_background_colors(cls, coords, colors):
         shader = gpu.shader.from_builtin('FLAT_COLOR')
         from gpu_extras.batch import batch_for_shader
-        batch = batch_for_shader(
-            shader, 'TRIS',
-            {"pos": coords, "color": colors})
+        batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
         batch.draw(shader)
 
     @staticmethod
