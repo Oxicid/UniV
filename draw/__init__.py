@@ -66,7 +66,7 @@ class DrawerNonSyncSelectProcessing:
         shaders.blend_set_alpha()
         view_3d_theme = bpy.context.preferences.themes[0].view_3d
         shaders.set_point_size(view_3d_theme.vertex_size)
-        shaders.set_line_width(getattr(view_3d_theme, 'edge_width', 1) + 0.5)
+        shaders.set_line_width(getattr(view_3d_theme, 'edge_width', 1.0) + 1.0)
 
 
         # lst = ['NONE', 'ALWAYS', 'LESS', 'LESS_EQUAL', 'EQUAL', 'GREATER', 'GREATER_EQUAL']
