@@ -12,7 +12,9 @@ VK_ENABLED = False
 
 UNIFORM_COLOR = None
 UNIFORM_COLOR_3D = None
-FLAT_SHADING_UNIFORM_COLOR_3D = None
+
+# The color doesn't go into the shader, so it's hardcoded as a constant that gets updated when the color changes.
+FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT = None
 
 POLYLINE_UNIFORM_COLOR = None  # Edge Shader with width support
 POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
@@ -21,7 +23,7 @@ POINT_UNIFORM_COLOR = None  # Edge Shader with width support
 POINT_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
 
 set_line_width = lambda width: None
-set_line_width_vk = lambda shader: None
+set_line_width_vk = lambda shader, width=2.0: None
 set_point_size = gpu.state.point_size_set
 
 blend_set_alpha = lambda : gpu.state.blend_set('ALPHA')
@@ -101,57 +103,15 @@ class Shaders:
         else:
             global set_line_width_vk
 
-            def _set_line_width_vk(shader):
+            def _set_line_width_vk(shader, width=2.0):
+                shader.uniform_float('lineWidth', width)
                 shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
-                shader.uniform_float('lineWidth', 2.0)
 
             set_line_width_vk = _set_line_width_vk
 
 
         cls.init_flat_shading_uniform_color()
 
-
-    @staticmethod
-    def init_flat_shading_uniform_color():
-        vertex_shader = '''
-        in vec3 pos;
-        in vec3 normal;
-        
-        uniform mat4 mvp;
-        uniform vec4 color;
-        uniform mat3 normal_matrix;
-        uniform vec3 light_dir;
-
-        out vec4 fcolor;
-
-        void main()
-        {
-            vec3 n = normalize(normal_matrix * normal);
-            vec3 offset = pos + (n * 0.01);
-            gl_Position = mvp * vec4(offset, 1.0);
-
-            float lambert_light = max(dot(n, normalize(light_dir)), 0.3);
-            vec3 shaded = color.rgb * lambert_light;
-
-            fcolor = vec4(shaded, color.a);
-        }
-        '''
-
-        fragment_shader = '''
-        in vec4 fcolor;
-        out vec4 fragColor;
-
-        void main()
-        {
-            if (gl_FrontFacing) {
-                fragColor = blender_srgb_to_framebuffer_space(fcolor);
-            } else {
-                fragColor = blender_srgb_to_framebuffer_space(vec4(fcolor.rgb * 1.5, fcolor.a));
-            }
-        }
-        '''
-        global FLAT_SHADING_UNIFORM_COLOR_3D
-        FLAT_SHADING_UNIFORM_COLOR_3D = gpu.types.GPUShader(vertex_shader, fragment_shader)
 
     @staticmethod
     def get_round_shape_vertex():
@@ -179,4 +139,67 @@ class Shaders:
                 gl_FragColor = vec4(1.0, 1.0, 0.0, 1);
             }
         """
+        return vertex_shader, fragment_shader
 
+    @classmethod
+    def init_flat_shading_uniform_color(cls):
+        vert_out = gpu.types.GPUStageInterfaceInfo("UniV")
+        vert_out.smooth('VEC4', "fcolor")
+
+        shader_info = gpu.types.GPUShaderCreateInfo()
+        shader_info.push_constant('MAT4', "mvp")
+        shader_info.push_constant('MAT3', "normal_matrix")
+        shader_info.push_constant('VEC3', "light_dir")
+
+
+        shader_info.vertex_in(0, 'VEC3', "pos")
+        shader_info.vertex_in(1, 'VEC3', "normal")
+        shader_info.vertex_out(vert_out)
+        shader_info.fragment_out(0, 'VEC4', "fragColor")
+
+        from .. import preferences
+        r, g, b, a = preferences.univ_settings().overlay_3d_uv_face_color
+        color_glsl_constant = f"\nconst vec4 color = vec4({r:.6f}, {g:.6f}, {b:.6f}, {a:.6f});\n\n"
+
+        shader_info.vertex_source(color_glsl_constant + '''
+        void main()
+        {   
+            vec3 n = normalize(normal_matrix * normal);
+            vec3 offset = pos + (n * 0.0025);
+            gl_Position = mvp * vec4(offset, 1.0);
+
+            float lambert_light = max(dot(n, normalize(light_dir)), 0.3);
+            vec3 shaded = color.rgb * lambert_light;
+
+            fcolor = vec4(shaded, color.a);
+        }
+        '''
+        )
+
+        shader_info.fragment_source('''
+        void main()
+        {
+            if (gl_FrontFacing) {
+                fragColor = (fcolor);
+            } else {
+                fragColor = vec4(fcolor.rgb * 0.5, fcolor.a);
+            }
+        }
+        '''
+        )
+
+        global FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
+        FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT = gpu.shader.create_from_info(shader_info)
+
+    @staticmethod
+    def unpack_vec4() -> str:
+        return  '''
+        vec4 unpack_vec4(uint packed) {
+            float r = float((packed >> 24) & 0xFF000000u) / 255.0;
+            float g = float((packed >> 16) & 0x00FF0000u) / 255.0;
+            float b = float((packed >> 8)  & 0x0000FF00u) / 255.0;
+            float a = float(packed & 0x000000FF) / 255.0;
+            return vec4(r, g, b, a);
+        }
+
+        '''

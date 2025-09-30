@@ -57,45 +57,42 @@ class DrawerSeamsProcessing:
 
 class DrawerNonSyncSelectProcessing:
     @staticmethod
-    def draw_fn_2d(shader, batch, color, world_matrix):
-
+    def draw_fn_2d(shader, batch, verts_lines_color, world_matrix):
         verts_lines_shader, tris_shader = shader
         verts_lines_batch, tris_batch = batch
-        verts_lines_color, tris_color = color
 
         shaders.blend_set_alpha()
         view_3d_theme = bpy.context.preferences.themes[0].view_3d
-        shaders.set_point_size(view_3d_theme.vertex_size)
-        shaders.set_line_width(getattr(view_3d_theme, 'edge_width', 1.0) + 1.0)
+        shaders.set_point_size(view_3d_theme.vertex_size + 1.0)
+        edge_width = getattr(view_3d_theme, 'edge_width', 1.0) + 1.0
+        shaders.set_line_width(edge_width)
 
-
-        # lst = ['NONE', 'ALWAYS', 'LESS', 'LESS_EQUAL', 'EQUAL', 'GREATER', 'GREATER_EQUAL']
         gpu.state.depth_test_set('ALWAYS' if univ_settings().overlay_toggle_xray else 'LESS')  # enable deps-test
         gpu.state.depth_mask_set(True)  # write in depth-buffer
 
         if tris_batch:
-            rv3d = bpy.context.region_data
-
-            mvp = rv3d.perspective_matrix @ world_matrix
             tris_shader.bind()
+            rv3d = bpy.context.region_data
+            mvp = rv3d.perspective_matrix @ world_matrix
             tris_shader.uniform_float("mvp", mvp)
 
             normal_matrix = world_matrix.to_3x3().inverted_safe().transposed()
             tris_shader.uniform_float("normal_matrix", normal_matrix)
-            tris_shader.uniform_float("color", tris_color)
 
-            view_dir = (rv3d.view_rotation @ Vector((0.0, 0.0, 1.0))).normalized()
-
+            view_dir = rv3d.view_rotation @ Vector((0.0, 0.0, 1.0))
             tris_shader.uniform_float("light_dir", view_dir)
-            tris_batch.draw(tris_shader)
 
+            tris_batch.draw(tris_shader)
 
         gpu.state.depth_test_set('ALWAYS')  # enable deps-test
         gpu.state.depth_mask_set(True)
         if verts_lines_batch:
             verts_lines_shader.bind()
             verts_lines_shader.uniform_float("color", verts_lines_color)
-            # shaders.set_line_width_vk(verts_lines_shader)
+            try:
+                # TODO: Split shaders by elem mode
+                shaders.set_line_width_vk(verts_lines_shader, edge_width)
+            except: pass  # noqa
             rv3d = bpy.context.region_data
 
             with gpu.matrix.push_pop():
@@ -136,9 +133,9 @@ class DrawerNonSyncSelectProcessing:
     @staticmethod
     def get_color():
         if bpy.context.tool_settings.uv_select_mode == 'VERTEX':
-            return univ_settings().overlay_3d_uv_vert_color, univ_settings().overlay_3d_uv_face_color
+            return univ_settings().overlay_3d_uv_vert_color
         else:
-            return univ_settings().overlay_3d_uv_edge_color, univ_settings().overlay_3d_uv_face_color
+            return univ_settings().overlay_3d_uv_edge_color
 
     @classmethod
     def update_color(cls):
@@ -156,9 +153,9 @@ class DrawerNonSyncSelectProcessing:
     @staticmethod
     def get_shader():
         if bpy.context.tool_settings.uv_select_mode == 'VERTEX':
-            return shaders.POINT_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D
+            return shaders.POINT_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
         else:
-            return shaders.POLYLINE_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D
+            return shaders.POLYLINE_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
 
     @staticmethod
     def is_enable():

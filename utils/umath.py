@@ -179,6 +179,13 @@ def np_vec_dot(a, b):
 def np_vec_normalized(a, keepdims=True):
     return np.linalg.norm(a, axis=1, keepdims=keepdims)
 
+def pack_rgba_to_uint32(rgba) -> int:
+    r = int(rgba[0] * 255.0) & 0xFF
+    g = int(rgba[1] * 255.0) & 0xFF
+    b = int(rgba[2] * 255.0) & 0xFF
+    a = int(rgba[3] * 255.0) & 0xFF
+    return (r << 24) | (g << 16) | (b << 8) | a
+
 # def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
 #     line_vecs = l_b - l_a
 #     pt_vecs = pt - l_a
