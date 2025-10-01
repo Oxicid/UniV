@@ -6,11 +6,13 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy  # noqa
+import bmesh
 import typing
 
+from .. import utypes
 from bmesh.types import BMFace, BMLoop
 
-from .. import utypes
+USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
 
 def face_select_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa

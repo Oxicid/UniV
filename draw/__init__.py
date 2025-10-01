@@ -80,7 +80,7 @@ class DrawerNonSyncSelectProcessing:
             tris_shader.uniform_float("normal_matrix", normal_matrix)
 
             view_dir = rv3d.view_rotation @ Vector((0.0, 0.0, 1.0))
-            tris_shader.uniform_float("light_dir", view_dir)
+            tris_shader.uniform_float("light_dir", view_dir.xy)
 
             tris_batch.draw(tris_shader)
 

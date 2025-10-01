@@ -144,13 +144,12 @@ class Shaders:
     @classmethod
     def init_flat_shading_uniform_color(cls):
         vert_out = gpu.types.GPUStageInterfaceInfo("UniV")
-        vert_out.smooth('VEC4', "fcolor")
+        vert_out.smooth('VEC3', "fcolor")
 
         shader_info = gpu.types.GPUShaderCreateInfo()
         shader_info.push_constant('MAT4', "mvp")
         shader_info.push_constant('MAT3', "normal_matrix")
-        shader_info.push_constant('VEC3', "light_dir")
-
+        shader_info.push_constant('VEC2', "light_dir")
 
         shader_info.vertex_in(0, 'VEC3', "pos")
         shader_info.vertex_in(1, 'VEC3', "normal")
@@ -164,25 +163,30 @@ class Shaders:
         shader_info.vertex_source(color_glsl_constant + '''
         void main()
         {   
-            vec3 n = normalize(normal_matrix * normal);
-            vec3 offset = pos + (n * 0.0025);
-            gl_Position = mvp * vec4(offset, 1.0);
+            vec3 n = normal_matrix * normal;
 
-            float lambert_light = max(dot(n, normalize(light_dir)), 0.3);
+            vec4 clip_ = mvp * vec4(pos, 1.0);
+            clip_.z -= 0.00005 * clip_.w;
+            gl_Position = clip_;
+            
+            float derive_z = sqrt(1.0f - light_dir.x*light_dir.x - light_dir.y*light_dir.y);
+            vec3 light_dir_ = vec3(light_dir, derive_z);
+            
+            float lambert_light = max(dot(n, light_dir_), 0.3);
             vec3 shaded = color.rgb * lambert_light;
 
-            fcolor = vec4(shaded, color.a);
+            fcolor = shaded;
         }
         '''
         )
 
-        shader_info.fragment_source('''
+        shader_info.fragment_source(color_glsl_constant + '''
         void main()
         {
             if (gl_FrontFacing) {
-                fragColor = (fcolor);
+                fragColor = vec4(fcolor, color.a);
             } else {
-                fragColor = vec4(fcolor.rgb * 0.5, fcolor.a);
+                fragColor = vec4(fcolor * 0.6, color.a);
             }
         }
         '''
