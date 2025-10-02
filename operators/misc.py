@@ -637,6 +637,7 @@ class UNIV_OT_Focus(Operator):
         lines = bounds.draw_data_lines()
 
         n_panel_width = next(r.width for r in context.area.regions if r.type == 'UI')
+        tools_width = next(r.width for r in context.area.regions if r.type == 'TOOLS')
         bounds.scale(1.2)  # Add padding
 
         space_data = context.area.spaces.active
@@ -655,16 +656,18 @@ class UNIV_OT_Focus(Operator):
         image_size[1] *= aspect[1]
 
         # adjust offset and zoom
-        c_region = utypes.ARegion.get_fields(context.region)
+        c_region = utypes.ARegion(context.region)
 
-        size_y = c_region.winrct.height / ((bounds.height + 0.00001) * image_size[1])
-        size_x = (c_region.winrct.width - n_panel_width) / ((bounds.width + 0.00001) * image_size[0])
+        zero_division_avoid = 0.00001
+        size_y = c_region.winrct.height / ((bounds.height + zero_division_avoid) * image_size[1])
+        size_x = (c_region.winrct.width - n_panel_width - tools_width) / ((bounds.width + zero_division_avoid) * image_size[0])
 
         zoom = min(size_x, size_y)
         if zoom > 100.0:
             zoom = 100.0
 
-        sima.xof = round((bounds.center_x - 0.5) * image_size[0] + (n_panel_width / zoom) / 2)
+        offset_x = (n_panel_width - tools_width) / zoom / 2
+        sima.xof = round((bounds.center_x - 0.5) * image_size[0] + offset_x)
         sima.yof = round((bounds.center_y - 0.5) * image_size[1])
 
         # sima_zoom_set

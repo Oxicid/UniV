@@ -9,6 +9,7 @@ import bpy
 import typing
 from ctypes import (
     POINTER,
+    Union,
     Structure,
     c_float,
     c_short,
@@ -58,6 +59,18 @@ class StructBase(Structure):
         setattr(cls, 'info', info_size)
         cls._subclasses.append(cls)
 
+    def __new__(cls, srna: bpy_struct_subclass | None =None):
+        if srna is None:
+            return super().__new__(cls)
+        try:
+            return cls.from_address(srna.as_pointer())
+        except AttributeError:
+            raise Exception("Not a StructRNA instance")
+
+    # Required
+    def __init__(self, *_):  # noqa
+        pass
+
     @staticmethod
     def _init_structs():
         """ Initialize subclasses, converting annotations to fields. """
@@ -65,10 +78,16 @@ class StructBase(Structure):
 
         for cls in StructBase._subclasses:
             fields = []
-            for field, value in cls.__annotations__.items():
+            anons = []
+            for key, value in cls.__annotations__.items():
                 if isinstance(value, functype):
                     value = value()
-                fields.append((field, value))
+                elif isinstance(value, Union):
+                    anons.append(key)
+                fields.append((key, value))
+
+            if anons:
+                cls._anonynous_ = anons
 
             if fields:  # Base classes might not have _fields_. Don't set anything.
                 cls._fields_ = fields
