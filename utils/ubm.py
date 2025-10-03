@@ -370,7 +370,7 @@ def linked_crn_to_vert_pair(crn: BMLoop, uv, sync: bool):
 
 
 def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
-    """Linked to arg corner by island index with arg corner"""
+    """Linked to arg corner by island index with arg corner (non-included)"""
     is_invisible = is_invisible_func(sync)
     first_vert = crn.vert
 

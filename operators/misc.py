@@ -662,7 +662,7 @@ class UNIV_OT_Focus(Operator):
         size_y = c_region.winrct.height / ((bounds.height + zero_division_avoid) * image_size[1])
         size_x = (c_region.winrct.width - n_panel_width - tools_width) / ((bounds.width + zero_division_avoid) * image_size[0])
 
-        zoom = min(size_x, size_y)
+        zoom = max(min(size_x, size_y), 0.05)
         if zoom > 100.0:
             zoom = 100.0
 

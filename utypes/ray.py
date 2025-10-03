@@ -466,7 +466,7 @@ class CrnEdgeHit:
     def find_nearest_crn_by_visible_faces(self, umesh, use_faces_from_umesh_seq=False):
         from .. import utils
         from math import nextafter, inf
-        from mathutils.geometry import intersect_point_line
+        from ..utils import intersect_point_line_segment
 
         pt = self.point
         min_dist = self.min_dist
@@ -485,15 +485,7 @@ class CrnEdgeHit:
             for crn in corners:
                 v_curr = crn[uv].uv
 
-                # +15% faster without call function
-                # close_pt = closest_pt_to_line(pt, v_prev, v_curr)
-                close_pt, percent = intersect_point_line(pt, v_prev, v_curr)
-                if percent < 0.0:
-                    close_pt = v_prev
-                elif percent > 1.0:
-                    close_pt = v_curr
-
-                dist = (close_pt - pt).length
+                _, dist = intersect_point_line_segment(pt, v_prev, v_curr)
                 if dist < min_dist:
                     # If the point is inside the face, we add it immediately,
                     # otherwise, we do nextafter and check again for nearest.

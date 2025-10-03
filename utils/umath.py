@@ -3,6 +3,7 @@
 
 import math
 import typing
+import mathutils
 import numpy as np
 from math import floor
 from bl_math import lerp
@@ -185,6 +186,18 @@ def pack_rgba_to_uint32(rgba) -> int:
     b = int(rgba[2] * 255.0) & 0xFF
     a = int(rgba[3] * 255.0) & 0xFF
     return (r << 24) | (g << 16) | (b << 8) | a
+
+if hasattr(mathutils.geometry, 'intersect_point_line_segment'):
+    # version >= (5, 0, 0)
+    intersect_point_line_segment = mathutils.geometry.intersect_point_line_segment
+else:
+    def intersect_point_line_segment(pt, line_a, line_b):
+        close_pt, percent = intersect_point_line(pt, line_a, line_b)
+        if percent < 0.0:
+            close_pt = line_a
+        elif percent > 1.0:
+            close_pt = line_b
+        return close_pt, (close_pt - pt).length
 
 # def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
 #     line_vecs = l_b - l_a
