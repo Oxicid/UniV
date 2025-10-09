@@ -403,6 +403,25 @@ class BBox:
             return False
         return True
 
+    def isect_triangles(self, tris):
+        from mathutils.geometry import intersect_tri_tri_2d
+        assert tris
+        a0, a1, a2, a3, a4, a5 = self.draw_data_tris()
+        if isinstance(tris[0], tuple):
+            for b0, b1, b2 in tris:
+                if intersect_tri_tri_2d(a0, a1, a2, b0, b1, b2):
+                    return True
+                if intersect_tri_tri_2d(a3, a4, a5, b0, b1, b2):
+                    return True
+        else:
+            for i in range(0, len(tris), 3):
+                b0, b1, b2 = tris[i], tris[i + 1], tris[i + 2]
+                if intersect_tri_tri_2d(a0, a1, a2, b0, b1, b2):
+                    return True
+                if intersect_tri_tri_2d(a3, a4, a5, b0, b1, b2):
+                    return True
+        return False
+
     def length_x(self, x) -> float:
         if x < self.xmin:
             return self.xmin - x

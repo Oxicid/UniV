@@ -174,6 +174,87 @@ class PaddingHelper:
                                          'which will result in incorrect padding.')
 
 
+class ViewBoxSyncBlock:
+    def __init__(self, bbox):
+        self.view_box = bbox
+        self.has_blocked = False
+        self.skip = False
+
+    def isect_island(self, island):
+        from ..utypes import BBox, FaceIsland, AdvIsland  # , UnionIslands
+
+        if self.skip:
+            return True
+
+        view: BBox = self.view_box
+        isl_bbox: BBox = island.calc_bbox()
+
+        if not view.isect(isl_bbox):
+            return False
+        if view.isect_x(isl_bbox.xmin) and view.isect_x(isl_bbox.xmax):
+            return True
+        if view.isect_y(isl_bbox.ymin) and view.isect_y(isl_bbox.ymax):
+            return True
+
+        if type(island) == FaceIsland:
+            island = AdvIsland(island.faces, island.umesh)
+
+        if not island.flat_coords:
+            island.calc_tris_simple()
+            island.calc_flat_coords(save_triplet=True)
+
+        if view.isect_triangles(island.flat_coords):
+            return True
+        self.has_blocked = True
+        return False
+
+    def has_inner_selection(self, island):
+        if self.skip:
+            return True
+        if not (island.umesh.elem_mode in ('VERT', 'EDGE')):
+            return True
+
+        assert island.umesh.sync
+
+        uv = island.umesh.uv
+        if island.umesh.elem_mode == 'VERT':
+            def vert_has_unpair_select(crn_: BMLoop):
+                if not crn_.vert.select:
+                    return False
+                # If the number of all visible faces and the number of linked corners are the same,
+                # then they belong to the same island, and this is not a random selection.
+                count_visible_faces = sum(not f_.hide for f_ in crn_.vert.link_faces)
+                count_linked_corners = len(linked_crn_to_vert_pair_with_seam(crn_, uv, True)) + 1
+                return count_visible_faces == count_linked_corners
+
+            for f in island:
+                for crn in f.loops:
+                    if vert_has_unpair_select(crn):
+                        return True
+        else:
+            def edge_has_unpair_select(crn_: BMLoop):
+                if not crn_.edge.select:
+                    return False
+                if crn_.edge.is_boundary:
+                    return True
+                if crn_.edge.seam:
+                    return False
+                pair = crn_.link_loop_radial_prev
+                if pair.face.hide:
+                    return True
+                return is_pair(crn_, pair, uv)
+
+            for f in island:
+                for crn in f.loops:
+                    if edge_has_unpair_select(crn):
+                        return True
+        return False
+
+    def flush_if_blocked(self):
+        if self.has_blocked:
+            from ..draw import LinesDrawSimple
+            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (0.05, 0.2, 0.9, 0.8))
+
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 
