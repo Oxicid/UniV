@@ -657,6 +657,12 @@ class FaceIsland:
             if self.umesh.sync and not self.umesh.sync_valid:
                 return not any(f.select for f in self)
             return not any(f.uv_select for f in self)
+
+        def is_full_vert_deselected(self):
+            if self.umesh.sync and not self.umesh.sync_valid:
+                return not any(v.select for f in self for v in f.verts)
+            return not any(crn.uv_select_vert for f in self for crn in f.loops)
+
     else:
         def is_full_face_selected(self):
             if self.umesh.sync:
@@ -668,6 +674,12 @@ class FaceIsland:
         def is_full_face_deselected(self):
             if self.umesh.sync:
                 return not any(f.select for f in self)
+            uv = self.umesh.uv
+            return not any(crn[uv].select for f in self for crn in f.loops)
+
+        def is_full_vert_deselected(self):
+            if self.umesh.sync:
+                return not any(v.select for f in self for v in f.verts)
             uv = self.umesh.uv
             return not any(crn[uv].select for f in self for crn in f.loops)
 

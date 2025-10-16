@@ -70,6 +70,14 @@ class UMesh:
         if hasattr(self.bm, 'uv_select_sync_valid'):
             self.bm.uv_select_sync_valid = state
 
+    def sync_from_mesh_if_needed(self, sticky=''):
+        if USE_GENERIC_UV_SYNC:
+            if not self.bm.uv_select_sync_valid:
+                if sticky:
+                    self.bm.uv_select_sync_from_mesh(sticky_select_mode=sticky)
+                else:
+                    self.bm.uv_select_sync_from_mesh()
+
     def mesh_to_bmesh(self):
         bm = bmesh.from_edit_mesh(self.obj.data)
         self.bm = bm
