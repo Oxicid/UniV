@@ -1744,9 +1744,8 @@ class Islands(IslandsBase):
     @classmethod
     def calc_extended_any_elem_with_mark_seam(cls, umesh: _umesh.UMesh):
         """Get islands with vertex select."""
-        # TODO: Fix behavior in face mode
         if umesh.sync:
-            if umesh.elem_mode == 'FACE':
+            if umesh.elem_mode in ('FACE', 'ISLAND'):
                 if umesh.is_full_face_deselected:
                     return cls()
             elif umesh.elem_mode == 'VERT':
@@ -1763,8 +1762,12 @@ class Islands(IslandsBase):
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         else:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
-                       if cls.island_filter_is_any_vert_selected(i, umesh)]
+            if umesh.elem_mode in ('FACE', 'ISLAND'):
+                islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                           if cls.island_filter_is_any_face_selected(i, umesh)]
+            else:
+                islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                           if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
