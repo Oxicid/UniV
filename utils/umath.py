@@ -11,16 +11,23 @@ from mathutils import Vector
 from mathutils.geometry import intersect_point_line
 
 
-def all_equal(sequence, key: typing.Callable | None = None):
+def all_equal(sequence: typing.Iterable, key: typing.Callable | None = None):
     if key is None:
         sequence_iter = iter(sequence)
-        first = next(sequence_iter)
+        try:
+            first = next(sequence_iter)
+        except StopIteration:
+            return True
+
         for i in sequence_iter:
             if i != first:
                 return False
     else:
         sequence_iter = iter(sequence)
-        first = key(next(sequence_iter))
+        try:
+            first = key(next(sequence_iter))
+        except StopIteration:
+            return True
         for i in sequence_iter:
             if key(i) != first:
                 return False
