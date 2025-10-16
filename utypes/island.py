@@ -27,6 +27,7 @@ from ..utils import umath
 from . import umesh as _umesh
 from . import BBox
 
+USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
 class eInfoSelectFaceIsland(enum.IntEnum):
     UNSELECTED = 0
@@ -98,10 +99,13 @@ class SaveTransform:
     def calc_static_corners(island, uv) -> tuple[list[BMLoop], list[BMLoop]]:
         corners = []
         pinned_corners = []
+        vert_select_get = utils.vert_select_get_func(island.umesh)
+
         if island.umesh.sync:
             if island.umesh.elem_mode == 'FACE':
+                face_select_get = utils.face_select_get_func(island.umesh)
                 for f in island:
-                    if f.select:
+                    if face_select_get(f):
                         for crn in f.loops:
                             if crn[uv].pin_uv:
                                 pinned_corners.append(crn)
@@ -114,30 +118,27 @@ class SaveTransform:
                                 # crn_uv.pin_uv = True
                                 corners.append(crn)
             elif island.umesh.elem_mode == 'EDGE':
+                edge_select_get = utils.edge_select_get_func(island.umesh)
                 for f in island:
                     for crn in f.loops:
-                        crn_uv = crn[uv]
-                        if not crn.edge.select:
-                            # crn_uv.pin_uv = True
+                        if not edge_select_get(crn):
                             corners.append(crn)
-                        elif crn_uv.pin_uv:
+                        elif crn[uv].pin_uv:
                             pinned_corners.append(crn)
 
             else:  # VERTS
                 for f in island:
                     for crn in f.loops:
-                        crn_uv = crn[uv]
-                        if not crn.vert.select:
+                        if not vert_select_get(crn):
                             corners.append(crn)
-                        elif crn_uv.pin_uv:
+                        elif crn[uv].pin_uv:
                             pinned_corners.append(crn)
         else:
             for f in island:
                 for crn in f.loops:
-                    crn_uv = crn[uv]
-                    if not crn_uv.select:
+                    if not vert_select_get(crn):
                         corners.append(crn)
-                    elif crn_uv.pin_uv:
+                    elif crn[uv].pin_uv:
                         pinned_corners.append(crn)
 
         return corners, pinned_corners
@@ -561,18 +562,44 @@ class FaceIsland:
     def select(self):
         raise NotImplementedError()
 
-    @select.setter
-    def select(self, state: bool):
-        if self.umesh.sync:
-            for face in self.faces:
-                face.select = state
-        else:
-            uv = self.umesh.uv
-            for face in self.faces:
-                for crn in face.loops:
-                    luv = crn[uv]
-                    luv.select = state
-                    luv.select_edge = state
+    if USE_GENERIC_UV_SYNC:
+        @select.setter
+        def select(self, state: bool):
+            # TODO: Use bm.foreach
+            if self.umesh.sync:
+                if self.umesh.sync_valid:
+                    for face in self.faces:
+                        face.select = state
+                        face.uv_select = state
+                        for crn in face.loops:
+                            crn.uv_select_vert = state
+                            crn.uv_select_edge = state
+                else:
+                    if state:  # FAST_LOAD
+                        for face in self.faces:
+                            face.select = True
+                    else:
+                        for face in self.faces:
+                            face.select = False
+            else:
+                for face in self.faces:
+                    face.uv_select = state
+                    for crn in face.loops:
+                        crn.uv_select_vert = state
+                        crn.uv_select_edge = state
+    else:
+        @select.setter
+        def select(self, state: bool):
+            if self.umesh.sync:
+                for face in self.faces:
+                    face.select = state
+            else:
+                uv = self.umesh.uv
+                for face in self.faces:
+                    for crn in face.loops:
+                        luv = crn[uv]
+                        luv.select = state
+                        luv.select_edge = state
 
     def hide_first(self):
         if self.umesh.sync:
@@ -623,27 +650,6 @@ class FaceIsland:
         else:
             for face in self.faces:
                 face.select = False
-
-    @property
-    def select_all_elem(self):
-        raise NotImplementedError()
-
-    @select_all_elem.setter
-    def select_all_elem(self, state: bool):
-        if self.umesh.sync:
-            for face in self.faces:
-                face.select = state
-                for v in face.verts:
-                    v.select = state
-                for e in face.edges:
-                    e.select = state
-        else:
-            uv = self.umesh.uv
-            for face in self.faces:
-                for crn in face.loops:
-                    luv = crn[uv]
-                    luv.select = state
-                    luv.select_edge = state
 
     def is_full_face_selected(self):
         if self.umesh.sync:
@@ -1226,124 +1232,223 @@ class AdvIsland(FaceIsland):
         return f'Advanced Island. Faces count = {len(self.faces)}, Tris Count = {len(self.tris)}'
 
 
-class IslandsBaseTagFilterPre:
-    @staticmethod
-    def tag_filter_all(umesh: _umesh.UMesh, tag=True):
-        for face in umesh.bm.faces:
-            face.tag = tag
+if USE_GENERIC_UV_SYNC:
+    class IslandsBaseTagFilterPre:
+        @staticmethod
+        def tag_filter_all(umesh: _umesh.UMesh, tag=True):
+            for face in umesh.bm.faces:
+                face.tag = tag
 
-    @staticmethod
-    def tag_filter_selected(umesh: _umesh.UMesh):
-        uv = umesh.uv
-        if umesh.is_full_face_selected:
+        @staticmethod
+        def tag_filter_selected(umesh: _umesh.UMesh):
+            if umesh.is_full_face_selected:
+                if umesh.sync and not umesh.sync_valid:
+                    for face in umesh.bm.faces:
+                        face.tag = True
+                else:
+                    for face in umesh.bm.faces:
+                        face.tag = face.uv_select
+                return
+
+            if umesh.sync:
+                if umesh.sync_valid:
+                    for face in umesh.bm.faces:
+                        face.tag = (face.uv_select and not face.hide)
+                else:
+                    for face in umesh.bm.faces:
+                        face.tag = face.select
+            else:
+                for face in umesh.bm.faces:
+                    face.tag = face.select and face.uv_select
+
+        @staticmethod
+        def tag_filter_non_selected(umesh: _umesh.UMesh):
+            if umesh.sync:
+                if umesh.is_full_face_deselected:
+                    for face in umesh.bm.faces:
+                        face.tag = not face.hide
+                    return
+
+                for face in umesh.bm.faces:
+                    face.tag = not (face.select or face.hide)
+            else:
+                if umesh.is_full_face_selected:
+                    for face in umesh.bm.faces:
+                        face.tag = not face.uv_select
+                else:
+                    for face in umesh.bm.faces:
+                        face.tag = not face.uv_select and face.select
+
+        @staticmethod
+        def tag_filter_visible(umesh: _umesh.UMesh):
+            if umesh.is_full_face_selected:
+                for face in umesh.bm.faces:
+                    face.tag = True
+                return
+
             if umesh.sync:
                 for face in umesh.bm.faces:
-                    face.tag = True
-                return
-            if umesh.elem_mode == 'VERT':
-                for face in umesh.bm.faces:
-                    face.tag = all(crn[uv].select for crn in face.loops)
-            else:
-                for face in umesh.bm.faces:
-                    face.tag = all(crn[uv].select_edge for crn in face.loops)
-            return
-
-        if umesh.sync:
-            for face in umesh.bm.faces:
-                face.tag = face.select
-            return
-        if umesh.elem_mode == 'VERT':
-            for face in umesh.bm.faces:
-                face.tag = all(crn[uv].select for crn in face.loops) and face.select
-        else:
-            for face in umesh.bm.faces:
-                face.tag = all(crn[uv].select_edge for crn in face.loops) and face.select
-
-    @staticmethod
-    def tag_filter_non_selected(umesh: _umesh.UMesh):
-        if umesh.sync:
-            if umesh.is_full_face_deselected:
-                for face in umesh.bm.faces:
                     face.tag = not face.hide
-                return
-
-            for face in umesh.bm.faces:
-                face.tag = not (face.select or face.hide)
-        else:
-            uv = umesh.uv
-            if umesh.is_full_face_selected:
-                if umesh.elem_mode == 'VERT':
-                    for face in umesh.bm.faces:
-                        face.tag = not all(l[uv].select for l in face.loops)
-                else:
-                    for face in umesh.bm.faces:
-                        face.tag = not all(l[uv].select_edge for l in face.loops)
-            else:
-                if umesh.elem_mode == 'VERT':
-                    for face in umesh.bm.faces:
-                        face.tag = not all(l[uv].select for l in face.loops) and face.select
-                else:
-                    for face in umesh.bm.faces:
-                        face.tag = not all(l[uv].select_edge for l in face.loops) and face.select
-
-    @staticmethod
-    def tag_filter_visible(umesh: _umesh.UMesh):
-        if umesh.sync:
-            for face in umesh.bm.faces:
-                face.tag = not face.hide
-        else:
-            if umesh.is_full_face_selected:
-                for face in umesh.bm.faces:
-                    face.tag = True
             else:
                 for face in umesh.bm.faces:
                     face.tag = face.select
+else:
+    class IslandsBaseTagFilterPre:
+        @staticmethod
+        def tag_filter_all(umesh: _umesh.UMesh, tag=True):
+            for face in umesh.bm.faces:
+                face.tag = tag
 
-
-class IslandsBaseTagFilterPost:
-
-    @staticmethod
-    def island_filter_is_partial_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
-        if umesh.sync:
-            select = (face.select for face in island)
-        else:
+        @staticmethod
+        def tag_filter_selected(umesh: _umesh.UMesh):
             uv = umesh.uv
-            select = (all(crn[uv].select_edge for crn in face.loops) for face in island)  # TODO: Add vertex select
-        first_check = next(select)
-        return any(first_check is not i for i in select)
+            if umesh.is_full_face_selected:
+                if umesh.sync:
+                    for face in umesh.bm.faces:
+                        face.tag = True
+                    return
+                if umesh.elem_mode == 'VERT':
+                    for face in umesh.bm.faces:
+                        face.tag = all(crn[uv].select for crn in face.loops)
+                else:
+                    for face in umesh.bm.faces:
+                        face.tag = all(crn[uv].select_edge for crn in face.loops)
+                return
 
-    @staticmethod
-    def island_filter_is_all_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
-        if umesh.sync:
-            return all(face.select for face in island)
-        else:
-            uv = umesh.uv
-            return all(all(crn[uv].select_edge for crn in face.loops) for face in island)
+            if umesh.sync:
+                for face in umesh.bm.faces:
+                    face.tag = face.select
+                return
+            if umesh.elem_mode == 'VERT':
+                for face in umesh.bm.faces:
+                    face.tag = all(crn[uv].select for crn in face.loops) and face.select
+            else:
+                for face in umesh.bm.faces:
+                    face.tag = all(crn[uv].select_edge for crn in face.loops) and face.select
 
-    @staticmethod
-    def island_filter_is_any_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
-        if umesh.sync:
-            return any(face.select for face in island)
-        else:
-            uv = umesh.uv
-            return any(all(crn[uv].select_edge for crn in face.loops) for face in island)
+        @staticmethod
+        def tag_filter_non_selected(umesh: _umesh.UMesh):
+            if umesh.sync:
+                if umesh.is_full_face_deselected:
+                    for face in umesh.bm.faces:
+                        face.tag = not face.hide
+                    return
 
-    @staticmethod
-    def island_filter_is_any_vert_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
-        if umesh.sync:
-            return any(v.select for face in island for v in face.verts)
-        else:
-            uv = umesh.uv
-            return any(crn[uv].select for face in island for crn in face.loops)
+                for face in umesh.bm.faces:
+                    face.tag = not (face.select or face.hide)
+            else:
+                uv = umesh.uv
+                if umesh.is_full_face_selected:
+                    if umesh.elem_mode == 'VERT':
+                        for face in umesh.bm.faces:
+                            face.tag = not all(l[uv].select for l in face.loops)
+                    else:
+                        for face in umesh.bm.faces:
+                            face.tag = not all(l[uv].select_edge for l in face.loops)
+                else:
+                    if umesh.elem_mode == 'VERT':
+                        for face in umesh.bm.faces:
+                            face.tag = not all(l[uv].select for l in face.loops) and face.select
+                    else:
+                        for face in umesh.bm.faces:
+                            face.tag = not all(l[uv].select_edge for l in face.loops) and face.select
 
-    @staticmethod
-    def island_filter_is_any_edge_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
-        if umesh.sync:
-            return any(e.select for face in island for e in face.edges)
-        else:
-            uv = umesh.uv
-            return any(crn[uv].select_edge for face in island for crn in face.loops)
+        @staticmethod
+        def tag_filter_visible(umesh: _umesh.UMesh):
+            if umesh.sync:
+                for face in umesh.bm.faces:
+                    face.tag = not face.hide
+            else:
+                if umesh.is_full_face_selected:
+                    for face in umesh.bm.faces:
+                        face.tag = True
+                else:
+                    for face in umesh.bm.faces:
+                        face.tag = face.select
 
+
+if USE_GENERIC_UV_SYNC:
+    class IslandsBaseTagFilterPost:
+
+        @staticmethod
+        def island_filter_is_partial_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync and not umesh.sync_valid:
+                select = (f.select for f in island)
+            else:
+                select = (f.uv_select for f in island)
+            return not utils.all_equal(select)
+
+        @staticmethod
+        def island_filter_is_all_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync and not umesh.sync_valid:
+                return all(f.select for f in island)
+            else:
+                return all(f.uv_select for f in island)
+
+        @staticmethod
+        def island_filter_is_any_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync and not umesh.sync_valid:
+                return any(f.select for f in island)
+            else:
+                return any(f.uv_select for f in island)
+
+        @staticmethod
+        def island_filter_is_any_vert_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync and not umesh.sync_valid:
+                return any(v.select for face in island for v in face.verts)
+            else:
+                return any(crn.uv_select_vert for face in island for crn in face.loops)
+
+        @staticmethod
+        def island_filter_is_any_edge_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync and not umesh.sync_valid:
+                return any(e.select for face in island for e in face.edges)
+            else:
+                return any(crn.uv_select_edge for face in island for crn in face.loops)
+else:
+    class IslandsBaseTagFilterPost:
+
+        @staticmethod
+        def island_filter_is_partial_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync:
+                select = (face.select for face in island)
+            else:
+                uv = umesh.uv
+                select = (all(crn[uv].select_edge for crn in face.loops) for face in island)  # TODO: Add vertex select
+            first_check = next(select)
+            return any(first_check is not i for i in select)
+
+        @staticmethod
+        def island_filter_is_all_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync:
+                return all(face.select for face in island)
+            else:
+                uv = umesh.uv
+                return all(all(crn[uv].select_edge for crn in face.loops) for face in island)
+
+        @staticmethod
+        def island_filter_is_any_face_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync:
+                return any(face.select for face in island)
+            else:
+                uv = umesh.uv
+                return any(all(crn[uv].select_edge for crn in face.loops) for face in island)
+
+        @staticmethod
+        def island_filter_is_any_vert_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync:
+                return any(v.select for face in island for v in face.verts)
+            else:
+                uv = umesh.uv
+                return any(crn[uv].select for face in island for crn in face.loops)
+
+        @staticmethod
+        def island_filter_is_any_edge_selected(island: list[BMFace], umesh: _umesh.UMesh) -> bool:
+            if umesh.sync:
+                return any(e.select for face in island for e in face.edges)
+            else:
+                uv = umesh.uv
+                return any(crn[uv].select_edge for face in island for crn in face.loops)
 
 class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
     @staticmethod
@@ -1535,20 +1640,11 @@ class Islands(IslandsBase):
 
     @classmethod
     def calc_non_selected(cls, umesh: _umesh.UMesh):
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             return cls()
 
         cls.tag_filter_non_selected(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
-        if umesh.sync and umesh.is_full_face_selected:
-            return cls()
-
-        cls.tag_filter_non_selected(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
@@ -1578,21 +1674,13 @@ class Islands(IslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_full_selected(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-        cls.tag_filter_visible(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(
-            umesh) if cls.island_filter_is_all_face_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
     def calc_partial_selected(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls()
-        if umesh.sync:
-            if umesh.is_full_face_selected:
-                return cls()
+
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
+            return cls()
+
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(
             umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
@@ -1602,9 +1690,10 @@ class Islands(IslandsBase):
     def calc_partial_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.is_full_face_deselected:
             return cls()
-        if umesh.sync:
-            if umesh.is_full_face_selected:
-                return cls()
+
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
+            return cls()
+
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                    if cls.island_filter_is_partial_face_selected(i, umesh)]
@@ -1615,11 +1704,12 @@ class Islands(IslandsBase):
         if umesh.is_full_face_deselected:
             return cls()
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         else:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(
-                umesh) if cls.island_filter_is_any_face_selected(i, umesh)]
+            islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)
+                       if cls.island_filter_is_any_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
@@ -1639,23 +1729,10 @@ class Islands(IslandsBase):
                     return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)
-                       if cls.island_filter_is_any_vert_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_by_vert_with_mark_seam(cls, umesh: _umesh.UMesh):
-        if not umesh.has_selected_uv_verts():
-            return cls()
-
-        cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
-        else:
-            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                        if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 
@@ -1678,7 +1755,7 @@ class Islands(IslandsBase):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
@@ -1703,7 +1780,7 @@ class Islands(IslandsBase):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_non_manifold_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_non_manifold_ex(umesh)
@@ -1728,7 +1805,7 @@ class Islands(IslandsBase):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_non_manifold_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_non_manifold_ex(umesh)
@@ -1750,7 +1827,7 @@ class Islands(IslandsBase):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(umesh)
@@ -1772,7 +1849,7 @@ class Islands(IslandsBase):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_selected:
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         else:
             islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
@@ -1794,7 +1871,7 @@ class Islands(IslandsBase):
     @classmethod
     def calc_non_full_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
         if umesh.sync:
-            if umesh.is_full_face_selected:
+            if umesh.is_full_face_selected_for_avoid_force_explicit_check:
                 return cls()
         else:
             if umesh.is_full_face_deselected:
@@ -1810,21 +1887,6 @@ class Islands(IslandsBase):
         cls.tag_filter_visible(umesh)
         islands = [cls.island_type(i, umesh) for i in cls.calc_iter_ex(
             umesh) if not cls.island_filter_is_any_face_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_all(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_vert_deselected:
-            return cls()
-        cls.tag_filter_visible(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_all_ex(
-            umesh) if cls.island_filter_is_any_vert_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_visible_all(cls, umesh: _umesh.UMesh):
-        cls.tag_filter_visible(umesh)
-        islands = [cls.island_type(i, umesh) for i in cls.calc_all_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
@@ -1844,19 +1906,6 @@ class Islands(IslandsBase):
         if extended:
             return cls.calc_extended_any_vert_non_manifold(umesh)
         return cls.calc_visible_non_manifold(umesh)
-
-    @classmethod
-    def calc_extended_or_visible_all(cls, umesh: _umesh.UMesh, *, extended) -> 'Islands':
-        """All == mark seam, angle, mark sharp, smooth_angle"""
-        if extended:
-            return cls.calc_extended_all(umesh)
-        return cls.calc_visible_all(umesh)
-
-    @classmethod
-    def calc(cls, umesh: _umesh.UMesh, *, selected) -> 'Islands':
-        if selected:
-            return cls.calc_selected(umesh)
-        return cls.calc_visible(umesh)
 
     @classmethod
     def calc_with_hidden(cls, umesh: _umesh.UMesh):
@@ -1927,46 +1976,6 @@ class Islands(IslandsBase):
     def reset_aspect_ratio(self):
         scale = Vector((1 / self.umesh.aspect, 1))
         return self.scale_simple(scale)
-
-    @staticmethod
-    def weld_selected(isl_a: FaceIsland | AdvIsland, isl_b: FaceIsland | AdvIsland, selected=True) -> bool:
-        """isl_a = target island"""
-        assert (isl_a.umesh == isl_b.umesh)
-        sync = isl_a.umesh.sync
-        uv = isl_a.umesh.uv
-        idx = isl_b[0].loops[0].face.index
-        welded = False
-
-        if selected:
-            for f in isl_a:
-                for crn in f.loops:
-                    shared_crn = crn.link_loop_radial_prev
-                    if shared_crn.face.index != idx:
-                        continue
-                    if sync:
-                        if crn.edge.select:
-                            utils.copy_pos_to_target(crn, uv, idx)
-                            welded = True
-                    else:
-                        if crn[uv].select_edge or shared_crn[uv].select_edge:
-                            utils.copy_pos_to_target(crn, uv, idx)
-                            welded = True
-        else:
-            for f in isl_a:
-                for crn in f.loops:
-                    shared_crn = crn.link_loop_radial_prev
-                    if shared_crn.face.index != idx:
-                        continue
-                    utils.copy_pos_to_target(crn, uv, idx)
-                    welded = True
-
-        if welded:
-            new_idx = isl_a[0].loops[0].face.index
-            for f in isl_b:
-                f.index = new_idx
-            isl_a.faces.extend(isl_b.faces)
-            isl_b.clear()
-        return welded
 
     def faces_iter(self):
         return (f for isl in self for f in isl)
@@ -2125,7 +2134,7 @@ class UnionIslands(Islands):
 
                 def calc_coords(self):
                     uv = self.island.umesh.uv
-                    self.coords = np.array([crn[uv].uv for f in self.island for crn in f.loops], dtype='float32')
+                    self.coords = np.array([crn[uv].uv.to_tuple() for f in self.island for crn in f.loops], dtype='float32')
 
                 def compare(self, other, threshold_):
                     distances = np.linalg.norm(self.coords[:, None] - other.coords, axis=2)

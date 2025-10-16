@@ -21,6 +21,9 @@ from . import umesh as _umesh
 from . import bbox
 from .. import utils
 
+if typing.TYPE_CHECKING:
+    from . import AdvIsland, FaceIsland  # noqa
+
 
 class LoopGroup:
     def __init__(self, umesh: _umesh.UMesh):
@@ -43,14 +46,6 @@ class LoopGroup:
             assert self.chain_linked_corners_mask
             self.is_unpinned_exist_ = not all(self.chain_linked_corners_mask)
         return self.is_unpinned_exist_
-
-    def is_cyclic_vert(self):
-        if len(self.corners) > 1:
-            return self.corners[-1].link_loop_next.vert == self.corners[0].vert
-
-    def is_cyclic_crn(self):
-        if len(self.corners) > 1:
-            return self.corners[-1].link_loop_next == self.corners[0]
 
     @property
     def is_cyclic(self):
@@ -114,32 +109,6 @@ class LoopGroup:
                 bm_iter.link_loop_prev.tag = False
                 return bm_iter.link_loop_prev
 
-    def is_boundary_sync(self, crn):
-        shared_crn = crn.link_loop_radial_prev
-        if shared_crn == crn:
-            return True
-        if shared_crn.face.hide:  # Change
-            return True
-        uv = self.umesh.uv
-        return not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
-
-    def is_boundary(self, crn):
-        shared_crn = crn.link_loop_radial_prev  # We get a clockwise corner, but linked to the end of the current corner
-        if shared_crn == crn:
-            return True
-        if not shared_crn.face.select:  # Change
-            return True
-        uv = self.umesh.uv
-        return not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
-
-    def calc_shared_group(self) -> 'typing.Self':
-        shared_group = []
-        for crn in reversed(self.corners):
-            shared_group.append(crn.link_loop_radial_prev)
-        lg = LoopGroup(self.umesh)
-        lg.corners = shared_group
-        return lg
-
     def calc_shared_group_for_stitch(self) -> 'typing.Self':
         shared_group = []
         is_flipped = self._is_flipped_3d
@@ -189,48 +158,6 @@ class LoopGroup:
             trans_crn_linked[uv].uv = ref_co
         end_crn[uv].uv = ref_co
 
-    def boundary_tag_by_face_index(self, crn: BMLoop):
-        uv = self.umesh.uv
-        shared_crn = crn.link_loop_radial_prev
-        if shared_crn == crn:
-            crn.tag = False
-            return
-
-        # if shared_crn.face.index in (-1, crn.face.index):
-        if shared_crn.face.index == -1:
-            crn.tag = False
-            return
-
-        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
-
-    def boundary_tag(self, crn: BMLoop):
-        uv = self.umesh.uv
-        shared_crn = crn.link_loop_radial_prev
-        if shared_crn == crn:
-            crn.tag = False
-            return
-        if not crn[uv].select_edge:
-            crn.tag = False
-            return
-        if not shared_crn.face.select:  # Change
-            crn.tag = False
-            return
-        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
-
-    def boundary_tag_sync(self, crn: BMLoop):
-        uv = self.umesh.uv
-        shared_crn = crn.link_loop_radial_prev
-        if shared_crn == crn:
-            crn.tag = False
-            return
-        if not crn.edge.select:
-            crn.tag = False
-            return
-        if shared_crn.face.hide:  # Change
-            crn.tag = False
-            return
-        crn.tag = not (crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv)
-
     @staticmethod
     def calc_island_index_for_stitch(island) -> defaultdict[int, list[BMLoop]]:
         islands_for_stitch = defaultdict(list)
@@ -246,47 +173,25 @@ class LoopGroup:
         uv = self.umesh.uv
         return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
 
-    def calc_signed_corners_area(self):
-        uv = self.umesh.uv
-        area = 0.0
-        first_crn_co = self.corners[-1][uv].uv
-        for crn in self.corners:
-            next_crn_co = crn[uv].uv
-            area += first_crn_co.cross(next_crn_co)
-            first_crn_co = next_crn_co
-        return area * 0.5
+    def tagging(self, island: 'AdvIsland | FaceIsland'):
+        face_is_invisible = utils.is_invisible_func(island.umesh.sync)
+        get_edge_select = utils.edge_select_get_func(island.umesh)
+        is_pair = utils.is_pair
 
-    def tagging(self, island):
-        func: typing.Callable = self.boundary_tag_sync if island.umesh.sync else self.boundary_tag
+        uv = self.umesh.uv
         for f in island:
             for crn in f.loops:
-                func(crn)
-
-    def calc_first(self, island, selected=True):
-        if selected:
-            self.tagging(island)
-        else:
-            for f__ in island:
-                for crn__ in f__.loops:
-                    self.boundary_tag_by_face_index(crn__)
-
-        indexes = self.calc_island_index_for_stitch(island)
-        for k, corner_edges in indexes.items():
-            for _crn in corner_edges:
-                _crn.tag = True
-
-            crn_edges = (__crn for __crn in corner_edges if __crn.tag)
-
-            for crn_edge in crn_edges:
-                loop_group = self.calc_loop_group(crn_edge)
-
-                yield loop_group
-
-                if loop_group.tag:
-                    if len(loop_group) != len(corner_edges):
-                        for _crn in corner_edges:
-                            _crn.tag = False
-                    break
+                shared_crn = crn.link_loop_radial_prev
+                if shared_crn == crn:
+                    crn.tag = False
+                    continue
+                if not get_edge_select(crn):
+                    crn.tag = False
+                    continue
+                if face_is_invisible(shared_crn.face):  # Change
+                    crn.tag = False
+                    continue
+                crn.tag = not is_pair(crn, shared_crn, uv)
 
     def set_tag(self, state=True):
         for g in self.corners:

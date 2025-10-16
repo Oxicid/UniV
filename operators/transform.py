@@ -841,7 +841,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         if self.is_island_mode or (not selected and self.direction not in {'LEFT', 'RIGHT', 'BOTTOM', 'UPPER'}):
             for umesh in self.umeshes:
-                if islands := Islands.calc(umesh, selected=selected):
+                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     for island in islands:
                         bbox = island.calc_bbox()
                         all_groups.append((island, bbox, umesh.uv))

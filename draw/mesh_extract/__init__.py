@@ -49,19 +49,16 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
     from mathutils.geometry import tessellate_polygon
 
     verts_or_edges = []
-    verts_or_edges_append = verts_or_edges.append
-    verts_or_edges_extend = verts_or_edges.extend
-
     flat_tris = []
     normals = []
-    flat_tris_append = flat_tris.append
-    normals_extend = normals.extend
 
-    uv = umesh.uv
+    vert_select_get = utils.vert_select_get_func(umesh)
+    edge_select_get = utils.edge_select_get_func(umesh)
+    # uv = umesh.uv
     match bpy.context.tool_settings.uv_select_mode:
         case 'VERTEX':
             for f in utils.calc_visible_uv_faces_iter(umesh):
-                selected_mask = [crn[uv].select for crn in f.loops]
+                selected_mask = [vert_select_get(crn) for crn in f.loops]
                 if not any(selected_mask):
                     continue
 
@@ -70,19 +67,17 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
                     # verts_or_edges_extend(coords)
                     tessellated = tessellate_polygon((coords,))
                     for a, b, c in tessellated:
-                        flat_tris_append(coords[a])
-                        flat_tris_append(coords[b])
-                        flat_tris_append(coords[c])
-                    normals_extend([f.normal] * (len(tessellated) * 3))
+                        flat_tris.append(coords[a])
+                        flat_tris.append(coords[b])
+                        flat_tris.append(coords[c])
+                    normals.extend([f.normal] * (len(tessellated) * 3))
                 else:
                     for select_state, v in zip(selected_mask, f.verts):
                         if select_state:
-                            verts_or_edges_append(v.co)
-
-
+                            verts_or_edges.append(v.co)
         case 'EDGE':
             for f in utils.calc_visible_uv_faces_iter(umesh):
-                selected_mask = [crn[uv].select_edge for crn in f.loops]
+                selected_mask = [edge_select_get(crn) for crn in f.loops]
                 if not any(selected_mask):
                     continue
 
@@ -97,24 +92,24 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
 
                     tessellated = tessellate_polygon((coords,))
                     for a, b, c in tessellated:
-                        flat_tris_append(coords[a])
-                        flat_tris_append(coords[b])
-                        flat_tris_append(coords[c])
-                    normals_extend([f.normal] * (len(tessellated) * 3))
+                        flat_tris.append(coords[a])
+                        flat_tris.append(coords[b])
+                        flat_tris.append(coords[c])
+                    normals.extend([f.normal] * (len(tessellated) * 3))
                 else:
                     for select_state, crn in zip(selected_mask, f.loops):
                         if select_state:
-                            verts_or_edges_append(crn.vert.co)
-                            verts_or_edges_append(crn.link_loop_next.vert.co)
+                            verts_or_edges.append(crn.vert.co)
+                            verts_or_edges.append(crn.link_loop_next.vert.co)
         case _:
             for f in utils.calc_selected_uv_faces_iter(umesh):
                 coords = [v.co for v in f.verts]
                 tessellated = tessellate_polygon((coords,))
                 for a, b, c in tessellated:
-                    flat_tris_append(coords[a])
-                    flat_tris_append(coords[b])
-                    flat_tris_append(coords[c])
-                normals_extend([f.normal] * (len(tessellated) * 3))
+                    flat_tris.append(coords[a])
+                    flat_tris.append(coords[b])
+                    flat_tris.append(coords[c])
+                normals.extend([f.normal] * (len(tessellated) * 3))
 
     return verts_or_edges, (flat_tris, normals)
 

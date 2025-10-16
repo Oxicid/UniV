@@ -375,15 +375,6 @@ class MeshIslands(MeshIslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
-        if umesh.sync and umesh.is_full_face_selected:  # TODO: Remove umesh.sync (use assert instead)
-            return cls([], umesh)
-
-        cls.tag_filter_non_selected(umesh)
-        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
     def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
         """Calc any edges selected islands"""
         assert umesh.sync

@@ -463,7 +463,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             else:
                 has_selected = False
                 for umesh in self.umeshes:
-                    if umesh.has_any_selected_crn_non_sync:
+                    if umesh.has_selected_uv_verts():
                         has_selected = True
                         break
 
