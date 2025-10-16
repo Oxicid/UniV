@@ -2395,18 +2395,28 @@ class UNIV_OT_Stacked(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()
+
+        need_sync_validation_check = False
         if umeshes.sync:
-            umeshes.elem_mode = 'FACE'
+            if utils.USE_GENERIC_UV_SYNC:
+                need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
+            else:
+                umeshes.elem_mode = 'FACE'
 
         all_islands = []
         for umesh in reversed(umeshes):
             umesh.update_tag = False
             if islands := AdvIslands.calc_visible_with_mark_seam(umesh):
                 all_islands.extend(islands)
+
+            if need_sync_validation_check:
+                if not umesh.sync_valid:
+                    umesh.sync_valid = True
+                    umesh.bm.uv_select_sync_from_mesh()
 
         union_islands = UnionIslands.calc_overlapped_island_groups(all_islands, self.threshold)
 

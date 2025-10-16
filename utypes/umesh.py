@@ -846,6 +846,7 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
+                # TODO: Remove redundant mesh type check in 'EDIT_MESH'
                 if obj.type == 'MESH' and obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
                     if bm.faces:
