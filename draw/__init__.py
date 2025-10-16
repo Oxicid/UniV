@@ -18,6 +18,11 @@ from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
 from mathutils import Vector
 from gpu_extras.batch import batch_for_shader
 
+def get_seam_color():
+    view_3d = bpy.context.preferences.themes[0].view_3d
+    if seam_color := getattr(view_3d, 'seam', None):
+        return *seam_color, 0.5
+    return *view_3d.edge_seam, 0.5
 
 class DrawerSeamsProcessing:
     @staticmethod
@@ -41,7 +46,7 @@ class DrawerSeamsProcessing:
 
     @staticmethod
     def get_color():
-        return *bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8
+        return get_seam_color()
 
     @staticmethod
     def get_shader():

@@ -139,9 +139,8 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
             from .. import draw
             if not draw.DrawerSeamsProcessing.is_enable():
-                seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
                 coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
-                draw.LinesDrawSimple.draw_register(coords, seam_color)
+                draw.LinesDrawSimple.draw_register(coords, draw.get_seam_color())
                 if coords:
                     bpy.context.area.tag_redraw()
             return {'FINISHED'} if had_seam else {'FINISHED'}

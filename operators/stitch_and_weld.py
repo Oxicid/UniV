@@ -563,8 +563,7 @@ class Stitch:
                                 welded_append(crn[uv].uv)
                                 toggle = True
 
-        seam_color = (*bpy.context.preferences.themes[0].view_3d.edge_seam, 0.8)
-        draw.LinesDrawSimple.draw_register(with_seam, seam_color)
+        draw.LinesDrawSimple.draw_register(with_seam, draw.get_seam_color())
 
         welded_color = (0.1, 0.1, 1.0, 1.0)
         draw.DotLinesDrawSimple.draw_register(welded, welded_color)
