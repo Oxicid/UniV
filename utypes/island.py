@@ -568,19 +568,14 @@ class FaceIsland:
             # TODO: Use bm.foreach
             if self.umesh.sync:
                 if self.umesh.sync_valid:
+                    self.umesh.bm.uv_select_foreach_set_from_mesh(state, faces=self.faces, sticky_select_mode='DISABLED')
+
+                if state:  # FAST_LOAD
                     for face in self.faces:
-                        face.select = state
-                        face.uv_select = state
-                        for crn in face.loops:
-                            crn.uv_select_vert = state
-                            crn.uv_select_edge = state
+                        face.select = True
                 else:
-                    if state:  # FAST_LOAD
-                        for face in self.faces:
-                            face.select = True
-                    else:
-                        for face in self.faces:
-                            face.select = False
+                    for face in self.faces:
+                        face.select = False
             else:
                 for face in self.faces:
                     face.uv_select = state
@@ -651,32 +646,30 @@ class FaceIsland:
             for face in self.faces:
                 face.select = False
 
-    def is_full_face_selected(self):
-        if self.umesh.sync:
-            return all(f.select for f in self)
-        uv = self.umesh.uv
-        return all(crn[uv].select for f in self for crn in f.loops)
+    if USE_GENERIC_UV_SYNC:
+        def is_full_face_selected(self):
+            if self.umesh.sync and not self.umesh.sync_valid:
+                return all(f.select for f in self)
+            return all(f.uv_select for f in self)
 
-    @property
-    def is_full_face_deselected(self):
-        if self.umesh.sync:
-            return not any(f.select for f in self)
-        uv = self.umesh.uv
-        return not any(crn[uv].select for f in self for crn in f.loops)
+        @property
+        def is_full_face_deselected(self):
+            if self.umesh.sync and not self.umesh.sync_valid:
+                return not any(f.select for f in self)
+            return not any(f.uv_select for f in self)
+    else:
+        def is_full_face_selected(self):
+            if self.umesh.sync:
+                return all(f.select for f in self)
+            uv = self.umesh.uv
+            return all(crn[uv].select for f in self for crn in f.loops)
 
-    @property
-    def is_full_vert_deselected(self):
-        if self.umesh.sync:
-            return not any(v.select for f in self for v in f.verts)
-        uv = self.umesh.uv
-        return not any(crn[uv].select for f in self for crn in f.loops)
-
-    @property
-    def is_full_edge_deselected(self):
-        if self.umesh.sync:
-            return not any(e.select for f in self for e in f.edges)
-        uv = self.umesh.uv
-        return not any(crn[uv].select_edge for f in self for crn in f.loops)
+        @property
+        def is_full_face_deselected(self):
+            if self.umesh.sync:
+                return not any(f.select for f in self)
+            uv = self.umesh.uv
+            return not any(crn[uv].select for f in self for crn in f.loops)
 
     def __info_vertex_select(self) -> eInfoSelectFaceIsland:
         uv = self.umesh.uv

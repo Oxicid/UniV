@@ -853,8 +853,7 @@ class UNIV_OT_Select_Pick(Operator):
         return self.pick_select()
 
     def pick_select(self):
-        if self.umeshes.sync and not self.select:
-            self.umeshes.elem_mode = 'FACE'
+
 
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
@@ -878,8 +877,15 @@ class UNIV_OT_Select_Pick(Operator):
             return {'CANCELLED'}
 
         umesh = hit.island.umesh
+        if utils.USE_GENERIC_UV_SYNC:
+            if not umesh.sync_valid and self.umeshes.elem_mode in ('VERT', 'EDGE'):
+                umesh.sync_valid = True
+                umesh.bm.uv_select_sync_from_mesh()
+
+        elif self.umeshes.sync and not self.select :
+            self.umeshes.elem_mode = 'FACE'
+
         hit.island.select = self.select
-        # TODO:Notify if has extra selection in sync non face mode
         umesh.update()
 
         return {'FINISHED'}
