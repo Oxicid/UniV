@@ -6,7 +6,6 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
-import gpu
 import math
 
 from math import sqrt, isclose
@@ -15,72 +14,16 @@ from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
 from bmesh.types import BMFace
-from gpu_extras.batch import batch_for_shader
-from time import perf_counter as time
 from collections.abc import Callable
 
 from .. import utils
 from .. import utypes
-from ..draw import shaders
 from ..preferences import prefs, univ_settings
 from ..utypes import Islands, AdvIslands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands
 
 from ..utils import (
     face_centroid_uv,
 )
-
-
-uv_handle = None
-start = time()
-shader: gpu.types.GPUShader | None = None
-batch: gpu.types.GPUBatch | None = None
-
-
-def draw_callback_px(color):
-    global shader
-    global batch
-    shader.bind()
-    shader.uniform_float("color", color)
-    batch.draw(shader)
-
-    for a in bpy.context.screen.areas:
-        if a.type == 'IMAGE_EDITOR' and a.ui_type == 'UV':
-            a.tag_redraw()
-
-
-def uv_area_draw_timer():
-    global start
-    global uv_handle
-    if uv_handle is None:
-        return
-    counter = time() - start
-    if counter < 0.8:
-        return 0.2
-    bpy.types.SpaceImageEditor.draw_handler_remove(uv_handle, 'WINDOW')
-
-    for a in bpy.context.screen.areas:
-        if a.type == 'IMAGE_EDITOR' and a.ui_type == 'UV':
-            a.tag_redraw()
-    uv_handle = None
-    return
-
-
-def add_draw_rect(data, color=(1, 1, 0, 1)):
-    global start
-    global shader
-    global batch
-    global uv_handle
-
-    start = time()
-    shader = shaders.POLYLINE_UNIFORM_COLOR
-    batch = batch_for_shader(shader, 'LINES', {"pos": data})
-
-    if not (uv_handle is None):
-        bpy.types.SpaceImageEditor.draw_handler_remove(uv_handle, 'WINDOW')
-
-    uv_handle = bpy.types.SpaceImageEditor.draw_handler_add(draw_callback_px, (color,), 'WINDOW', 'POST_VIEW')
-    bpy.app.timers.register(uv_area_draw_timer)
-
 
 class UNIV_OT_SelectLinked(Operator):
     bl_idname = 'uv.univ_select_linked'
@@ -92,7 +35,7 @@ class UNIV_OT_SelectLinked(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -101,119 +44,33 @@ class UNIV_OT_SelectLinked(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        if self.deselect is False:
-            umeshes = UMeshes.calc(verify_uv=False)
-            umeshes.fix_context()
-
-            if context.area.ui_type == 'UV':
-                return bpy.ops.uv.select_linked()
-            if uv_areas := [area for area in context.screen.areas if area.ui_type == 'UV']:
-                with context.temp_override(area=uv_areas[0]):  # noqa
-                    return bpy.ops.uv.select_linked()
-            return {'CANCELLED'}
-        else:
-            sync = bpy.context.scene.tool_settings.use_uv_select_sync
-            return self.deselect_linked(sync=sync)
-
-    def deselect_linked(self, sync):
         umeshes = UMeshes(report=self.report)
         umeshes.fix_context()
+        umeshes.update_tag = False
 
-        if sync and umeshes.elem_mode == 'VERT':
-            for umesh in umeshes:
-                if umesh.is_full_vert_selected or umesh.is_full_vert_deselected:
-                    umesh.update_tag = False
-                    continue
-                has_full_selected = False
-                half_selected = []
-                if islands := Islands.calc_visible(umesh):
-                    for island in islands:
-                        select_info = island.info_select()
-                        if select_info == utypes.eInfoSelectFaceIsland.HALF_SELECTED:
-                            half_selected.append(island)
-                        elif select_info == utypes.eInfoSelectFaceIsland.FULL_SELECTED:
-                            has_full_selected |= True
-                            island.set_tag()
-
-                is_update = bool(half_selected)
-
-                if is_update and not has_full_selected:
-                    for half_sel in half_selected:
-                        for f in half_sel:
-                            for v in f.verts:
-                                v.select = False
-
-                elif is_update and has_full_selected:
-                    for half_sel in half_selected:
-                        for f in half_sel:
-                            verts = f.verts
-                            if any(f.tag for v in verts for f in v.link_faces):
-                                continue
-                            for v in verts:
-                                v.select = False
-
-                if is_update:
-                    umesh.bm.select_flush_mode()
-
-                umesh.update_tag = is_update
-            return umeshes.update(info='No islands for deselect')
-
-        if sync and umeshes.elem_mode == 'EDGE':
-            for umesh in umeshes:
-                if umesh.is_full_edge_selected or umesh.is_full_edge_deselected:
-                    umesh.update_tag = False
-                    continue
-                has_full_selected = False
-                half_selected = []
-                if islands := Islands.calc_visible(umesh):
-                    for island in islands:
-                        select_info = island.info_select()
-                        if select_info == utypes.eInfoSelectFaceIsland.HALF_SELECTED:
-                            half_selected.append(island)
-                        elif select_info == utypes.eInfoSelectFaceIsland.FULL_SELECTED:
-                            has_full_selected |= True
-                            island.set_tag()
-
-                is_update = bool(half_selected)
-
-                if is_update and not has_full_selected:
-                    for half_sel in half_selected:
-                        for f in half_sel:
-                            for e in f.edges:
-                                e.select = False
-
-                elif is_update and has_full_selected:
-                    for half_sel in half_selected:
-                        for f in half_sel:
-                            edges = f.edges
-                            for e in edges:
-                                if any(ff.tag for ff in e.link_faces):
-                                    continue
-                                e.select = False
-
-                if is_update:
-                    umesh.bm.select_flush_mode()
-
-                umesh.update_tag = is_update
-            return umeshes.update(info='No islands for deselect')
+        select_state = not self.deselect
+        need_sync_validation_check = False
+        if umeshes.sync:
+            if utils.USE_GENERIC_UV_SYNC:
+                need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
+            else:
+                umeshes.elem_mode = 'FACE'
 
         for umesh in umeshes:
-            if sync and umeshes.elem_mode == 'FACE':
-                if umesh.is_full_edge_selected or umesh.is_full_edge_deselected:
-                    umesh.update_tag = False
-                    continue
-            is_update = False
-            if islands := Islands.calc_visible(umesh):
-                for island in islands:
-                    if update_state := (island.info_select() == utypes.eInfoSelectFaceIsland.HALF_SELECTED):
-                        island.select = False
-                    is_update |= update_state
-            umesh.update_tag = is_update
+            if islands := Islands.calc_partial_selected_by_context(umesh):
+                if need_sync_validation_check:
+                    umesh.sync_from_mesh_if_needed()
 
-            if is_update and sync:
-                umesh.bm.select_flush_mode()
+                for isl in islands:
+                    isl.select = select_state
 
-        return umeshes.update(info='No islands for deselect')
+                if need_sync_validation_check and self.deselect:
+                    umesh.bm.uv_select_sync_to_mesh()
+                umesh.update_tag = True
+
+        sel_opname = 'select' if select_state else 'deselect'
+        umeshes.update(info=f'No found islands for {sel_opname}')
+        return {'FINISHED'}
 
 
 class UNIV_OT_Select_By_Cursor(Operator):
@@ -268,7 +125,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
         if self.mode == 'SELECT':
             umeshes.filter_by_visible_uv_faces()
             self.select(umeshes, view_rect, need_sync_validation_check)
-        if self.mode == 'ADDITIONAL':
+        elif self.mode == 'ADDITIONAL':
             umeshes.filter_by_visible_uv_faces()
             self.additional(umeshes, view_rect, need_sync_validation_check)
         else: # self.mode == 'DESELECT':
@@ -288,106 +145,128 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
     def select(self, umeshes, view_box: utypes.BBox, need_sync_validation_check):
         for umesh in umeshes:
+            to_select = []
+            to_deselect = []
             if self.face_mode:
                 if need_sync_validation_check:
                     umesh.sync_from_mesh_if_needed()
                 uv = umesh.uv
-                face_select_set = utils.face_select_set_func(umesh)
+                face_select_get = utils.face_select_get_func(umesh)
+                has_any_select = utils.has_any_vert_select_func(umesh)
+
                 for f in utils.calc_visible_uv_faces_iter(umesh):
-                    # TODO: Add isect by tris
-                    face_select_set(f, face_centroid_uv(f, uv) in view_box)
+                    if face_centroid_uv(f, uv) in view_box:  # TODO: Add isect by tris
+                        if not face_select_get(f):
+                            to_select.append(f)
+                    elif has_any_select(f):
+                        to_deselect.append(f)
+
+                if to_select or to_deselect:
+                    if need_sync_validation_check:
+                        umesh.sync_from_mesh_if_needed()
+
+                    face_select_set = utils.face_select_set_func(umesh)
+                    for f in to_deselect:
+                        face_select_set(f, False)
+                    for f in to_select:
+                        face_select_set(f, True)
+
+                    if need_sync_validation_check and to_deselect:
+                        umesh.bm.uv_select_sync_to_mesh()
             else:
                 adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords(save_triplet=True)
 
-                if need_sync_validation_check:  # Lazy validation for fast check full select
-                    umesh.sync_from_mesh_if_needed()
-
-                to_select = []
-                to_deselect = []
                 for island in adv_islands:
                     if view_box.isect_triangles(island.flat_coords):
-                        to_select.append(island)
+                        if not island.is_full_face_selected():
+                            to_select.append(island)
                     else:
-                        to_deselect.append(island)
+                        if not island.is_full_deselected_by_context():
+                            to_deselect.append(island)
 
-                # NOTE: To avoid using flush, in order to correct defective face selections, first need deselect and then select
-                for isl in to_deselect:
-                    isl.select = False
-                for isl in to_select:
-                    isl.select = True
+                if to_deselect or to_select:
+                    if need_sync_validation_check:
+                        umesh.sync_from_mesh_if_needed()
+
+                    for isl in to_deselect:
+                        isl.select = False
+                    for isl in to_select:
+                        isl.select = True
+                    if need_sync_validation_check and to_deselect:
+                        umesh.bm.uv_select_sync_to_mesh()
+            umesh.update_tag = bool(to_select or to_deselect)
 
     def additional(self, umeshes: UMeshes, view_box, need_sync_validation_check):
         for umesh in umeshes:
-            has_update = False
-            if not umesh.has_full_selected_uv_faces():
-                if self.face_mode:
-                    uv = umesh.uv
-                    to_select = []
-                    for f in utils.calc_unselected_uv_faces_iter(umesh):
-                        if face_centroid_uv(f, uv) in view_box:
-                            to_select.append(f)
+            if umesh.has_full_selected_uv_faces():
+                continue
 
-                    if to_select:
+            has_update = False
+            if self.face_mode:
+                uv = umesh.uv
+                to_select = []
+                for f in utils.calc_unselected_uv_faces_iter(umesh):
+                    if face_centroid_uv(f, uv) in view_box:
+                        to_select.append(f)
+
+                if to_select:
+                    has_update = True
+                    if need_sync_validation_check:
+                        umesh.sync_from_mesh_if_needed()
+                    face_select_set = utils.face_select_set_func(umesh)
+                    for f in to_select:
+                        face_select_set(f, True)
+            else:
+                adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+                adv_islands.calc_tris()
+                adv_islands.calc_flat_coords(save_triplet=True)
+
+                for island in adv_islands:
+                    has_update = True
+                    if island.is_full_face_selected():
+                        continue
+                    if view_box.isect_triangles(island.flat_coords):
                         if need_sync_validation_check:
                             umesh.sync_from_mesh_if_needed()
-                        face_select_set = utils.face_select_set_func(umesh)
-                        for f in to_select:
-                            face_select_set(f, True)
-                        has_update = True
-                else:
-                    adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
-                    adv_islands.calc_tris()
-                    adv_islands.calc_flat_coords(save_triplet=True)
-
-                    for island in adv_islands:
-                        if island.is_full_face_selected():
-                            continue
-                        if view_box.isect_triangles(island.flat_coords):
-                            if need_sync_validation_check:
-                                umesh.sync_from_mesh_if_needed()
-                            island.select = True
-                            has_update = True
+                        island.select = True
 
             umesh.update_tag = has_update
 
     def deselect(self, umeshes, view_box, need_sync_validation_check):
         has_update = False
         for umesh in umeshes:
+            has_any_select = utils.has_any_vert_select_func(umesh)
             if self.face_mode:
                 uv = umesh.uv
                 to_deselect = []
                 for f in utils.calc_visible_uv_faces_iter(umesh):
-                    if face_centroid_uv(f, uv) in view_box:
+                    if has_any_select(f) and face_centroid_uv(f, uv) in view_box:
                         to_deselect.append(f)
 
                 if to_deselect:
+                    has_update = True
                     if need_sync_validation_check:
                         umesh.sync_from_mesh_if_needed()
+
                     face_select_set = utils.face_select_set_func(umesh)
                     for f in to_deselect:
                         face_select_set(f, False)
-                    has_update = True
-
             else:
-                adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+                adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords(save_triplet=True)
 
                 for island in adv_islands:
-                    if utils.USE_GENERIC_UV_SYNC:
-                        if island.is_full_vert_deselected():
-                            continue
-                    else:
-                        if island.is_full_face_deselected():
-                            continue
+                    if island.is_full_deselected_by_context():
+                        continue
 
                     if view_box.isect_triangles(island.flat_coords):
+                        has_update = True
                         if need_sync_validation_check:
                             umesh.sync_from_mesh_if_needed()
                         island.select = False
-                        has_update = True
 
             if has_update and need_sync_validation_check:
                 umesh.bm.uv_select_sync_to_mesh()
@@ -2431,7 +2310,8 @@ class UNIV_OT_SelectByArea(Operator):
 
             islands.umesh.update_tag = (to_select or to_deselect)
             if islands.umesh.update_tag:
-                umesh.sync_from_mesh_if_needed()
+                if need_sync_validation_check:
+                    umesh.sync_from_mesh_if_needed()
 
                 for isl in to_deselect:
                     isl.select = False
@@ -2672,7 +2552,7 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
 
         for umesh in umeshes:
             face_select_get = utils.face_select_get_func(umesh)
-            has_any_select = self.has_any_elem_select_func(umesh)
+            has_any_select = utils.has_any_vert_select_func(umesh)
 
             to_select = []
             to_deselect = []
@@ -2690,11 +2570,11 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
                 else:
                     for isl in AdvIslands.calc_visible_with_mark_seam(umesh):
                         if all(is_target_face(f) for f in isl):
-                            if isl.has_all_face_select:
+                            if isl.is_full_face_selected():
                                 counter_without_effect += 1
                             else:
                                 to_select.append(isl)
-                        elif isl.has_any_elem_select:
+                        elif not isl.is_full_deselected_by_context():
                             to_deselect.append(isl)
 
             elif self.mode == 'ADDITION':
@@ -2756,42 +2636,6 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
             umesh.check_faces_exist(self.report)
         return {'FINISHED'}
 
-    @staticmethod
-    def has_any_elem_select_func(umesh: utypes.UMesh):
-        def catcher(uv):
-            if utils.USE_GENERIC_UV_SYNC:
-                def func(f):
-                    # Unroll any
-                    for crn in f.loops:
-                        if crn.uv_select_vert:
-                            return True
-                    return False
-
-                if not umesh.sync_valid and umesh.sync:
-                    def func(f):
-                        # Unroll any
-                        for v in f.verts:
-                            if v.select:
-                                return True
-                        return False
-
-                return func
-            else:
-                if umesh.sync:
-                    if umesh.elem_mode in ('VERT', 'EDGE'):
-                        return lambda f: any(v.select for v in f.verts)
-                    else:
-                        return lambda f: f.select
-                else:
-                    def func(f):
-                        # Unroll any
-                        for crn in f.loops:
-                            if crn[uv].select:
-                                return True
-                        return False
-                    return func
-        return catcher(umesh.uv)
-
 
 class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
     bl_idname = "mesh.univ_select_by_vertex_count"
@@ -2838,12 +2682,12 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
                 else:
                     for isl in MeshIslands.calc_visible_with_mark_seam(umesh):
                         if all(is_target_face(f) for f in isl):
-                            if isl.has_all_face_select:
+                            if isl.is_full_face_selected():
                                 counter_without_effect += 1
                             else:
                                 local_counter += 1
                                 isl.select = True
-                        elif isl.has_any_elem_select:
+                        elif not isl.is_full_face_deselected():
                             has_update = True
                             isl.select = False
 
@@ -2852,19 +2696,7 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
                 counter += local_counter
                 continue
 
-            elif self.mode == 'DESELECT':
-                if self.elem_mode == 'FACE':
-                    for f in umesh.bm.faces:
-                        if f.select and is_target_face(f):
-                            local_counter += 1
-                            f.select = False
-                else:
-                    for isl in MeshIslands.calc_visible_with_mark_seam(umesh):
-                        if isl.has_any_elem_select:
-                            if all(is_target_face(f) for f in isl):
-                                local_counter += 1
-                                isl.select = False
-            else:  # self.mode == 'ADDITION':
+            elif self.mode == 'ADDITION':
                 if self.elem_mode == 'FACE':
                     for f in umesh.bm.faces:
                         if (not f.select and not f.hide) and is_target_face(f):
@@ -2872,10 +2704,23 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
                             f.select = True
                 else:
                     for isl in MeshIslands.calc_visible_with_mark_seam(umesh):
-                        if not isl.has_all_face_select:
+                        if not isl.is_full_face_selected():
                             if all(is_target_face(f) for f in isl):
                                 local_counter += 1
                                 isl.select = True
+
+            else: # self.mode == 'DESELECT':
+                if self.elem_mode == 'FACE':
+                    for f in umesh.bm.faces:
+                        if f.select and is_target_face(f):
+                            local_counter += 1
+                            f.select = False
+                else:
+                    for isl in MeshIslands.calc_visible_with_mark_seam(umesh):
+                        if not isl.is_full_face_deselected():
+                            if all(is_target_face(f) for f in isl):
+                                local_counter += 1
+                                isl.select = False
 
             if local_counter:
                 umesh.update()

@@ -833,7 +833,7 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH' and obj.data.uv_layers:
+                if obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
                     bmeshes.append(UMesh(bm, obj))
         else:
@@ -854,8 +854,7 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                # TODO: Remove redundant mesh type check in 'EDIT_MESH'
-                if obj.type == 'MESH' and obj.data.uv_layers:
+                if obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
                     if bm.faces:
                         bmeshes.append(UMesh(bm, obj))
@@ -923,10 +922,9 @@ class UMeshes:
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH':
-                    bm = bmesh.from_edit_mesh(obj.data)
-                    if bm.faces:
-                        bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
+                bm = bmesh.from_edit_mesh(obj.data)
+                if bm.faces:
+                    bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
 
@@ -955,9 +953,8 @@ class UMeshes:
         umeshes = []
         if bpy.context.mode == 'EDIT_MESH':
             for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.type == 'MESH':
-                    bm = bmesh.from_edit_mesh(obj.data)
-                    umeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
+                bm = bmesh.from_edit_mesh(obj.data)
+                umeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
             data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
 

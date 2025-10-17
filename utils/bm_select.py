@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# NOTE: Use functions after sync validation
+# NOTE: To avoid using flush, in order to correct defective face selections, first need deselect and then select
+
 if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
@@ -496,3 +499,42 @@ def select_edge_processing(umesh, to_deselect, to_select):
         for crn in to_select:
             set_edge_select(crn, True)
         umesh.bm.select_flush(True)
+
+if USE_GENERIC_UV_SYNC:
+    def has_any_vert_select_func(umesh: 'utypes.UMesh'):
+        def catcher(uv):
+            def func(f):
+                # Unroll any
+                for crn in f.loops:
+                    if crn.uv_select_vert:
+                        return True
+                return False
+
+            if not umesh.sync_valid and umesh.sync:
+                def func(f):
+                    # Unroll any
+                    for v in f.verts:
+                        if v.select:
+                            return True
+                    return False
+
+            return func
+        return catcher(umesh.uv)
+else:
+    def has_any_vert_select_func(umesh: 'utypes.UMesh'):
+        def catcher(uv):
+            if umesh.sync:
+                if umesh.elem_mode in ('VERT', 'EDGE'):
+                    return lambda f: any(v.select for v in f.verts)
+                else:
+                    return lambda f: f.select
+            else:
+                def func(f):
+                    # Unroll any
+                    for crn in f.loops:
+                        if crn[uv].select:
+                            return True
+                    return False
+
+                return func
+        return catcher(umesh.uv)

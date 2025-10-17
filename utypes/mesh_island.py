@@ -48,6 +48,12 @@ class MeshIsland:
         for face in self.faces:
             face.select = state
 
+    def is_full_face_selected(self):
+        return all(f.select for f in self)
+
+    def is_full_face_deselected(self):
+        return not any(f.select for f in self)
+
     @property
     def has_all_face_select(self):
         return all(f.select for f in self)
