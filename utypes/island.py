@@ -798,23 +798,11 @@ class FaceIsland:
                 return self.__info_face_select_sync()
 
     @property
-    def has_all_face_select(self):
-        if self.umesh.sync:
-            return all(f.select for f in self)
-        else:
-            uv = self.umesh.uv
-            if utils.get_select_mode_uv() == 'EDGE':
-                for f in self:
-                    if not all(crn[uv].select_edge for crn in f.loops):
-                        return False
-            else:
-                for f in self:
-                    if not all(crn[uv].select for crn in f.loops):
-                        return False
-            return True
+    def has_all_face_select(self):  # TODO: Remove
+        return self.is_full_face_selected()
 
     @property
-    def has_any_elem_select(self):
+    def has_any_elem_select(self):  # TODO: Remove
         if self.umesh.sync:
             if self.umesh.elem_mode == 'FACE':
                 return any(f.select for f in self)
