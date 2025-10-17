@@ -652,7 +652,6 @@ class FaceIsland:
                 return all(f.select for f in self)
             return all(f.uv_select for f in self)
 
-        @property
         def is_full_face_deselected(self):
             if self.umesh.sync and not self.umesh.sync_valid:
                 return not any(f.select for f in self)
@@ -670,7 +669,6 @@ class FaceIsland:
             uv = self.umesh.uv
             return all(crn[uv].select for f in self for crn in f.loops)
 
-        @property
         def is_full_face_deselected(self):
             if self.umesh.sync:
                 return not any(f.select for f in self)
@@ -682,6 +680,11 @@ class FaceIsland:
                 return not any(v.select for f in self for v in f.verts)
             uv = self.umesh.uv
             return not any(crn[uv].select for f in self for crn in f.loops)
+
+    def is_full_deselected_by_context(self):
+        if self.umesh.elem_mode in ('VERT', 'EDGE'):
+            return self.is_full_vert_deselected()
+        return self.is_full_face_deselected()
 
     def __info_vertex_select(self) -> eInfoSelectFaceIsland:
         uv = self.umesh.uv

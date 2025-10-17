@@ -380,7 +380,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                         if island.is_full_vert_deselected():
                             continue
                     else:
-                        if island.is_full_face_deselected:
+                        if island.is_full_face_deselected():
                             continue
 
                     if view_box.isect_triangles(island.flat_coords):
@@ -500,7 +500,7 @@ class UNIV_OT_Select_Square_Island(Operator):
                     if island.is_full_vert_deselected():
                         continue
                 else:
-                    if island.is_full_face_deselected:
+                    if island.is_full_face_deselected():
                         continue
 
                 if self.is_target_island(island):
@@ -942,7 +942,7 @@ class UNIV_OT_Select_Pick(Operator):
                     if isl.is_full_face_selected():
                         continue
                 else:  # Skip full deselected islands
-                    if isl.is_full_face_deselected:
+                    if isl.is_full_face_deselected():
                         continue
                 hit.find_nearest_island(isl)
 
@@ -2229,7 +2229,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                             isl.select = True
                             umesh.update_tag = True
                         elif has_selected:
-                            if isl.is_full_face_deselected:
+                            if isl.is_full_face_deselected():
                                 continue
                             isl.select = False
                             umesh.update_tag = True
@@ -2243,7 +2243,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
                             umesh.update_tag = True
                     else:  # self.mode == 'DESELECT':
                         if compared_result:
-                            if isl.is_full_face_deselected:
+                            if isl.is_full_face_deselected():
                                 counter_skipped += 1
                                 continue
                             counter += 1
@@ -2346,20 +2346,32 @@ class UNIV_OT_SelectByArea(Operator):
 
     def execute(self, context):
         umeshes = UMeshes()
+
+        need_sync_validation_check = False
         if umeshes.sync:
-            umeshes.elem_mode = 'FACE'
-        umeshes.filter_by_visible_uv_faces()
+            if utils.USE_GENERIC_UV_SYNC:
+                need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
+            else:
+                umeshes.elem_mode = 'FACE'
+
+        if self.mode == 'SELECT':
+            umeshes.filter_by_visible_uv_faces()
+        elif self.mode == 'ADDITIONAL':
+            umeshes.filter_by_visible_uv_faces()
+        else: # self.mode == 'DESELECT':
+            if utils.USE_GENERIC_UV_SYNC:
+                umeshes.filter_by_selected_uv_verts()
+            else:
+                umeshes.filter_by_selected_uv_faces()
 
         min_value = float('inf')
         max_value = float('-inf')
         islands_of_mesh = []
-        counter = 0
-        counter_skipped = 0
-        for umesh in reversed(umeshes):
+
+        for umesh in umeshes:
             umesh.update_tag = False
             if islands := AdvIslands.calc_visible_with_mark_seam(umesh):
                 islands_of_mesh.append(islands)
-                islands.value = umesh.has_selected_uv_verts()
 
                 if self.size_type == 'AREA':
                     for isl in islands:
@@ -2377,8 +2389,6 @@ class UNIV_OT_SelectByArea(Operator):
                         isl.value = size
                         min_value = min(size, min_value)
                         max_value = max(size, max_value)
-            else:
-                umeshes.umeshes.remove(umesh)
 
         if self.size_mode == 'SMALL':
             lower = min_value
@@ -2394,43 +2404,44 @@ class UNIV_OT_SelectByArea(Operator):
 
         for islands in islands_of_mesh:
             umesh = islands.umesh
-            has_selected = islands.value
+            to_select = []
+            to_deselect = []
+
             for isl in islands:
                 if self.mode == 'SELECT':
                     if lower <= isl.value <= higher:
-                        if has_selected and isl.is_full_face_selected():
-                            counter_skipped += 1
+                        if isl.is_full_face_selected():
                             continue
-                        counter += 1
-                        isl.select = True
-                        umesh.update_tag = True
-                    elif has_selected:
-                        if isl.is_full_face_deselected:
+                        to_select.append(isl)
+                    else:
+                        if isl.is_full_deselected_by_context():
                             continue
-                        isl.select = False
-                        umesh.update_tag = True
+                        to_deselect.append(isl)
+
                 elif self.mode == 'ADDITION':
                     if lower <= isl.value <= higher:
-                        if has_selected and isl.is_full_face_selected():
-                            counter_skipped += 1
+                        if isl.is_full_face_selected():
                             continue
-                        counter += 1
-                        isl.select = True
-                        umesh.update_tag = True
+                        to_select.append(isl)
                 else:  # self.mode == 'DESELECT':
                     if lower <= isl.value <= higher:
-                        if isl.is_full_face_deselected:
-                            counter_skipped += 1
+                        if isl.is_full_deselected_by_context():
                             continue
-                        counter += 1
-                        isl.select = False
-                        umesh.update_tag = True
+                        to_deselect.append(isl)
 
-        if not islands_of_mesh:
-            self.report({'WARNING'}, f'Islands not found')
-        else:
-            if not counter and not counter_skipped:
-                self.report({'WARNING'}, f'No found in the specified size')
+            islands.umesh.update_tag = (to_select or to_deselect)
+            if islands.umesh.update_tag:
+                umesh.sync_from_mesh_if_needed()
+
+                for isl in to_deselect:
+                    isl.select = False
+
+                for isl in to_select:
+                    isl.select = True
+
+                if need_sync_validation_check and to_deselect:
+                    umesh.bm.uv_select_sync_to_mesh()
+
         umeshes.silent_update()
         return {'FINISHED'}
 
@@ -2506,7 +2517,7 @@ class UNIV_OT_Stacked(Operator):
                         isl.select = True
                         isl.umesh.update_tag = True
                 else:
-                    if union_isl.is_full_face_deselected:
+                    if union_isl.is_full_face_deselected():
                         continue
                     union_isl.select = False
                     union_isl.umesh.update_tag = True
@@ -2523,7 +2534,7 @@ class UNIV_OT_Stacked(Operator):
             else:  # self.mode == 'DESELECT':
                 if isinstance(union_isl, UnionIslands):
                     for isl in union_isl:
-                        if isl.is_full_face_deselected:
+                        if isl.is_full_face_deselected():
                             counter_skipped += 1
                             continue
                         counter += 1
