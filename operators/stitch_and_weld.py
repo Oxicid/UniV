@@ -687,7 +687,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
                 islands.indexing()
 
                 for idx, isl in enumerate(islands):
-                    isl.set_selected_crn_edge_tag(umesh)
+                    isl.set_selected_crn_edge_tag()
 
                     for crn in isl.iter_corners_by_tag():
                         shared = crn.link_loop_radial_prev

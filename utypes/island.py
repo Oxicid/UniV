@@ -435,31 +435,38 @@ class FaceIsland:
                     crn.tag = False
 
     def set_boundary_tag(self, match_idx=False):
-        uv = self.umesh.uv
+        is_boundary = utils.is_boundary_func(self.umesh)
         if match_idx:
-            is_pair = utils.is_pair
             for f in self:
                 idx = f.index
                 for crn in f.loops:
-                    crn.tag = (crn.edge.seam or
-                               (pair_crn := crn.link_loop_radial_prev).face.index != idx or
-                               not is_pair(crn, pair_crn, uv))  # noqa
+                    crn.tag = is_boundary(crn) or crn.link_loop_radial_prev.face.index != idx
         else:
-            is_boundary = utils.is_boundary_sync if self.umesh.sync else utils.is_boundary_non_sync
             for f in self:
                 for crn in f.loops:
-                    crn.tag = crn.edge.seam or is_boundary(crn, uv)
+                    crn.tag = is_boundary(crn)
 
-    def set_selected_crn_edge_tag(self, umesh):
-        if umesh.sync:
-            for f in self:
-                for crn in f.loops:
-                    crn.tag = crn.edge.select
-        else:
-            uv = umesh.uv
-            for f in self:
-                for crn in f.loops:
-                    crn.tag = crn[uv].select_edge
+    if USE_GENERIC_UV_SYNC:
+        def set_selected_crn_edge_tag(self):
+            if self.umesh.sync and not self.umesh.sync_valid:
+                for f in self:
+                    for crn in f.loops:
+                        crn.tag = crn.edge.select
+            else:
+                for f in self:
+                    for crn in f.loops:
+                        crn.tag = crn.uv_select_edge
+    else:
+        def set_selected_crn_edge_tag(self):
+            if self.umesh.sync:
+                for f in self:
+                    for crn in f.loops:
+                        crn.tag = crn.edge.select
+            else:
+                uv = self.umesh.uv
+                for f in self:
+                    for crn in f.loops:
+                        crn.tag = crn[uv].select_edge
 
     def iter_corners_by_tag(self):
         return (crn for f in self for crn in f.loops if crn.tag)
