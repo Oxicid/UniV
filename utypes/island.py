@@ -485,19 +485,19 @@ class FaceIsland:
                 for crn in f.loops:
                     crn[uv].pin_uv = state
 
-    def calc_selected_vert_corners_iter(self):
-        if self.umesh.sync:
-            return (crn for f in self for crn in f.loops if crn.vert.select)
-        else:
-            uv = self.umesh.uv
-            return (crn for f in self for crn in f.loops if crn[uv].select)
-
-    def calc_selected_edge_corners_iter(self):
-        if self.umesh.sync:
-            return (crn for f in self for crn in f.loops if crn.edge.select)
-        else:
-            uv = self.umesh.uv
-            return (crn for f in self for crn in f.loops if crn[uv].select_edge)
+    if USE_GENERIC_UV_SYNC:
+        def calc_selected_edge_corners_iter(self):
+            if self.umesh.sync and not self.umesh.sync_valid:
+                return (crn for f in self for crn in f.loops if crn.edge.select)
+            else:
+                return (crn for f in self for crn in f.loops if crn.uv_select_edge)
+    else:
+        def calc_selected_edge_corners_iter(self):
+            if self.umesh.sync:
+                return (crn for f in self for crn in f.loops if crn.edge.select)
+            else:
+                uv = self.umesh.uv
+                return (crn for f in self for crn in f.loops if crn[uv].select_edge)
 
     def tag_selected_corner_verts_by_verts(self, umesh):
         corners = (_crn for f in self for _crn in f.loops)
