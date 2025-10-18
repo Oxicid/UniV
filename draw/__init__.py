@@ -284,18 +284,20 @@ def has_modal_running():
 def has_crash_modal_running():
     """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
     if bpy.app.version >= (4, 2, 0):
-        for op in bpy.context.window.modal_operators:
-            if not op.bl_idname.startswith('UV_OT_univ_'):
-                return True
+        for window in bpy.context.window_manager.windows:
+            for op in window.modal_operators:
+                if not op.bl_idname.startswith('UV_OT_univ_'):
+                    return True
         return False
     else:
         # In older versions, modal operators cannot be selectively excluded,
         # so any modal operator interrupts drawing.
         from .. import utypes
-        win = utypes.wmWindow.get_fields(bpy.context.window)
-        for handle in win.modalhandlers:
-            if handle.type == 3:  # WM_HANDLER_TYPE_OP
-                return True
+        for window in bpy.context.window_manager.windows:
+            win = utypes.wmWindow.get_fields(window)  # TODO: Check in old versions
+            for handle in win.modalhandlers:
+                if handle.type == 3:  # WM_HANDLER_TYPE_OP
+                    return True
         return False
 
 @bpy.app.handlers.persistent
