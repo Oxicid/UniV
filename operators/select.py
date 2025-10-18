@@ -2291,79 +2291,95 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
         umeshes = UMeshes()
+        umeshes.update_tag = False
+        need_sync_validation_check = False
 
         if not self.bl_idname.startswith('UV'):
             umeshes.set_sync()
             umeshes.sync_invalidate()
+            umeshes.elem_mode = 'FACE'
+        else:
+            if umeshes.sync:
+                if utils.USE_GENERIC_UV_SYNC:
+                    need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
 
         if umeshes.sync:
             umeshes.elem_mode = 'FACE'
 
         umeshes.filter_by_visible_uv_faces()
-        has_elem = False
+
         counter = 0
         counter_skipped = 0
         for umesh in umeshes:
-            umesh.update_tag = False
-            has_selected = umesh.has_selected_uv_verts()
             if self.island_mode == 'ISLAND':
                 islands = AdvIslands.calc_visible_with_mark_seam(umesh)
             else:
                 islands = [AdvIsland([f], umesh) for f in utils.calc_visible_uv_faces(umesh)]
-            if islands:
-                has_elem = True
-                scale = umesh.check_uniform_scale(self.report)
-                for isl in islands:
-                    isl.calc_area_3d(scale)
-                    isl.calc_area_uv()
 
-                    area_3d = sqrt(isl.area_3d)
-                    area_uv = sqrt(isl.area_uv) * texture_size
+            scale = umesh.check_uniform_scale(self.report)
+            to_select = []
+            to_deselect = []
+            for isl in islands:
+                isl.calc_area_3d(scale)
+                isl.calc_area_uv()
 
-                    texel = area_uv / area_3d if area_3d else 0
+                area_3d = sqrt(isl.area_3d)
+                area_uv = sqrt(isl.area_uv) * texture_size
 
-                    if not (compared_result := isclose(texel, self.target_texel, abs_tol=self.threshold)):
-                        if self.compare_type == 'LESS':
-                            compared_result = texel < self.target_texel
-                        elif self.compare_type == 'GREATER':
-                            compared_result = texel > self.target_texel
+                texel = area_uv / area_3d if area_3d else 0
 
-                    if self.mode == 'SELECT':
-                        if compared_result:
-                            if has_selected and isl.is_full_face_selected():
-                                counter_skipped += 1
-                                continue
-                            counter += 1
-                            isl.select = True
-                            umesh.update_tag = True
-                        elif has_selected:
-                            if isl.is_full_face_deselected():
-                                continue
-                            isl.select = False
-                            umesh.update_tag = True
-                    elif self.mode == 'ADDITION':
-                        if compared_result:
-                            if has_selected and isl.is_full_face_selected():
-                                counter_skipped += 1
-                                continue
-                            counter += 1
-                            isl.select = True
-                            umesh.update_tag = True
-                    else:  # self.mode == 'DESELECT':
-                        if compared_result:
-                            if isl.is_full_face_deselected():
-                                counter_skipped += 1
-                                continue
-                            counter += 1
-                            isl.select = False
-                            umesh.update_tag = True
+                if not (compared_result := isclose(texel, self.target_texel, abs_tol=self.threshold)):
+                    if self.compare_type == 'LESS':
+                        compared_result = texel < self.target_texel
+                    elif self.compare_type == 'GREATER':
+                        compared_result = texel > self.target_texel
 
-        if not has_elem:
+                if self.mode == 'SELECT':
+                    if compared_result:
+                        if isl.is_full_face_selected():
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        to_select.append(isl)
+                    elif not isl.is_full_deselected_by_context():
+                        to_deselect.append(isl)
+                elif self.mode == 'ADDITION':
+                    if compared_result:
+                        if isl.is_full_face_selected():
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        to_select.append(isl)
+                else:  # self.mode == 'DESELECT':
+                    if compared_result:
+                        if isl.is_full_face_deselected():
+                            counter_skipped += 1
+                            continue
+                        counter += 1
+                        to_deselect.append(isl)
+
+            if to_select or to_deselect:
+                umesh.update_tag = True
+                if need_sync_validation_check:
+                    umesh.sync_from_mesh_if_needed()
+                elif umesh._sync_invalidate:  # noqa
+                    umesh.sync_valid = False
+
+                for isl in to_deselect:
+                    isl.select = False
+
+                for isl in to_select:
+                    isl.select = True
+
+                if need_sync_validation_check and to_deselect:
+                    umesh.bm.uv_select_sync_to_mesh()
+
+        if not umeshes:
             self.report({'WARNING'}, f'{self.island_mode.capitalize() + "s"} not found')
         else:
             if not counter and not counter_skipped:
