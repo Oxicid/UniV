@@ -344,6 +344,7 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
 
         from ..preferences import univ_settings
         self.texel = univ_settings().texel_density

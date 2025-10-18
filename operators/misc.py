@@ -1197,6 +1197,7 @@ class UNIV_OT_CopyToLayer(Operator):
         if umeshes.is_edit_mode:
             if context.area.type != 'IMAGE_EDITOR':
                 umeshes.set_sync()
+                umeshes.sync_invalidate()
 
             selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
             umeshes = selected if selected else visible
@@ -1467,6 +1468,8 @@ class UNIV_OT_Flatten(Operator):
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
+
         if not self.umeshes:
             return self.umeshes.update()
         if self.use_correct_aspect:
@@ -2007,6 +2010,7 @@ class UNIV_OT_FlattenCleanup(Operator):
         self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
         self.umeshes.fix_context()
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
 
         removed_sk_counter = 0
         removed_modifiers = 0

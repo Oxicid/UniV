@@ -269,18 +269,6 @@ class DrawerSubscribeRNA:
             if handler.__name__ == cls.univ_drawer_load_handler.__name__:
                 bpy.app.handlers.load_post.remove(handler)
 
-def has_modal_running():
-    """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
-    if bpy.app.version >= (4, 2, 0):
-        return len(bpy.context.window.modal_operators)
-    else:
-        from .. import utypes
-        win = utypes.wmWindow.get_fields(bpy.context.window)
-        for handle in win.modalhandlers:
-            if handle.type == 3:  # WM_HANDLER_TYPE_OP
-                return True
-        return False
-
 def has_crash_modal_running():
     """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
     if bpy.app.version >= (4, 2, 0):

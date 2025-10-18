@@ -76,6 +76,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
 
         if not self.bl_idname.startswith('UV'):
             self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
 
         all_islands: list[AdvIsland | UnionIslands] = []
 
@@ -614,6 +615,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
 
         if self.use_aspect:
             # TODO: Implement exact aspect for materials (get aspect by face mat id)
@@ -694,6 +696,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
 
         if self.use_aspect:
             self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
@@ -705,6 +708,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         for umesh in (unselected_umeshes := UMeshes.unselected_with_uv()):
             umesh.value = umesh.check_uniform_scale(report=self.report)
         unselected_umeshes.set_sync()
+        unselected_umeshes.sync_invalidate()
 
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
@@ -829,6 +833,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
 
         cancel = False
         if not self.umeshes.is_edit_mode:
@@ -954,6 +959,7 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
 
         if not self.bl_idname.startswith('UV') or not self.umeshes.is_edit_mode:
             self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
 
         cancel = False
         if self.umeshes.is_edit_mode:
@@ -1243,6 +1249,7 @@ class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
         umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
         has_selected = False
         if umeshes.is_edit_mode:
@@ -1297,6 +1304,7 @@ class UNIV_OT_Calc_UV_Area(Operator):
         umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
         has_selected = False
         if umeshes.is_edit_mode:
@@ -1344,6 +1352,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
         umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
         has_selected = False
         if umeshes.is_edit_mode:

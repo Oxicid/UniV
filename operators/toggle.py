@@ -25,6 +25,13 @@ class UNIV_OT_SplitUVToggle(Operator):
     bl_idname = 'wm.univ_split_uv_toggle'
     bl_label = 'Split UV Toggle'
     bl_options = {'UNDO'}
+    bl_description = """
+Default - splits the window by opening the UV or 3D editor.
+Ctrl - creates a new window
+Shift - switches windows (3D View <-> UV Editor)
+Alt - swaps windows
+
+Has [Shift + T] keymap"""
 
     mode: EnumProperty(name='Mode',
                        default='SPLIT',

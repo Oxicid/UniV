@@ -1423,6 +1423,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
         self.umeshes = UMeshes.calc_any_unique(verify_uv=False)
 
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
         if self.grow:
             return self.grow_select()
         else:
@@ -2016,6 +2017,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
             return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
         if self.clamp_on_seam:
             self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam
         else:
@@ -2285,6 +2287,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
 
         if not self.bl_idname.startswith('UV'):
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
         if umeshes.sync:
             umeshes.elem_mode = 'FACE'

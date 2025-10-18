@@ -53,6 +53,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
         if self.umeshes.is_edit_mode:
             selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
@@ -480,6 +481,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
     def execute(self, context):
         self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
 
         self.area = context.area
         if self.area.type != 'VIEW_3D':
@@ -755,6 +757,7 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
             umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
             umeshes.fix_context()
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
             selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:

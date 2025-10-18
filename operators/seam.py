@@ -180,6 +180,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
     def execute(self, context) -> set[str]:
         self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
 
         selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_edges()
         self.umeshes = selected if selected else visible
@@ -409,6 +410,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
         if not self.bl_idname.startswith('UV'):
             umeshes.set_sync()
+            umeshes.sync_invalidate()
 
         sync = umeshes.sync
         for umesh in umeshes:

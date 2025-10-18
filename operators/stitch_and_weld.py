@@ -966,6 +966,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
     def execute(self, context):
         self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
         for umesh in self.umeshes:
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
@@ -1165,6 +1166,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
     def execute(self, context):
         self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
+        self.umeshes.sync_invalidate()
         self.umeshes.update_tag = False
 
         for umesh in self.umeshes:

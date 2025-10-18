@@ -31,6 +31,7 @@ class UMesh:
         self.is_edit_bm: bool = is_edit_bm
         self.update_tag: bool = True
         self.sync: bool = utils.sync()
+        self._sync_invalidate: bool = False  # Need for 3D operators
         # self.islands_calc_type
         # self.islands_calc_subtype
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
@@ -63,6 +64,8 @@ class UMesh:
 
     @property
     def sync_valid(self):
+        if self._sync_invalidate:
+            return False
         return getattr(self.bm, 'uv_select_sync_valid', False)
 
     @sync_valid.setter
@@ -801,6 +804,10 @@ class UMeshes:
             umesh.sync = state
         self.sync = state
         self.elem_mode = utils.get_select_mode_mesh() if state else utils.get_select_mode_uv()
+
+    def sync_invalidate(self):
+        for umesh in self:
+            umesh._sync_invalidate = True
 
     def active_to_first(self):
         active_obj = bpy.context.active_object
