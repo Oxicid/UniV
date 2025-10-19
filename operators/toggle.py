@@ -453,7 +453,7 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         tool_settings = context.tool_settings
@@ -492,6 +492,12 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @staticmethod
     def disable_sync(umesh):
+        if utils.USE_GENERIC_UV_SYNC:
+            umesh.sync_from_mesh_if_needed()
+            for f in umesh.bm.faces:
+                if not f.hide:
+                    f.select = True
+            return
         uv = umesh.uv
         if utils.get_select_mode_mesh() == 'FACE':
             if umesh.is_full_face_selected:
@@ -573,6 +579,10 @@ class UNIV_OT_SyncUVToggle(Operator):
 
     @staticmethod
     def to_sync(umesh):
+        if utils.USE_GENERIC_UV_SYNC:
+            umesh.sync_valid = True
+            umesh.bm.uv_select_sync_to_mesh()
+            return
         uv = umesh.uv
         if utils.get_select_mode_uv() in ('FACE', 'ISLAND'):
             for face in umesh.bm.faces:
