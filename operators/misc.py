@@ -326,6 +326,7 @@ class UNIV_OT_Hide(Operator):
             # Fix incorrect for hide in non-sync mode
             if utils.get_select_mode_mesh() != 'FACE':
                 self.umeshes.sync = True
+                self.umeshes._elem_mode = ''  # noqa
                 self.umeshes.elem_mode = 'FACE'
                 utils.update_area_by_type('VIEW_3D')
             self.umeshes.sync = False
@@ -337,6 +338,11 @@ class UNIV_OT_Hide(Operator):
             return self.umeshes.update()
         if not selected_umeshes and self.mouse_pos:
             return self.pick_hide()
+
+        if utils.USE_GENERIC_UV_SYNC:
+            return bpy.ops.uv.hide(unselected=self.unselected)
+
+        # Legacy
 
         # Unselected
         if self.unselected:
@@ -530,7 +536,7 @@ class UNIV_OT_SetCursor2D(Operator):
             for umesh in (umeshes := UMeshes()):
                 uv = umesh.uv
                 if prefs().snap_points_default == 'ALL':
-                    for f in utils.calc_visible_uv_faces(umesh):
+                    for f in utils.calc_visible_uv_faces_iter(umesh):
                         face_center_sum = zero_pt.copy()
                         corners = f.loops
                         prev_co = corners[-1][uv].uv
@@ -552,14 +558,14 @@ class UNIV_OT_SetCursor2D(Operator):
                             min_dist = dist
 
                 elif umeshes.elem_mode == 'VERT':
-                    for f in utils.calc_visible_uv_faces(umesh):
+                    for f in utils.calc_visible_uv_faces_iter(umesh):
                         for crn in f.loops:
                             uv_co = crn[uv].uv
                             if (length := (mouse_pos - uv_co).length) < min_dist:
                                 pt = uv_co
                                 min_dist = length
                 elif umeshes.elem_mode == 'EDGE':
-                    for f in utils.calc_visible_uv_faces(umesh):
+                    for f in utils.calc_visible_uv_faces_iter(umesh):
                         corners = f.loops
                         prev_co = corners[-1][uv].uv
                         for crn in corners:
@@ -573,7 +579,7 @@ class UNIV_OT_SetCursor2D(Operator):
                                 min_dist = dist
                             prev_co = cur_co
                 else:
-                    for f in utils.calc_visible_uv_faces(umesh):
+                    for f in utils.calc_visible_uv_faces_iter(umesh):
                         face_center_sum = zero_pt.copy()
                         corners = f.loops
                         for crn in corners:
