@@ -437,6 +437,28 @@ def edge_deselect_safe_3d_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop
     return deselect_edge
 
 if USE_GENERIC_UV_SYNC:
+    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], typing.NoReturn]:  # noqa
+        if umesh.sync and not umesh.sync_valid:
+            def select_set(crn):
+                crn.vert.select = True
+        else:
+            def select_set(crn):
+                crn.vert.select = True
+                crn.uv_select_vert = True
+        return select_set
+else:
+    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], typing.NoReturn]:  # noqa
+        def catcher(uv, sync):
+            if sync:
+                def select_set(crn):
+                    crn.vert.select = True
+            else:
+                def select_set(crn):
+                    crn[uv].select = True
+            return select_set
+        return catcher(umesh.uv, umesh.sync)
+
+if USE_GENERIC_UV_SYNC:
     def vert_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], bool]:
         def inner(sync, sync_valid):
             def select_get(crn):  # noqa
@@ -579,3 +601,15 @@ else:
 
                 return func
         return catcher(umesh.uv)
+
+def fast_deselect(umesh):
+    # TODO: Add more info and add uv_select_to_mesh
+    umesh.sync_valid = True
+    bm = umesh.bm
+    bm.uv_select_foreach_set(False, faces=bm.faces, sticky_select_mode='DISABLED')
+
+    # Deselect verts/edges.
+    saved_mode = bm.select_mode
+    bm.select_mode = {'FACE'}
+    bm.uv_select_flush_mode(flush_down=True)
+    bm.select_mode = saved_mode
