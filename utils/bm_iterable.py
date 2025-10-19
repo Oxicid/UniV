@@ -61,10 +61,9 @@ if USE_GENERIC_UV_SYNC:
             if umesh.is_full_face_selected:
                 if umesh.is_full_face_selected_for_avoid_force_explicit_check:
                     return umesh.bm.faces
-                if not umesh.sync_valid:
-                    return (f for f in umesh.bm.faces if f.select)
-
                 return (f for f in umesh.bm.faces if f.uv_select)
+            if not umesh.sync_valid:
+                return (f for f in umesh.bm.faces if f.select)
             return (f for f in umesh.bm.faces if f.uv_select and not f.hide)
 
         if umesh.is_full_face_selected:

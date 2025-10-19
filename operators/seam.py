@@ -412,17 +412,13 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
             umeshes.set_sync()
             umeshes.sync_invalidate()
 
-        sync = umeshes.sync
         for umesh in umeshes:
             if self.selected:
-                faces = utils.calc_selected_uv_faces(umesh)
+                faces = utils.calc_selected_uv_faces_iter(umesh)
             else:
-                faces = utils.calc_visible_uv_faces(umesh)
+                faces = utils.calc_visible_uv_faces_iter(umesh)
 
-            if not faces:
-                umesh.update_tag = False
-                continue
-
+            has_update = False
             is_pair = utils.is_pair
             uv_layers_size = len(umesh.obj.data.uv_layers)
             if _all_channels := self.all_channels and uv_layers_size > 1:
@@ -431,22 +427,16 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
                 for layer_idx in range(uv_layers_size):
                     uv = umesh.bm.loops.layers.uv[layer_idx]
-
                     if layer_idx == 0:
+                        umesh.uv = uv
+                        is_boundary = utils.is_boundary_func(umesh, with_seam=self.addition)
+
                         for idx, crn in enumerate(corners):
-                            crn_edge = crn.edge
-                            pair = crn.link_loop_radial_prev
-                            if crn == pair:
+                            if is_boundary(crn):
                                 seams[idx] = True
-                            elif not is_pair(crn, pair, uv):
+                            elif self.by_sharps and not crn.edge.smooth:
                                 seams[idx] = True
-                            elif (pair_face := pair.face).hide if sync else not (pair_face := pair.face).select:  # if hidden
-                                seams[idx] = True
-                            elif self.by_sharps and not crn_edge.smooth:
-                                seams[idx] = True
-                            elif self.mtl and crn.face.material_index != pair_face.material_index:
-                                seams[idx] = True
-                            elif crn_edge.seam and self.addition:
+                            elif self.mtl and crn.face.material_index != crn.link_loop_radial_prev.face.material_index:
                                 seams[idx] = True
                     else:
                         for idx, crn in enumerate(corners):
@@ -456,26 +446,27 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
                                 seams[idx] = True
 
                 for idx, crn in enumerate(corners):
-                    crn.edge.seam = seams[idx]
+                    if crn.edge.seam != seams[idx]:
+                        crn.edge.seam = seams[idx]
+                        has_update = True
 
             else:
-                uv = umesh.uv
+                is_boundary = utils.is_boundary_func(umesh, with_seam=self.addition)
                 for f in faces:
                     for crn in f.loops:
                         crn_edge = crn.edge
-                        pair = crn.link_loop_radial_prev
-                        if crn == pair:
-                            crn_edge.seam = True
-                        elif not is_pair(crn, pair, uv):
-                            crn_edge.seam = True
-                        elif (pair_face := pair.face).hide if sync else not (pair_face := pair.face).select:  # if hidden
-                            crn_edge.seam = True
-                        elif self.by_sharps and not crn_edge.smooth:
-                            crn_edge.seam = True
-                        elif self.mtl and f.material_index != pair_face.material_index:
-                            crn_edge.seam = True
-                        elif not self.addition:
-                            crn_edge.seam = False
+                        if (is_boundary(crn) or
+                                (self.by_sharps and not crn_edge.smooth) or
+                                (self.mtl and f.material_index != crn.link_loop_radial_prev.face.material_index)):
+                            if not crn_edge.seam:
+                                crn_edge.seam = True
+                                has_update = True
+
+                        else:
+                            if crn_edge.seam:
+                                crn_edge.seam = False
+                                has_update = True
+            umesh.update_tag = has_update
 
         if self.bl_idname.startswith('UV'):
             # Flush System
@@ -483,7 +474,8 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
             if not draw.DrawerSeamsProcessing.is_enable():
                 coords = draw.mesh_extract.extract_seams_umeshes(umeshes)
                 draw.LinesDrawSimple.draw_register(coords, draw.DrawerSeamsProcessing.get_color())
-        umeshes.update()
+
+        umeshes.silent_update()
         return {'FINISHED'}
 
 
