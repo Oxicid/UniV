@@ -476,11 +476,18 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                     isl.umesh.update_tag = True
 
         if zero_area_islands:
+            need_validation = False
+            if utils.USE_GENERIC_UV_SYNC:
+                if utils.sync() and utils.get_select_mode_mesh() in ('VERT', 'EDGE'):
+                    need_validation = True
+
             for isl in islands:
                 if isl not in zero_area_islands:
                     isl.select = False
                     isl.umesh.update_tag = True
             for isl in zero_area_islands:
+                if need_validation:
+                    isl.umesh.sync_from_mesh_if_needed()
                 isl.select = True
                 isl.umesh.update_tag = True
 
@@ -910,10 +917,17 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         if zero_area_islands:
             self.report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
             if self.umeshes.is_edit_mode:
+                need_validation = False
+                if utils.USE_GENERIC_UV_SYNC:
+                    if utils.sync() and utils.get_select_mode_mesh() in ('VERT', 'EDGE'):
+                        need_validation = True
+
                 for islands in selected_islands_of_mesh:
                     for isl in islands:
                         isl.select = False
                 for isl in zero_area_islands:
+                    if need_validation:
+                        isl.umesh.sync_from_mesh_if_needed()
                     isl.select = True
             self.umeshes.update_tag = True
             self.umeshes.silent_update()
