@@ -280,38 +280,41 @@ class Align_by_Angle:
             angle = self.angle
             negative_ange = math.pi - angle
 
-            groups = []
             islands = AdvIslands.calc_visible(umesh)
             islands.indexing()
+            is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+            get_face_select = utils.face_select_get_func(umesh)
+            get_edge_select = utils.edge_select_get_func(umesh)
+
+            face_align = False
+            if umesh.elem_mode in ('FACE', 'ISLAND'):
+                face_align = True
+            elif not utils.USE_GENERIC_UV_SYNC:
+                if umesh.sync and umesh.total_face_sel:  # Preserve sync
+                    face_align = True
+            else:
+                if umesh.sync and not umesh.sync_valid and umesh.total_face_sel:
+                    face_align = True
 
             for isl in islands:
                 isl.apply_aspect_ratio()
                 if selected_umeshes:
-                    if umeshes.sync:
-                        if umeshes.elem_mode == 'FACE' or umesh.total_face_sel:
-                            def corners_iter():
-                                for crn_ in isl.corners_iter():
-                                    if crn_.edge.select:
-                                        if crn_.face.select or (utils.is_pair(crn_, crn_.link_loop_prev, uv) and crn_.link_loop_prev.face.select):
-                                            yield crn_
-                                        else:
-                                            crn_.tag = False
-                                    else:
-                                        crn_.tag = False
-                        else:
-                            def corners_iter():
-                                for crn_ in isl.corners_iter():
-                                    if crn_.edge.select:
+                    def corners_iter():
+                        for crn_ in isl.corners_iter():
+                            if get_edge_select(crn_):
+                                yield crn_
+                            else:
+                                crn_.tag = False
+                    if umeshes.sync and face_align:
+                        def corners_iter():
+                            for crn_ in isl.corners_iter():
+                                if get_edge_select(crn_):
+                                    if get_face_select(crn_.face) or (not is_boundary(crn_) and get_face_select(crn_.link_loop_prev.face)):
                                         yield crn_
                                     else:
                                         crn_.tag = False
-                    else:
-                        def corners_iter():
-                            for crn_ in isl.corners_iter():
-                                if not crn_[uv].select_edge:
+                                else:
                                     crn_.tag = False
-                                    continue
-                                yield crn_
                 else:
                     def corners_iter():
                         return isl.corners_iter()
@@ -326,8 +329,6 @@ class Align_by_Angle:
                         crn.tag = True
                     else:
                         crn.tag = False
-
-                    groups.append(to_segmenting_corners)
 
                 has_segments |= bool(to_segmenting_corners)
                 segments = Segments.from_tagged_corners(to_segmenting_corners, umesh)
