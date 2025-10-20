@@ -3003,23 +3003,232 @@ class UNIV_OT_SelectMode(Operator):
             return bpy.ops.uv.select_mode.poll()  # noqa
 
     def execute(self, context):
-        if utils.sync():
-            if self.type == 'ISLAND':
-                # TODO: Implement toggle island checkbox for new sync select system
-                return {'CANCELLED'}
+        if utils.USE_GENERIC_UV_SYNC:
+            return self.set_mode()
+        else:
+            return self.set_mode_legacy()
 
+    def set_mode(self):
+        ts = bpy.context.scene.tool_settings
+        umeshes = UMeshes()
+        umeshes.update_tag = False
+        initial_mode = umeshes.elem_mode
+        initial_use_island_select = ts.use_uv_select_island
+
+        update = self.toggle_sticky_mode()
+
+        if self.type == 'ISLAND':
+            if not ts.use_uv_select_island:
+                ts.use_uv_select_island = True
+                update = True
+        else:
+            if ts.use_uv_select_island:
+                ts.use_uv_select_island = False
+                update = True
+
+        if not utils.sync():
+            if self.type == 'ISLAND':
+                res = bpy.ops.uv.select_mode(type='FACE')
+            else:
+                res = bpy.ops.uv.select_mode(type=self.type)
+            update |= res == {'FINISHED'}
+        else:
+            if self.type == 'ISLAND':
+                if initial_mode != 'FACE':
+                    umeshes.elem_mode = 'FACE'
+                    update = True
+
+                if update:
+                    for umesh in umeshes:
+                        if not umesh.has_selected_uv_faces():
+                            if umesh.sync_valid:
+                                umesh.sync_valid = False
+                                umesh.update_tag = True
+                            continue
+
+                        Islands.tag_filter_visible(umesh)
+                        select_get = utils.face_select_get_func(umesh)
+                        for faces in Islands.calc_with_markseam_iter_ex(umesh):
+                            if not utils.all_equal(faces, select_get):
+                                utypes.FaceIsland(faces, umesh).select = False
+                                umesh.update_tag = True
+
+                        if umesh.sync_valid:
+                            umesh.bm.uv_select_sync_to_mesh()
+                            umesh.sync_valid = False
+                            umesh.update_tag = True
+
+            elif self.type == 'FACE':
+                if initial_mode != 'FACE':
+                    umeshes.elem_mode = 'FACE'
+                    update = True
+
+                if update:
+                    for umesh in umeshes:
+                        if umesh.sync_valid:
+                            umesh.bm.uv_select_sync_to_mesh()
+                            umesh.sync_valid = False
+                            umesh.update_tag = True
+
+            elif self.type == 'EDGE':
+                if initial_mode not in ('VERT', 'EDGE') or initial_use_island_select:
+                    for umesh in umeshes:
+                        if not umesh.has_selected_uv_verts():
+                            if umesh.sync_valid:
+                                umesh.sync_valid = False
+                                umesh.update_tag = True
+                            continue
+
+                        if not umesh.sync_valid:
+                            umesh.sync_valid = True
+                            umesh.update_tag = True
+                            umesh.bm.uv_select_sync_from_mesh(sticky_select_mode='DISABLED')
+                            umesh.bm.uv_select_flush_mode(flush_down=True)
+
+                        uv = umesh.uv
+                        unselected_faces_with_selected_corners = set()
+                        for f in utils.calc_unselected_uv_faces_iter(umesh):
+                            for crn in f.loops:
+                                if not crn.vert.select or crn.uv_select_vert:
+                                    continue
+
+                                # Get unselect verts, with selected links
+                                linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, True)
+                                if any(l_crn.uv_select_vert for l_crn in linked):
+                                    for ll_crn in reversed(linked):
+                                        if ll_crn.uv_select_vert:
+                                            linked.remove(ll_crn)
+                                    linked.append(crn)
+
+                                    for f_crn in linked:
+                                        f_crn.uv_select_vert = True
+                                        unselected_faces_with_selected_corners.add(f_crn.face)
+
+                        if unselected_faces_with_selected_corners:
+                            is_boundary = utils.is_boundary_func(umesh)
+                            for f in unselected_faces_with_selected_corners:
+
+                                # Select edges and face if needed
+                                all_edges_selected = True
+                                for f_crn in f.loops:
+                                    if not f_crn.uv_select_edge:
+                                        if (f_crn.uv_select_vert and f_crn.link_loop_next.uv_select_vert and
+                                                f_crn.link_loop_radial_prev.face.uv_select and not is_boundary(f_crn)):
+                                            f_crn.uv_select_edge = True
+                                        else:
+                                            all_edges_selected = False
+
+                                if all_edges_selected:
+                                    f.uv_select = True
+
+
+                if initial_mode != 'EDGE':
+                    umeshes.elem_mode = 'EDGE'
+                    update = True
+
+            else:  # VERTEX
+                if initial_mode != 'VERT' or initial_use_island_select:
+                    if initial_mode == 'EDGE':
+                        for umesh in umeshes:
+                            if not umesh.has_selected_uv_verts():
+                                if umesh.sync_valid:
+                                    umesh.sync_valid = False
+                                    umesh.update_tag = True
+                                continue
+
+                            if not umesh.sync_valid:
+                                umesh.sync_valid = True
+                                umesh.update_tag = True
+                                umesh.bm.uv_select_sync_from_mesh()
+                                continue
+
+                            for f in utils.calc_unselected_uv_faces_iter(umesh):
+                                for crn in f.loops:
+                                    if crn.link_loop_next.uv_select_vert and crn.uv_select_vert:
+                                        if not crn.uv_select_edge:
+                                            crn.uv_select_edge = True
+                                            umesh.update_tag = True
+
+                    else:
+                        for umesh in umeshes:
+                            if not umesh.has_selected_uv_verts():
+                                if umesh.sync_valid:
+                                    umesh.sync_valid = False
+                                    umesh.update_tag = True
+                                continue
+
+                            if not umesh.sync_valid:
+                                umesh.sync_valid = True
+                                umesh.update_tag = True
+                                umesh.bm.uv_select_sync_from_mesh(sticky_select_mode='DISABLED')
+                                umesh.bm.uv_select_flush_mode(flush_down=True)
+
+                            uv = umesh.uv
+                            unselected_faces_with_selected_corners = set()
+                            for f in utils.calc_unselected_uv_faces_iter(umesh):
+                                for crn in f.loops:
+                                    if not crn.vert.select or crn.uv_select_vert:
+                                        continue
+
+                                    # Get unselect verts, with selected links
+                                    linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, True)
+                                    if any(l_crn.uv_select_vert for l_crn in linked):
+                                        for ll_crn in reversed(linked):
+                                            if ll_crn.uv_select_vert:
+                                                linked.remove(ll_crn)
+                                        linked.append(crn)
+
+                                        for f_crn in linked:
+                                            f_crn.uv_select_vert = True
+                                            unselected_faces_with_selected_corners.add(f_crn.face)
+
+                            if unselected_faces_with_selected_corners:
+                                for f in unselected_faces_with_selected_corners:
+
+                                    # Select edges and face if needed
+                                    all_verts_selected = True
+                                    for f_crn in f.loops:
+                                        if not f_crn.uv_select_vert:
+                                            all_verts_selected = False
+
+                                        if not f_crn.uv_select_edge:
+                                            if f_crn.link_loop_next.uv_select_vert:
+                                                f_crn.uv_select_edge = True
+
+                                    if all_verts_selected:
+                                        f.uv_select = True
+
+                if initial_mode != 'VERT':
+                    umeshes.elem_mode = 'VERT'
+                    update = True
+
+
+        # TODO: Need flush 3d ?
+        umeshes.silent_update()
+        update |= umeshes.update_tag
+        return {'FINISHED'} if update else {'CANCELLED'}
+
+
+    def toggle_sticky_mode(self):
+        update = False
+        tool_settings = bpy.context.scene.tool_settings
+        sticky_mode = tool_settings.uv_sticky_select_mode
+        if self.type == 'FACE':
+            if sticky_mode != 'DISABLED':
+                update = True
+                tool_settings.uv_sticky_select_mode = 'DISABLED'
+        else:
+            if sticky_mode != 'SHARED_LOCATION':
+                update = True
+                tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+        return update
+
+
+    def set_mode_legacy(self):
+        if utils.sync():
             update = False
             if bpy.app.version >= (4, 5, 0):
-                tool_settings = context.scene.tool_settings
-                sticky_mode = tool_settings.uv_sticky_select_mode
-                if self.type == 'FACE':
-                    if sticky_mode != 'DISABLED':
-                        update = True
-                        tool_settings.uv_sticky_select_mode = 'DISABLED'
-                else:
-                    if sticky_mode != 'SHARED_LOCATION':
-                        update = True
-                        tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+                update = self.toggle_sticky_mode_legacy()
             elem_type = self.type
             if elem_type == 'VERTEX':
                 elem_type = 'VERT'
@@ -3030,17 +3239,7 @@ class UNIV_OT_SelectMode(Operator):
             else:
                 return res
         else:
-            update = False
-            tool_settings = context.scene.tool_settings
-            sticky_mode = tool_settings.uv_sticky_select_mode
-            if self.type == 'FACE':
-                if sticky_mode != 'DISABLED':
-                    update = True
-                    tool_settings.uv_sticky_select_mode = 'DISABLED'
-            else:
-                if sticky_mode != 'SHARED_LOCATION':
-                    update = True
-                    tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+            update = self.toggle_sticky_mode_legacy()
 
             current_mode = utils.get_select_mode_uv()
             if self.type == 'ISLAND' and current_mode == 'FACE':
@@ -3064,3 +3263,17 @@ class UNIV_OT_SelectMode(Operator):
                 return {'FINISHED'}
             else:
                 return res
+
+    def toggle_sticky_mode_legacy(self):
+        update = False
+        tool_settings = bpy.context.scene.tool_settings
+        sticky_mode = tool_settings.uv_sticky_select_mode
+        if self.type == 'FACE':
+            if sticky_mode != 'DISABLED':
+                update = True
+                tool_settings.uv_sticky_select_mode = 'DISABLED'
+        else:
+            if sticky_mode != 'SHARED_LOCATION':
+                update = True
+                tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
+        return update
