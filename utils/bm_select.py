@@ -131,18 +131,33 @@ else:
             return select_set
         return inner(umesh.uv, umesh.sync)
 
-
-def face_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
-    if umesh.sync and not umesh.sync_valid:
-        select_get = BMFace.select.__get__
-    else:
-        if umesh.sync:
-            def select_get(f):
-                return (not f.hide) and f.uv_select
+if USE_GENERIC_UV_SYNC:
+    def face_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
+        if umesh.sync and not umesh.sync_valid:
+            select_get = BMFace.select.__get__
         else:
-            def select_get(f):
-                return (not f.hide) and f.select and f.uv_select
-    return select_get
+            if umesh.sync:
+                def select_get(f):
+                    return (not f.hide) and f.uv_select
+            else:
+                def select_get(f):
+                    return (not f.hide) and f.select and f.uv_select
+        return select_get
+else:
+    def face_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
+        def catcher(uv):
+            if umesh.sync:
+                select_get = BMFace.select.__get__
+            else:
+                if umesh.elem_mode == 'EDGE':
+                    def select_get(f):
+                        return f.select and all(crn[uv].select_edge for crn in f.loops)
+                else:
+                    def select_get(f):
+                        return f.select and all(crn[uv].select for crn in f.loops)
+            return select_get
+
+        return catcher(umesh.uv)
 
 if USE_GENERIC_UV_SYNC:
     def face_select_linked_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
