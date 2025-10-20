@@ -248,10 +248,10 @@ if USE_GENERIC_UV_SYNC:
                     pair_crn = crn.link_loop_radial_prev
                     if state:
                         # Select pair edge
-                        crn.select_edge = True
+                        crn.uv_select_edge = True
                         if not face_is_invisible(pair_crn.face) and not pair_crn.uv_select_edge:
                             if v2_co == pair_crn[uv].uv and v1_co == pair_crn.link_loop_next[uv].uv:
-                                pair_crn.select_edge = True
+                                pair_crn.uv_select_edge = True
 
                         # Select A
                         for linked_crn in crn.vert.link_loops:
