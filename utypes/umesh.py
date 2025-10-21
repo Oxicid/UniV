@@ -77,7 +77,7 @@ class UMesh:
         if USE_GENERIC_UV_SYNC:
             if not self.bm.uv_select_sync_valid:
                 if sticky:
-                    self.bm.uv_select_sync_from_mesh(sticky_select_mode=sticky)
+                    self.bm.uv_select_sync_from_mesh(sticky_select_mode=sticky)  # noqa
                 else:
                     self.bm.uv_select_sync_from_mesh()
 
@@ -750,28 +750,6 @@ class UMeshes:
     def verify_uv(self):
         for umesh in self:
             umesh.verify_uv()
-
-    def loop(self):
-        active = bpy.context.active_object
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        for obj in bpy.context.selected_objects[:]:
-            obj.select_set(False)
-
-        for umesh in self.umeshes:
-            bpy.context.view_layer.objects.active = umesh.obj
-            umesh.obj.select_set(True)
-            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-
-            bm = bmesh.from_edit_mesh(umesh.obj.data)
-            yield UMesh(bm, umesh.obj)
-
-            umesh.obj.select_set(False)
-            bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-
-        for umesh in self.umeshes:
-            umesh.obj.select_set(True)
-        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-        bpy.context.view_layer.objects.active = active
 
     @staticmethod
     def loop_for_object_mode_processing(without_selection=True):

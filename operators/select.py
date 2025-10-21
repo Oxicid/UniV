@@ -2399,17 +2399,35 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         umesh = self.umeshes[0]
         uv = umesh.uv
 
-        islands = AdvIslands.calc_visible(umesh)
+        islands = AdvIslands.calc_visible_with_mark_seam(umesh)
         islands.indexing()
 
-        if lgs := utypes.LoopGroup.calc_dirt_loop_groups(umesh):
-            # umesh.tag_visible_corners()
-            # for lg in lgs:
-            #     lg.extend_from_linked()
+        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        get_edge_select = utils.edge_select_get_func(umesh)
+        get_face_select = utils.face_select_get_func(umesh)
 
-            self.calc_from_corners(lgs, uv)
+        for idx, isl in enumerate(islands):
+            to_segmenting_corners = []
+            for crn in isl.corners_iter():
+                pair_face = crn.link_loop_radial_prev.face
 
-        umesh.update()
+                if not get_edge_select(crn):
+                    crn.tag = False
+                elif get_face_select(crn.face):
+                    crn.tag = False
+                elif not is_boundary(crn) and get_face_select(pair_face) and pair_face.index == idx:
+                    crn.tag = False
+                else:
+                    crn.tag = True
+                    to_segmenting_corners.append(crn)
+            if to_segmenting_corners:
+                segments = utypes.Segments.from_tagged_corners(to_segmenting_corners, umesh)
+                self.calc_from_segments(segments)
+            break
+
+
+
+        # umesh.update()
 
 
 class UNIV_OT_SelectByArea(Operator):

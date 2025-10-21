@@ -806,12 +806,12 @@ class Segment:
             return adv_crn.crn.link_loop_next.vert
 
     @property
-    def start_co(self):
+    def start_co(self) -> Vector:
         adv_crn = self.seg[0]
         return adv_crn.crn[adv_crn.uv].uv
 
     @property
-    def end_co(self):
+    def end_co(self) -> Vector:
         adv_crn = self.seg[-1]
         if adv_crn.invert:
             return adv_crn.crn.link_loop_prev[adv_crn.uv].uv
@@ -884,6 +884,20 @@ class Segment:
 
     def deepcopy(self):
         return Segment([adv_crn.copy() for adv_crn in self.seg], self.umesh)
+
+    def distribute(self, start, end, uv_length_distribute):
+        assert self.chain_linked_corners
+        uv = self.umesh.uv
+        if uv_length_distribute:
+            assert self.lengths_seq
+            weights = self.lengths_seq
+        else:
+            weights = [crn.edge.calc_length() for crn in self]
+
+        points = utils.weighted_linear_space(start, end, weights)
+        for corners, co in zip(self.chain_linked_corners, points):
+            for l_crn in corners:
+                l_crn[uv].uv = co
 
     def __iter__(self):
         return iter(self.seg)
