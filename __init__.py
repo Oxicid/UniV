@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 6),
+    "version": (3, 9, 7),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -320,7 +320,7 @@ def register():
     # Perhaps it does not allow to reload operators in a normal way.
     bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
-    tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09)
+    tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09, persistent=True)
     tm_register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1, persistent=True)
     if univ_pro:
         tm_register(draw.DrawerSubscribeRNA.register_handler, first_interval=0.1, persistent=True)
