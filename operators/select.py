@@ -2307,9 +2307,8 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
             if umeshes.sync:
                 if utils.USE_GENERIC_UV_SYNC:
                     need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
-
-        if umeshes.sync:
-            umeshes.elem_mode = 'FACE'
+                else:
+                    umeshes.elem_mode = 'FACE'
 
         umeshes.filter_by_visible_uv_faces()
 
