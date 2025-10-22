@@ -166,7 +166,8 @@ if USE_GENERIC_UV_SYNC:
                 raise NotImplementedError()
 
             if sync_invalid:
-                select_set = BMFace.select.__set__
+                def select_set(f: BMFace):
+                    f.select = True
             else:
                 def select_set(f: BMFace):
                     f.select = True  # useless for no-sync

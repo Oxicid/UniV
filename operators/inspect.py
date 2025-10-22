@@ -373,18 +373,24 @@ scaled islands from the calculation, focusing only on actual stretches"""
             high = median * (1 + face_threshold)
 
             for umesh, faces, coefficients in face_seq_coef_by_mesh:
-                face_select_set = utils.face_select_linked_func(umesh)
-                local_face_counter = 0
+                over_faces = []
                 for f, coef in zip(faces, coefficients):
                     if coef < low or high < coef:
-                        face_select_set(f)
-                        local_face_counter += 1
+                        over_faces.append(f)
+
+                if over_faces:
+                    if umesh.sync and umesh.elem_mode in ('VERT', 'EDGE'):
+                        umesh.sync_from_mesh_if_needed()
+
+                    set_face_select = utils.face_select_linked_func(umesh)
+                    for f in over_faces:
+                        set_face_select(f)
 
                 to_select_edges, local_edge_counter = cls.overstretched_edges(umesh, faces, edge_threshold)
                 umesh.sequence = to_select_edges
-                faces_counter += local_face_counter
+                faces_counter += len(over_faces)
                 edges_counter += local_edge_counter
-                umesh.update_tag |= local_face_counter or local_edge_counter
+                umesh.update_tag |= len(over_faces) or local_edge_counter
 
         if edges_counter:
             if batch_inspect or faces_counter:
@@ -398,6 +404,9 @@ scaled islands from the calculation, focusing only on actual stretches"""
                 umeshes.elem_mode = 'EDGE'
 
             for umesh in umeshes:
+                if umesh.sync and umesh.sequence:
+                    umesh.sync_from_mesh_if_needed()
+
                 edge_select_set = utils.edge_select_linked_set_func(umesh)
                 for edge in umesh.sequence:
                     edge_select_set(edge, True)
