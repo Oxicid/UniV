@@ -105,8 +105,13 @@ class UNIV_OT_Check_Zero(Operator):
         sync = umeshes.sync
         tool_settings = bpy.context.scene.tool_settings
         sticky_mode = tool_settings.uv_sticky_select_mode
-        if sync and umeshes.elem_mode != 'FACE':
-            umeshes.elem_mode = 'FACE'
+
+        need_sync_validation_check = False
+        if umeshes.sync:
+            if utils.USE_GENERIC_UV_SYNC:
+                need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
+            else:
+                umeshes.elem_mode = 'FACE'
 
         precision *= 0.0001
         total_counter = 0
@@ -117,24 +122,36 @@ class UNIV_OT_Check_Zero(Operator):
 
             uv = umesh.uv
             is_invisible = utils.face_invisible_get_func(umesh)
-            face_select_get = utils.face_select_get_func(umesh)
             if sticky_mode == 'DISABLED':
                 face_select_set = utils.face_select_func(umesh)
             else:
                 face_select_set = utils.face_select_linked_func(umesh)
 
-            local_counter = 0
+            to_select = set()
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
-                if is_invisible(face) or face_select_get(face):
+                if is_invisible(face) or face in to_select:
                     continue
 
                 area = area_tri(tris_a[uv].uv, tris_b[uv].uv, tris_c[uv].uv)
                 if area <= precision:
                     face_select_set(face)
-                    local_counter += 1
-            umesh.update_tag |= bool(local_counter)
-            total_counter += local_counter
+                    to_select.add(face)
+
+            if to_select:
+                if need_sync_validation_check:
+                    umesh.sync_from_mesh_if_needed()
+
+                if sticky_mode == 'DISABLED':
+                    set_face_select = utils.face_select_func(umesh)
+                else:
+                    set_face_select = utils.face_select_linked_func(umesh)
+
+                for f in to_select:
+                    set_face_select(f)
+
+            umesh.update_tag |= bool(to_select)
+            total_counter += len(to_select)
         return total_counter
 
 
@@ -171,8 +188,13 @@ class UNIV_OT_Check_Flipped(Operator):
         tool_settings = bpy.context.scene.tool_settings
         sticky_mode = tool_settings.uv_sticky_select_mode
 
-        if sync and umeshes.elem_mode != 'FACE':
-            umeshes.elem_mode = 'FACE'
+        need_sync_validation_check = False
+        if umeshes.sync:
+            if utils.USE_GENERIC_UV_SYNC:
+                need_sync_validation_check = umeshes.elem_mode in ('VERT', 'EDGE')
+            else:
+                umeshes.elem_mode = 'FACE'
+
 
         total_counter = 0
         flipped_tris_counter = 0
@@ -183,16 +205,12 @@ class UNIV_OT_Check_Flipped(Operator):
 
             uv = umesh.uv
             is_invisible = utils.face_invisible_get_func(umesh)
-            face_select_get = utils.face_select_get_func(umesh)
-            if sticky_mode == 'DISABLED':
-                face_select_set = utils.face_select_func(umesh)
-            else:
-                face_select_set = utils.face_select_linked_func(umesh)
 
-            local_counter = 0
+
+            to_select = set()
             for tris_a, tris_b, tris_c in umesh.bm.calc_loop_triangles():
                 face = tris_a.face
-                if is_invisible(face) or face_select_get(face):
+                if is_invisible(face) or face in to_select:
                     continue
 
                 ax, ay = tris_a[uv].uv
@@ -207,10 +225,22 @@ class UNIV_OT_Check_Flipped(Operator):
                         # TODO: Add flash system for flipped triangles
                         flipped_tris_counter += 1
                         continue
-                    face_select_set(face)
-                    local_counter += 1
-            umesh.update_tag |= bool(local_counter)
-            total_counter += local_counter
+                    to_select.add(face)
+
+            if to_select:
+                if need_sync_validation_check:
+                    umesh.sync_from_mesh_if_needed()
+
+                if sticky_mode == 'DISABLED':
+                    set_face_select = utils.face_select_func(umesh)
+                else:
+                    set_face_select = utils.face_select_linked_func(umesh)
+
+                for f in to_select:
+                    set_face_select(f)
+
+            umesh.update_tag |= bool(to_select)
+            total_counter += len(to_select)
         return total_counter, flipped_tris_counter
 
     @staticmethod
