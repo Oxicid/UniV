@@ -85,6 +85,7 @@ class icons:
     stack = 0
     stitch = 0
     straight = 0
+    symmetrize = 0
     td_get = 0
     td_set = 0
     transfer = 0
@@ -436,6 +437,8 @@ class IconsCreator:
         bpy.ops.object.select_all(action='DESELECT')
 
         for attr in dir(icons):
+            # if attr != 'symmetrize':
+            #     continue
             if not attr.endswith('_'):
                 if not isinstance(getattr(icons, attr), int):
                     raise AttributeError(f"{attr!r} is not a valid icon attribute")

@@ -222,6 +222,9 @@ class UNIV_PT_General(Panel):
         if univ_pro:
             row.operator('uv.univ_select_similar', text='', icon_value=icons.arrow)
 
+        row = split.row(align=True)
+        row.operator('uv.univ_symmetrize', icon_value=icons.symmetrize)
+
         # Select
         col_align.label(text='Select')
         col_align = col.column(align=True)

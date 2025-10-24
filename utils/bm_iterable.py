@@ -118,7 +118,7 @@ def calc_visible_uv_faces_iter(umesh: 'utypes.UMesh') -> typing.Iterable[BMFace]
     return (f for f in umesh.bm.faces if f.select)
 
 
-def calc_visible_uv_faces(umesh) -> typing.Iterable[BMFace]:
+def calc_visible_uv_faces(umesh) -> typing.Sequence[BMFace]:
     if umesh.is_full_face_selected:
         return umesh.bm.faces
     if umesh.sync:

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 7),
+    "version": (3, 9, 8),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -37,6 +37,7 @@ from .operators import select
 from .operators import stitch_and_weld
 from .operators import stack
 from .operators import straight
+from .operators import symmetrize
 from .operators import texel
 from .operators import toggle
 from .operators import transform
@@ -120,11 +121,16 @@ def load_register_types():
             texel.UNIV_OT_Calc_UV_Area,
             texel.UNIV_OT_Calc_UV_Coverage_VIEW3D,
             texel.UNIV_OT_Calc_UV_Coverage,
+            # Symmetrize
+            symmetrize.UNIV_OT_Symmetrize,
             # Quadrify
             quadrify.UNIV_OT_Quadrify,
+            # Straight
             straight.UNIV_OT_Straight,
+            # Relax
             relax.UNIV_OT_Relax,
             relax.UNIV_OT_Relax_VIEW3D,
+            # Unwrap
             unwrap.UNIV_OT_Unwrap,
             unwrap.UNIV_OT_Unwrap_VIEW3D,
             # Toggles
