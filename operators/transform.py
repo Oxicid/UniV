@@ -780,9 +780,13 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     def align(self):
         match self.mode:
             case 'ALIGN':
-                self.align_ex(selected=True)
-                if not self.umeshes.final():
-                    self.align_ex(selected=False)
+                if self.is_island_mode:
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+                else:
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+                self.umeshes = selected if selected else visible
+
+                self.align_ex(selected=bool(selected))
 
             case 'ALIGN_TO_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
@@ -907,35 +911,51 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     def align_ex(self, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox()
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
+
         if self.is_island_mode or not selected:
             for umesh in self.umeshes:
+                umesh.update_tag = False
+                view_box_sync_block.skip = not (umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid)
+
                 if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected):
                     for island in islands:
-                        bbox = island.calc_bbox()
-                        general_bbox.union(bbox)
+                        if view_box_sync_block.isect_island(island):
+                            umesh.update_tag = True
+                            bbox = island.calc_bbox()
+                            general_bbox.union(bbox)
 
-                        all_groups.append((island, bbox, umesh.uv))
-                umesh.update_tag = bool(islands)
+                            all_groups.append((island, bbox, umesh.uv))
             self.align_islands(all_groups, general_bbox)
-        else:
-            for umesh in self.umeshes:
-                if umesh.sync and any(umesh.total_edge_sel for umesh in self.umeshes):
-                    if umesh.elem_mode in ('FACE', 'ISLAND'):
-                        corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
+            view_box_sync_block.draw_if_blocked()
+            return
+
+        assert selected
+        for umesh in self.umeshes:
+            if umesh.sync:
+                if not umesh.sync_valid and umesh.elem_mode in ('VERT', 'EDGE'):
+                    if umesh.elem_mode == 'VERT':
+                        corners = utils.calc_selected_uv_vert_corners(umesh)
+                        corners = view_box_sync_block.filter_verts(corners, umesh.uv)
                     else:
                         corners = utils.calc_selected_uv_edge_corners(umesh)
-                    if corners:
+                        corners = view_box_sync_block.filter_edges(corners, umesh)
                         corners = self.get_unique_linked_corners_from_crn_edge(umesh, corners)
-                        bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
-                        general_bbox.union(bbox)
-                        all_groups.append((corners, umesh.uv))
+                elif umesh.elem_mode in ('FACE', 'ISLAND'):
+                    corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
                 else:
-                    if corners := utils.calc_selected_uv_vert_corners(umesh):
-                        bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
-                        general_bbox.union(bbox)
-                        all_groups.append((corners, umesh.uv))
-                    umesh.update_tag = bool(corners)
-            self.align_corners(all_groups, general_bbox)
+                    corners = utils.calc_selected_uv_vert_corners(umesh)
+            else:
+                corners = utils.calc_selected_uv_vert_corners(umesh)
+
+            umesh.update_tag = bool(corners)
+            if corners:
+                bbox = BBox.calc_bbox_uv_corners(corners, umesh.uv)
+                general_bbox.union(bbox)
+                all_groups.append((corners, umesh.uv))
+
+        self.align_corners(all_groups, general_bbox)
+        view_box_sync_block.draw_if_blocked()
 
     def move_ex(self, selected=True):
         assert self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}

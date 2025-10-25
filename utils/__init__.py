@@ -5,7 +5,6 @@ import bpy  # noqa
 import sys
 import subprocess
 import typing  # noqa
-import mathutils
 
 import numpy as np  # noqa
 from math import pi
@@ -179,9 +178,35 @@ class PaddingHelper:
 
 class ViewBoxSyncBlock:
     def __init__(self, bbox):
-        self.view_box = bbox
+        from ..utypes import BBox
+        self.view_box: BBox = bbox
         self.has_blocked = False
         self.skip = False
+
+    @classmethod
+    def from_area(cls, area):
+        if area and area.ui_type == 'UV':
+            reg = area.regions[-1]
+            if reg.type == 'WINDOW':
+                from ..utypes import BBox
+                n_panel_width = next(r.width for r in area.regions if r.type == 'UI')
+                tools_width = next(r.width for r in area.regions if r.type == 'TOOLS')
+
+                view_rect = BBox.init_from_minmax(
+                    Vector(reg.view2d.region_to_view(reg.x+tools_width, reg.y)),
+                    Vector(reg.view2d.region_to_view(reg.x + (reg.width - n_panel_width), reg.y + reg.height))
+                )
+                view_rect.scale(0.6)
+                return cls(view_rect)
+
+        view_box = cls(None)
+        view_box.skip = True
+        return view_box
+
+    def draw_if_blocked(self):
+        if self.has_blocked:
+            from ..draw import LinesDrawSimple
+            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,1))
 
     def isect_island(self, island):
         from ..utypes import BBox, FaceIsland, AdvIsland  # , UnionIslands
@@ -193,6 +218,7 @@ class ViewBoxSyncBlock:
         isl_bbox: BBox = island.calc_bbox()
 
         if not view.isect(isl_bbox):
+            self.has_blocked = True
             return False
         if view.isect_x(isl_bbox.xmin) and view.isect_x(isl_bbox.xmax):
             return True
@@ -253,10 +279,85 @@ class ViewBoxSyncBlock:
                         return True
         return False
 
+    def filter_verts(self, corners, uv):
+        if self.skip:
+            return corners
+
+        xmin = self.view_box.xmin
+        xmax = self.view_box.xmax
+        ymin = self.view_box.ymin
+        ymax = self.view_box.ymax
+
+        filtered_corners = set()
+        for crn in corners:
+            if crn in filtered_corners:
+                continue
+
+            x, y = crn[uv].uv
+            if xmin <= x <= xmax and ymin <= y <= ymax:
+                filtered_corners.add(crn)
+                filtered_corners.update(linked_crn_to_vert_pair_iter(crn, uv, True))
+                continue
+
+            # Add outside unpair vertices
+            count_visible_faces = sum(not f_.hide for f_ in crn.vert.link_faces)
+            linked = linked_crn_to_vert_pair_with_seam(crn, uv, True)
+            if count_visible_faces == len(linked) + 1:
+                filtered_corners.add(crn)
+                filtered_corners.update(linked)
+
+        assert len(filtered_corners) <= len(corners)
+        if len(filtered_corners) < len(corners):
+            self.has_blocked = True
+        return filtered_corners
+
+    def filter_edges(self, corners: list[BMLoop], umesh):
+        if self.skip:
+            return corners
+
+        uv = umesh.uv
+        xmin = self.view_box.xmin
+        xmax = self.view_box.xmax
+        ymin = self.view_box.ymin
+        ymax = self.view_box.ymax
+        l1_a, l1_b, l2_a, l2_b, l3_a, l3_b, l4_a, l4_b = self.view_box.draw_data_lines()
+        from mathutils.geometry import intersect_line_line_2d
+
+        is_boundary = is_boundary_func(umesh, with_seam=False)
+        filtered_corners = set()
+        for crn in corners:
+            if crn in filtered_corners:
+                continue
+
+            if not is_boundary(crn):
+                filtered_corners.add(crn)
+                filtered_corners.add(crn.link_loop_radial_prev)
+                continue
+
+            pt_1 = crn[uv].uv
+            pt_2 = crn.link_loop_next[uv].uv
+            if (xmin <= pt_1.x <= xmax and ymin <= pt_1.y <= ymax or
+                xmin <= pt_2.x <= xmax and ymin <= pt_2.y <= ymax):
+                filtered_corners.add(crn)
+                continue
+
+            if (intersect_line_line_2d(pt_1, pt_2, l1_a, l1_b) or
+                intersect_line_line_2d(pt_1, pt_2, l2_a, l2_b) or
+                intersect_line_line_2d(pt_1, pt_2, l3_a, l3_b) or
+                intersect_line_line_2d(pt_1, pt_2, l4_a, l4_b)
+            ):
+                filtered_corners.add(crn)
+
+        assert len(filtered_corners) <= len(corners)
+        if len(filtered_corners) < len(corners):
+            self.has_blocked = True
+        return filtered_corners
+
+
     def flush_if_blocked(self):
         if self.has_blocked:
             from ..draw import LinesDrawSimple
-            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (0.05, 0.2, 0.9, 0.8))
+            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (0.05, 0.2, 0.9, 0.1))
 
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
