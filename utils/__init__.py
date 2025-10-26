@@ -208,6 +208,12 @@ class ViewBoxSyncBlock:
             from ..draw import LinesDrawSimple
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,1))
 
+    def skip_from_param(self, umesh, select):
+        if select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
+            self.skip = False
+        else:
+            self.skip = True
+
     def isect_island(self, island):
         from ..utypes import BBox, FaceIsland, AdvIsland  # , UnionIslands
 

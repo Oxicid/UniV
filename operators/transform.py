@@ -804,19 +804,6 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 if not self.umeshes.final():
                     self.move_to_cursor_union_ex(cursor_loc, selected=False)
 
-            case 'ALIGN_CURSOR':
-                if not (cursor_loc := utils.get_cursor_location()):
-                    self.umeshes.report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                general_bbox = self.align_cursor_ex(selected=True)
-                if not general_bbox.is_valid:
-                    general_bbox = self.align_cursor_ex(selected=False)
-                if not general_bbox.is_valid:
-                    self.umeshes.report()
-                    return {'CANCELLED'}
-                self.align_cursor(general_bbox, cursor_loc)
-                return {'FINISHED'}
-
             case 'INDIVIDUAL_OR_MOVE':
                 if self.is_island_mode:
                     if self.direction == 'CENTER':
@@ -874,25 +861,6 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             group[1] = general_bbox
         self.align_islands(all_groups, target_bbox, invert=True)
 
-    def align_cursor_ex(self, selected):
-        general_bbox = BBox()
-        if self.umeshes.sync and selected and any(umesh.total_edge_sel for umesh in self.umeshes):
-            for umesh in self.umeshes:
-                if umesh.elem_mode in ('FACE', 'ISLAND'):
-                    corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
-                else:
-                    corners = utils.calc_selected_uv_edge_corners(umesh)
-                if corners:
-                    uv = umesh.uv
-                    general_bbox.update(crn[uv].uv for crn in corners)
-                    general_bbox.update(crn.link_loop_next[uv].uv for crn in corners)
-        else:
-            for umesh in self.umeshes:
-                if corners := utils.calc_uv_corners(umesh, selected=selected):
-                    uv = umesh.uv
-                    general_bbox.update(crn[uv].uv for crn in corners)
-        return general_bbox
-
     @staticmethod
     def get_unique_linked_corners_from_crn_edge(umesh, corners):
         assert umesh.sync
@@ -916,7 +884,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         if self.is_island_mode or not selected:
             for umesh in self.umeshes:
                 umesh.update_tag = False
-                view_box_sync_block.skip = not (umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid)
+                view_box_sync_block.skip_from_param(umesh, selected)
 
                 if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected):
                     for island in islands:
@@ -960,15 +928,21 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     def move_ex(self, selected=True):
         assert self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}
         move_value = Vector(self.get_move_value(self.direction))
+
         if self.is_island_mode:
+            view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
             for umesh in self.umeshes:
+                umesh.update_tag = False
+                view_box_sync_block.skip_from_param(umesh, selected)
                 if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
                     for island in islands:
-                        island.move(move_value)
-                umesh.update_tag = bool(islands)
+                        if view_box_sync_block.isect_island(island):
+                            island.move(move_value)
+                            umesh.update_tag = True
+            view_box_sync_block.draw_if_blocked()
         else:
             for umesh in self.umeshes:
-                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                if corners := utils.calc_visible_uv_corners_iter(umesh):
                     uv = umesh.uv
                     for corner in corners:
                         corner[uv].uv += move_value
@@ -1070,23 +1044,6 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     for luv in luvs:
                         luv[uv].uv = destination
 
-    def align_cursor(self, general_bbox, cursor_loc):
-        if self.direction in ('UPPER', 'BOTTOM'):
-            loc = getattr(general_bbox, self.direction.lower())
-            loc.x = cursor_loc.x
-            utils.set_cursor_location(loc)
-        elif self.direction in ('RIGHT', 'LEFT'):
-            loc = getattr(general_bbox, self.direction.lower())
-            loc.y = cursor_loc.y
-            utils.set_cursor_location(loc)
-        elif loc := getattr(general_bbox, self.direction.lower(), False):
-            utils.set_cursor_location(loc)
-        elif self.direction == 'VERTICAL':
-            utils.set_cursor_location(Vector((general_bbox.center.x, cursor_loc.y)))
-        elif self.direction == 'HORIZONTAL':
-            utils.set_cursor_location(Vector((cursor_loc.x, general_bbox.center.y)))
-        else:
-            raise NotImplementedError(self.direction)
 
     @staticmethod
     def get_move_value(direction):
@@ -1118,8 +1075,7 @@ align_event_info_ex = \
     "\t\t\tCenter button collects islands in Island mode.\n" \
     "\t\t\tH/V buttons - align edges by angle in Island mode.\n" \
     "Ctrl - Align to cursor\n" \
-    "Ctrl+Shift+Alt - Align to cursor union\n" \
-    "Alt - Move cursor to selected faces/verts"
+    "Ctrl+Shift+Alt - Align to cursor union"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 
 
@@ -1130,7 +1086,6 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
     mode: EnumProperty(name="Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', ''),
         ('INDIVIDUAL_OR_MOVE', 'Individual | Move', ''),
-        ('ALIGN_CURSOR', 'Move cursor to selected', ''),
         ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
         # ('MOVE_COLLISION', 'Collision move', '')
@@ -1162,8 +1117,6 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
                 self.mode = 'ALIGN_TO_CURSOR'
             case True, True, True:
                 self.mode = 'ALIGN_TO_CURSOR_UNION'
-            case False, False, True:
-                self.mode = 'ALIGN_CURSOR'
             case False, True, False:
                 self.mode = 'INDIVIDUAL_OR_MOVE'
             case _:
