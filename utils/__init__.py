@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if 'bpy' in locals():
+    from .. import reload
+    reload.reload(globals())
+
 import bpy  # noqa
 import sys
 import subprocess
@@ -87,7 +91,6 @@ class Pip:
                 status = line.strip()
             if "Error:" in line:
                 status = line.strip()
-            print(line)
             if "Successfully" in line:
                 status = line.strip()
                 res = True
@@ -214,16 +217,58 @@ class ViewBoxSyncBlock:
         else:
             self.skip = True
 
-    def isect_island(self, island):
-        from ..utypes import BBox, FaceIsland, AdvIsland  # , UnionIslands
+    def filter_by_isect_islands(self, islands):
+        if not self.skip:
+            islands.islands = [isl for isl in islands if self.isect_island(isl)]
 
+    @staticmethod
+    def _isl_has_inner_elem(island):
+        uv = island.umesh.uv
+
+        if island.umesh.elem_mode == 'VERT':
+            for crn in island.corners_iter():
+                if not crn.vert.select:
+                    continue
+                uv_co = crn[uv].uv
+                for l_crn in crn.vert.link_loops:
+                    if l_crn.face.hide:
+                        continue
+                    if l_crn[uv].uv != uv_co:
+                        break
+                else:
+                    return True
+        else:
+            for crn in island.corners_iter():
+                if not crn.edge.select:
+                    continue
+                pair = crn.link_loop_radial_prev
+                if pair == crn or pair.hide:
+                    # If there is no pair crn, or it is hidden, then this edge is chosen deliberately.
+                    return True
+
+                if crn.link_loop_next[uv].uv == pair[uv].uv or \
+                    crn[uv].uv == pair.link_loop_next[uv].uv:
+                    return True
+
+
+    def isect_island(self, island):
+        """ NOTE: For the intersection check (isect) to work correctly,
+        all islands must be sorted by their intersection data first, before applying any transformations."""
+        from ..utypes import BBox, FaceIsland, AdvIsland
         if self.skip:
             return True
 
         view: BBox = self.view_box
+        if not island.is_full_face_selected():
+            selected_faces = [f for f in island if f.select]
+            island = AdvIsland(selected_faces, island.umesh)
+
         isl_bbox: BBox = island.calc_bbox()
 
         if not view.isect(isl_bbox):
+            if self._isl_has_inner_elem(island):
+                return True
+
             self.has_blocked = True
             return False
         if view.isect_x(isl_bbox.xmin) and view.isect_x(isl_bbox.xmax):
@@ -240,6 +285,62 @@ class ViewBoxSyncBlock:
 
         if view.isect_triangles(island.flat_coords):
             return True
+
+        if self._isl_has_inner_elem(island):
+            return True
+        self.has_blocked = True
+        return False
+
+    @staticmethod
+    def _lg_has_inner_elem(lg):
+        uv = lg.umesh.uv
+
+        if lg.umesh.elem_mode == 'VERT':
+            for crn in lg:
+                assert crn.vert.select
+                uv_co = crn[uv].uv
+                for l_crn in crn.vert.link_loops:
+                    if l_crn.face.hide:
+                        continue
+                    if l_crn[uv].uv != uv_co:
+                        break
+                else:
+                    return True
+        else:
+            for crn in lg:
+                if not crn.edge.select:
+                    continue
+                pair = crn.link_loop_radial_prev
+                if pair == crn or pair.hide:
+                    # If there is no pair crn, or it is hidden, then this edge is chosen deliberately.
+                    return True
+
+                if crn.link_loop_next[uv].uv == pair[uv].uv or \
+                    crn[uv].uv == pair.link_loop_next[uv].uv:
+                    return True
+
+    def isect_lg(self, lg):
+        from ..utypes import BBox
+
+        if self.skip:
+            return True
+
+        view: BBox = self.view_box
+        lg_bbox: BBox = lg.calc_bbox()
+
+        if not view.isect(lg_bbox):
+            if self._lg_has_inner_elem(lg):
+                return True
+            self.has_blocked = True
+            return False
+        elif view.isect_x(lg_bbox.xmin) and view.isect_x(lg_bbox.xmax):
+            return True
+        elif view.isect_y(lg_bbox.ymin) and view.isect_y(lg_bbox.ymax):
+            return True
+
+        if self._lg_has_inner_elem(lg):
+            return True
+
         self.has_blocked = True
         return False
 
@@ -306,10 +407,15 @@ class ViewBoxSyncBlock:
                 continue
 
             # Add outside unpair vertices
-            count_visible_faces = sum(not f_.hide for f_ in crn.vert.link_faces)
-            linked = linked_crn_to_vert_pair_with_seam(crn, uv, True)
-            if count_visible_faces == len(linked) + 1:
-                filtered_corners.add(crn)
+            linked = []
+            uv_co = crn[uv].uv
+            for l_crn in crn.vert.link_loops:
+                if l_crn.face.hide:
+                    continue
+                if uv_co != l_crn[uv].uv:
+                    break
+                linked.append(crn)
+            else:
                 filtered_corners.update(linked)
 
         assert len(filtered_corners) <= len(corners)

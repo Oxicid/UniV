@@ -56,7 +56,7 @@ class UNIV_OT_Pin(Operator):
                 has_selected = any(u.total_vert_sel for u in self.umeshes)
             else:
                 utils.set_select_mode_uv('VERT')
-                has_selected = any(any(utils.calc_selected_uv_vert_corners_iter(u)) for u in self.umeshes)
+                has_selected = any(any(utils.calc_selected_uv_vert_iter(u)) for u in self.umeshes)
 
             if has_selected:
                 bpy.ops.uv.pin(clear=self.clear)
@@ -627,7 +627,10 @@ class UNIV_OT_Focus(Operator):
         color = (1, 1, 0, 1)
         for umesh in umeshes:
             uv = umesh.uv
-            bounds.update(crn[uv].uv for crn in utils.calc_selected_uv_vert_corners_iter(umesh))
+            if umesh.sync and umesh.elem_mode in ('FACE', 'ISLAND'):
+                bounds.update(crn[uv].uv for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
+            else:
+                bounds.update(crn[uv].uv for crn in utils.calc_selected_uv_vert_iter(umesh))
         if bounds == BBox():
             color = (0, 1, 1, 1)
             for umesh in umeshes:

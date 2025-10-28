@@ -67,7 +67,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         # self.umeshes.elem_mode
         # Legacy
         if not self.slim_support or self.legacy:
-            self.umeshes.filter_by_selected_uv_elem_by_mode()
+            self.umeshes.filter_by_selected_uv_by_context()
             if self.umeshes.sync:  # noqa pycharm moment
                 if self.umeshes.elem_mode == 'FACE':
                     self.relax_sync_faces()

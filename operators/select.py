@@ -1125,7 +1125,7 @@ if utils.USE_GENERIC_UV_SYNC:
                         umesh.update()
                         has_update = True
                 else:
-                    for crn in utils.calc_selected_uv_vert_corners_iter(umesh):
+                    for crn in utils.calc_selected_uv_vert_iter(umesh):
                         if crn in to_deselect:
                             continue
                         if not crn.face.uv_select:

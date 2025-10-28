@@ -606,7 +606,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
                     move_corners = []
                     edge_select_get = utils.edge_select_get_func(kdmesh.umesh)
-                    for crn in utils.calc_selected_uv_vert_corners_iter(kdmesh.umesh):
+                    for crn in utils.calc_selected_uv_vert_iter(kdmesh.umesh):
                         if edge_select_get(crn):
                             if crn.tag:
                                 crn.tag = False

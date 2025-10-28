@@ -95,7 +95,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         for umesh in self.umeshes:
             uv = umesh.uv
             face_select_get = utils.face_select_get_func(umesh)
-            for crn in utils.calc_selected_uv_edge_corners_iter(umesh):
+            for crn in utils.calc_selected_uv_edge_iter(umesh):
                 pair_crn = crn.link_loop_radial_prev
                 if not utils.is_pair(crn, pair_crn, uv):
                     crn.edge.seam = True

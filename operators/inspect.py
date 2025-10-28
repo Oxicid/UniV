@@ -678,7 +678,7 @@ class UNIV_OT_Check_Overlap(Operator):
                 if umesh.sync:
                     count += umesh.total_edge_sel
                 else:
-                    count += len(utils.calc_selected_uv_edge_corners(umesh))
+                    count += len(utils.calc_selected_uv_edge(umesh))
 
         return count
 

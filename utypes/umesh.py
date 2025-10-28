@@ -715,7 +715,7 @@ class UMeshes:
                             for v in umesh.bm.verts:
                                 v.select = False
                 else:
-                    if selected_corners := utils.calc_selected_uv_vert_corners(umesh):
+                    if selected_corners := utils.calc_selected_uv_vert(umesh):
                         umesh.update_tag = True
                         for crn in selected_corners:
                             crn.face.uv_select = False
@@ -739,7 +739,7 @@ class UMeshes:
                         for v in umesh.bm.verts:
                             v.select = False
                 else:
-                    if selected_corners := utils.calc_selected_uv_vert_corners(umesh):
+                    if selected_corners := utils.calc_selected_uv_vert(umesh):
                         uv = umesh.uv
                         umesh.update_tag = True
                         for crn in selected_corners:
@@ -990,13 +990,21 @@ class UMeshes:
                 selected.append(umesh)
         self.umeshes = selected
 
-    def filter_by_selected_uv_elem_by_mode(self) -> None:
+    def filter_by_selected_uv_by_context(self) -> None:
         if self.elem_mode == 'VERT':
             self.filter_by_selected_uv_verts()
         elif self.elem_mode == 'EDGE':
             self.filter_by_selected_uv_edges()
         else:
             self.filter_by_selected_uv_faces()
+
+    def filtered_by_selected_and_visible_uv_by_context(self):
+        if self.elem_mode == 'VERT':
+            return self.filtered_by_selected_and_visible_uv_verts()
+        elif self.elem_mode == 'EDGE':
+            return self.filtered_by_selected_and_visible_uv_edges()
+        else:
+            return self.filtered_by_selected_and_visible_uv_faces()
 
     def filter_by_partial_selected_uv_elem_by_mode(self) -> None:
         for umesh in reversed(self):

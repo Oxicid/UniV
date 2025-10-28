@@ -338,17 +338,11 @@ class LoopGroup:
     @classmethod
     def calc_dirt_loop_groups(cls, umesh):
         uv = umesh.uv
-        # Tagging
-        if umesh.sync:
-            assert umesh.elem_mode != 'FACE'
-            umesh.tag_selected_corners()
-        else:
-            umesh.tag_selected_corners()
-
-        sel_loops = (l for f in umesh.bm.faces for l in f.loops if l.tag)
+        umesh.tag_selected_corners()
+        sel_corners = (crn for f in umesh.bm.faces for crn in f.loops if crn.tag)
 
         groups: list[cls] = []
-        for crn_ in sel_loops:
+        for crn_ in sel_corners:
             group = []
             temp_group = [crn_]
             while True:

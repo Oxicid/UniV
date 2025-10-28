@@ -591,16 +591,23 @@ class Collect(utils.OverlapHelper):
         else:
             islands_calc_type = AdvIslands.calc_visible_with_mark_seam
 
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         all_islands = []
         for umesh in umeshes:
-            if adv_islands := islands_calc_type(umesh):
+            view_box_sync_block.skip_from_param(umesh, select=True)
+            adv_islands = islands_calc_type(umesh)
+            view_box_sync_block.filter_by_isect_islands(adv_islands)
+
+            if adv_islands:
                 if self.lock_overlap_mode == 'ANY':
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_uv_coords(save_triplet=True)
                 all_islands.extend(adv_islands)
             umesh.update_tag = bool(adv_islands)
 
+
         if not all_islands:
+            view_box_sync_block.draw_if_blocked()
             self.report({'WARNING'}, 'Islands not found')  # noqa
             return {'FINISHED'}
 
@@ -660,6 +667,7 @@ class Collect(utils.OverlapHelper):
                 failed_isl.set_position(right_center, left_center)
                 right_center.x += bb.width
 
+        view_box_sync_block.draw_if_blocked()
         return umeshes.update()
 
     @staticmethod
@@ -783,7 +791,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 if self.is_island_mode:
                     selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
                 else:
-                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
                 self.umeshes = selected if selected else visible
 
                 self.align_ex(selected=bool(selected))
@@ -792,37 +800,39 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 if not (cursor_loc := utils.get_cursor_location()):
                     self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                self.move_to_cursor_ex(cursor_loc, selected=True)
-                if not self.umeshes.final():
-                    self.move_to_cursor_ex(cursor_loc, selected=False)
+
+                if self.is_island_mode:
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+                else:
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
+                self.umeshes = selected if selected else visible
+
+                self.move_to_cursor_ex(cursor_loc, selected=bool(selected))
 
             case 'ALIGN_TO_CURSOR_UNION':
                 if not (cursor_loc := utils.get_cursor_location()):
                     self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'CANCELLED'}
-                self.move_to_cursor_union_ex(cursor_loc, selected=True)
-                if not self.umeshes.final():
-                    self.move_to_cursor_union_ex(cursor_loc, selected=False)
+                selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+                self.umeshes = selected if selected else visible
+                self.move_to_cursor_union_ex(cursor_loc, selected=bool(selected))
 
             case 'INDIVIDUAL_OR_MOVE':
                 if self.is_island_mode:
-                    if self.direction == 'CENTER':
-                        return self.collect_islands()
-                    elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                        return self.align_edge_by_angle(x_axis=self.direction == 'VERTICAL')
-                    else:
-                        self.move_ex(selected=True)
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
                 else:
-                    self.individual_scale_zero()
+                    selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
+                self.umeshes = selected if selected else visible
 
-                if not self.umeshes.final():
+                if selected and not self.is_island_mode:
+                    self.individual_scale_zero()
+                else:
                     if self.direction == 'CENTER':
                         return self.collect_islands()
                     elif self.direction in ('HORIZONTAL', 'VERTICAL'):
                         return self.align_edge_by_angle(x_axis=self.direction == 'VERTICAL')
                     else:
-                        self.move_ex(selected=False)
-
+                        self.move_ex(selected=bool(selected))
             case _:
                 raise NotImplementedError(self.mode)
 
@@ -831,49 +841,90 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     def move_to_cursor_ex(self, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         if self.is_island_mode or (not selected and self.direction not in {'LEFT', 'RIGHT', 'BOTTOM', 'UPPER'}):
             for umesh in self.umeshes:
-                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
-                    for island in islands:
-                        bbox = island.calc_bbox()
-                        all_groups.append((island, bbox, umesh.uv))
+                view_box_sync_block.skip_from_param(umesh, selected)
+                islands = AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
+
+                for island in islands:
+                    all_groups.append((island, island.calc_bbox()))
+
             self.align_islands(all_groups, general_bbox, invert=True)
         else:
             for umesh in self.umeshes:
-                if corners := utils.calc_uv_corners(umesh, selected=selected):
+                view_box_sync_block.skip_from_param(umesh, selected)
+                if selected and not umesh.sync_valid:
+                    if umesh.elem_mode == 'VERT':
+                        corners = utils.calc_selected_uv_vert(umesh)
+                        corners = view_box_sync_block.filter_verts(corners, umesh.uv)
+                        corners = self.get_unique_linked_corners_from_crn_vert(umesh, corners)
+                    elif umesh.elem_mode == 'EDGE':
+                        corners = utils.calc_selected_uv_edge(umesh)
+                        corners = view_box_sync_block.filter_edges(corners, umesh)
+                        corners = self.get_unique_linked_corners_from_crn_edge(umesh, corners)
+                    else:
+                        corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
+                        tool_settings = bpy.context.scene.tool_settings
+                        sticky_mode = tool_settings.uv_sticky_select_mode
+                        if sticky_mode != 'DISABLED':
+                            corners = self.get_unique_linked_corners_from_crn_vert(umesh, corners)
+                else:
+                    corners = utils.calc_uv_corners(umesh, selected=selected)
+
+                if corners:
                     all_groups.append((corners, umesh.uv))
                 umesh.update_tag = bool(corners)
             self.align_corners(all_groups, general_bbox)
+
+        view_box_sync_block.draw_if_blocked()
 
     def move_to_cursor_union_ex(self, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         for umesh in self.umeshes:
-            if faces := utils.calc_uv_faces(umesh, selected=selected):
-                island = FaceIsland(faces, umesh)
-                bbox = island.calc_bbox()
-                general_bbox.union(bbox)
-                all_groups.append([island, bbox, umesh.uv])
-            umesh.update_tag = bool(faces)
+            view_box_sync_block.skip_from_param(umesh, selected)
+            islands = AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+            view_box_sync_block.filter_by_isect_islands(islands)
+            umesh.update_tag = bool(islands)
+
+            for island in islands:
+                general_bbox.union(island.bbox)
+                all_groups.append([island, island.bbox])
+
         for group in all_groups:
             group[1] = general_bbox
         self.align_islands(all_groups, target_bbox, invert=True)
+        view_box_sync_block.draw_if_blocked()
 
     @staticmethod
-    def get_unique_linked_corners_from_crn_edge(umesh, corners):
-        assert umesh.sync
+    def get_unique_linked_corners_from_crn_vert(umesh, corners):
+        sync = umesh.sync
         uv = umesh.uv
         unique_linked_corners = set()
         for crn in corners:
             if crn not in unique_linked_corners:
                 unique_linked_corners.add(crn)
-                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, True))
+                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync))
+        return unique_linked_corners
+
+    @staticmethod
+    def get_unique_linked_corners_from_crn_edge(umesh, corners):
+        sync = umesh.sync
+        uv = umesh.uv
+        unique_linked_corners = set()
+        for crn in corners:
+            if crn not in unique_linked_corners:
+                unique_linked_corners.add(crn)
+                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync))
             next_crn = crn.link_loop_next
             if next_crn not in unique_linked_corners:
                 unique_linked_corners.add(next_crn)
-                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(next_crn, uv, True))
+                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(next_crn, uv, sync))
         return unique_linked_corners
 
     def align_ex(self, selected=True):
@@ -883,17 +934,18 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
         if self.is_island_mode or not selected:
             for umesh in self.umeshes:
-                umesh.update_tag = False
                 view_box_sync_block.skip_from_param(umesh, selected)
 
-                if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected):
-                    for island in islands:
-                        if view_box_sync_block.isect_island(island):
-                            umesh.update_tag = True
-                            bbox = island.calc_bbox()
-                            general_bbox.union(bbox)
+                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                view_box_sync_block.filter_by_isect_islands(islands)
+                umesh.update_tag = bool(islands)
+                for island in islands:
+                    if view_box_sync_block.isect_island(island):
 
-                            all_groups.append((island, bbox, umesh.uv))
+                        bbox = island.calc_bbox()
+                        general_bbox.union(bbox)
+
+                        all_groups.append((island, bbox))
             self.align_islands(all_groups, general_bbox)
             view_box_sync_block.draw_if_blocked()
             return
@@ -903,18 +955,18 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             if umesh.sync:
                 if not umesh.sync_valid and umesh.elem_mode in ('VERT', 'EDGE'):
                     if umesh.elem_mode == 'VERT':
-                        corners = utils.calc_selected_uv_vert_corners(umesh)
+                        corners = utils.calc_selected_uv_vert(umesh)
                         corners = view_box_sync_block.filter_verts(corners, umesh.uv)
                     else:
-                        corners = utils.calc_selected_uv_edge_corners(umesh)
+                        corners = utils.calc_selected_uv_edge(umesh)
                         corners = view_box_sync_block.filter_edges(corners, umesh)
                         corners = self.get_unique_linked_corners_from_crn_edge(umesh, corners)
                 elif umesh.elem_mode in ('FACE', 'ISLAND'):
                     corners = [crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops]
                 else:
-                    corners = utils.calc_selected_uv_vert_corners(umesh)
+                    corners = utils.calc_selected_uv_vert(umesh)
             else:
-                corners = utils.calc_selected_uv_vert_corners(umesh)
+                corners = utils.calc_selected_uv_vert(umesh)
 
             umesh.update_tag = bool(corners)
             if corners:
@@ -931,14 +983,16 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
         if self.is_island_mode:
             view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
+
             for umesh in self.umeshes:
-                umesh.update_tag = False
                 view_box_sync_block.skip_from_param(umesh, selected)
-                if islands := Islands.calc_extended_or_visible(umesh, extended=selected):
-                    for island in islands:
-                        if view_box_sync_block.isect_island(island):
-                            island.move(move_value)
-                            umesh.update_tag = True
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                view_box_sync_block.filter_by_isect_islands(islands)
+
+                umesh.update_tag = bool(islands)
+
+                for island in islands:
+                    island.move(move_value)
             view_box_sync_block.draw_if_blocked()
         else:
             for umesh in self.umeshes:
@@ -949,25 +1003,34 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 umesh.update_tag = bool(corners)
 
     def individual_scale_zero(self):
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         if self.umeshes.elem_mode == 'FACE':
             for umesh in self.umeshes:
-                uv = umesh.uv
-                if islands := Islands.calc_selected_with_mark_seam(umesh):
-                    for isl in islands:
-                        self.align_corners(((isl.corners_iter(), uv),), isl.calc_bbox())
+                view_box_sync_block.skip_from_param(umesh, select=True)
+                islands = AdvIslands.calc_selected_with_mark_seam(umesh)
+                view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
+                for isl in islands:
+                    self.align_corners(((isl.corners_iter(), umesh.uv),), isl.bbox)
         else:
             for umesh in self.umeshes:
+                umesh.update_tag = False
+                view_box_sync_block.skip_from_param(umesh, select=True)
+
                 uv = umesh.uv
                 if lgs := LoopGroup.calc_dirt_loop_groups(umesh):
-                    umesh.tag_visible_corners()
+                    umesh.tag_visible_corners()  # TODO: Delete, use pair linked with ms for extend from linked
                     for lg in lgs:
-                        lg.extend_from_linked()
-                        self.align_corners(((lg, uv),), lg.calc_bbox())
-                umesh.update_tag = bool(lgs)
+                        if view_box_sync_block.isect_lg(lg):
+
+                            lg.extend_from_linked()
+                            self.align_corners(((lg, uv),), lg.calc_bbox())
+                            umesh.update_tag = True
+
+        view_box_sync_block.draw_if_blocked()
 
     def align_islands(self, groups, general_bbox, invert=False):
-        for island, bounds, _ in groups:
+        for island, bounds in groups:
             center = bounds.center
             match self.direction:
                 case 'UPPER':
@@ -1085,7 +1148,7 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
 
     mode: EnumProperty(name="Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', ''),
-        ('INDIVIDUAL_OR_MOVE', 'Individual | Move', ''),
+        ('INDIVIDUAL_OR_MOVE', 'Individual | Move | Angle | Collect', ''),
         ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
         # ('MOVE_COLLISION', 'Collision move', '')
