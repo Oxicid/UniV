@@ -509,7 +509,7 @@ class CrnEdgeHit:
             radial_prev = self.crn.link_loop_radial_prev
             if (utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and
                     utils.is_visible_func(umesh.sync)(radial_prev.face)):
-                if not point_inside_face(pt, radial_prev.face, uv):
+                if point_inside_face(pt, radial_prev.face, uv):
                     self.crn = radial_prev
             else:
                 # Prioritize boundary edges where the point is inside the face,
