@@ -2912,11 +2912,10 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
             islands = Islands.calc_extended_any_edge_with_markseam(umesh)
 
             for isl in islands:
-                if view_box_sync_block.skip:
-                    isl.value = list(isl.calc_selected_edge_corners_iter())
-                else:
-                    isl.value = view_box_sync_block.filter_edges(list(isl.calc_selected_edge_corners_iter()), umesh)
-
+                corners = isl.calc_selected_edge_corners_iter()
+                if not view_box_sync_block.skip:
+                    corners = view_box_sync_block.filter_edges(list(corners), umesh)
+                isl.value = utils.calc_max_length_uv_crn_with_dist(corners, umesh.uv)
 
             for island in islands:
                 self.orient_edge(island)
@@ -2979,12 +2978,12 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
             islands = AdvIslands.calc_extended_any_edge_with_markseam(umesh)
             for isl in islands:
-                if view_box_sync_block.skip:
-                    isl.value = list(isl.calc_selected_edge_corners_iter())
-                else:
-                    isl.value = view_box_sync_block.filter_edges(list(isl.calc_selected_edge_corners_iter()), umesh)
+                corners = isl.calc_selected_edge_corners_iter()
+                if not view_box_sync_block.skip:
+                    corners = view_box_sync_block.filter_edges(list(corners), umesh)
+                isl.value = utils.calc_max_length_uv_crn_with_dist(corners, umesh.uv)
 
-            if islands and any(isl.value for isl in islands):
+            if islands:
                 islands.calc_tris()
                 islands.calc_flat_coords(save_triplet=True)
                 islands_of_mesh.extend(islands)
@@ -2994,19 +2993,8 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
     def orient_edge(self, island):
         iter_isl = island if isinstance(island, UnionIslands) else (island,)
-        max_length = -1.0
-        v1 = Vector()
-        v2 = Vector()
-        for isl in iter_isl:
-            uv = isl.umesh.uv
-            selected_corners = isl.value
-            for crn in selected_corners:
-                v1_ = crn[uv].uv
-                v2_ = crn.link_loop_next[uv].uv
-                if (new_length := (v1_ - v2_).length) > max_length:
-                    v1 = v1_
-                    v2 = v2_
-                    max_length = new_length
+        max_edge_length_isl = max(iter_isl, key=lambda i: i.value[0])
+        max_length, v1, v2 = max_edge_length_isl.value
 
         if max_length != -1.0:
             self.orient_edge_ex(island, v1, v2)

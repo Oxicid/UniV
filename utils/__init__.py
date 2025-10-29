@@ -211,7 +211,7 @@ class ViewBoxSyncBlock:
             from ..draw import LinesDrawSimple
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,1))
 
-    def skip_from_param(self, umesh, select):
+    def skip_from_param(self, umesh: 'utypes.UMesh', select: bool):
         if select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
             self.skip = False
         else:
@@ -222,7 +222,7 @@ class ViewBoxSyncBlock:
             islands.islands = [isl for isl in islands if self.isect_island(isl)]
 
     @staticmethod
-    def _isl_has_inner_elem(island):
+    def _isl_has_inner_elem(island: 'utypes.FaceIsland | utypes.AdvIsland'):
         uv = island.umesh.uv
 
         if island.umesh.elem_mode == 'VERT':
@@ -242,7 +242,7 @@ class ViewBoxSyncBlock:
                 if not crn.edge.select:
                     continue
                 pair = crn.link_loop_radial_prev
-                if pair == crn or pair.hide:
+                if pair == crn or pair.face.hide:
                     # If there is no pair crn, or it is hidden, then this edge is chosen deliberately.
                     return True
 
@@ -292,7 +292,7 @@ class ViewBoxSyncBlock:
         return False
 
     @staticmethod
-    def _lg_has_inner_elem(lg):
+    def _lg_has_inner_elem(lg: 'utypes.LoopGroup'):
         uv = lg.umesh.uv
 
         if lg.umesh.elem_mode == 'VERT':
@@ -311,7 +311,7 @@ class ViewBoxSyncBlock:
                 if not crn.edge.select:
                     continue
                 pair = crn.link_loop_radial_prev
-                if pair == crn or pair.hide:
+                if pair == crn or pair.face.hide:
                     # If there is no pair crn, or it is hidden, then this edge is chosen deliberately.
                     return True
 

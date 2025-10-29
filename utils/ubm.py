@@ -136,7 +136,7 @@ def calc_max_length_uv_crn_with_dist(corners, uv):
             v2 = v2_
             max_length = new_length
 
-    return max_length, v1, v2
+    return max_length, v1.copy(), v2.copy()
 
 
 def copy_pos_to_target_with_select(crn: BMLoop, uv, idx):
