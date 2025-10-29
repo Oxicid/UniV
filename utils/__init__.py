@@ -471,6 +471,10 @@ class ViewBoxSyncBlock:
             from ..draw import LinesDrawSimple
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (0.05, 0.2, 0.9, 0.1))
 
+    def __str__(self):
+        return f"View Box={self.view_box}, Skip={self.skip}, Has Blocked={self.has_blocked}"
+
+
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 

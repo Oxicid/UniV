@@ -111,7 +111,7 @@ def calc_total_area_3d(faces, scale):
         return sum(f.calc_area() for f in faces)
 
 
-def calc_max_length_uv_crn(corners, uv) -> BMLoop:
+def calc_max_length_uv_crn_for_save_transform(corners, uv) -> BMLoop:
     length = -1.0
     crn_ = None
     prev_co = corners[-1][uv].uv
@@ -122,6 +122,21 @@ def calc_max_length_uv_crn(corners, uv) -> BMLoop:
             length = length_
         prev_co = curr_co
     return crn_.link_loop_prev
+
+def calc_max_length_uv_crn_with_dist(corners, uv):
+    max_length = -1.0
+    v1 = Vector()
+    v2 = Vector()
+
+    for crn in corners:
+        v1_ = crn[uv].uv
+        v2_ = crn.link_loop_next[uv].uv
+        if (new_length := (v1_ - v2_).length) > max_length:
+            v1 = v1_
+            v2 = v2_
+            max_length = new_length
+
+    return max_length, v1, v2
 
 
 def copy_pos_to_target_with_select(crn: BMLoop, uv, idx):

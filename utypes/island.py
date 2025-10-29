@@ -83,7 +83,7 @@ class SaveTransform:
                 max_uv_area_face = self.target_subisland.calc_max_uv_area_face()
             else:
                 max_uv_area_face = self.island.calc_max_uv_area_face()
-            max_length_crn = utils.calc_max_length_uv_crn(max_uv_area_face.loops, uv)
+            max_length_crn = utils.calc_max_length_uv_crn_for_save_transform(max_uv_area_face.loops, uv)
             max_length_crn[uv].pin_uv = True
             self.target_crn = max_length_crn
             self.old_coords = [max_length_crn[uv].uv.copy(), max_length_crn.link_loop_next[uv].uv.copy()]
