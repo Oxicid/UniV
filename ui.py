@@ -147,30 +147,27 @@ class UNIV_PT_General(Panel):
         # Transform
         if panel := draw_panel(layout, 'Transform'):
             col_align = panel.column(align=True)
-            row = col_align.row(align=True)
-            row.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
-            row.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
-            row.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
-            row.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
-            row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
+            grid = col_align.grid_flow(row_major=True, columns=3, align=True)
+            grid.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
+            grid.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
+            grid.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
-            row.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
-            row.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
+            grid.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
+            grid.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
-            row.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
-            row.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
+            grid.operator('uv.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
+            grid.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
+            grid.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
 
-            # col_for_align = panel.column()
-            col_align.separator(factor=0.35)
+            grid.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
+            grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
+            grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
+
+            col_align.separator(factor=0.25)
             self.draw_align_buttons(col_align)
-            col_align.separator(factor=0.35)
+            col_align.separator(factor=0.25)
 
             row = col_align.row(align=True)
             row.operator('uv.univ_rotate', icon_value=icons.rotate)
@@ -231,35 +228,31 @@ class UNIV_PT_General(Panel):
         # Select
         if panel := draw_panel(layout, 'Select'):
             col_align = panel.column(align=True)
+            grid = col_align.grid_flow(row_major=True, columns=2, align=True)
 
             if univ_pro:
-                row = col_align.row(align=True)
-                row.operator('uv.univ_select_flat', icon_value=icons.flat)
-                row.operator('uv.univ_select_loop', icon_value=icons.loop_select)
+                grid.operator('uv.univ_select_flat', icon_value=icons.flat)
+                grid.operator('uv.univ_select_loop', icon_value=icons.loop_select)
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_grow', icon_value=icons.grow)
-            row.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
+            grid.operator('uv.univ_select_grow', icon_value=icons.grow)
+            grid.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_linked', icon_value=icons.linked)
-            row.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
+            grid.operator('uv.univ_select_linked', icon_value=icons.linked)
+            grid.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_border', icon_value=icons.border)
-            row.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
+            grid.operator('uv.univ_select_border', icon_value=icons.border)
+            grid.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
 
-            col_align.separator(factor=0.35)
+            col_align.separator(factor=0.25)
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
-            row.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
-            row.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
+            grid = col_align.grid_flow(row_major=True, columns=3, align=True)
+            grid.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
+            grid.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
+            grid.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
-            row.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
-            row.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
+            grid.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
+            grid.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
+            grid.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
 
 
         # Mark

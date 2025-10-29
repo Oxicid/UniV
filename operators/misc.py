@@ -25,11 +25,7 @@ class UNIV_OT_Pin(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n" \
         f"With sync mode disabled, Edge mode switches to Vertex since the pins are not visible in edge mode\n\n" \
-        f"Default - Set Pin \n" \
-        f"Ctrl or Alt- Clear Pin\n\n" \
         f"This button is used to free the 'P' button for the Pack operator"
-
-    clear: BoolProperty(name='Clear', default=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -39,41 +35,59 @@ class UNIV_OT_Pin(Operator):
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
-    def invoke(self, context, event):
-        if event.value == 'PRESS':
-            return self.execute(context)
-
-        self.clear = (event.ctrl or event.alt)
-        return self.execute(context)
-
     def execute(self, context):
+        from .transform import UNIV_OT_Align_pie
         self.umeshes = UMeshes()
-        self.umeshes.fix_context()
-        set_pin_state = not self.clear
+        self.umeshes.update_tag = False
 
         if context.mode == 'EDIT_MESH':
-            if self.umeshes.sync:
-                has_selected = any(u.total_vert_sel for u in self.umeshes)
-            else:
-                utils.set_select_mode_uv('VERT')
-                has_selected = any(any(utils.calc_selected_uv_vert_iter(u)) for u in self.umeshes)
+            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            self.umeshes = selected if selected else visible
 
-            if has_selected:
-                bpy.ops.uv.pin(clear=self.clear)
-                return {'FINISHED'}
+            if selected:
+                for umesh in self.umeshes:
+                    if umesh.elem_mode == 'VERT':
+                        umesh.sequence = utils.calc_selected_uv_vert(umesh)
+                    elif umesh.elem_mode == 'EDGE':
+                        corners = utils.calc_selected_uv_edge_iter(umesh)
+                        umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_edge(umesh, corners)
+                    else:
+                        corners = (crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
+                        umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_vert(umesh, corners)
+
+                    umesh.update_tag = bool(umesh.sequence)
             else:
                 for umesh in self.umeshes:
-                    uv = umesh.uv
-                    for crn in (visible_corners := utils.calc_visible_uv_corners(umesh)):
-                        crn[uv].pin_uv = set_pin_state
-
-                    umesh.update_tag = bool(visible_corners)
+                    umesh.sequence = utils.calc_visible_uv_corners(umesh)
+                    umesh.update_tag = bool(umesh.sequence)
         else:
             for umesh in self.umeshes:
-                uv = umesh.uv
-                for f in umesh.bm.faces:
-                    for crn in f.loops:
-                        crn[uv].pin_uv = set_pin_state
+                umesh.sequence = [crn for f in umesh.bm.faces for crn in f.loops]
+                umesh.update_tag = bool(umesh.sequence)
+
+        all_pinned = True
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            corners = umesh.sequence
+            if not all(crn[uv].pin_uv for crn in corners):
+                all_pinned = False
+                break
+
+
+        for umesh in self.umeshes:
+            uv = umesh.uv
+            corners = umesh.sequence
+
+            if all_pinned:
+                if any(crn[uv].pin_uv for crn in corners):
+                    umesh.update_tag = True
+                    for crn in corners:
+                        crn[uv].pin_uv = False
+            else:
+                if not all(crn[uv].pin_uv for crn in corners):
+                    umesh.update_tag = True
+                    for crn in corners:
+                        crn[uv].pin_uv = True
 
         return self.umeshes.update()
 
