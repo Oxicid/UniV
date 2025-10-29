@@ -282,6 +282,9 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_stack', 'S', 'PRESS', alt=True)
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('uv.univ_symmetrize', 'X', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
     # Orient
     kmi = km.keymap_items.new('uv.univ_orient', 'O', 'PRESS')
     kmi.properties.edge_dir = 'BOTH'
@@ -690,8 +693,8 @@ class ConflictFilter:
 
         # main filter func, runs many times
         def filter_func(kmi):
-            for kk, ki in kmi_test_dict.items():
-                val = getattr(kmi, kk)
+            for kk_, ki in kmi_test_dict.items():
+                val = getattr(kmi, kk_)
                 if val not in ki:
                     return False
 

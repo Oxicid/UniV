@@ -15,7 +15,7 @@ from mathutils import Vector, kdtree
 class UNIV_OT_Symmetrize(bpy.types.Operator):
     bl_idname = "uv.univ_symmetrize"
     bl_label = "Symmetrize"
-    bl_description = "Symmetrize"
+    bl_description = "Symmetrize\n\n Has [Alt+X] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis_uv: bpy.props.EnumProperty(name='UV Axis', default='-X to +X',
