@@ -16,23 +16,14 @@ except ImportError:
 REDRAW_UV_LAYERS = True
 
 if bpy.app.version >= (4, 1, 0):
-    def draw_panel_2d(layout, _name, _closed=False) -> bpy.types.UILayout:
-        header, panel = layout.panel("UniV_2d_"+_name, default_closed=_closed)
-        header.label(text=_name)
-        return panel
-    def draw_panel_3d(layout, _name, _closed=False) -> bpy.types.UILayout:
-        header, panel = layout.panel("UniV_3d_"+_name, default_closed=_closed)
+    def draw_panel(layout, _name) -> bpy.types.UILayout:
+        header, panel = layout.panel("UniV_"+_name)
         header.label(text=_name)
         return panel
 else:
-    def draw_panel_2d(layout, _name, _closed=False) -> bpy.types.UILayout:
+    def draw_panel(layout, _name) -> bpy.types.UILayout:
         layout.label(text=_name)
         return layout
-
-    def draw_panel_3d(layout, _name, _closed=False) -> bpy.types.UILayout:
-        layout.label(text=_name)
-        return layout
-
 
 class UNIV_PT_General(Panel):
     bl_label = ''
@@ -139,12 +130,13 @@ class UNIV_PT_General(Panel):
 
     def draw_header(self, context):
         layout = self.layout
-        row = layout.split(factor=.5)
+        row = layout.row()
         row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
-        row.label(text='UniV')
+        row.label(text='UniV Pro' if univ_pro else 'UniV Lite')
 
     def draw(self, context):
         layout = self.layout
+
         if prefs().use_csa_mods:
             layout.operator_context = 'INVOKE_DEFAULT'
         else:
@@ -153,7 +145,7 @@ class UNIV_PT_General(Panel):
 
 
         # Transform
-        if panel := draw_panel_2d(layout, 'Transform'):
+        if panel := draw_panel(layout, 'Transform'):
             col_align = panel.column(align=True)
             row = col_align.row(align=True)
             row.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
@@ -208,7 +200,7 @@ class UNIV_PT_General(Panel):
 
 
         # Misc
-        if panel := draw_panel_2d(layout, 'Misc'):
+        if panel := draw_panel(layout, 'Misc'):
             col_align = panel.column(align=True)
             if univ_pro:
                 col_align.operator('uv.univ_rectify', icon_value=icons.rectify)
@@ -237,7 +229,7 @@ class UNIV_PT_General(Panel):
 
 
         # Select
-        if panel := draw_panel_2d(layout, 'Select'):
+        if panel := draw_panel(layout, 'Select'):
             col_align = panel.column(align=True)
 
             if univ_pro:
@@ -271,7 +263,7 @@ class UNIV_PT_General(Panel):
 
 
         # Mark
-        if panel := draw_panel_2d(layout, 'Mark'):
+        if panel := draw_panel(layout, 'Mark'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -283,7 +275,7 @@ class UNIV_PT_General(Panel):
 
 
         # Other
-        if panel := draw_panel_2d(layout, 'Other'):
+        if panel := draw_panel(layout, 'Other'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -298,7 +290,7 @@ class UNIV_PT_General(Panel):
 
 
         # UV Maps
-        if panel := draw_panel_2d(layout, 'UV Maps'):
+        if panel := draw_panel(layout, 'UV Maps'):
             self.draw_uv_layers(panel,draw_label=False)
 
 
@@ -315,9 +307,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
     def draw_header(self, context):
         layout = self.layout
-        row = layout.split(factor=.5)
+        row = layout.row()
         row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
-        row.label(text='UniV')
+        row.label(text='UniV Pro' if univ_pro else 'UniV Lite')
 
     def draw(self, context):
         layout = self.layout
@@ -327,7 +319,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             layout.operator_context = 'EXEC_DEFAULT'
         # col = layout.column(align=True)
 
-        if panel := draw_panel_3d(layout, 'Transform'):
+        if panel := draw_panel(layout, 'Transform'):
             col_align = panel.column(align=True)
             col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)
             col_align.operator('mesh.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
@@ -339,7 +331,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             UNIV_PT_General.draw_texel_density(col_align, 'mesh')
 
 
-        if panel := draw_panel_3d(layout, 'Misc'):
+        if panel := draw_panel(layout, 'Misc'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -357,7 +349,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
                 row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
-        if panel := draw_panel_3d(layout, 'Select'):
+        if panel := draw_panel(layout, 'Select'):
             col_align = panel.column(align=True)
             if univ_pro:
                 row = col_align.row(align=True)
@@ -368,7 +360,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
 
 
-        if panel := draw_panel_3d(layout, 'Mark'):
+        if panel := draw_panel(layout, 'Mark'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -379,7 +371,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             col_align.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
 
-        if panel := draw_panel_3d(layout, 'Project'):
+        if panel := draw_panel(layout, 'Project'):
             col_align = panel.column(align=True)
             if univ_pro:
                 row = col_align.row(align=True)
@@ -398,7 +390,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
 
 
-        if panel := draw_panel_3d(layout, 'Other'):
+        if panel := draw_panel(layout, 'Other'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -406,7 +398,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_checker', icon_value=icons.checker)
             row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
-        if panel := draw_panel_3d(layout, 'UV Maps'):
+        if panel := draw_panel(layout, 'UV Maps'):
             UNIV_PT_General.draw_uv_layers(panel, draw_label=False)
 
 

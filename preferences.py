@@ -16,7 +16,7 @@ def prefs() -> 'UNIV_AddonPreferences':
 
 
 def univ_settings() -> 'UNIV_Settings':
-    return bpy.context.scene.univ_settings  # noqa
+    return bpy.context.window_manager.univ_settings  # noqa
 
 
 def force_debug():

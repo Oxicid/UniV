@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2025 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 bl_info = {
@@ -324,7 +324,7 @@ def register():
     # WARNING: When modules are reloaded, classes are overwritten and have no registration.
     # To avoid this, it is necessary to use initially registered classes.
     # Perhaps it does not allow to reload operators in a normal way.
-    bpy.types.Scene.univ_settings = bpy.props.PointerProperty(type=classes[3])
+    bpy.types.WindowManager.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
     tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09, persistent=True)
     tm_register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1, persistent=True)
@@ -370,7 +370,7 @@ def unregister():
         if handle.__name__.startswith('univ_'):
             bpy.app.handlers.depsgraph_update_post.remove(handle)
 
-    del bpy.types.Scene.univ_settings  # noqa
+    del bpy.types.WindowManager.univ_settings  # noqa
     # for scene in bpy.data.scenes:
     #     if "univ_settings" in scene:
     #         del scene["univ_settings"]
