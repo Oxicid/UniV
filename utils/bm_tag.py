@@ -110,7 +110,7 @@ def is_boundary_with_flip_check_sync(crn: BMLoop, uv: BMLayerItem):
             crn.link_loop_next[uv].uv.to_tuple() != pair[uv].uv.to_tuple())
 
 
-def is_boundary_func(umesh, with_seam=True, with_flipped_check=True) -> typing.Callable[[BMLoop], bool]:
+def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_check=True) -> typing.Callable[[BMLoop], bool]:
     def catcher(uv: BMLayerItem, is_boundary_):
         if with_seam:
             def is_boundary(crn: BMLoop):
@@ -125,16 +125,37 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True) -> typing.C
                 return is_boundary_(crn, uv)
             return is_boundary
 
-    if umesh.sync:
-        if with_flipped_check:
-            return catcher(umesh.uv, is_boundary_with_flip_check_sync)
+
+    if invisible_check:
+        if umesh.sync:
+            if with_flipped_check:
+                return catcher(umesh.uv, is_boundary_with_flip_check_sync)
+            else:
+                return catcher(umesh.uv, is_boundary_sync)
         else:
-            return catcher(umesh.uv, is_boundary_sync)
+            if with_flipped_check:
+                return catcher(umesh.uv, is_boundary_with_flip_check_non_sync)
+            else:
+                return catcher(umesh.uv, is_boundary_non_sync)
     else:
         if with_flipped_check:
-            return catcher(umesh.uv, is_boundary_with_flip_check_non_sync)
+            def is_boundary_with_flip_no_invisible_check(crn: BMLoop, uv: BMLayerItem):
+                if (pair := crn.link_loop_radial_prev) == crn:
+                    return True
+                if crn.vert == pair.vert:
+                    return True
+                return (crn[uv].uv.to_tuple() != pair.link_loop_next[uv].uv.to_tuple() or
+                        crn.link_loop_next[uv].uv.to_tuple() != pair[uv].uv.to_tuple())
+
+            return catcher(umesh.uv, is_boundary_with_flip_no_invisible_check)
         else:
-            return catcher(umesh.uv, is_boundary_non_sync)
+            def is_boundary_no_invisible_check(crn: BMLoop, uv: BMLayerItem):
+                if (pair := crn.link_loop_radial_prev) == crn:
+                    return True
+                return (crn[uv].uv.to_tuple() != pair.link_loop_next[uv].uv.to_tuple() or
+                        crn.link_loop_next[uv].uv.to_tuple() != pair[uv].uv.to_tuple())
+
+            return catcher(umesh.uv, is_boundary_no_invisible_check)
 
 
 def is_visible_func(sync: bool):

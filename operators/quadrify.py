@@ -13,7 +13,6 @@ from itertools import chain
 from mathutils import Vector
 from bmesh.types import BMLoopUV, BMLoop, BMFace
 from collections.abc import Callable
-from mathutils.geometry import area_tri
 
 from .. import utils
 from .. import utypes
@@ -96,7 +95,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
-                        set_corner_tag_by_border_and_by_tag(isl)  # TODO: Preserve flipped 3D
+                        set_corner_tag_by_border_and_by_tag(isl)
 
                         if not edge_lengths:
                             edge_lengths = self.init_edge_sequence_from_umesh(umesh)
@@ -264,30 +263,55 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
 
 def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
-    uv = island.umesh.uv
+    is_boundary = utils.is_boundary_func(island.umesh, invisible_check=False)
     for crn in island.corners_iter():
-        prev = crn.link_loop_radial_prev
-        if crn.edge.seam or crn == prev or not prev.face.tag:
+        if not crn.link_loop_radial_prev.face.tag:
             crn.tag = False
-            continue
-        crn.tag = utils.is_pair(crn, prev, uv)
+        else:
+            crn.tag = not is_boundary(crn)
+
+def get_face_score_fn(uv_):
+    def catcher(uv):
+        def get_face_score_(f: BMFace):
+            import math
+            def calc_angle_2d():
+                c = l[uv].uv
+                prev = l.link_loop_prev[uv].uv
+                next_ = l.link_loop_next[uv].uv
+                return (prev - c).angle_signed(next_ - c, math.pi)
+
+            # priority 90 degrees
+            rightness = 0.0
+            for l in f.loops:
+                a2d = calc_angle_2d()
+                rightness += 1.0 - min(abs(a2d - math.pi/2) / (math.pi/2), 1.0)
+            rightness /= 4
+
+            # diff between 2D and 3D angle, less == better
+            angle_error = 0.0
+            for l in f.loops:
+                a2d = calc_angle_2d()
+                a3d = l.calc_angle()
+                angle_error += abs(a2d - a3d)
+            angle_error /= 4
+            angle_score = 1.0 - min(angle_error / math.pi, 1.0)  # normalize [0..1]
+
+            # slight priority by uv area
+            area2d = utils.calc_face_area_uv(f, uv)
+            area_boost = math.log1p(area2d) * 0.1
+
+            score = rightness * 0.6 + angle_score * 0.3 + area_boost
+            return score
+        return get_face_score_
+    return catcher(uv_)
 
 
 def quad(island: AdvIsland, edge_lengths):
     uv = island.umesh.uv
+    max_quad_uv_face_area = get_face_score_fn(uv)
 
-    def max_quad_uv_face_area(f):
-        f_loops = f.loops
-        l1 = f_loops[0][uv].uv
-        l2 = f_loops[1][uv].uv
-        l3 = f_loops[2][uv].uv
-        l4 = f_loops[3][uv].uv
-
-        return area_tri(l1, l2, l3) + area_tri(l3, l4, l1)
-
-    # TODO: Find most quare and large target face
     target_face = max(island, key=max_quad_uv_face_area)
-    co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, island.umesh.uv)
+    co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, uv)
     shape_face(uv, target_face, co_and_linked_uv_corners)
     follow_active_uv(target_face, island, edge_lengths)
 
