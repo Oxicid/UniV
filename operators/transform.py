@@ -594,7 +594,7 @@ class Collect(utils.OverlapHelper):
         view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         all_islands = []
         for umesh in umeshes:
-            view_box_sync_block.skip_from_param(umesh, select=True)
+            view_box_sync_block.skip_from_param(umesh, select=bool(selected_umeshes))
             adv_islands = islands_calc_type(umesh)
             view_box_sync_block.filter_by_isect_islands(adv_islands)
 

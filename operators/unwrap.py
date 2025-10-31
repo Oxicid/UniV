@@ -115,21 +115,27 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             return {'CANCELLED'}
 
         isl = hit.island
+        if utils.USE_GENERIC_UV_SYNC and isl.umesh.sync:
+            if isl.umesh.elem_mode in ('VERT', 'EDGE'):
+                isl.umesh.sync_from_mesh_if_needed()
+
         isl.select = True
+
         shared_selected_faces = []
         pinned_crn_uvs = []
-
-        if self.umeshes.sync and isl.umesh.total_face_sel != len(isl):
-            faces = set(isl)
-            uv = isl.umesh.uv
-            for f in isl.umesh.bm.faces:
-                if f.select and f not in faces:
-                    shared_selected_faces.append(f)
-                    for crn in f.loops:
-                        crn_uv = crn[uv]
-                        if not crn_uv.pin_uv:
-                            crn_uv.pin_uv = True
-                            pinned_crn_uvs.append(crn_uv)
+        if not utils.USE_GENERIC_UV_SYNC and isl.umesh.sync:
+            if isl.umesh.elem_mode in ('VERT', 'EDGE'):
+                if isl.umesh.total_face_sel != len(isl):
+                    faces = set(isl)
+                    uv = isl.umesh.uv
+                    for f in isl.umesh.bm.faces:
+                        if f.select and f not in faces:
+                            shared_selected_faces.append(f)
+                            for crn in f.loops:
+                                crn_uv = crn[uv]
+                                if not crn_uv.pin_uv:
+                                    crn_uv.pin_uv = True
+                                    pinned_crn_uvs.append(crn_uv)
 
         unique_number_for_multiply = hash(isl[0])  # multiplayer
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
@@ -154,6 +160,11 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         is_updated = isl.reset_aspect_ratio()
 
         isl.select = False
+
+        if utils.USE_GENERIC_UV_SYNC and isl.umesh.sync:
+            if isl.umesh.elem_mode in ('VERT', 'EDGE'):
+                isl.umesh.bm.uv_select_sync_valid = False
+
         if shared_selected_faces or pinned_crn_uvs or is_updated:
             for f in shared_selected_faces:
                 f.select = False

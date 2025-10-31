@@ -184,7 +184,7 @@ class ViewBoxSyncBlock:
         from ..utypes import BBox
         self.view_box: BBox = bbox
         self.has_blocked = False
-        self.skip = False
+        self.skip = True
 
     @classmethod
     def from_area(cls, area):
@@ -209,7 +209,7 @@ class ViewBoxSyncBlock:
     def draw_if_blocked(self):
         if self.has_blocked:
             from ..draw import LinesDrawSimple
-            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,1))
+            LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,0.5))
 
     def skip_from_param(self, umesh: 'utypes.UMesh', select: bool):
         if select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
