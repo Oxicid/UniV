@@ -1864,7 +1864,13 @@ class UNIV_OT_Flatten(Operator):
         # node Merge by Distance
         merge_by_distance = bb.nodes.new("GeometryNodeMergeByDistance")
         merge_by_distance.name = "Merge by Distance"
-        merge_by_distance.mode = 'ALL'
+
+        is_inputs = False  # TODO: use version check instead
+        try:
+            merge_by_distance.mode = 'ALL'
+        except:  # noqa
+            is_inputs = True
+            merge_by_distance.inputs[2].default_value = 'All'
 
         # node Aspect Ratio Scale
         vector_math_004 = bb.nodes.new("ShaderNodeVectorMath")
@@ -1988,7 +1994,10 @@ class UNIV_OT_Flatten(Operator):
         # set_position.Geometry -> merge_by_distance.Geometry
         bb.links.new(set_position.outputs[0], merge_by_distance.inputs[0])
         # group_input.Distance -> merge_by_distance.Distance
-        bb.links.new(group_input.outputs[4], merge_by_distance.inputs[2])
+        if is_inputs:
+            bb.links.new(group_input.outputs[4], merge_by_distance.inputs[3])
+        else:
+            bb.links.new(group_input.outputs[4], merge_by_distance.inputs[2])
         # index_switch.Output -> vector_math_004.Vector
         bb.links.new(index_switch.outputs[0], vector_math_004.inputs[0])
         # vector_math_004.Vector -> vector_math_002.Vector
