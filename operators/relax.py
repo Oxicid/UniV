@@ -92,6 +92,10 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             if not selected_umeshes and self.max_distance is not None:
                 return self.pick_unwrap(no_flip=True, iterations=self.iterations)
 
+            if not selected_umeshes:
+                self.report({'WARNING'}, 'Need selected geometry')
+                return {'CANCELLED'}
+
             if self.umeshes.sync:
                 if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)
@@ -365,6 +369,10 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
         if not selected_umeshes and self.mouse_pos_from_3d:
             return self.pick_unwrap(no_flip=True, iterations=self.iterations)
         else:
+            if not selected_umeshes:
+                self.report({'WARNING'}, 'Need selected geometry')
+                return {'CANCELLED'}
+
             for u in reversed(self.umeshes):
                 if not u.has_uv and not u.total_face_sel:
                     self.umeshes.umeshes.remove(u)

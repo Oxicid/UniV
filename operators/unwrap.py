@@ -84,7 +84,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
         if not self.umeshes:
             return self.umeshes.update()
@@ -92,6 +92,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         if not selected_umeshes and self.max_distance is not None and context.area.ui_type == 'UV':
             return self.pick_unwrap()
         else:
+            if not selected_umeshes:
+                self.report({'WARNING'}, 'Need selected geometry')
+                return {'CANCELLED'}
+
             if self.umeshes.sync:
                 if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces()
@@ -516,6 +520,10 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         if not selected_umeshes and self.mouse_pos_from_3d:
             return self.pick_unwrap()
         else:
+            if not selected_umeshes:
+                self.report({'WARNING'}, 'Need selected geometry')
+                return {'CANCELLED'}
+
             for u in reversed(self.umeshes):
                 if not u.has_uv and not u.total_face_sel:
                     self.umeshes.umeshes.remove(u)
