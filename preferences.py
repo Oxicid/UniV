@@ -168,6 +168,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
     # Texel Settings
+    use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')
     texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})

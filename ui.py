@@ -425,6 +425,8 @@ class UNIV_PT_GlobalSettings(Panel):
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
 
+        layout.prop(settings, 'use_texel', text='Use Texel in operators')
+
         layout.prop(settings, 'padding', slider=True)
         layout.separator()
         layout.prop(settings, 'uv_layers_show')
@@ -659,6 +661,8 @@ class UNIV_PT_TD_PresetsManager(Panel):
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
         row.prop(settings, 'size_y', text='')
+
+        layout.prop(settings, 'use_texel', text='Use Texel in operators')
 
         layout.separator()
         col = layout.column(align=True)

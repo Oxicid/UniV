@@ -18,6 +18,7 @@ from collections.abc import Callable
 
 from .. import utils
 from .. import utypes
+from ..preferences import univ_settings
 from ..utypes import AdvIslands, AdvIsland, UMeshes
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
 
@@ -57,6 +58,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         layout.prop(self, 'shear')
         layout.prop(self, 'xy_scale')
 
+        layout.prop(univ_settings(), 'use_texel')
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.has_selected = True
@@ -84,6 +87,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             return {'CANCELLED'}
 
     def quadrify_selected(self):
+        texel = univ_settings().texel_density
+        texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
         counter = 0
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
@@ -110,6 +116,17 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
                     if self.shear or self.xy_scale:
                         self.quad_normalize(quad_islands, umesh)
+
+                    if univ_settings().use_texel:
+                        for isl in quad_islands:
+
+                            if isl.area_3d == -1.0:
+                                isl.calc_area_3d(umesh.value)
+                            if isl.area_uv == -1.0:
+                                isl.calc_area_uv()
+
+                            isl.calc_bbox()
+                            isl.set_texel(texel, texture_size)
 
                     for static_crn, quad_corners in links_static_with_quads:
                         static_co = static_crn[uv].uv
@@ -191,6 +208,20 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         uv = umesh.uv
         umesh.value = umesh.check_uniform_scale(report=self.report)
         umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+
+        if univ_settings().use_texel:
+            texel = univ_settings().texel_density
+            texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+
+            for isl in quad_islands:
+                if isl.area_3d == -1.0:
+                    isl.calc_area_3d(umesh.value)
+                if isl.area_uv == -1.0:
+                    isl.calc_area_uv()
+
+                isl.calc_bbox()
+                isl.set_texel(texel, texture_size)
+
         if self.shear or self.xy_scale:
             self.quad_normalize(quad_islands, umesh)
 
@@ -233,7 +264,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
-    def split_by_static_faces_and_quad_islands_pick(self, island):
+    def split_by_static_faces_and_quad_islands_pick(self, island) -> tuple[list[tuple[BMLoop, list[BMLoop]]], list[BMFace], list[AdvIsland]]:
         umesh = island.umesh
         uv = umesh.uv
         quad_faces = []
@@ -257,7 +288,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return links_static_with_quads, static_faces, islands
 
     @staticmethod
-    def store_links_static_with_quads(faces, uv):
+    def store_links_static_with_quads(faces: typing.Iterable[BMFace], uv):
         links_static_with_quads = []
         for f in faces:
             for crn in f.loops:
@@ -385,18 +416,17 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     def get_face_score_fn(uv_):
         def catcher(uv):
             def get_face_score_(f: BMFace):
-                import math
                 def calc_angle_2d():
                     c = l[uv].uv
                     prev = l.link_loop_prev[uv].uv
                     next_ = l.link_loop_next[uv].uv
-                    return (prev - c).angle_signed(next_ - c, math.pi)
+                    return (prev - c).angle_signed(next_ - c, pi)
 
                 # priority 90 degrees
                 rightness = 0.0
                 for l in f.loops:
                     a2d = abs(calc_angle_2d())
-                    rightness += 1.0 - min(abs(a2d - math.pi/2) / (math.pi/2), 1.0)
+                    rightness += 1.0 - min(abs(a2d - pi/2) / (pi/2), 1.0)
                 rightness /= QUAD_SIZE
 
                 # diff between 2D and 3D angle, less == better
@@ -406,10 +436,11 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     a3d = l.calc_angle()
                     angle_error += abs(a2d - a3d)
                 angle_error /= QUAD_SIZE
-                angle_score = 1.0 - min(angle_error / math.pi, 1.0)  # normalize [0..1]
+                angle_score = 1.0 - min(angle_error / pi, 1.0)  # normalize [0..1]
 
                 # slight priority by uv area
                 area2d = utils.calc_face_area_uv(f, uv)
+                import math
                 area_boost = math.log1p(area2d) * 0.1
 
                 score = rightness * 0.6 + angle_score * 0.3 + area_boost
