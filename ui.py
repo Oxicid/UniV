@@ -183,12 +183,14 @@ class UNIV_PT_General(Panel):
 
             col_align.operator('uv.univ_random', icon_value=icons.random)
 
+            col_align.separator(factor=0.25)
             row = col_align.row(align=True)
             row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
             row.operator('uv.univ_normalize', icon_value=icons.normalize)
 
             self.draw_texel_density(col_align, 'uv')
 
+            col_align.separator(factor=0.25)
             # Pack
             row = col_align.row(align=True)
             row.scale_y = 1.3

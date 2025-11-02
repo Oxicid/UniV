@@ -610,6 +610,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                 layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
 
             layout.label(text="UniV Pro includes such advanced operators as:")
+            layout.label(text="Real-time seam display.", icon_value=icons.cut)
+            layout.label(text="Real-time display of selected geometry in non-sync mode.", icon_value=icons.arrow)
             layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",
                          icon_value=icons.rectify)
             layout.separator(factor=0.35)

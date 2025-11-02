@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2025 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The code was taken and modified from the UvSquares addon: https://github.com/Radivarig/UvSquares/blob/master/uv_squares.py
@@ -8,16 +8,20 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import typing
 
+from math import pi, atan2
 from itertools import chain
-from mathutils import Vector
-from bmesh.types import BMLoopUV, BMLoop, BMFace
+from mathutils import Vector, Matrix
+from bmesh.types import BMLoop, BMFace
 from collections.abc import Callable
 
 from .. import utils
 from .. import utypes
 from ..utypes import AdvIslands, AdvIsland, UMeshes
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
+
+QUAD_SIZE = 4
 
 
 class UNIV_OT_Quadrify(bpy.types.Operator):
@@ -95,12 +99,12 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
-                        set_corner_tag_by_border_and_by_tag(isl)
+                        self.set_corner_tag_by_border_and_by_tag(isl)
 
                         if not edge_lengths:
                             edge_lengths = self.init_edge_sequence_from_umesh(umesh)
 
-                        quad(isl, edge_lengths)
+                        self.quad(isl, edge_lengths)
                         counter += 1
                         umesh.update_tag = True
 
@@ -179,9 +183,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
         for isl in quad_islands:
             utils.set_faces_tag(isl, True)
-            set_corner_tag_by_border_and_by_tag(isl)
+            self.set_corner_tag_by_border_and_by_tag(isl)
             edge_lengths = self.init_edge_sequence_from_island(isl)
-            quad(isl, edge_lengths)
+            self.quad(isl, edge_lengths)
 
         umesh = hit.island.umesh
         uv = umesh.uv
@@ -210,7 +214,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
         for f in island:
             if face_select_get(f):
-                if len(f.loops) == 4:
+                if len(f.loops) == QUAD_SIZE:
                     quad_faces.append(f)
                 else:
                     selected_non_quads.append(f)
@@ -236,7 +240,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         static_faces = []
 
         for f in island:
-            if len(f.loops) == 4:
+            if len(f.loops) == QUAD_SIZE:
                 quad_faces.append(f)
             else:
                 static_faces.append(f)
@@ -261,130 +265,166 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 
+    def quad(self, island: AdvIsland, edge_lengths):
+        uv = island.umesh.uv
+        max_quad_uv_face_area = self.get_face_score_fn(uv)
 
-def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
-    is_boundary = utils.is_boundary_func(island.umesh, invisible_check=False)
-    for crn in island.corners_iter():
-        if not crn.link_loop_radial_prev.face.tag:
-            crn.tag = False
+        target_face = max(island, key=max_quad_uv_face_area)
+        temp_coords = [crn[uv].uv.copy() for crn in target_face.loops]
+        self.face_to_rect(temp_coords)
+
+        for crn, uv_co in zip(target_face.loops, temp_coords):
+            for l_crn in linked_crn_uv_by_face_tag_unordered_included(crn, uv):
+                l_crn[uv].uv = uv_co
+
+        follow_active_uv(target_face, island, edge_lengths)
+
+    def face_to_rect(self, coords: 'typing.MutableSequence[Vector] | list[Vector]'):
+        best_crn_idx: int = self.get_best_crn_idx(coords)
+
+        # Orient
+        curr_uv_co = coords[best_crn_idx]
+        prev_uv_co = coords[best_crn_idx - 1]
+        next_uv_co = coords[0] if best_crn_idx == (len(coords) - 1) else coords[best_crn_idx + 1]
+
+        delta_a = prev_uv_co - curr_uv_co
+        delta_b = next_uv_co - curr_uv_co
+
+        min_angle_a = -utils.find_min_rotate_angle(atan2(*delta_a.normalized()))
+        min_angle_b = -utils.find_min_rotate_angle(atan2(*delta_b.normalized()))
+
+        min_angle_is_prev = True
+        min_angle = min_angle_a
+
+        if abs(min_angle_b) < abs(min_angle_a):
+            min_angle_is_prev = False
+            min_angle = min_angle_b
+
+        pivot = curr_uv_co.copy()
+        rot_matrix = Matrix.Rotation(-min_angle, 2)
+        diff = pivot - (rot_matrix @ pivot)
+        for crn_co in coords:
+            crn_co.rotate(rot_matrix)
+            crn_co += diff
+
+        # Rect next or prev corner
+        delta_prev = (prev_uv_co - curr_uv_co).normalized()
+        delta_next = (next_uv_co - curr_uv_co).normalized()
+
+        # Fix zero lengths
+        if delta_prev == Vector((0.0, 0.0)):
+            prev_uv_co.y += 0.01
+            delta_prev = Vector((0.0, 1.0))
+
+        if delta_next == Vector((0.0, 0.0)):
+            next_uv_co.x += 0.01
+            delta_next = Vector((1.0, 0.0))
+
+        # Get minimal rotation angle by orthogonal vectors
+        if min_angle_is_prev:
+            orto_pos = delta_prev.orthogonal()
+            orto_neg = orto_pos.copy()
+            orto_neg.negate()
+
+            angle_a = delta_next.angle_signed(orto_pos, 0.0)
+            angle_b = delta_next.angle_signed(orto_neg, 0.0)
         else:
-            crn.tag = not is_boundary(crn)
+            orto_pos = delta_next.orthogonal()
+            orto_neg = orto_pos.copy()
+            orto_neg.negate()
 
-def get_face_score_fn(uv_):
-    def catcher(uv):
-        def get_face_score_(f: BMFace):
-            import math
-            def calc_angle_2d():
-                c = l[uv].uv
-                prev = l.link_loop_prev[uv].uv
-                next_ = l.link_loop_next[uv].uv
-                return (prev - c).angle_signed(next_ - c, math.pi)
+            angle_a = delta_prev.angle_signed(orto_pos, 0.0)
+            angle_b = delta_prev.angle_signed(orto_neg, 0.0)
 
-            # priority 90 degrees
-            rightness = 0.0
-            for l in f.loops:
-                a2d = calc_angle_2d()
-                rightness += 1.0 - min(abs(a2d - math.pi/2) / (math.pi/2), 1.0)
-            rightness /= 4
+        min_angle = angle_a
+        if abs(angle_b) < abs(angle_a):
+            min_angle = angle_b
 
-            # diff between 2D and 3D angle, less == better
-            angle_error = 0.0
-            for l in f.loops:
-                a2d = calc_angle_2d()
-                a3d = l.calc_angle()
-                angle_error += abs(a2d - a3d)
-            angle_error /= 4
-            angle_score = 1.0 - min(angle_error / math.pi, 1.0)  # normalize [0..1]
+        rot_matrix = Matrix.Rotation(-min_angle, 2)
+        diff = pivot - (rot_matrix @ pivot)
 
-            # slight priority by uv area
-            area2d = utils.calc_face_area_uv(f, uv)
-            area_boost = math.log1p(area2d) * 0.1
+        if min_angle_is_prev:
+            next_uv_co.rotate(rot_matrix)
+            next_uv_co += diff
+        else:
+            prev_uv_co.rotate(rot_matrix)
+            prev_uv_co += diff
 
-            score = rightness * 0.6 + angle_score * 0.3 + area_boost
-            return score
-        return get_face_score_
-    return catcher(uv_)
+        # Complete the rectangle.
+        p3 = prev_uv_co + (next_uv_co - curr_uv_co)
+        coords[best_crn_idx - 2] = p3
 
+    @staticmethod
+    def get_best_crn_idx(coords: list[Vector]):
+        assert len(coords) == QUAD_SIZE
+        angle_90 = pi / 2
 
-def quad(island: AdvIsland, edge_lengths):
-    uv = island.umesh.uv
-    max_quad_uv_face_area = get_face_score_fn(uv)
+        max_score = -1.0
+        arg_max = 0
+        for i in range(QUAD_SIZE):
+            curr_uv_co = coords[i]
+            prev_uv_co = coords[i - 1]
+            next_uv_co = coords[0] if i == (QUAD_SIZE - 1) else coords[i + 1]
 
-    target_face = max(island, key=max_quad_uv_face_area)
-    co_and_linked_uv_corners = calc_co_and_linked_uv_corners_dict(target_face, uv)
-    shape_face(uv, target_face, co_and_linked_uv_corners)
-    follow_active_uv(target_face, island, edge_lengths)
+            delta_a = prev_uv_co - curr_uv_co
+            delta_b = next_uv_co - curr_uv_co
 
+            angle = delta_a.angle(delta_b, pi)
+            rightness = 1.0 - min(abs(angle - angle_90) / angle_90, 1.0)
 
-def calc_co_and_linked_uv_corners_dict(f, uv) -> dict[Vector, list[BMLoopUV]]:
-    co_and_linked_uv_corners = {}
-    for crn in f.loops:
-        co: Vector = crn[uv].uv.copy().freeze()
-        corners = linked_crn_uv_by_face_tag_unordered_included(crn, uv)
-        co_and_linked_uv_corners[co] = [crn[uv] for crn in corners]
+            dist = delta_a.length * delta_b.length
 
-    return co_and_linked_uv_corners
+            score = rightness * 0.6 + dist * 0.01
 
+            if score > max_score:
+                max_score = score
+                arg_max = i
+        return arg_max
 
-def shape_face(uv, target_face, co_and_linked_uv_corners):
-    corners = []
-    for l in target_face.loops:
-        corners.append(l[uv])
+    @staticmethod
+    def get_face_score_fn(uv_):
+        def catcher(uv):
+            def get_face_score_(f: BMFace):
+                import math
+                def calc_angle_2d():
+                    c = l[uv].uv
+                    prev = l.link_loop_prev[uv].uv
+                    next_ = l.link_loop_next[uv].uv
+                    return (prev - c).angle_signed(next_ - c, math.pi)
 
-    first_highest = corners[0]
-    for c in corners:
-        if c.uv.y > first_highest.uv.y:
-            first_highest = c
-    corners.remove(first_highest)
+                # priority 90 degrees
+                rightness = 0.0
+                for l in f.loops:
+                    a2d = abs(calc_angle_2d())
+                    rightness += 1.0 - min(abs(a2d - math.pi/2) / (math.pi/2), 1.0)
+                rightness /= QUAD_SIZE
 
-    second_highest = corners[0]
-    for c in corners:
-        if c.uv.y > second_highest.uv.y:
-            second_highest = c
+                # diff between 2D and 3D angle, less == better
+                angle_error = 0.0
+                for l in f.loops:
+                    a2d = calc_angle_2d()
+                    a3d = l.calc_angle()
+                    angle_error += abs(a2d - a3d)
+                angle_error /= QUAD_SIZE
+                angle_score = 1.0 - min(angle_error / math.pi, 1.0)  # normalize [0..1]
 
-    if first_highest.uv.x < second_highest.uv.x:
-        left_up = first_highest
-        right_up = second_highest
-    else:
-        left_up = second_highest
-        right_up = first_highest
-    corners.remove(second_highest)
+                # slight priority by uv area
+                area2d = utils.calc_face_area_uv(f, uv)
+                area_boost = math.log1p(area2d) * 0.1
 
-    first_lowest = corners[0]
-    second_lowest = corners[1]
+                score = rightness * 0.6 + angle_score * 0.3 + area_boost
+                return score
+            return get_face_score_
+        return catcher(uv_)
 
-    if first_lowest.uv.x < second_lowest.uv.x:
-        left_down = first_lowest
-        right_down = second_lowest
-    else:
-        left_down = second_lowest
-        right_down = first_lowest
-
-    make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down)
-
-
-def make_uv_face_equal_rectangle(co_and_linked_uv_corners, left_up, right_up, right_down, left_down):
-    left_up = left_up.uv.copy().freeze()
-    right_up = right_up.uv.copy().freeze()
-    right_down = right_down.uv.copy().freeze()
-    left_down = left_down.uv.copy().freeze()
-
-    final_scale_x = (left_up - right_up).length
-    final_scale_y = (left_up - left_down).length
-    curr_row_x = left_up.x
-    curr_row_y = left_up.y
-
-    for v in co_and_linked_uv_corners[left_up]:
-        v.uv[:] = curr_row_x, curr_row_y
-
-    for v in co_and_linked_uv_corners[right_up]:
-        v.uv[:] = curr_row_x + final_scale_x, curr_row_y
-
-    for v in co_and_linked_uv_corners[right_down]:
-        v.uv[:] = curr_row_x + final_scale_x, curr_row_y - final_scale_y
-
-    for v in co_and_linked_uv_corners[left_down]:
-        v.uv[:] = curr_row_x, curr_row_y - final_scale_y
+    @staticmethod
+    def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
+        is_boundary = utils.is_boundary_func(island.umesh, invisible_check=False)
+        for crn in island.corners_iter():
+            if not crn.link_loop_radial_prev.face.tag:
+                crn.tag = False
+            else:
+                crn.tag = not is_boundary(crn)
 
 
 def follow_active_uv(f_act, island: AdvIsland, edge_lengths):
