@@ -122,6 +122,9 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 isl.inplace()
                 isl.island.reset_aspect_ratio()
 
+                if isl.rotate:
+                    utils.set_global_texel(isl.island)
+
     def pick_cut(self):
         hit = utypes.CrnEdgeHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
@@ -165,6 +168,15 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.prop(univ_settings(), 'use_texel')
+        layout.prop(self, 'addition')
+        layout.prop(self, 'use_correct_aspect')
+        layout.prop(self, 'unwrap')
+
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -238,6 +250,8 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
             for isl in save_transform_islands:
                 isl.inplace()
                 isl.island.reset_aspect_ratio()
+                if isl.rotate:
+                    utils.set_global_texel(isl.island)
 
             texel = univ_settings().texel_density
             texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
@@ -250,11 +264,15 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
                 adv_islands.calc_area_3d(scale=umesh.value)
 
                 for isl in adv_islands:
-                    scale = Vector((1 / umesh.aspect, 1))
-                    isl.scale(scale, pivot=isl.bbox.center)
-                    if (status := isl.set_texel(texel, texture_size)) is None:  # noqa
-                        # zero_area_islands.append(isl)  # TODO: Highlight islands with zero area
+                    if umesh.aspect != 1.0:
+                        scale = Vector((1 / umesh.aspect, 1))
+                        isl.scale(scale, pivot=isl.bbox.center)
+
+                    # TODO: Check correctness texel density after aspect ratio (check Unwrap and Relax too)
+                    if isl.set_texel(texel, texture_size):
+                        # zero_area_islands.append(isl)
                         continue
+
                 umesh.update()
 
     def pick_cut(self):

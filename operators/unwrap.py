@@ -914,5 +914,6 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             # reset aspect
             for adv_isl in adv_islands:
                 adv_isl.set_texel(self.texel, self.texture_size)
-                scale = Vector((1 / umesh.aspect, 1))
-                adv_isl.scale(scale, adv_isl.bbox.center)
+                if umesh.aspect != 1.0:
+                    scale = Vector((1 / umesh.aspect, 1))
+                    adv_isl.scale(scale, adv_isl.bbox.center)

@@ -878,7 +878,7 @@ class AdvIsland(FaceIsland):
         area_3d = math.sqrt(self.area_3d)
         area_uv = math.sqrt(self.area_uv) * texture_size
         if math.isclose(area_3d, 0.0, abs_tol=1e-6) or math.isclose(area_uv, 0.0, abs_tol=1e-6):
-            return None
+            return None  # TODO: Highlight islands with zero area
         scale = (texel / (area_uv / area_3d))
         return self.scale(Vector((scale, scale)), self.bbox.center)
 
