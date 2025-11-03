@@ -17,9 +17,16 @@ class UNIV_OT_Straight(bpy.types.Operator):
     bl_description = "Straighten selected edge-chain and relax the rest of the UV Island"
     bl_options = {'REGISTER', 'UNDO'}
 
+    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
+
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH'
+
+    def draw(self, context):
+        from ..preferences import univ_settings
+        self.layout.prop(univ_settings(), 'use_texel')
+        self.layout.prop(self, 'use_correct_aspect')
 
     def execute(self, context):
         assert (context.area.ui_type == 'UV')
@@ -28,6 +35,9 @@ class UNIV_OT_Straight(bpy.types.Operator):
         if umeshes.elem_mode not in ('VERT', 'EDGE'):
             self.report({'WARNING'}, f'Use Vertex or Edge mode')
             return {'CANCELLED'}
+
+        if self.use_correct_aspect:
+            umeshes.calc_aspect_ratio(from_mesh=False)
 
         umeshes.fix_context()
         umeshes.filter_by_selected_uv_edges()
@@ -122,11 +132,13 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     crn.edge.seam = True
 
             isl.select = True
+            isl.apply_aspect_ratio()
 
-        bpy.ops.uv.unwrap(method='ANGLE_BASED', fill_holes=True, correct_aspect=True, use_subsurf_data=False, margin=0)
+        bpy.ops.uv.unwrap(method='ANGLE_BASED', fill_holes=True, correct_aspect=False, use_subsurf_data=False, margin=0)
 
         # Deselect islands and restore edge selection and clear pins
         for isl in straight_islands:
+            isl.reset_aspect_ratio()
             isl.select = False
 
         for isl in temporary_hidden_islands:
@@ -142,6 +154,9 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     set_edge_select(adv_crn.crn.link_loop_prev, True)
                 else:
                     set_edge_select(adv_crn.crn, True)
+
+            isl._bbox = utypes.BBox.calc_bbox([segment.start_co])
+            utils.set_global_texel(isl, calc_bbox=False)
 
             uv = isl.umesh.uv
             for linked in segment.chain_linked_corners:
