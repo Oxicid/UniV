@@ -11,7 +11,8 @@ import bmesh
 from . import unwrap
 from .. import utypes
 from .. import utils
-from ..utypes import Islands
+from ..utypes import AdvIslands
+from ..preferences import univ_settings
 
 
 class RelaxData:
@@ -20,7 +21,7 @@ class RelaxData:
         self.selected_elem = _selected_elem
         self.coords_before = _coords_before
         self.border_corners = _border_corners
-        self.save_transform_islands = _save_transform_islands
+        self.save_transform_islands: list[utypes.SaveTransform] = _save_transform_islands
 
     def remove_all_pins_from_umesh(self):
         uv = self.umesh.uv
@@ -54,6 +55,8 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.layout.prop(self, 'legacy')
         self.layout.prop(self, 'use_correct_aspect')
 
+        self.layout.prop(univ_settings(), 'use_texel')
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.slim_support: bool = bpy.app.version >= (4, 3, 0)
@@ -78,6 +81,11 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             for umesh in self.umeshes:
                 umesh.bm.select_flush_mode()
+
+            self.umeshes.update()
+            # Always return FINISHED for legacy, to avoid not showed property.
+            return {'FINISHED'}
+
         else:  # SLIM
             operators = context.window_manager.operators
             if not operators or operators[-1].name != 'Relax':
@@ -117,7 +125,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 selected_elem = utils.calc_selected_edges(umesh)
 
             uv = umesh.uv
-            islands = Islands.calc_visible(umesh)
+            islands = AdvIslands.calc_visible(umesh)
             for isl in islands:
                 isl.mark_seam()
 
@@ -188,6 +196,9 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Weld half selected islands
                 isl.inplace()
+
+                utils.set_global_texel(isl.island)  # Set Texel without rotate check.
+
         bpy.ops.uv.select_all(action='DESELECT')
 
         for rd in relax_data:
@@ -207,7 +218,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
             uv = umesh.uv
-            islands = Islands.calc_extended(umesh)
+            islands = AdvIslands.calc_extended(umesh)
 
             for isl in islands:
                 isl.mark_seam()
@@ -273,9 +284,12 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                     crn_uv.uv = co.lerp(crn_uv.uv, self.border_blend)
         bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
 
+
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Fix, weld half selected islands
                 isl.inplace()
+
+                utils.set_global_texel(isl.island)  # Set Texel without rotate check.
 
             for elem in rd.selected_elem:
                 elem.select = False
@@ -288,7 +302,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
             uv = umesh.uv
-            islands = Islands.calc_extended_any_elem(umesh)
+            islands = AdvIslands.calc_extended_any_elem(umesh)
 
             for isl in islands:
                 isl.mark_seam()
@@ -336,6 +350,8 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
         if unwrap.MULTIPLAYER != 1:
             self.layout.label(text=f'Multiplayer: x{unwrap.MULTIPLAYER}')
         self.layout.prop(self, 'iterations', slider=True)
+
+        self.layout.prop(univ_settings(), 'use_texel')
         self.layout.prop(self, 'use_correct_aspect')
 
     def execute(self, context):

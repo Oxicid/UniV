@@ -87,9 +87,6 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             return {'CANCELLED'}
 
     def quadrify_selected(self):
-        texel = univ_settings().texel_density
-        texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
-
         counter = 0
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
@@ -117,16 +114,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     if self.shear or self.xy_scale:
                         self.quad_normalize(quad_islands, umesh)
 
-                    if univ_settings().use_texel:
-                        for isl in quad_islands:
-
-                            if isl.area_3d == -1.0:
-                                isl.calc_area_3d(umesh.value)
-                            if isl.area_uv == -1.0:
-                                isl.calc_area_uv()
-
-                            isl.calc_bbox()
-                            isl.set_texel(texel, texture_size)
+                    for isl in quad_islands:
+                        utils.set_global_texel(isl)
 
                     for static_crn, quad_corners in links_static_with_quads:
                         static_co = static_crn[uv].uv
@@ -209,18 +198,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         umesh.value = umesh.check_uniform_scale(report=self.report)
         umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
-        if univ_settings().use_texel:
-            texel = univ_settings().texel_density
-            texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
-
-            for isl in quad_islands:
-                if isl.area_3d == -1.0:
-                    isl.calc_area_3d(umesh.value)
-                if isl.area_uv == -1.0:
-                    isl.calc_area_uv()
-
-                isl.calc_bbox()
-                isl.set_texel(texel, texture_size)
+        for isl in quad_islands:
+            utils.set_global_texel(isl)
 
         if self.shear or self.xy_scale:
             self.quad_normalize(quad_islands, umesh)

@@ -475,6 +475,29 @@ class ViewBoxSyncBlock:
         return f"View Box={self.view_box}, Skip={self.skip}, Has Blocked={self.has_blocked}"
 
 
+def set_global_texel(isl: 'utypes.AdvIsland', calc_bbox=True):
+    from ..preferences import univ_settings
+    if not univ_settings().use_texel:
+        return False
+
+    if isl.area_3d == -1.0:
+        if isinstance(isl.umesh.value, Vector):
+            isl.calc_area_3d(isl.umesh.value)
+        else:
+            isl.calc_area_3d()
+
+    if isl.area_uv == -1.0:
+        isl.calc_area_uv()
+
+    if calc_bbox:
+        isl.calc_bbox()
+
+    # TODO: Double scale for small area island
+    texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+    res = isl.set_texel(univ_settings().texel_density, texture_size)
+    return bool(res)
+
+
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 

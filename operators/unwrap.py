@@ -9,7 +9,7 @@ import bpy
 from mathutils import Vector
 from .. import utypes
 from .. import utils
-from ..preferences import prefs
+from ..preferences import prefs, univ_settings
 from ..utils import linked_crn_uv_by_island_index_unordered_included
 
 
@@ -17,7 +17,7 @@ class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
         self.umesh: utypes.UMesh = umesh
         self.pins = pins
-        self.islands = island
+        self.islands: list[utypes.SaveTransform] = island
         self.temp_selected = selected
 
 
@@ -49,6 +49,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
+        self.layout.prop(univ_settings(), 'use_texel')
 
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
@@ -161,7 +162,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         save_t.inplace(self.unwrap_along)
         save_t.apply_saved_coords(self.unwrap_along, self.blend_factor)
-        is_updated = isl.reset_aspect_ratio()
+        isl.reset_aspect_ratio()
+
+        if save_t.rotate:
+            utils.set_global_texel(save_t.island)
 
         isl.select = False
 
@@ -169,13 +173,12 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             if isl.umesh.elem_mode in ('VERT', 'EDGE'):
                 isl.umesh.bm.uv_select_sync_valid = False
 
-        if shared_selected_faces or pinned_crn_uvs or is_updated:
-            for f in shared_selected_faces:
-                f.select = False
-            for crn_uv in pinned_crn_uvs:
-                crn_uv.pin_uv = False
+        for f in shared_selected_faces:
+            f.select = False
+        for crn_uv in pinned_crn_uvs:
+            crn_uv.pin_uv = False
 
-            isl.umesh.update()
+        isl.umesh.update()
         return {'FINISHED'}
 
     # TODO: Implement has unlinked_and_linked_selected_edges
@@ -280,6 +283,10 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 isl.inplace(self.unwrap_along)
                 isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
                 isl.island.reset_aspect_ratio()
+
+                if isl.rotate:
+                    utils.set_global_texel(isl.island)
+
             for v in ud.temp_selected:
                 v.select = False
 
@@ -364,6 +371,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
             isl.island.reset_aspect_ratio()
 
+            if isl.rotate:
+                utils.set_global_texel(isl.island)
+
     def unwrap_non_sync(self, **unwrap_kwargs):
         save_transform_islands = []
         unique_number_for_multiply = 0
@@ -437,6 +447,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
             isl.island.reset_aspect_ratio()
 
+            if isl.rotate:
+                utils.set_global_texel(isl.island)
+
             if is_sticky_mode_disabled:
                 if isl.island.sequence:
                     unpin_uvs, corners_to_select = isl.island.sequence
@@ -478,6 +491,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
+        self.layout.prop(univ_settings(), 'use_texel')
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
@@ -578,6 +592,10 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             save_t.inplace()
 
             adv_island.reset_aspect_ratio()
+
+            if save_t.rotate:
+                utils.set_global_texel(save_t.island)
+
             adv_island.select = False
 
             for f in shared_selected_faces:
@@ -874,6 +892,14 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         for safe_transform in unwrap_data.islands:
             safe_transform.inplace_mesh_island()
             safe_transform.island.reset_aspect_ratio()
+
+            if safe_transform.rotate:
+                if isinstance(safe_transform.island, utypes.AdvIsland):
+                    utils.set_global_texel(safe_transform.island)
+                else:
+                    for isl in safe_transform.island:
+                        utils.set_global_texel(isl)
+
 
     def unwrap_without_uvs(self, umeshes):
         for umesh in umeshes:
