@@ -163,6 +163,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
                 for crn in linked:
                     crn[uv].pin_uv = False
 
+        umeshes.update()
         return {'FINISHED'}
 
     @staticmethod
