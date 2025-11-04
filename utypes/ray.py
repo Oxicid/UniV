@@ -486,6 +486,7 @@ class CrnEdgeHit:
                 v_curr = crn[uv].uv
 
                 _, dist = intersect_point_line_segment(pt, v_prev, v_curr)
+                # TODO: Prioritize flipped face
                 if dist < min_dist:
                     # If the point is inside the face, we add it immediately,
                     # otherwise, we do nextafter and check again for nearest.

@@ -6,6 +6,7 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy  # noqa
+import bmesh
 
 from bmesh.types import BMFace, BMLoop, BMLayerItem
 from math import isclose
@@ -223,3 +224,15 @@ def point_inside_face(pt, f, uv):
                 return True
             p2 = p3
         return False
+
+
+def polyfill_beautify(coords) -> list[list[int]]:
+    bm = bmesh.new()
+    bm.faces.new([bm.verts.new(co) for co in coords])
+    bm.faces.ensure_lookup_table()
+
+    res = bmesh.ops.triangulate(bm, faces=bm.faces)  # beauty by default
+    tris = [[v.index for v in f.verts] for f in res['faces']]
+
+    bm.free()
+    return tris

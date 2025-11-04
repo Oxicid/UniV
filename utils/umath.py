@@ -7,7 +7,7 @@ import mathutils
 import numpy as np
 from math import floor
 from bl_math import lerp
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from mathutils.geometry import intersect_point_line
 
 
@@ -206,52 +206,57 @@ else:
             close_pt = line_b
         return close_pt, (close_pt - pt).length
 
-# def closest_pts_to_lines(pt: np.ndarray, l_a: np.ndarray, l_b: np.ndarray) -> np.ndarray:
-#     line_vecs = l_b - l_a
-#     pt_vecs = pt - l_a
-#
-#     line_len_squared = np.sum(line_vecs ** 2, axis=1)
-#     projections = np.sum(pt_vecs * line_vecs, axis=1) / line_len_squared
-#
-#     # Restrict projections in the range [0, 1] for those that are inside segments
-#     projections_clipped = np.clip(projections, 0, 1)
-#
-#     closest_pts = l_a + projections_clipped[:, np.newaxis] * line_vecs
-#
-#     return closest_pts
 
-# def test(self, event):
-#     from numpy import mean as np_mean
-#     from numpy import array as np_array
-#     from numpy import roll as np_roll
-#     from numpy.linalg import norm as np_distance
-#     from ..utils import closest_pts_to_lines
-#
-#     pt = self.get_mouse_pos(event)
-#     pt_np = np.array([pt], dtype='float32')
-#     u = self.umeshes[0]
-#     uv = u.uv
-#
-#     min_pt = ()
-#     min_dist = float('inf')
-#
-#     for f in u.bm.faces:
-#         l_a = np_array([crn[uv].uv.to_tuple() for crn in f.loops], dtype='float32')
-#         l_b = np_roll(l_a, shift=1, axis=0)
-#
-#         closest_points = closest_pts_to_lines(pt_np, l_a, l_b)
-#         distance = np_distance(pt_np - closest_points, axis=1)
-#
-#         min_index = np.argmin(distance)
-#         if distance[min_index] < min_dist:
-#             min_dist = distance[min_index]
-#             min_pt = closest_points[min_index]
-#
-#         face_center = np_mean(l_a, axis=0)
-#         distance_face_center = np_distance(pt_np - face_center, axis=1)
-#
-#         if distance_face_center < min_dist:
-#             min_dist = distance_face_center
-#             min_pt = face_center
-#
-#     self.points = (min_pt,)
+FLT_EPSILON = 1.192092896e-07
+BLI_ASSERT_UNIT_EPSILON = 0.0002
+
+def assert_unit_v3(v: Vector):
+    _test_unit = v.length_squared
+    if not ((abs(_test_unit - 1.0) >= BLI_ASSERT_UNIT_EPSILON) or (abs(_test_unit) >= BLI_ASSERT_UNIT_EPSILON)):
+        raise AssertionError(f"Vector {v} is not normalized")
+
+def dot_m3_v3_row_z(m: Matrix, a: Vector):
+    return m[0][2] * a[0] + m[1][2] * a[1] + m[2][2] * a[2]
+
+def ortho_basis_v3v3_v3(r_n1: Vector, r_n2: Vector, n: Vector):
+    eps = FLT_EPSILON
+    f = n.length_squared
+
+    if f > eps:
+        d = 1.0 / math.sqrt(f)
+
+        assert math.isfinite(d)
+
+        r_n1[0] = n[1] * d
+        r_n1[1] = -n[0] * d
+        r_n1[2] = 0.0
+        r_n2[0] = -n[2] * r_n1[1]
+        r_n2[1] = n[2] * r_n1[0]
+        r_n2[2] = n[0] * r_n1[1] - n[1] * r_n1[0]
+
+    else:
+        # degenerate case
+        r_n1[0] = -1.0 if (n[2] < 0.0) else 1.0
+        r_n1[1] = r_n1[2] = r_n2[0] = r_n2[2] = 0.0
+        r_n2[1] = 1.0
+
+def axis_dominant_v3_to_m3_negate(normal: Vector):
+    assert_unit_v3(normal)
+
+    mat = Matrix.Identity(3)
+    neg = normal.copy()
+    neg.negate()
+    mat[2] = neg
+
+    ortho_basis_v3v3_v3(mat[0], mat[1], mat[2])
+
+    assert_unit_v3(mat[0])
+    assert_unit_v3(mat[1])
+
+    mat.transpose()
+
+    assert not mat.is_negative
+    assert (dot_m3_v3_row_z(mat, normal) < BLI_ASSERT_UNIT_EPSILON or
+            not any(normal))
+
+    return mat
