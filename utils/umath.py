@@ -7,7 +7,7 @@ import mathutils
 import numpy as np
 from math import floor
 from bl_math import lerp
-from mathutils import Vector, Matrix
+from mathutils import Vector
 from mathutils.geometry import intersect_point_line
 
 
@@ -206,57 +206,55 @@ else:
             close_pt = line_b
         return close_pt, (close_pt - pt).length
 
+class LinearSolver:
+    def __init__(self, m, n, least_squares=False):
+        self.m = m
+        self.n = n
+        self.least_squares = least_squares
+        self.M = np.zeros((m, n), dtype=np.float64)
+        self.b = []      # list of right parts (vectors)
+        self.x = []      # solvers
+        self.locked: list[bool] = []
+        self.values = []  # fixed values
 
-FLT_EPSILON = 1.192092896e-07
-BLI_ASSERT_UNIT_EPSILON = 0.0002
+    def add_rhs(self, b):
+        self.b.append(np.array(b, dtype=np.float64))
+        self.x.append(np.zeros(self.n, dtype=np.float64))
 
-def assert_unit_v3(v: Vector):
-    _test_unit = v.length_squared
-    if not ((abs(_test_unit - 1.0) >= BLI_ASSERT_UNIT_EPSILON) or (abs(_test_unit) >= BLI_ASSERT_UNIT_EPSILON)):
-        raise AssertionError(f"Vector {v} is not normalized")
+    def solve(self):
+        if self.m == 0 or self.n == 0:
+            return True
 
-def dot_m3_v3_row_z(m: Matrix, a: Vector):
-    return m[0][2] * a[0] + m[1][2] * a[1] + m[2][2] * a[2]
+        # creating a copy of the matrix (so as not to spoil the original)
+        M = self.M.copy()
 
-def ortho_basis_v3v3_v3(r_n1: Vector, r_n2: Vector, n: Vector):
-    eps = FLT_EPSILON
-    f = n.length_squared
+        # apply locks
+        for j, locked in enumerate(self.locked):
+            if locked:
+                # zero the column and set the diagonal=1
+                M[:, j] = 0.0
+                M[j, j] = 1.0
 
-    if f > eps:
-        d = 1.0 / math.sqrt(f)
+        # Least squares
+        if self.least_squares:
+            Mt = M.T
+            MtM = Mt @ M
 
-        assert math.isfinite(d)
+        success = True
+        for k, b in enumerate(self.b):
+            b = b.copy()
+            # for locked variables, replace b[j] = value
+            for j, locked in enumerate(self.locked):
+                if locked:
+                    b[j] = self.values[j]
 
-        r_n1[0] = n[1] * d
-        r_n1[1] = -n[0] * d
-        r_n1[2] = 0.0
-        r_n2[0] = -n[2] * r_n1[1]
-        r_n2[1] = n[2] * r_n1[0]
-        r_n2[2] = n[0] * r_n1[1] - n[1] * r_n1[0]
-
-    else:
-        # degenerate case
-        r_n1[0] = -1.0 if (n[2] < 0.0) else 1.0
-        r_n1[1] = r_n1[2] = r_n2[0] = r_n2[2] = 0.0
-        r_n2[1] = 1.0
-
-def axis_dominant_v3_to_m3_negate(normal: Vector):
-    assert_unit_v3(normal)
-
-    mat = Matrix.Identity(3)
-    neg = normal.copy()
-    neg.negate()
-    mat[2] = neg
-
-    ortho_basis_v3v3_v3(mat[0], mat[1], mat[2])
-
-    assert_unit_v3(mat[0])
-    assert_unit_v3(mat[1])
-
-    mat.transpose()
-
-    assert not mat.is_negative
-    assert (dot_m3_v3_row_z(mat, normal) < BLI_ASSERT_UNIT_EPSILON or
-            not any(normal))
-
-    return mat
+            try:
+                if self.least_squares:
+                    Mtb = Mt @ b  # noqa pylint: disable=used-before-assignment
+                    x = np.linalg.solve(MtM, Mtb)  # noqa pylint: disable=used-before-assignment
+                else:
+                    x = np.linalg.solve(M, b)
+                self.x[k] = x
+            except np.linalg.LinAlgError:
+                success = False
+        return success

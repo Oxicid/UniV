@@ -230,6 +230,7 @@ def polyfill_beautify(coords) -> list[list[int]]:
     bm = bmesh.new()
     bm.faces.new([bm.verts.new(co) for co in coords])
     bm.faces.ensure_lookup_table()
+    bm.normal_update()  # TODO: Test uv_parametrization with zero normal (if bad set normal to 0, 0, 1)
 
     res = bmesh.ops.triangulate(bm, faces=bm.faces)  # beauty by default
     tris = [[v.index for v in f.verts] for f in res['faces']]

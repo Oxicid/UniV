@@ -23,6 +23,7 @@ from .bm_tag import *
 from .bm_iterable import *
 from .bm_walk import *
 from .umath import *
+from . import uv_parametrizer
 from .. import utypes
 
 resolutions = (('256', '256', ''), ('512', '512', ''), ('1024', '1024', ''),
