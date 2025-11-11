@@ -350,16 +350,20 @@ class LinearSolver:
                         b_vec[coeff.index] -= coeff.value * var.value
 
         # Solve
-        try:
-            if self.least_squares:
+        if self.least_squares:
+            rhs_vec = M.T @ b_vec
+            try:
                 # Solve (MtM) x = M^T b
-                rhs_vec = M.T @ b_vec
                 x_compact = np.linalg.solve(A, rhs_vec)
-            else:
+            except np.linalg.LinAlgError:
+                # fallback to least-squares solution if singular
+                x_compact, *_ = np.linalg.lstsq(A, rhs_vec , rcond=None)
+        else:
+            try:
                 x_compact = np.linalg.solve(A, b_vec)
-        except np.linalg.LinAlgError:
-            # fallback to least-squares solution if singular
-            x_compact, *_ = np.linalg.lstsq(A, (M.T @ b_vec) if self.least_squares else b_vec, rcond=None)
+            except np.linalg.LinAlgError:
+                # fallback to least-squares solution if singular
+                x_compact, *_ = np.linalg.lstsq(A, b_vec, rcond=None)
 
         # store into solver.x
         self.x[:] = x_compact
