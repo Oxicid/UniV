@@ -3,6 +3,7 @@
 
 import math
 import typing
+import unittest
 import mathutils
 import numpy as np
 from math import floor
@@ -207,54 +208,258 @@ else:
         return close_pt, (close_pt - pt).length
 
 class LinearSolver:
-    def __init__(self, m, n, least_squares=False):
+    class Coeff:
+        __slots__ = ('index', 'value')
+        def __init__(self, index=0, value=0.0):
+            self.index = index
+            self.value = value
+
+    class Variable:
+        __slots__ = ('index', 'locked', 'value', 'coeffs')
+        def __init__(self):
+            self.index = -1     # compact index (or ~0 if locked)
+            self.locked = False
+            self.value = 0.0
+            self.coeffs = []    # list of Coeff (row index, value)
+
+    def __init__(self, num_rows: int, num_variables: int, least_squares=False):
+        # num_rows == original number of rows provided by caller
+        self.num_rows = num_rows
+        self.num_variables = num_variables
+        self.least_squares = least_squares
+
+        self.state = 'VARIABLES_CONSTRUCT'
+
+        # storage used during 'matrix construct' stage
+        self.M_triplets: list[(int, int, float)] = []   # list of (row, col, value)
+        self.b = None         # will be list of rhs vectors after ensure_matrix_construct
+        self.x = None         # solution vectors after ensure_matrix_construct
+
+        # compact sizes filled by ensure_matrix_construct
+        self.m = 0
+        self.n = 0
+
+        self.variable = [self.Variable() for _ in range(num_variables)]
+
+        self._ensure_matrix_construct()
+
+    def _ensure_matrix_construct(self):
+        assert self.state == 'VARIABLES_CONSTRUCT'
+
+        # assign compact indices for non-locked variables
+        # TODO: Remove???
+        n = 0
+        for i in range(self.num_variables):
+            var = self.variable[i]
+            if not var.locked:
+                var.index = n
+                n += 1
+
+        # m is either given num_rows or n when num_rows == 0
+        m = self.num_rows if self.num_rows != 0 else n
+
         self.m = m
         self.n = n
-        self.least_squares = least_squares
-        self.M = np.zeros((m, n), dtype=np.float64)
-        self.b = []      # list of right parts (vectors)
-        self.x = []      # solvers
-        self.locked: list[bool] = []
-        self.values = []  # fixed values
 
-    def add_rhs(self, b):
-        self.b.append(np.array(b, dtype=np.float64))
-        self.x.append(np.zeros(self.n, dtype=np.float64))
+        assert (self.least_squares or (self.m == self.n)), "For non-least-squares m must equal n"
+
+        # reserve structures
+        self.M_triplets = []
+        # b and x are lists of numpy vectors (one per rhs)
+        self.b = np.zeros(self.m, dtype=np.float64)
+        self.x = np.zeros(self.n, dtype=np.float64)
+
+        # TODO: Remove???
+        # move variable initial values into x vectors for unlocked variables
+        for i in range(self.num_variables):
+            v = self.variable[i]
+            if not v.locked:
+                idx = v.index
+                # if user had pre-set variable.value, store into x
+                self.x[idx] = v.value
+
+        self.state = 'MATRIX_CONSTRUCT'
+
+    def matrix_add(self, row: int, col: int, value: float):
+        assert self.state == 'MATRIX_CONSTRUCT'
+
+        # if not least_squares and variable[row] is locked -> ignore
+        if (not self.least_squares) and self.variable[row].locked:
+            return
+
+        if self.variable[col].locked:
+            # store coefficient to variable[col].coeffs
+            # in non-lsq case the row must be mapped to compact index
+            r = row
+            if not self.least_squares:
+                r = self.variable[row].index
+            coeff = LinearSolver.Coeff(r, value)
+            self.variable[col].coeffs.append(coeff)
+        else:
+            # add triplet to matrix (map row and col to compact indices when needed)
+            r = row
+            if not self.least_squares:
+                r = self.variable[row].index
+            c = self.variable[col].index
+
+            if r is None or c is None:
+                raise IndexError(f'Invalid indices: {row=}, {col=}')
+            self.M_triplets.append((r, c, value))
+
+    def right_hand_side_add(self, index: int, value: float):
+        if self.least_squares:
+            self.b[index] += value
+        else:
+            # only add if variable not locked
+            if not self.variable[index].locked:
+                assert self.variable[index].index == index
+                self.b[index] += value
+
+    def lock_variable(self, index: int, value: float):
+        v = self.variable[index]
+        v.locked = True
+        v.value = value
 
     def solve(self):
+        # nothing to solve
+        assert self.state == 'MATRIX_CONSTRUCT'
+
         if self.m == 0 or self.n == 0:
-            return True
+            raise ValueError
 
-        # creating a copy of the matrix (so as not to spoil the original)
-        M = self.M.copy()
+        # Build dense matrix from triplets
+        M = np.zeros((self.m, self.n), dtype=np.float64)
+        for (r, c, val) in self.M_triplets:
+            M[r, c] += val
 
-        # apply locks
-        for j, locked in enumerate(self.locked):
-            if locked:
-                # zero the column and set the diagonal=1
-                M[:, j] = 0.0
-                M[j, j] = 1.0
-
-        # Least squares
         if self.least_squares:
-            Mt = M.T
-            MtM = Mt @ M
+            MtM = M.T @ M
+            A = MtM
+        else:
+            A = M
 
-        success = True
-        for k, b in enumerate(self.b):
-            b = b.copy()
-            # for locked variables, replace b[j] = value
-            for j, locked in enumerate(self.locked):
-                if locked:
-                    b[j] = self.values[j]
+        b_vec = self.b.copy()  # TODO: Remove ???
 
-            try:
-                if self.least_squares:
-                    Mtb = Mt @ b  # noqa pylint: disable=used-before-assignment
-                    x = np.linalg.solve(MtM, Mtb)  # noqa pylint: disable=used-before-assignment
-                else:
-                    x = np.linalg.solve(M, b)
-                self.x[k] = x
-            except np.linalg.LinAlgError:
-                success = False
-        return success
+        # Apply locked variables' a-coeff contributions: b[a.index] -= a.value * variable.value
+        for i in range(self.num_variables):
+            var = self.variable[i]
+            if var.locked and var.coeffs:
+                for coeff in var.coeffs:
+                    # coeff.index already mapped according to earlier logic in matrix_add
+                    if 0 <= coeff.index < len(b_vec):  # TODO: Remove len(b_vec) ???
+                        b_vec[coeff.index] -= coeff.value * var.value
+
+        # Solve
+        try:
+            if self.least_squares:
+                # Solve (MtM) x = M^T b
+                rhs_vec = M.T @ b_vec
+                x_compact = np.linalg.solve(A, rhs_vec)
+            else:
+                x_compact = np.linalg.solve(A, b_vec)
+        except np.linalg.LinAlgError:
+            # fallback to least-squares solution if singular
+            x_compact, *_ = np.linalg.lstsq(A, (M.T @ b_vec) if self.least_squares else b_vec, rcond=None)
+
+        # store into solver.x
+        self.x[:] = x_compact
+
+        # map back solution from compact x into variables
+        for i in range(self.num_variables):
+            v = self.variable[i]
+            if not v.locked:
+                idx = v.index
+                if 0 <= idx < self.n:
+                    v.value = self.x[idx]
+            else:
+                # locked variable retains its set value
+                pass
+
+        self.b.fill(0.0)  # TODO: Remove ???
+
+        self.state = 'MATRIX_SOLVED'
+        return True
+
+    def variable_get(self, index: int):
+        return self.variable[index].value
+
+    def variable_set(self, index: int, value: float):
+        self.variable[index].value = float(value)
+
+    def __str__(self):
+        return str([str(v) for v in self.variable])
+
+
+
+class TestSolver(unittest.TestCase):
+    def test_solver_simple(self):
+        # from mathutils import Solver as LinearSolver
+        def fill_solver():
+            # system:  2*x0 + 3*x1 = 5
+            #            x0 -  x1 = 1
+            solver.matrix_add(0, 0, 2)
+            solver.matrix_add(0, 1, 3)
+            solver.matrix_add(1, 0, 1)
+            solver.matrix_add(1, 1, -1)
+
+            solver.right_hand_side_add(0, 5)
+            solver.right_hand_side_add(1, 1)
+
+            solver.solve()
+
+        solver = LinearSolver(2, 2, least_squares=False)
+        fill_solver()
+
+        self.assertAlmostEqual(solver.variable_get(0), 1.6, delta=1e-9)
+        self.assertAlmostEqual(solver.variable_get(1), 0.6, delta=1e-9)
+
+
+        solver = LinearSolver(2, 2, least_squares=True)
+        solver.lock_variable(1, 22)  # lock x1 = 22
+        fill_solver()
+
+        self.assertAlmostEqual(solver.variable_get(0), -19.8, delta=1e-9)
+        self.assertAlmostEqual(solver.variable_get(1), 22.0, delta=1e-9)
+
+
+    def test_solver_least_squares_with_lock(self):
+        # from mathutils import Solver as LinearSolver
+        n_faces = 1
+        n_verts = 3
+        solver = LinearSolver(2 * n_faces, 2 * n_verts, least_squares=True)
+
+        solver.lock_variable(2, -0.726492702960968)
+        solver.lock_variable(3, 0.043564677238464355)
+
+        solver.lock_variable(4, 0.771076500415802)
+        solver.lock_variable(5, 0.043564677238464355)
+
+        solver.matrix_add(0, 0, -0.5412585554468488)
+        solver.matrix_add(0, 1, -0.7496441899404173)
+        solver.matrix_add(0, 2, -0.4587414445531512)
+        solver.matrix_add(0, 3, 0.7496441899404173)
+        solver.matrix_add(0, 4, 1.0)
+
+        solver.matrix_add(1, 0, 0.7496441899404173)
+        solver.matrix_add(1, 1, -0.5412585554468488)
+        solver.matrix_add(1, 2, -0.7496441899404173)
+        solver.matrix_add(1, 3, -0.4587414445531512)
+        solver.matrix_add(1, 5, 1.0)
+
+        solver.solve()
+
+        self.assertAlmostEqual(solver.variable_get(0), 0.22162558147294173, delta=1e-9)
+        self.assertAlmostEqual(solver.variable_get(1), 1.3567104116562398, delta=1e-9)
+
+        self.assertAlmostEqual(solver.variable_get(2), -0.726492702960968, delta=1e-9)
+        self.assertAlmostEqual(solver.variable_get(3), 0.043564677238464355, delta=1e-9)
+
+        self.assertAlmostEqual(solver.variable_get(4), 0.771076500415802, delta=1e-9)
+        self.assertAlmostEqual(solver.variable_get(5), 0.043564677238464355, delta=1e-9)
+
+    @classmethod
+    def start(cls):
+        suite = unittest.TestLoader().loadTestsFromTestCase(cls)
+        runner = unittest.TextTestRunner(verbosity=2)
+        result = runner.run(suite)
+        result.wasSuccessful()

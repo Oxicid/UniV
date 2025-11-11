@@ -11,10 +11,10 @@ from .ubm import polyfill_beautify
 from . import bm_select
 from .. import utypes
 
-try:
-    from mathutils import Solver as LinearSolver
-except ImportError:
-    from .umath import LinearSolver
+# try:
+#     from mathutils import Solver as LinearSolver
+# except ImportError:
+from .umath import LinearSolver
 
 T = typing.TypeVar("T", "PFace", "PEdge", "PVert")
 class ParametrizerIt(typing.Generic[T]):
@@ -810,7 +810,6 @@ class PChart:
 
                 self.pin1 = pin1[0]
                 self.pin2 = pin2[0]
-
 
         self.context = LinearSolver(2 * self.n_faces, 2 * self.n_verts, least_squares=True)
 
