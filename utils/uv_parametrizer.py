@@ -2,12 +2,19 @@ import math
 import typing
 
 from bmesh.types import BMFace
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
-from .umath import LinearSolver
+from math import pi
+from bl_math import clamp
+
 from .ubm import polyfill_beautify
 from . import bm_select
 from .. import utypes
+
+try:
+    from mathutils import Solver as LinearSolver
+except ImportError:
+    from .umath import LinearSolver
 
 T = typing.TypeVar("T", "PFace", "PEdge", "PVert")
 class ParametrizerIt(typing.Generic[T]):
@@ -51,9 +58,73 @@ PFACE_FILLED = 2
 PFACE_COLLAPSE = 4
 PFACE_DONE = 8
 
+def angle_v3v3v3(a: Vector, b: Vector, c: Vector):
+    return (b - a).angle(b - c, 0.0)
+
+
+def fix_large_angle(v_fix: Vector, v1: Vector, v2: Vector, r_fix: float, r_a1: float, r_a2: float) -> tuple[float, float, float]:
+    """
+    # Angles close to 0 or 180 degrees cause rows filled with zeros in the linear_solver.
+    # The matrix will then be rank deficient and / or have poor conditioning.
+    # => Reduce the maximum angle to 179 degrees, and spread the remainder to the other angles.
+    """
+    max_angle: float = math.degrees(179.0)
+    fix_amount: float = r_fix - max_angle
+    if fix_amount < 0.0:
+        # angle is reasonable, i.e. less than 179 degrees.
+        return  r_fix, r_a1, r_a2
+
+
+    # The triangle is probably degenerate, or close to it.
+    # Without loss of generality, transform the triangle such that
+    # v_fix == {  0, s}, *r_fix = 180 degrees
+    # v1    == {-x1, 0}, *r_a1  = 0
+    # v2    == { x2, 0}, *r_a2  = 0
+    #
+    # With `s = 0`, `x1 > 0`, `x2 > 0`
+    #
+    # Now make `s` a small number and do some math:
+    # tan(*r_a1) = s / x1
+    # tan(*r_a2) = s / x2
+    #
+    # Remember that `tan(angle) ~= angle`
+    #
+    # Rearrange to obtain:
+    # *r_a1 = fix_amount * x2 / (x1 + x2)
+    # *r_a2 = fix_amount * x1 / (x1 + x2)
+
+    dist_v1: float = (v_fix - v1).length
+    dist_v2: float = (v_fix - v2).length
+    dist_sum: float = dist_v1 + dist_v2
+    weight: float = dist_v2 / dist_sum if (dist_sum > 1e-20) else 0.5
+
+    # Ensure sum of angles in triangle is unchanged.
+    r_fix -= fix_amount
+    r_a1 += fix_amount * weight
+    r_a2 += fix_amount * (1.0 - weight)
+    return r_fix, r_a1, r_a2
+
+
+def p_triangle_angles(v1: Vector, v2: Vector, v3: Vector) -> tuple[float, float, float]:
+
+    a1 = angle_v3v3v3(v3, v1, v2)
+    a2 = angle_v3v3v3(v1, v2, v3)
+    a3 = angle_v3v3v3(v2, v3, v1)
+
+    # Fix for degenerate geometry e.g. v1 = sum(v2 + v3). See #100874
+    a1, a2, a3 = fix_large_angle(v1, v2, v3, a1, a2, a3)
+    a2, a3, a1 = fix_large_angle(v2, v3, v1, a2, a3, a1)
+    a3, a1, a2 = fix_large_angle(v3, v1, v2, a3, a1, a2)
+
+    # Workaround for degenerate geometry, e.g. v1 == v2 == v3.
+    a1 = max(a1, 0.001)
+    a2 = max(a2, 0.001)
+    a3 = max(a3, 0.001)
+    return a1, a2, a3
+
+
 PHashKey = typing.NewType('PHashKey', int)  # uintptr_t
 ParamKey = typing.NewType('ParamKey', int)  # uintptr_t
-
 
 def PHASH_hash(ph, key):
     return key % ph.cursize
@@ -231,6 +302,10 @@ class PVert:
         elif n_edges > 0:
             self.uv.xy *= 1 / n_edges
 
+    @property
+    def is_interior(self):
+        return bool(self.edge.pair)
+
 
 class PEdge:
     def __init__(self):
@@ -287,6 +362,24 @@ class PEdge:
     def wheel_edge_prev(self) -> 'PEdge | None':
         return self.pair.next if self.pair else None
 
+    @property
+    def boundary_edge_next(self: 'PEdge') -> 'PEdge':
+        return self.next.vert.edge
+
+    @property
+    def boundary_edge_prev(self: 'PEdge') -> 'PEdge':
+        we: PEdge = self
+        last: PEdge
+
+        while True:
+            last = we
+            we = we.wheel_edge_next
+            if not we or we == self:
+                break
+
+        return last.next.next
+
+
     def implicit_seam(self, e_pair: 'PEdge') -> bool:
         uv1 = self.orig_uv
         uv2 = self.next.orig_uv
@@ -313,7 +406,7 @@ class PEdge:
 
         return False
 
-    def edge_connect_pair(self, handle: 'ParamHandle', stack: 'list[PEdge]') -> bool:
+    def edge_connect_pair(self, handle: 'ParamHandleConstruct', stack: 'list[PEdge]') -> bool:
         pair: list[PEdge | None] = [None]
 
         if not self.pair and self.has_pair(handle, pair):
@@ -329,7 +422,7 @@ class PEdge:
 
         return bool(self.pair)
 
-    def has_pair(self, handle: 'ParamHandle', r_pair: list) -> bool:
+    def has_pair(self, handle: 'ParamHandleConstruct', r_pair: list) -> bool:
         """r_pair[0] - is imitation pointer of pointer."""
         if self.flag & PEDGE_SEAM:
             return False
@@ -453,6 +546,43 @@ class PFace:
         e3.orig_uv = orig_uv1
         e3.flag = (f3 & ~PEDGE_VERTEX_FLAGS) | (f1 & PEDGE_VERTEX_FLAGS)
 
+    def backup_uvs(self):
+
+        e1: PEdge = self.edge
+        e2: PEdge = e1.next
+        e3: PEdge = e2.next
+
+        if e1.orig_uv:
+            e1.old_uv = e1.orig_uv.copy()
+
+        if e2.orig_uv:
+            e2.old_uv = e2.orig_uv.copy()
+
+        if e3.orig_uv:
+            e3.old_uv = e3.orig_uv.copy()
+
+    def calc_angles(self):
+
+        e1: PEdge = self.edge
+        e2: PEdge = e1.next
+        e3: PEdge = e2.next
+        v1: PVert = e1.vert
+        v2: PVert = e2.vert
+        v3: PVert = e3.vert
+
+        return p_triangle_angles(v1.co, v2.co, v3.co)
+
+    def calc_signed_uv_area(self) -> float:
+
+        e1: PEdge = self.edge
+        e2: PEdge = e1.next
+        e3: PEdge = e2.next
+        v1: PVert = e1.vert
+        v2: PVert = e2.vert
+        v3: PVert = e3.vert
+
+        return 0.5 * (v2.uv - v1.uv).cross(v3.uv - v1.uv)
+
 
 class PChart:
     def __init__(self):
@@ -472,25 +602,27 @@ class PChart:
         self.area_uv: float = 0.0
         self.area_3d: float = 0.0
 
-        self.origin: Vector
+        self.origin: Vector = Vector((0.0, 0.0))
 
-        self.context: LinearSolver
-        self.abf_alpha: float  # list of alpha ???
+        self.context: LinearSolver | None = None
+        self.abf_alpha: list[float]  = [] # list of alpha ???
 
-        self.pin1: PVert
-        self.pin2: PVert
-        self.single_pin: PVert
+        self.pin1: PVert | None = None
+        self.pin2: PVert | None = None
+        self.single_pin: PVert | None = None
 
         self.has_pins: bool = False
-        self.skip_flush: bool
+        self.skip_flush: bool = False
 
     def boundaries(self):
         max_length = -1.0
         outer = None
-
+        self.n_boundaries = 0
         for e in self.edges:
-            if e.pair or e.flag & PEDGE_DONE:
+            if e.pair or (e.flag & PEDGE_DONE):
                 continue
+
+            self.n_boundaries += 1
 
             length = 0.0
             be = e
@@ -544,7 +676,6 @@ class PChart:
                 total_area += area_tri(e1.vert.co, e2.vert.co, e3.vert.co)
         self.area_3d = total_area
         return total_area
-
 
     def split_charts(self, ncharts):
         charts: list[PChart] = [PChart() for _ in range(ncharts)]
@@ -636,35 +767,886 @@ class PChart:
                 if not we or we == lastwe:
                     break
 
+    def lscm_begin(self):
+
+        assert self.context is None
+
+        n_pins: int = sum(bool(v.flag & PVERT_PIN) for v in self.verts)
+
+    #if 0
+        # p_chart_simplify_compute(chart, p_collapse_cost, p_collapse_allowed)
+        # p_chart_topological_sanity_check(chart)
+    #endif
+
+        if n_pins == 1:
+            self.ensure_area_uv()
+            for v in self.verts:
+                if v.flag & PVERT_PIN:
+                    self.single_pin = v
+                    break
+
+        if UnwrapOptions.use_abf:
+            if not self.abf_solve():
+                print("ABF solving failed: falling back to LSCM.")
+
+        # ABF uses these indices for its internal references.
+        # Set the indices afterward.
+        for idx, v in enumerate(self.verts):
+            v.id = idx
+
+
+        if UnwrapOptions.unwrap_along == 'UV':
+            if n_pins <= 1:
+                # No pins, let's find some ourselves.
+
+                outer: PEdge = self.boundaries()
+
+                pin1: list[PVert | None] = [None]
+                pin2: list[PVert | None] = [None]
+                # Outer can be null with non-finite coordinates.
+                if not (outer and self.symmetry_pins(outer, pin1, pin2)):
+                    self.extrema_verts(pin1, pin2)
+
+
+                self.pin1 = pin1[0]
+                self.pin2 = pin2[0]
+
+
+        self.context = LinearSolver(2 * self.n_faces, 2 * self.n_verts, least_squares=True)
+
+    def lscm_solve(self) -> bool:
+        from math import sin, cos
+        context: LinearSolver = self.context
+
+        # for v in chart.verts:
+        #     if v.flag & PVERT_PIN:
+        #         v.load_pin_select_uvs() # Reload for Live Unwrap.
+
+        # if self.single_pin:
+        #     # If only one pin, save location as origin.
+        #     self.origin = self.single_pin.uv.copy()
+        #
+        if self.pin1:
+            pin1: PVert = self.pin1
+            pin2: PVert = self.pin2
+            context.lock_variable(2 * pin1.id, pin1.uv[0])
+            context.lock_variable(2 * pin1.id + 1, pin1.uv[1])
+            context.lock_variable(2 * pin2.id, pin2.uv[0])
+            context.lock_variable(2 * pin2.id + 1, pin2.uv[1])
+
+        else:
+            # Set and lock the pins.
+            for v in self.verts:
+                if v.flag & PVERT_PIN:
+                    context.lock_variable(2 * v.id, v.uv[0])
+                    context.lock_variable(2 * v.id + 1, v.uv[1])
+
+        # Lock axis
+        if UnwrapOptions.unwrap_along == 'V':
+            for v in self.verts:
+                context.lock_variable(2 * v.id, v.uv[0])
+        elif UnwrapOptions.unwrap_along == 'U':
+            for v in self.verts:
+                context.lock_variable(2 * v.id + 1, v.uv[1])
+
+        # Detect "up" direction based on pinned vertices.
+        area_pinned_up: float = 0.0
+        area_pinned_down: float = 0.0
+
+        for f in self.faces:
+            e1: PEdge = f.edge
+            e2: PEdge = e1.next
+            e3: PEdge = e2.next
+            v1: PVert = e1.vert
+            v2: PVert = e2.vert
+            v3: PVert = e3.vert
+
+            if (v1.flag & PVERT_PIN) and (v2.flag & PVERT_PIN) and (v3.flag & PVERT_PIN) or True:
+                area: float = f.calc_signed_uv_area()
+
+                if area > 0.0:
+                    area_pinned_up += area
+
+                else:
+                    area_pinned_down -= area
+
+        flip_faces: bool = (area_pinned_down > area_pinned_up)
+
+        # Construct matrix.
+        alpha: list[float] = self.abf_alpha
+
+        row: int = 0
+        ii = 0
+        for f in self.faces:
+            e1: PEdge = f.edge
+            e2: PEdge = e1.next
+            e3: PEdge = e2.next
+            v1: PVert = e1.vert
+            v2: PVert = e2.vert
+            v3: PVert = e3.vert
+
+            if alpha:
+                # Use abf angles if present.
+                a1 = alpha[ii]
+                ii += 1
+                a2 = alpha[ii]
+                ii += 1
+                a3 = alpha[ii]
+                ii += 1
+            else:
+                a1, a2, a3 = f.calc_angles()
+
+            if flip_faces:
+                # swap
+                a2, a3 = a3, a2
+                # e2, e3 = e3, e2
+                v2, v3 = v3, v2
+
+            sina1: float = sin(a1)
+            sina2: float = sin(a2)
+            sina3: float = sin(a3)
+
+            sin_max: float = max(sina1, sina2, sina3)
+
+            # Shift vertices to find most stable order.
+            if sina3 != sin_max:
+                # shift right
+                v1, v2, v3 = v3, v1, v2
+                a1, a2, a3 = a3, a1, a2
+                sina1, sina2, sina3 = sina3, sina1, sina2
+
+                if sina2 == sin_max:
+                    # shift right
+                    v1, v2, v3 = v3, v1, v2
+                    a1, a2, a3 = a3, a1, a2
+                    sina1, sina2, sina3 = sina3, sina1, sina2
+
+            # Angle based lscm formulation.
+            ratio: float = sina2 / sina3 if sina3 else 1.0  # safe divide
+            cosine: float = cos(a1) * ratio
+            sine: float = sina1 * ratio
+
+            context.matrix_add(row, 2 * v1.id, cosine - 1.0)
+            context.matrix_add(row, 2 * v1.id + 1, -sine)
+            context.matrix_add(row, 2 * v2.id, -cosine)
+            context.matrix_add(row, 2 * v2.id + 1, sine)
+            context.matrix_add(row, 2 * v3.id, 1.0)
+            row += 1
+
+            context.matrix_add(row, 2 * v1.id, sine)
+            context.matrix_add(row, 2 * v1.id + 1, cosine - 1.0)
+            context.matrix_add(row, 2 * v2.id, -sine)
+            context.matrix_add(row, 2 * v2.id + 1, -cosine)
+            context.matrix_add(row, 2 * v3.id + 1, 1.0)
+            row += 1
+
+        if context.solve():
+            for v in self.verts:
+                v.uv[0] = context.variable_get(2 * v.id)
+                v.uv[1] = context.variable_get(2 * v.id + 1)
+            return True
+
+        for v in self.verts:
+            v.uv.xy = (0.0, 0.0)
+
+        return False
+
+    def abf_solve(self) -> bool:
+        from math import pi
+        sys = PAbfSystem()
+        limit: float = 1.0 if (self.n_faces > 100) else 0.001
+        # lastnorm: float = 1.0 if (chart.n_faces > 100) else 0.001
+
+        for v in self.verts:
+            if v.is_interior:
+                v.flag |= PVERT_INTERIOR
+                v.id = sys.n_interior
+                sys.n_interior += 1
+
+            else:
+                v.flag &= ~PVERT_INTERIOR
+
+        for f in self.faces:
+            e1 = f.edge
+            e2 = e1.next
+            e3 = e2.next
+            f.id = sys.n_faces
+            sys.n_faces += 1
+
+            # angle ids are conveniently stored in half edges
+            e1.id = sys.n_angles
+            sys.n_angles +=1
+            e2.id = sys.n_angles
+            sys.n_angles +=1
+            e3.id = sys.n_angles
+            sys.n_angles +=1
+
+
+        sys.p_abf_setup_system()
+
+        # compute initial angles
+        for f in self.faces:
+            e1 = f.edge
+            e2 = e1.next
+            e3 = e2.next
+            a1, a2, a3 = f.calc_angles()
+
+            sys.alpha[e1.id] = sys.beta[e1.id] = a1
+            sys.alpha[e2.id] = sys.beta[e2.id] = a2
+            sys.alpha[e3.id] = sys.beta[e3.id] = a3
+
+            sys.weight[e1.id] = 2.0 / (a1 * a1)
+            sys.weight[e2.id] = 2.0 / (a2 * a2)
+            sys.weight[e3.id] = 2.0 / (a3 * a3)
+
+
+        for v in self.verts:
+            if v.flag & PVERT_INTERIOR:
+                angle_sum: float = 0.0
+
+                e: PEdge = v.edge
+                while True:
+                    angle_sum += sys.beta[e.id]
+                    e = e.next.next.pair
+                    if not (e and (e != v.edge)):
+                        break
+
+                scale: float = 2.0 * pi / angle_sum if angle_sum else 0.0  # safe divide
+
+                e = v.edge
+                while True:
+                    sys.beta[e.id] = sys.alpha[e.id] = sys.beta[e.id] * scale
+                    e = e.next.next.pair
+                    if not (e and (e != v.edge)):
+                        break
+
+        if sys.n_interior > 0:
+            sys.compute_sines()
+
+            # iteration
+            # lastnorm = 1e10 /* UNUSED.
+
+            for i in range(PAbfSystem.ABF_MAX_ITER):
+                norm: float = sys.compute_gradient(self)
+
+                # lastnorm = norm /* UNUSED.
+                if norm < limit:
+                    break
+
+
+                if not sys.matrix_invert(self):
+                    print("UniV: ABF failed to invert matrix")
+                    # p_abf_free_system(sys)
+                    return False
+
+                sys.compute_sines()
+
+            else:
+                print("UniV: ABF maximum iterations reached")
+                # p_abf_free_system(sys)
+                return False
+
+        self.abf_alpha = sys.alpha
+        sys.alpha = []
+
+        return True
+
+    def symmetry_pins(self, outer: PEdge, pin1: list[PVert], pin2: list[PVert]) -> bool:
+        max_e1: PEdge | None= None
+        max_e2: PEdge | None= None
+        cure: PEdge | None = None
+        first_e1: PEdge | None = None
+        first_e2: PEdge | None = None
+        max_len: float = 0.0
+        cur_len: float = 0.0
+        tot_len: float = 0.0
+        first_len: float = 0.0
+
+        # find the longest series of verts split in the chart itself, these are
+        # marked during construction
+        be: PEdge = outer
+        last_be: PEdge = be.boundary_edge_prev
+        while True:
+            tot_len += be.length_3d
+            next_be: PEdge = be.boundary_edge_next
+
+            if (be.vert.flag & PVERT_SPLIT) or (last_be.vert.flag & next_be.vert.flag & PVERT_SPLIT):
+                if not cure:
+                    if be == outer:
+                        first_e1 = be
+                    cure = be
+                else:
+                    cur_len += last_be.length_3d
+            elif cure:
+                if cur_len > max_len:
+                    max_len = cur_len
+                    max_e1 = cure
+                    max_e2 = last_be
+                if first_e1 == cure:
+                    first_len = cur_len
+                    first_e2 = last_be
+                cur_len = 0.0
+                cure = None
+
+            last_be = be
+            be = next_be
+            if be == outer:
+                break
+
+        # make sure we also count a series of splits over the starting point
+        if cure and (cure != outer):
+            first_len += cur_len + be.length_3d
+
+            if first_len > max_len:
+                max_len = first_len
+                max_e1 = cure
+                max_e2 = first_e2
+
+        if not max_e1 or not max_e2 or (max_len < 0.5 * tot_len):
+            return False
+
+        # find pin1 in the split vertices
+        be1: PEdge = max_e1
+        be2: PEdge = max_e2
+        len1: float = 0.0
+        len2: float = 0.0
+
+        while True:
+            if len1 < len2:
+                len1 += be1.length_3d
+                be1 = be1.boundary_edge_next
+
+            else:
+                be2 = be2.boundary_edge_prev
+                len2 += be2.length_3d
+
+            if not (be1 != be2):
+                break
+
+        pin1[0] = be1.vert
+
+        # find pin2 outside the split vertices
+        be1 = max_e1
+        be2 = max_e2
+        len1 = 0.0
+        len2 = 0.0
+
+        while True:
+            if len1 < len2:
+                be1 = be1.boundary_edge_prev
+                len1 += be1.length_3d
+
+            else:
+                len2 += be2.length_3d
+                be2 = be2.boundary_edge_next
+
+            if not (be1 != be2):
+                break
+
+        pin2[0] = be1.vert
+
+        self.pin_positions(pin1, pin2)
+
+        return not pin1[0].co == pin2[0].co
+
+    def pin_positions(self, pin1: list[PVert], pin2: list[PVert]):
+
+        if not pin1[0] or not pin2[0] or pin1[0] == pin2[0]:
+            # degenerate case
+            f: PFace = self.faces.first_item
+            pin1[0] = f.edge.vert
+            pin2[0] = f.edge.next.vert
+
+            pin1[0].uv[0] = 0.0
+            pin1[0].uv[1] = 0.5
+            pin2[0].uv[0] = 1.0
+            pin2[0].uv[1] = 0.5
+            raise  # TODO: Test
+
+        else:
+            sub = pin1[0].co - pin2[0].co
+            sub[0] = abs(sub[0])
+            sub[1] = abs(sub[1])
+            sub[2] = abs(sub[2])
+
+            if (sub[0] > sub[1]) and (sub[0] > sub[2]):
+                dir_x = 0
+                dir_y = 1 if (sub[1] > sub[2]) else 2
+            elif (sub[1] > sub[0]) and (sub[1] > sub[2]):
+                dir_x = 1
+                dir_y = 0 if (sub[0] > sub[2]) else 2
+            else:
+                dir_x = 2
+                dir_y = 0 if (sub[0] > sub[1]) else 1
+
+
+            if dir_x == 2:
+                dir_u = 1
+                dir_v = 0
+
+            else:
+                dir_u = 0
+                dir_v = 1
+
+            pin1[0].uv[dir_u] = pin1[0].co[dir_x]
+            pin1[0].uv[dir_v] = pin1[0].co[dir_y]
+            pin2[0].uv[dir_u] = pin2[0].co[dir_x]
+            pin2[0].uv[dir_v] = pin2[0].co[dir_y]
+
+    def extrema_verts(self, pin1: list[PVert], pin2: list[PVert]):
+        # find minimum and maximum verts over x/y/z axes
+        min_v: Vector = Vector((1e20, 1e20, 1e20))
+        max_v: Vector = Vector((-1e20, -1e20, -1e20))
+
+        min_vert: list[PVert] = [None, None, None]
+        max_vert: list[PVert] = [None, None, None]
+
+        for v in self.verts:
+            for i in range(3):
+                if v.co[i] < min_v[i]:
+                    min_v[i] = v.co[i]
+                    min_vert[i] = v
+
+                if v.co[i] > max_v[i]:
+                    max_v[i] = v.co[i]
+                    max_vert[i] = v
+
+        # find axes with the longest distance
+        dir_: int = 0
+        dir_len: float = -1.0
+
+        for i in range(3):
+            if max_v[i] - min_v[i] > dir_len:
+                dir_ = i
+                dir_len = max_v[i] - min_v[i]
+
+        pin1[0] = min_vert[dir_]
+        pin2[0] = max_vert[dir_]
+
+        self.pin_positions(pin1, pin2)
+
+
+
+
+class PAbfSystem:
+    ABF_MAX_ITER = 20
+
+    def __init__(self):
+        # N Interior - is the number of internal vertices for which the system is solved (where the sum of the angles is ≈ 2π).
+        self.n_interior: int = 0
+        # Total tris.
+        self.n_faces: int = 0
+        # The total number of corners (3 × n_faces).
+        self.n_angles: int = 0
+
+        # Alpha - is the current angle (optimization variable).
+        # These are the angles that the algorithm corrects so that the scan turns out to be 'flat'.
+        self.alpha: list[float] = []
+        # Beta - is the target angle value (from the 3D model). That is, the initial angle between the edges in 3D.
+        self.beta: list[float] = []
+
+        # Sine, Cosine - are the precalculated values of the sine/cosine of the angles' alpha.
+        self.sine: list[float] = []
+        self.cosine: list[float] = []
+
+        # Weight - is the weight of the angle in the objective function
+        # (usually depends on the length of the edges and the area of the triangle).
+        # More important angles contribute more to optimization.
+        self.weight: list[float] = []
+
+        # These are residual vectors for various types of constraints in a system of linear equations
+
+        # bAlpha - residual according to the “angle difference” equation (α - β), i.e., how much the current angles deviate from the target angles.
+        self.bAlpha: list[float] = []
+        # bTriangle - the residual according to the equations of the sum of angles in a triangle (should be π).
+        self.bTriangle: list[float] = []
+        # bInterior - the residual according to the equations of the sum of angles around a vertex (should be 2π for interior angles, < 2π for boundary angles).
+        self.bInterior: list[float] = []
+
+        # These λ are Lagrange coefficients that ensure the fulfillment of geometric constraints:
+
+        # lambdaTriangle - multipliers for triangle angle sum constraints.
+        self.lambdaTriangle: list[float] = []
+        # lambdaPlanar - multipliers for planarity constraints (that a triangle can be unfolded in 2D without self-intersection).
+        self.lambdaPlanar: list[float] = []
+        # lambdaLength - multipliers for edge length matching constraints (so that the sides match when triangles are joined).
+        self.lambdaLength: list[float] = []
+
+        # These fields refer to the system of linear equations solved at each iteration step:
+
+        # J2dt - Jacobian (matrix of partial derivatives), with dimensions [n_angles][3], describes the relationship between angle changes and constraints.
+        self.J2dt: list[Vector] = []
+        # bstar - right-hand side for the reduced system (after eliminating dependencies).
+        self.bstar: list[float] = []
+        # dstar - result of solving the linear system (changes in variables α, λ, etc.).
+        self.dstar: list[float] = []
+
+
+    def p_abf_setup_system(self):
+        # NOTE: Use np.empty
+        self.alpha = self.n_angles * [None]
+        self.beta = self.n_angles * [None]
+        self.sine = self.n_angles * [None]
+        self.cosine = self.n_angles * [None]
+        self.weight = self.n_angles * [None]
+
+        self.bAlpha = self.n_angles * [None]
+        self.bTriangle = self.n_faces * [None]
+        self.bInterior = self.n_interior * 2 * [None]
+
+        self.lambdaTriangle = self.n_faces * [0.0]
+        self.lambdaPlanar = self.n_interior * [0.0]
+        self.lambdaLength = self.n_interior * [0.0]
+
+        self.J2dt = [Vector() for _ in range(self.n_angles)]
+        self.bstar = self.n_faces * [None]
+        self.dstar = self.n_faces * [None]
+
+        for i in range(self.n_interior):
+            self.lambdaLength[i] = 1.0
+
+    def __str__(self):
+        return (f"{self.n_interior = }\n {self.n_angles = } \n {self.n_faces = }\n "
+                f"{self.alpha = }\n {self.beta = } \n {self.sine = }\n {self.cosine = }\n {self.weight = } "
+                f"\n {self.bAlpha = }\n {self.bTriangle = } {self.bInterior = }\n {self.lambdaTriangle = }\n "
+                f"{self.lambdaPlanar = }\n {self.lambdaLength = }\n {self.J2dt = }\n {self.bstar = }\n {self.dstar = }")
+
+    def compute_sines(self):
+        from math import sin, cos
+        sine: list[float] = self.sine
+        cosine: list[float] = self.cosine
+        alpha: list[float] = self.alpha
+
+        for i in range(self.n_angles):
+            angle: float = alpha[i]
+            sine[i] = sin(angle)
+            cosine[i] = cos(angle)
+
+    def compute_sin_product(self, v: PVert, aid: int) -> float:
+        sin1 = 1.0
+        sin2 = 1.0
+
+        e: PEdge = v.edge
+        while True:
+            e1: PEdge = e.next
+            e2: PEdge = e.next.next
+
+            if aid == e1.id:
+                # we are computing a derivative for this angle,
+                # so we use cos and drop the other part
+                sin1 *= self.cosine[e1.id]
+                sin2 = 0.0
+            else:
+                sin1 *= self.sine[e1.id]
+
+            if aid == e2.id:
+                # see above
+                sin1 = 0.0
+                sin2 *= self.cosine[e2.id]
+            else:
+                sin2 *= self.sine[e2.id]
+
+            e = e.next.next.pair
+            if not e or e == v.edge:
+                break
+
+        return sin1 - sin2
+
+    def compute_grad_alpha(self, f: PFace, e: PEdge) -> float:
+
+        v: PVert = e.vert
+        v1: PVert = e.next.vert
+        v2: PVert = e.next.next.vert
+
+        deriv: float = (self.alpha[e.id] - self.beta[e.id]) * self.weight[e.id]
+        deriv += self.lambdaTriangle[f.id]
+
+        if v.flag & PVERT_INTERIOR:
+            deriv += self.lambdaPlanar[v.id]
+
+
+        if v1.flag & PVERT_INTERIOR:
+            product: float = self.compute_sin_product(v1, e.id)
+            deriv += self.lambdaLength[v1.id] * product
+
+
+        if v2.flag & PVERT_INTERIOR:
+            product: float = self.compute_sin_product(v2, e.id)
+            deriv += self.lambdaLength[v2.id] * product
+
+        return deriv
+
+    def compute_gradient(self, chart: PChart) -> float:
+        from math import pi
+        norm: float = 0.0
+
+        for f in chart.faces:
+            e1: PEdge = f.edge
+            e2: PEdge = e1.next
+            e3: PEdge = e2.next
+
+            g_alpha1: float = self.compute_grad_alpha(f, e1)
+            g_alpha2: float = self.compute_grad_alpha(f, e2)
+            g_alpha3: float = self.compute_grad_alpha(f, e3)
+
+            self.bAlpha[e1.id] = -g_alpha1
+            self.bAlpha[e2.id] = -g_alpha2
+            self.bAlpha[e3.id] = -g_alpha3
+
+            norm += g_alpha1 * g_alpha1 + g_alpha2 * g_alpha2 + g_alpha3 * g_alpha3
+
+            g_triangle: float = self.alpha[e1.id] + self.alpha[e2.id] + self.alpha[e3.id] - pi
+            self.bTriangle[f.id] = -g_triangle
+            norm += g_triangle * g_triangle
+
+
+        for v in chart.verts:
+            if v.flag & PVERT_INTERIOR:
+                g_planar: float = -2 * pi
+
+                e: PEdge = v.edge
+                while True:
+                    g_planar += self.alpha[e.id]
+                    e = e.next.next.pair
+                    if not e or e == v.edge:
+                        break
+
+                self.bInterior[v.id] = -g_planar
+                norm += g_planar * g_planar
+
+                g_length: float = self.compute_sin_product(v, -1)
+                self.bInterior[self.n_interior + v.id] = -g_length
+                norm += g_length * g_length
+
+        return norm
+
+    def adjust_alpha(self, id_: int, d_lambda1: float, pre: float):
+        alpha: float = self.alpha[id_]
+        dalpha: float = (self.bAlpha[id_] - d_lambda1)
+        alpha += dalpha / self.weight[id_] - pre
+        self.alpha[id_] = clamp(alpha, 0.0, pi)
+
+
+    def matrix_invert(self, chart: PChart) -> bool:
+
+        n_interior: int = self.n_interior
+        n_var: int = 2 * n_interior
+        context: LinearSolver = LinearSolver(0, n_var, 1)
+
+        for i in range(n_var):
+            context.right_hand_side_add(i, self.bInterior[i])
+
+
+        for f in chart.faces:
+            beta: Vector = Vector()
+            j2: Matrix = Matrix.Identity(3)
+
+            row1: Vector = Vector.Fill(6, 0)
+            row2: Vector = Vector.Fill(6, 0)
+            row3: Vector = Vector.Fill(6, 0)
+            vid: list[int] = [-1] * 6
+
+            e1: PEdge = f.edge
+            e2: PEdge = e1.next
+            e3: PEdge = e2.next
+            v1: PVert = e1.vert
+            v2: PVert = e2.vert
+            v3: PVert = e3.vert
+
+            wi1: float = 1.0 / self.weight[e1.id]
+            wi2: float = 1.0 / self.weight[e2.id]
+            wi3: float = 1.0 / self.weight[e3.id]
+
+            # bstar1 = (J1 dInv*bAlpha - bTriangle)
+            b: float = self.bAlpha[e1.id] * wi1
+            b += self.bAlpha[e2.id] * wi2
+            b += self.bAlpha[e3.id] * wi3
+            b -= self.bTriangle[f.id]
+
+            # si = J1 d*J1t
+            si: float = 1.0 / (wi1 + wi2 + wi3)
+
+            # J1t si*bstar1 - bAlpha
+            beta[0] = b * si - self.bAlpha[e1.id]
+            beta[1] = b * si - self.bAlpha[e2.id]
+            beta[2] = b * si - self.bAlpha[e3.id]
+
+            # use this later for computing other lambda's
+            self.bstar[f.id] = b
+            self.dstar[f.id] = si
+
+            # set matrix
+            si_for_w = [si] * 3
+            W = Matrix([si_for_w for _ in range(3)])
+
+            W[0][0] = si - self.weight[e1.id]
+            W[1][1] = si - self.weight[e2.id]
+            W[2][2] = si - self.weight[e3.id]
+
+            if v1.flag & PVERT_INTERIOR:
+                vid[0] = v1.id
+                vid[3] = n_interior + v1.id
+
+                self.J2dt[e1.id][0] = j2[0][0] = 1.0 * wi1
+                self.J2dt[e2.id][0] = j2[1][0] = self.compute_sin_product(v1, e2.id) * wi2
+                self.J2dt[e3.id][0] = j2[2][0] = self.compute_sin_product(v1, e3.id) * wi3
+
+                context.right_hand_side_add(v1.id, j2[0][0] * beta[0])
+                context.right_hand_side_add(n_interior + v1.id, j2[1][0] * beta[1] + j2[2][0] * beta[2])
+
+                row1[0] = j2[0][0] * W[0][0]
+                row2[0] = j2[0][0] * W[1][0]
+                row3[0] = j2[0][0] * W[2][0]
+
+                row1[3] = j2[1][0] * W[0][1] + j2[2][0] * W[0][2]
+                row2[3] = j2[1][0] * W[1][1] + j2[2][0] * W[1][2]
+                row3[3] = j2[1][0] * W[2][1] + j2[2][0] * W[2][2]
+
+
+            if v2.flag & PVERT_INTERIOR:
+                vid[1] = v2.id
+                vid[4] = n_interior + v2.id
+
+                self.J2dt[e1.id][1] = j2[0][1] = self.compute_sin_product(v2, e1.id) * wi1
+                self.J2dt[e2.id][1] = j2[1][1] = 1.0 * wi2
+                self.J2dt[e3.id][1] = j2[2][1] = self.compute_sin_product(v2, e3.id) * wi3
+
+                context.right_hand_side_add(v2.id, j2[1][1] * beta[1])
+                context.right_hand_side_add(n_interior + v2.id, j2[0][1] * beta[0] + j2[2][1] * beta[2])
+
+                row1[1] = j2[1][1] * W[0][1]
+                row2[1] = j2[1][1] * W[1][1]
+                row3[1] = j2[1][1] * W[2][1]
+
+                row1[4] = j2[0][1] * W[0][0] + j2[2][1] * W[0][2]
+                row2[4] = j2[0][1] * W[1][0] + j2[2][1] * W[1][2]
+                row3[4] = j2[0][1] * W[2][0] + j2[2][1] * W[2][2]
+
+
+            if v3.flag & PVERT_INTERIOR:
+                vid[2] = v3.id
+                vid[5] = n_interior + v3.id
+
+                self.J2dt[e1.id][2] = j2[0][2] = self.compute_sin_product(v3, e1.id) * wi1
+                self.J2dt[e2.id][2] = j2[1][2] = self.compute_sin_product(v3, e2.id) * wi2
+                self.J2dt[e3.id][2] = j2[2][2] = 1.0 * wi3
+
+                context.right_hand_side_add(v3.id, j2[2][2] * beta[2])
+                context.right_hand_side_add(n_interior + v3.id, j2[0][2] * beta[0] + j2[1][2] * beta[1])
+
+                row1[2] = j2[2][2] * W[0][2]
+                row2[2] = j2[2][2] * W[1][2]
+                row3[2] = j2[2][2] * W[2][2]
+
+                row1[5] = j2[0][2] * W[0][0] + j2[1][2] * W[0][1]
+                row2[5] = j2[0][2] * W[1][0] + j2[1][2] * W[1][1]
+                row3[5] = j2[0][2] * W[2][0] + j2[1][2] * W[2][1]
+
+
+            for i in range(3):
+                r: int = vid[i]
+
+                if r == -1:
+                    continue
+
+                for j in range(6):
+                    c: int = vid[j]
+
+                    if c == -1:
+                        continue
+
+                    if i == 0:
+                        context.matrix_add(r, c, j2[0][i] * row1[j])
+                    else:
+                        context.matrix_add(r + n_interior, c, j2[0][i] * row1[j])
+
+                    if i == 1:
+                        context.matrix_add(r, c, j2[1][i] * row2[j])
+                    else:
+                        context.matrix_add(r + n_interior, c, j2[1][i] * row2[j])
+
+
+                    if i == 2:
+                        context.matrix_add(r, c, j2[2][i] * row3[j])
+                    else:
+                        context.matrix_add(r + n_interior, c, j2[2][i] * row3[j])
+
+        if success := context.solve():
+            for f in chart.faces:
+                e1: PEdge = f.edge
+                e2: PEdge = e1.next
+                e3: PEdge = e2.next
+                v1: PVert = e1.vert
+                v2: PVert = e2.vert
+                v3: PVert = e3.vert
+
+                pre: Vector = Vector()
+
+                if v1.flag & PVERT_INTERIOR:
+                    x: float = context.variable_get(v1.id)
+                    x2: float = context.variable_get(n_interior + v1.id)
+                    pre[0] += self.J2dt[e1.id][0] * x
+                    pre[1] += self.J2dt[e2.id][0] * x2
+                    pre[2] += self.J2dt[e3.id][0] * x2
+
+                if v2.flag & PVERT_INTERIOR:
+                    x: float = context.variable_get(v2.id)
+                    x2: float = context.variable_get(n_interior + v2.id)
+                    pre[0] += self.J2dt[e1.id][1] * x2
+                    pre[1] += self.J2dt[e2.id][1] * x
+                    pre[2] += self.J2dt[e3.id][1] * x2
+
+                if v3.flag & PVERT_INTERIOR:
+                    x: float = context.variable_get(v3.id)
+                    x2: float = context.variable_get(n_interior + v3.id)
+                    pre[0] += self.J2dt[e1.id][2] * x2
+                    pre[1] += self.J2dt[e2.id][2] * x2
+                    pre[2] += self.J2dt[e3.id][2] * x
+
+                d_lambda1 = self.dstar[f.id] * (self.bstar[f.id] - sum(pre))
+                self.lambdaTriangle[f.id] += d_lambda1
+
+                self.adjust_alpha(e1.id, d_lambda1, pre[0])
+                self.adjust_alpha(e2.id, d_lambda1, pre[1])
+                self.adjust_alpha(e3.id, d_lambda1, pre[2])
+
+
+            for i in range(n_interior):
+                self.lambdaPlanar[i] += float(context.variable_get(i))
+                self.lambdaLength[i] += float(context.variable_get(n_interior + i))
+        return success
+
 
 class UnwrapOptions:
     # Connectivity based on UV coordinates instead of seams. */
-    topology_from_uvs: bool = True
+    topology_from_uvs: bool = False
     # Also use seams as well as UV coordinates (only valid when `topology_from_uvs` is enabled). */
     topology_from_uvs_use_seams: bool = True
     # Only affect selected faces. */
-    only_selected_faces: bool = True
+    only_selected_faces: bool = False
 
     # Only affect selected UVs.
     # \note Disable this for operations that don't run in the image-window.
     # Unwrapping from the 3D view for example, where only 'only_selected_faces' should be used.
 
-    only_selected_uvs: bool  = True
+    only_selected_uvs: bool  = False
     # Fill holes to better preserve shape. */
     fill_holes: bool = False
     # Correct for mapped image texture aspect ratio. */
     correct_aspect: bool = True
     # Treat unselected uvs as if they were pinned. */
-    pin_unselected: bool = True
+    pin_unselected: bool = False
+    unwrap_along: typing.Literal['UV', 'U', 'V'] = 'UV'
 
     method: int = 0
     use_slim: bool = False
-    use_abf: bool = True
+    use_abf: bool = False
     use_subsurf: bool = False
     use_weights: bool = False
 
     # slim: ParamSlimOptions = None
     weight_group: str = ''
+
 
 class GeoUVPinIndex:
     def __init__(self, uv_co, reindex):
@@ -673,7 +1655,7 @@ class GeoUVPinIndex:
           self.reindex: int = reindex
 
 
-class ParamHandle:
+class ParamHandleConstruct:
     """
      name Chart Construction:
 
@@ -694,7 +1676,7 @@ class ParamHandle:
     PHANDLE_STATE_STRETCH = 3
 
     def __init__(self):
-        self.state = ParamHandle.PHANDLE_STATE_ALLOCATED
+        self.state = ParamHandleConstruct.PHANDLE_STATE_ALLOCATED
         self.construction_chart: PChart = PChart()
         self.hash_verts: PHash = PHash(self.construction_chart.verts)
         self.hash_edges: PHash = PHash(self.construction_chart.edges)
@@ -804,6 +1786,7 @@ class ParamHandle:
             chart: PChart = self.charts[i]
 
             _outer: PEdge | None = chart.boundaries()
+
             if not UnwrapOptions.topology_from_uvs and chart.n_boundaries == 0:
                 # UnwrapOptions.count_failed += 1
                 continue
@@ -820,7 +1803,7 @@ class ParamHandle:
 
             self.ncharts = j
 
-            self.state = ParamHandle.PHANDLE_STATE_CONSTRUCTED
+            self.state = ParamHandleConstruct.PHANDLE_STATE_CONSTRUCTED
 
     def connect_pairs(self) -> int:
         """Connect pairs, count edges, set vertex-edge pointer to a pair-less edge"""
@@ -1115,3 +2098,62 @@ class ParamHandle:
                 uv_co = crn[uv].uv
                 self.uv_prepare_pin_index(vert_idx, uv_co)
 
+
+class ParamHandleSolve(ParamHandleConstruct):
+
+    def uv_parametrizer_lscm_begin(self):
+        assert (self.state == self.PHANDLE_STATE_CONSTRUCTED);
+        self.state = self.PHANDLE_STATE_LSCM
+
+        for chart in self.charts:
+            for f in chart.faces:
+                f.backup_uvs()
+
+            chart.lscm_begin()
+
+    def uv_parametrizer_lscm_solve(self):
+
+        assert self.state == self.PHANDLE_STATE_LSCM
+
+        for chart in self.charts:
+            if not chart.context:
+                continue
+
+            if chart.lscm_solve():
+                pass
+                # if not chart.has_pins:
+                #     # Every call to LSCM will eventually call uv_pack, so rotating here might be redundant.
+                #     p_chart_rotate_minimum_area(chart)
+                #
+                # elif chart.single_pin:
+                #     p_chart_rotate_fit_aabb(chart)
+                #     p_chart_lscm_transform_single_pin(chart)
+            else:
+                pass
+                # count_failed += 1
+
+    def uv_parametrizer_flush(self):
+        for chart in self.charts:
+            if not chart.skip_flush:
+                self.p_flush_uvs(chart)
+
+    def p_flush_uvs(self, chart: PChart):
+        blend: float = self.blend
+        inv_blend: float = 1.0 - blend
+        inv_blend_x: float = inv_blend / self.aspect_y
+        for e in chart.edges:
+            if e.orig_uv:
+                e.orig_uv[0] = blend * e.old_uv[0] + inv_blend_x * e.vert.uv[0]
+                e.orig_uv[1] = blend * e.old_uv[1] + inv_blend * e.vert.uv[1]
+
+        # if chart.collapsed_edges:
+        #     p_chart_flush_collapsed_uvs(chart)
+        #
+        #     for e in chart.collapsed_edges:
+        #         if e.orig_uv:
+        #             e.orig_uv[0] = blend * e.old_uv[0] + inv_blend_x * e.vert.uv[0]
+        #             e.orig_uv[1] = blend * e.old_uv[1] + inv_blend * e.vert.uv[1]
+
+
+class ParamHandle(ParamHandleSolve):
+    pass
