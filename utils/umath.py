@@ -182,7 +182,11 @@ def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
 
 
 def np_vec_dot(a, b):
-    return np.einsum('ij,ij->i', a, b)
+    try:
+        from numpy.core.umath_tests import inner1d  # noqa
+        return inner1d(a, b)  # x2 faster then einsum, but deprecated
+    except: # noqa
+        return np.einsum('ij,ij->i', a, b)
 
 
 def np_vec_normalized(a, keepdims=True):
@@ -221,6 +225,18 @@ class LinearSolver:
             self.locked = False
             self.value = 0.0
             self.coeffs = []    # list of Coeff (row index, value)
+
+    @classmethod
+    def new(cls, num_rows: int, num_variables: int, least_squares=False):
+        try:
+            import platform
+            if platform.system() == 'Windows':
+                from .. import fastapi
+                return fastapi.clib.LinearSolver.new(num_rows, num_variables, least_squares)
+        except:  # noqa
+            pass
+
+        return cls(num_rows, num_variables, least_squares)
 
     def __init__(self, num_rows: int, num_variables: int, least_squares=False):
         # num_rows == original number of rows provided by caller
@@ -306,6 +322,47 @@ class LinearSolver:
                 raise IndexError(f'Invalid indices: {row=}, {col=}')
             self.M_triplets.append((r, c, value))
 
+
+    def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int):
+        from math import sin, cos
+        v1_id *= 2
+        v2_id *= 2
+        v3_id *= 2
+
+        sina1: float = sin(a1)
+        sina2: float = sin(a2)
+        sina3: float = sin(a3)
+        sin_max: float = max(sina1, sina2, sina3)
+        # Shift vertices to find most stable order.
+        if sina3 != sin_max:
+            # shift right
+            v1_id, v2_id, v3_id = v3_id, v1_id, v2_id
+            a1, a2, a3 = a3, a1, a2
+            sina1, sina2, sina3 = sina3, sina1, sina2
+
+            if sina2 == sin_max:
+                # shift right
+                v1_id, v2_id, v3_id = v3_id, v1_id, v2_id
+                a1, a2, a3 = a3, a1, a2
+                sina1, sina2, sina3 = sina3, sina1, sina2
+        # Angle based lscm formulation.
+        ratio: float = sina2 / sina3 if sina3 else 1.0  # safe divide
+        cosine: float = cos(a1) * ratio
+        sine: float = sina1 * ratio
+
+        self.matrix_add(row, v1_id, cosine - 1.0)
+        self.matrix_add(row, v1_id + 1, -sine)
+        self.matrix_add(row, v2_id, -cosine)
+        self.matrix_add(row, v2_id + 1, sine)
+        self.matrix_add(row, v3_id, 1.0)
+
+        row += 1
+        self.matrix_add(row, v1_id, sine)
+        self.matrix_add(row, v1_id + 1, cosine - 1.0)
+        self.matrix_add(row, v2_id, -sine)
+        self.matrix_add(row, v2_id + 1, -cosine)
+        self.matrix_add(row, v3_id + 1, 1.0)
+
     def right_hand_side_add(self, index: int, value: float):
         if self.least_squares:
             self.b[index] += value
@@ -325,7 +382,10 @@ class LinearSolver:
         assert self.state == 'MATRIX_CONSTRUCT'
 
         if self.m == 0 or self.n == 0:
-            raise ValueError
+            raise ValueError("Empty matrix")
+
+        if not self.M_triplets:
+            raise ValueError("No triplets to build matrix")
 
         # Build dense matrix from triplets
         M = np.zeros((self.m, self.n), dtype=np.float64)
@@ -338,9 +398,8 @@ class LinearSolver:
         else:
             A = M
 
+        # Creating the RHS vector and applying locked variables
         b_vec = self.b.copy()  # TODO: Remove ???
-
-        # Apply locked variables' a-coeff contributions: b[a.index] -= a.value * variable.value
         for i in range(self.num_variables):
             var = self.variable[i]
             if var.locked and var.coeffs:

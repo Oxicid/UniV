@@ -1,6 +1,5 @@
 import math
 import typing
-
 from bmesh.types import BMFace
 from mathutils import Vector, Matrix
 
@@ -811,19 +810,18 @@ class PChart:
                 self.pin1 = pin1[0]
                 self.pin2 = pin2[0]
 
-        self.context = LinearSolver(2 * self.n_faces, 2 * self.n_verts, least_squares=True)
+        self.context = LinearSolver.new(2 * self.n_faces, 2 * self.n_verts, least_squares=True)
 
     def lscm_solve(self) -> bool:
-        from math import sin, cos
         context: LinearSolver = self.context
 
-        # for v in chart.verts:
-        #     if v.flag & PVERT_PIN:
-        #         v.load_pin_select_uvs() # Reload for Live Unwrap.
+        for v in self.verts:
+            if v.flag & PVERT_PIN:
+                v.load_pin_select_uvs() # Reload for Live Unwrap.
 
-        # if self.single_pin:
-        #     # If only one pin, save location as origin.
-        #     self.origin = self.single_pin.uv.copy()
+        if self.single_pin:
+            # If only one pin, save location as origin.
+            self.origin = self.single_pin.uv.copy()
         #
         if self.pin1:
             pin1: PVert = self.pin1
@@ -860,12 +858,11 @@ class PChart:
             v2: PVert = e2.vert
             v3: PVert = e3.vert
 
-            if (v1.flag & PVERT_PIN) and (v2.flag & PVERT_PIN) and (v3.flag & PVERT_PIN) or True:
+            if (v1.flag & PVERT_PIN) and (v2.flag & PVERT_PIN) and (v3.flag & PVERT_PIN):
                 area: float = f.calc_signed_uv_area()
 
                 if area > 0.0:
                     area_pinned_up += area
-
                 else:
                     area_pinned_down -= area
 
@@ -901,43 +898,8 @@ class PChart:
                 # e2, e3 = e3, e2
                 v2, v3 = v3, v2
 
-            sina1: float = sin(a1)
-            sina2: float = sin(a2)
-            sina3: float = sin(a3)
-
-            sin_max: float = max(sina1, sina2, sina3)
-
-            # Shift vertices to find most stable order.
-            if sina3 != sin_max:
-                # shift right
-                v1, v2, v3 = v3, v1, v2
-                a1, a2, a3 = a3, a1, a2
-                sina1, sina2, sina3 = sina3, sina1, sina2
-
-                if sina2 == sin_max:
-                    # shift right
-                    v1, v2, v3 = v3, v1, v2
-                    a1, a2, a3 = a3, a1, a2
-                    sina1, sina2, sina3 = sina3, sina1, sina2
-
-            # Angle based lscm formulation.
-            ratio: float = sina2 / sina3 if sina3 else 1.0  # safe divide
-            cosine: float = cos(a1) * ratio
-            sine: float = sina1 * ratio
-
-            context.matrix_add(row, 2 * v1.id, cosine - 1.0)
-            context.matrix_add(row, 2 * v1.id + 1, -sine)
-            context.matrix_add(row, 2 * v2.id, -cosine)
-            context.matrix_add(row, 2 * v2.id + 1, sine)
-            context.matrix_add(row, 2 * v3.id, 1.0)
-            row += 1
-
-            context.matrix_add(row, 2 * v1.id, sine)
-            context.matrix_add(row, 2 * v1.id + 1, cosine - 1.0)
-            context.matrix_add(row, 2 * v2.id, -sine)
-            context.matrix_add(row, 2 * v2.id + 1, -cosine)
-            context.matrix_add(row, 2 * v3.id + 1, 1.0)
-            row += 1
+            context.matrix_add_angles(row, a1, a2, a3, v1.id, v2.id, v3.id)
+            row += 2
 
         if context.solve():
             for v in self.verts:
@@ -1160,7 +1122,7 @@ class PChart:
             pin1[0].uv[1] = 0.5
             pin2[0].uv[0] = 1.0
             pin2[0].uv[1] = 0.5
-            raise  # TODO: Test
+            # raise  # TODO: Test
 
         else:
             sub = pin1[0].co - pin2[0].co
@@ -1223,8 +1185,6 @@ class PChart:
         pin2[0] = max_vert[dir_]
 
         self.pin_positions(pin1, pin2)
-
-
 
 
 class PAbfSystem:
@@ -1311,53 +1271,49 @@ class PAbfSystem:
                 f"{self.lambdaPlanar = }\n {self.lambdaLength = }\n {self.J2dt = }\n {self.bstar = }\n {self.dstar = }")
 
     def compute_sines(self):
-        from math import sin, cos
-        sine: list[float] = self.sine
-        cosine: list[float] = self.cosine
-        alpha: list[float] = self.alpha
-
-        for i in range(self.n_angles):
-            angle: float = alpha[i]
-            sine[i] = sin(angle)
-            cosine[i] = cos(angle)
+        import numpy as np
+        eix = np.exp(1j *  np.array(self.alpha))
+        self.sine = eix.imag.tolist()
+        self.cosine = eix.real.tolist()
 
     def compute_sin_product(self, v: PVert, aid: int) -> float:
         sin1 = 1.0
         sin2 = 1.0
-
+        cosine = self.cosine
+        sine = self.sine
         e: PEdge = v.edge
         while True:
             e1: PEdge = e.next
-            e2: PEdge = e.next.next
+            e2: PEdge = e1.next
 
-            if aid == e1.id:
+            if (e1_id := e1.id) == aid:
                 # we are computing a derivative for this angle,
                 # so we use cos and drop the other part
-                sin1 *= self.cosine[e1.id]
+                sin1 *= cosine[e1_id]
                 sin2 = 0.0
             else:
-                sin1 *= self.sine[e1.id]
+                sin1 *= sine[e1_id]
 
-            if aid == e2.id:
+            if (e2_id := e2.id) == aid:
                 # see above
                 sin1 = 0.0
-                sin2 *= self.cosine[e2.id]
+                sin2 *= cosine[e2_id]
             else:
-                sin2 *= self.sine[e2.id]
+                sin2 *= sine[e2_id]
 
-            e = e.next.next.pair
+            e = e2.pair
             if not e or e == v.edge:
                 break
 
         return sin1 - sin2
 
     def compute_grad_alpha(self, f: PFace, e: PEdge) -> float:
-
+        e_id = e.id
         v: PVert = e.vert
         v1: PVert = e.next.vert
         v2: PVert = e.next.next.vert
 
-        deriv: float = (self.alpha[e.id] - self.beta[e.id]) * self.weight[e.id]
+        deriv: float = (self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id]
         deriv += self.lambdaTriangle[f.id]
 
         if v.flag & PVERT_INTERIOR:
@@ -1365,12 +1321,12 @@ class PAbfSystem:
 
 
         if v1.flag & PVERT_INTERIOR:
-            product: float = self.compute_sin_product(v1, e.id)
+            product: float = self.compute_sin_product(v1, e_id)
             deriv += self.lambdaLength[v1.id] * product
 
 
         if v2.flag & PVERT_INTERIOR:
-            product: float = self.compute_sin_product(v2, e.id)
+            product: float = self.compute_sin_product(v2, e_id)
             deriv += self.lambdaLength[v2.id] * product
 
         return deriv
@@ -1430,7 +1386,7 @@ class PAbfSystem:
 
         n_interior: int = self.n_interior
         n_var: int = 2 * n_interior
-        context: LinearSolver = LinearSolver(0, n_var, 1)
+        context: LinearSolver = LinearSolver.new(0, n_var, 1)
 
         for i in range(n_var):
             context.right_hand_side_add(i, self.bInterior[i])
@@ -1440,9 +1396,9 @@ class PAbfSystem:
             beta: Vector = Vector()
             j2: Matrix = Matrix.Identity(3)
 
-            row1: Vector = Vector.Fill(6, 0)
-            row2: Vector = Vector.Fill(6, 0)
-            row3: Vector = Vector.Fill(6, 0)
+            row1: Vector = Vector.Fill(6, 0.0)
+            row2: Vector = Vector.Fill(6, 0.0)
+            row3: Vector = Vector.Fill(6, 0.0)
             vid: list[int] = [-1] * 6
 
             e1: PEdge = f.edge
@@ -1475,8 +1431,7 @@ class PAbfSystem:
             self.dstar[f.id] = si
 
             # set matrix
-            si_for_w = [si] * 3
-            W = Matrix([si_for_w for _ in range(3)])
+            W = Matrix([[si] * 3] * 3)
 
             W[0][0] = si - self.weight[e1.id]
             W[1][1] = si - self.weight[e2.id]
@@ -1611,8 +1566,8 @@ class PAbfSystem:
 
 
             for i in range(n_interior):
-                self.lambdaPlanar[i] += float(context.variable_get(i))
-                self.lambdaLength[i] += float(context.variable_get(n_interior + i))
+                self.lambdaPlanar[i] += context.variable_get(i)
+                self.lambdaLength[i] += context.variable_get(n_interior + i)
         return success
 
 

@@ -218,3 +218,50 @@ def split_by_similarity(lst, key=None):
         return [list(group) for _, group in groupby(lst, key=key)]
     else:
         return [list(group) for _, group in groupby(lst)]
+
+
+def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so', 'dylib'] | None=None):
+    if lib_ext is None:
+        import platform
+        system = platform.system()
+        if system == "Windows":
+            lib_ext = "dll"
+        elif system == "Darwin":
+            lib_ext = "dylib"
+        else:
+            lib_ext = "so"
+
+    from pathlib import Path
+    if root_path is None:
+        root_path = Path(__file__).parent.parent.parent
+    else:
+        root_path = Path(root_path)
+
+    # search 'univ' folder
+    univ_dir = None
+    for p in root_path.iterdir():
+        if p.is_dir():
+            name = p.name.lower()
+            if name.startswith('univ') and name != 'univ_pro':
+                univ_dir = p
+                break
+
+    assert univ_dir is not None, f"No directory starting with 'univ' found in {root_path!r}"
+
+    # recursive search lib
+    lib_filename = f"{lib_name}.{lib_ext}"
+    candidates = list(univ_dir.rglob(lib_filename))
+
+    lib = None
+    last_err = None
+    from ctypes import CDLL
+    for p in candidates:
+        try:
+            lib = CDLL(str(p))
+            break
+        except OSError as e:
+            last_err = e
+
+    if lib is None:
+        raise OSError(f"Could not load {lib_filename}. Tried: {candidates!r}\nLast error: {last_err}")
+    return lib
