@@ -1,4 +1,8 @@
+# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import math
+import heapq
 import typing
 from bmesh.types import BMFace
 from mathutils import Vector, Matrix
@@ -9,11 +13,8 @@ from bl_math import clamp
 from .ubm import polyfill_beautify
 from . import bm_select
 from .. import utypes
-
-# try:
-#     from mathutils import Solver as LinearSolver
-# except ImportError:
 from .umath import LinearSolver
+
 
 T = typing.TypeVar("T", "PFace", "PEdge", "PVert")
 class ParametrizerIt(typing.Generic[T]):
@@ -29,6 +30,50 @@ class ParametrizerIt(typing.Generic[T]):
     @staticmethod
     def __class_getitem__(item):
         return typing.Annotated[ParametrizerIt, item]
+
+
+class HeapItem:
+    __slots__ = ("angle", "edge", "removed")
+
+    def __init__(self, angle, edge):
+        self.angle = angle
+        self.edge = edge
+        self.removed = False
+
+    def __lt__(self, other):
+        return self.angle < other.angle
+
+
+class UnwrapOptions:
+    # Connectivity based on UV coordinates instead of seams. */
+    topology_from_uvs: bool = False
+    # Also use seams as well as UV coordinates (only valid when `topology_from_uvs` is enabled). */
+    topology_from_uvs_use_seams: bool = True
+    # Only affect selected faces. */
+    only_selected_faces: bool = False
+
+    # Only affect selected UVs.
+    # \note Disable this for operations that don't run in the image-window.
+    # Unwrapping from the 3D view for example, where only 'only_selected_faces' should be used.
+
+    only_selected_uvs: bool  = False
+    # Fill holes to better preserve shape. */
+    fill_holes: bool = True
+    # Correct for mapped image texture aspect ratio. */
+    correct_aspect: bool = True
+    # Treat unselected uvs as if they were pinned. */
+    pin_unselected: bool = False
+    unwrap_along: typing.Literal['UV', 'U', 'V'] = 'UV'
+
+    method: int = 0
+    use_slim: bool = False
+    use_abf: bool = False
+    use_subsurf: bool = False
+    use_weights: bool = False
+
+    # slim: ParamSlimOptions = None
+    weight_group: str = ''
+
 
 PVERT_PIN = 1
 PVERT_SELECT = 2
@@ -459,6 +504,24 @@ class PEdge:
 
         return r_pair[0] is not None
 
+    def boundary_angle(self) -> float:
+        v: PVert = self.vert
+
+        # concave angle check -- could be better
+        angle: float = pi
+
+        we: PEdge = v.edge
+        while True:
+            v1: PVert = we.next.vert
+            v2: PVert = we.next.next.vert
+            angle -= angle_v3v3v3(v1.co, v.co, v2.co)
+
+            we = we.next.next.pair
+            if not (we and (we != v.edge)):
+                break
+
+        return angle
+
 
 class PFace:
     def __init__(self):
@@ -581,6 +644,34 @@ class PFace:
         v3: PVert = e3.vert
 
         return 0.5 * (v2.uv - v1.uv).cross(v3.uv - v1.uv)
+
+    @classmethod
+    def add_fill(cls, chart, v1: PVert, v2: PVert, v3: PVert) -> 'PFace':
+
+        f: PFace = cls.new()
+        e1: PEdge = f.edge
+        e2: PEdge = e1.next
+        e3: PEdge = e2.next
+
+        e1.vert = v1
+        e2.vert = v2
+        e3.vert = v3
+
+        e1.orig_uv = e2.orig_uv = e3.orig_uv = None
+
+        f.nextlink = chart.faces.first_item
+        chart.faces.first_item = f
+        e1.nextlink = chart.edges.first_item
+        chart.edges.first_item = e1
+        e2.nextlink = chart.edges.first_item
+        chart.edges.first_item = e2
+        e3.nextlink = chart.edges.first_item
+        chart.edges.first_item = e3
+
+        chart.n_faces += 1
+        chart.n_edges += 3
+
+        return f
 
 
 class PChart:
@@ -770,19 +861,16 @@ class PChart:
 
         assert self.context is None
 
-        n_pins: int = sum(bool(v.flag & PVERT_PIN) for v in self.verts)
+        pins: list[PVert] = [v for v in self.verts if v.flag & PVERT_PIN]
 
     #if 0
         # p_chart_simplify_compute(chart, p_collapse_cost, p_collapse_allowed)
         # p_chart_topological_sanity_check(chart)
     #endif
 
-        if n_pins == 1:
+        if len(pins) == 1:
             self.ensure_area_uv()
-            for v in self.verts:
-                if v.flag & PVERT_PIN:
-                    self.single_pin = v
-                    break
+            self.single_pin = pins[0]
 
         if UnwrapOptions.use_abf:
             if not self.abf_solve():
@@ -795,7 +883,7 @@ class PChart:
 
 
         if UnwrapOptions.unwrap_along == 'UV':
-            if n_pins <= 1:
+            if len(pins) <= 1:
                 # No pins, let's find some ourselves.
 
                 outer: PEdge = self.boundaries()
@@ -1186,6 +1274,108 @@ class PChart:
 
         self.pin_positions(pin1, pin2)
 
+    def fill_boundaries(self, outer: PEdge):
+        for e in self.edges:
+            # e_next = e.nextlink - as yet unused
+
+            if e.pair or (e.flag & PEDGE_FILLED):
+                continue
+
+            n_edges: int = 0
+            be: PEdge = e
+            while True:
+                be.flag |= PEDGE_FILLED
+                be = be.next.vert.edge
+                n_edges += 1
+                if not (be != e):
+                    break
+
+            if e != outer:
+                self.fill_boundary(e, n_edges)
+
+    def fill_boundary(self, be: PEdge, n_edges: int):
+        heap = []
+
+        # Initial insertion of all boundary edges
+        e: PEdge = be
+        while True:
+            angle = e.boundary_angle()
+            item = HeapItem(angle, e)
+            e.heaplink = item
+            heapq.heappush(heap, item)
+
+            e = e.boundary_edge_next
+            if e == be:
+                break
+
+        # Isolated seam case (2 edges)
+        if n_edges == 2:
+            e = be.next.vert.edge
+
+            e.pair = be
+            be.pair = e
+
+            # lazily mark elements as deleted
+            e.heaplink.removed = True
+            be.heaplink.removed = True
+            return
+
+        # General case: fill boundary
+        while n_edges > 2:
+            # pop with lazy deletion
+            while True:
+                item = heapq.heappop(heap)
+                if not item.removed:
+                    break
+            e = item.edge
+
+            e1 = e.boundary_edge_prev
+            e2 = e.boundary_edge_next
+
+            # remove e1 and e2
+            e1.heaplink.removed = True
+            e2.heaplink.removed = True
+
+            e.flag |= PEDGE_FILLED
+            e1.flag |= PEDGE_FILLED
+
+            f = PFace.add_fill(self, e.vert, e1.vert, e2.vert)
+            f.flag |= PFACE_FILLED
+
+            # new edges
+            ne = f.edge.next.next
+            ne1 = f.edge
+            ne2 = f.edge.next
+
+            ne.flag = ne1.flag = ne2.flag = PEDGE_FILLED
+
+            e.pair = ne
+            ne.pair = e
+            e1.pair = ne1
+            ne1.pair = e1
+
+            ne.vert = e2.vert
+            ne1.vert = e.vert
+            ne2.vert = e1.vert
+
+            if n_edges == 3:
+                e2.pair = ne2
+                ne2.pair = e2
+            else:
+                ne2.vert.edge = ne2
+
+                # put ne2 and e2 back into the heap
+                it1 = HeapItem(ne2.boundary_angle(), ne2)
+                it2 = HeapItem(e2.boundary_angle(), e2)
+
+                ne2.heaplink = it1
+                e2.heaplink = it2
+
+                heapq.heappush(heap, it1)
+                heapq.heappush(heap, it2)
+
+            n_edges -= 1
+
 
 class PAbfSystem:
     ABF_MAX_ITER = 20
@@ -1571,37 +1761,6 @@ class PAbfSystem:
         return success
 
 
-class UnwrapOptions:
-    # Connectivity based on UV coordinates instead of seams. */
-    topology_from_uvs: bool = False
-    # Also use seams as well as UV coordinates (only valid when `topology_from_uvs` is enabled). */
-    topology_from_uvs_use_seams: bool = True
-    # Only affect selected faces. */
-    only_selected_faces: bool = False
-
-    # Only affect selected UVs.
-    # \note Disable this for operations that don't run in the image-window.
-    # Unwrapping from the 3D view for example, where only 'only_selected_faces' should be used.
-
-    only_selected_uvs: bool  = False
-    # Fill holes to better preserve shape. */
-    fill_holes: bool = False
-    # Correct for mapped image texture aspect ratio. */
-    correct_aspect: bool = True
-    # Treat unselected uvs as if they were pinned. */
-    pin_unselected: bool = False
-    unwrap_along: typing.Literal['UV', 'U', 'V'] = 'UV'
-
-    method: int = 0
-    use_slim: bool = False
-    use_abf: bool = False
-    use_subsurf: bool = False
-    use_weights: bool = False
-
-    # slim: ParamSlimOptions = None
-    weight_group: str = ''
-
-
 class GeoUVPinIndex:
     def __init__(self, uv_co, reindex):
           self.next: GeoUVPinIndex | None = None
@@ -1739,7 +1898,7 @@ class ParamHandleConstruct:
         for i in range(self.ncharts):
             chart: PChart = self.charts[i]
 
-            _outer: PEdge | None = chart.boundaries()
+            outer: PEdge | None = chart.boundaries()
 
             if not UnwrapOptions.topology_from_uvs and chart.n_boundaries == 0:
                 # UnwrapOptions.count_failed += 1
@@ -1748,9 +1907,8 @@ class ParamHandleConstruct:
             self.charts[j] = chart
             j += 1
 
-            # TODO: Implement fill boundary with weight property for that
-            # if UnwrapOptions.fill_holes and chart.n_boundaries > 1:
-            # p_chart_fill_boundaries(phandle, chart, outer)
+            if UnwrapOptions.fill_holes and chart.n_boundaries > 1:
+                chart.fill_boundaries(outer)
 
             for v in chart.verts:
                 v.load_pin_select_uvs()

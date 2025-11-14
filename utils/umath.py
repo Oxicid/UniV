@@ -229,10 +229,11 @@ class LinearSolver:
     @classmethod
     def new(cls, num_rows: int, num_variables: int, least_squares=False):
         try:
-            import platform
-            if platform.system() == 'Windows':
-                from .. import fastapi
-                return fastapi.clib.LinearSolver.new(num_rows, num_variables, least_squares)
+            from .. import fastapi
+            if fastapi.FastAPI.lib:
+                import platform
+                if platform.system() == 'Windows':
+                    return fastapi.LinearSolver.new(num_rows, num_variables, least_squares)
         except:  # noqa
             pass
 

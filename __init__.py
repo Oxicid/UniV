@@ -46,6 +46,7 @@ from . import ui
 from . import draw
 from . import icons
 from . import keymaps
+from . import fastapi
 from . import preferences
 
 from bpy.app.timers import register as tm_register
@@ -337,6 +338,12 @@ def register():
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
+
+    try:
+        fastapi.clib.FastAPI.load()
+    except:  # noqa
+        pass
+        # print('UniV: Cannot load fastapi')
 
     try:
         icons.icons.register_icons_()

@@ -8,4 +8,4 @@ if 'bpy' in locals():
 
 
 import bpy  # noqa: F401
-from . import clib
+from .clib import *
