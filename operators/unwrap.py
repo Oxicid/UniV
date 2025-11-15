@@ -32,16 +32,13 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                       "Organic Mode has incorrect behavior with pinned and flipped islands")
     bl_options = {'REGISTER', 'UNDO'}
 
-    unwrap: bpy.props.EnumProperty(name='Unwrap',
-                                   default='ANGLE_BASED',
+    unwrap: bpy.props.EnumProperty(name='Unwrap', default='ANGLE_BASED',
                                    items=(('ANGLE_BASED', 'Hard Surface', ''),
                                           ('CONFORMAL', 'Conformal', ''),
                                           ('MINIMUM_STRETCH', 'Organic', '')))
-    unwrap_along: bpy.props.EnumProperty(name='Unwrap Along', default='BOTH', items=(('BOTH', 'Both', ''), ('X', 'U', ''), ('Y', 'V', '')),
-                                         description="Doesnt work properly with disk-shaped topologies, which completely change their structure with default unwrap")
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
-    mark_seam_inner_island: bpy.props.BoolProperty(
-        name='Mark Seam Self Borders', default=True, description='Marking seams where there are split edges within the same island.')
+    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Self Borders', default=True,
+                                    description='Marking seams where there are split edges within the same island.')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -53,13 +50,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
-
-        col = self.layout.column()
-        split = col.split(factor=0.3, align=True)
-        split.label(text='Unwrap Along')
-        row = split.row(align=True)
-        row.prop(self, 'unwrap_along', expand=True)
-
         self.layout.prop(self, 'blend_factor', slider=True)
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
@@ -149,7 +139,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         isl.umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         isl.apply_aspect_ratio()
         save_t = isl.save_transform()
-        save_t.save_coords(self.unwrap_along, self.blend_factor)
+        save_t.save_coords(self.blend_factor)
 
         if self.mark_seam_inner_island:
             isl.mark_seam(additional=True)
@@ -160,8 +150,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
-        save_t.inplace(self.unwrap_along)
-        save_t.apply_saved_coords(self.unwrap_along, self.blend_factor)
+        save_t.inplace()
+        save_t.apply_saved_coords(self.blend_factor)
         isl.reset_aspect_ratio()
 
         if save_t.rotate:
@@ -267,7 +257,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 if any(v.select for f in isl for v in f.verts):
                     isl.apply_aspect_ratio()
                     save_t = isl.save_transform()
-                    save_t.save_coords(self.unwrap_along, self.blend_factor)
+                    save_t.save_coords(self.blend_factor)
                     save_transform_islands.append(save_t)
 
             pin_and_inplace.append((unpin_uvs, save_transform_islands))
@@ -280,8 +270,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for pin in ud.pins:
                 pin.pin_uv = False
             for isl in ud.islands:
-                isl.inplace(self.unwrap_along)
-                isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+                isl.inplace()
+                isl.apply_saved_coords(self.blend_factor)
                 isl.island.reset_aspect_ratio()
 
                 if isl.rotate:
@@ -354,7 +344,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
                 isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
-                save_t.save_coords(self.unwrap_along, self.blend_factor)
+                save_t.save_coords(self.blend_factor)
                 all_transform_islands.append(save_t)
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
@@ -367,8 +357,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for f in to_select:
                 f.select = False
 
-            isl.inplace(self.unwrap_along)
-            isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+            isl.inplace()
+            isl.apply_saved_coords(self.blend_factor)
             isl.island.reset_aspect_ratio()
 
             if isl.rotate:
@@ -435,7 +425,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands:
                 isl.apply_aspect_ratio()
                 save_t = isl.save_transform()
-                save_t.save_coords(self.unwrap_along, self.blend_factor)
+                save_t.save_coords(self.blend_factor)
                 save_transform_islands.append(save_t)
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
@@ -443,8 +433,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         for isl in save_transform_islands:
-            isl.inplace(self.unwrap_along)
-            isl.apply_saved_coords(self.unwrap_along, self.blend_factor)
+            isl.inplace()
+            isl.apply_saved_coords(self.blend_factor)
             isl.island.reset_aspect_ratio()
 
             if isl.rotate:

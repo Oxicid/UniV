@@ -208,9 +208,15 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_quadrify', icon_value=icons.quadrify)
             row.operator('uv.univ_straight', icon_value=icons.straight)
 
-            row = col_align.row(align=True)
-            row.operator('uv.univ_relax', icon_value=icons.relax)
-            row.operator('uv.univ_unwrap', icon_value=icons.unwrap)
+            split = col_align.split(align=True)
+            split.operator('uv.univ_relax', icon_value=icons.relax)
+            if univ_pro:
+                row = split.row(align=True)
+                row.operator('uv.univ_unwrap', icon_value=icons.unwrap).unwrap_along = 'UV'
+                row.operator('uv.univ_unwrap', text='', icon_value=icons.x).unwrap_along = 'U'
+                row.operator('uv.univ_unwrap', text='', icon_value=icons.y).unwrap_along = 'V'
+            else:
+                split.operator('uv.univ_unwrap', icon_value=icons.unwrap)
 
             row = col_align.row(align=True)
             row.operator('uv.univ_weld', icon_value=icons.weld)

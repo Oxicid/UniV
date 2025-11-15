@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 13),
+    "version": (3, 9, 14),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -132,7 +132,6 @@ def load_register_types():
             relax.UNIV_OT_Relax,
             relax.UNIV_OT_Relax_VIEW3D,
             # Unwrap
-            unwrap.UNIV_OT_Unwrap,
             unwrap.UNIV_OT_Unwrap_VIEW3D,
             # Toggles
             toggle.UNIV_OT_SplitUVToggle,
@@ -246,6 +245,8 @@ def load_register_types():
                 # Misc
                 univ_pro.rectify.UNIV_OT_Rectify,
                 univ_pro.projection.UNIV_OT_BoxProject,
+                # Unwrap
+                univ_pro.unwrap.UNIV_OT_Unwrap,
 
             ))
 
@@ -256,6 +257,8 @@ def load_register_types():
                 # Stack
                 stack.UNIV_OT_Stack,
                 stack.UNIV_OT_Stack_VIEW3D,
+                # Unwrap
+                unwrap.UNIV_OT_Unwrap
             ))
     except AttributeError:
         traceback.print_exc()

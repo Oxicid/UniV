@@ -17,7 +17,6 @@ class FastAPI:
 
     @classmethod
     def load(cls):
-        # assert cls.lib is None
         cls.lib = utils.load_lib('univ_fastapi')
         cls.init_linear_solver()
 

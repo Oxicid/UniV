@@ -230,7 +230,8 @@ class LinearSolver:
     def new(cls, num_rows: int, num_variables: int, least_squares=False):
         try:
             from .. import fastapi
-            if fastapi.FastAPI.lib:
+            from .. import preferences
+            if preferences.prefs().use_fastapi and fastapi.FastAPI.lib:
                 import platform
                 if platform.system() == 'Windows':
                     return fastapi.LinearSolver.new(num_rows, num_variables, least_squares)

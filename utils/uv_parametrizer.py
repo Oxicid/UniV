@@ -46,25 +46,17 @@ class HeapItem:
 
 class UnwrapOptions:
     # Connectivity based on UV coordinates instead of seams. */
-    topology_from_uvs: bool = False
+    topology_from_uvs: bool = True
     # Also use seams as well as UV coordinates (only valid when `topology_from_uvs` is enabled). */
     topology_from_uvs_use_seams: bool = True
-    # Only affect selected faces. */
-    only_selected_faces: bool = False
 
-    # Only affect selected UVs.
-    # \note Disable this for operations that don't run in the image-window.
-    # Unwrapping from the 3D view for example, where only 'only_selected_faces' should be used.
-
-    only_selected_uvs: bool  = False
     # Fill holes to better preserve shape. */
     fill_holes: bool = True
-    # Correct for mapped image texture aspect ratio. */
-    correct_aspect: bool = True
     # Treat unselected uvs as if they were pinned. */
     pin_unselected: bool = False
     unwrap_along: typing.Literal['UV', 'U', 'V'] = 'UV'
 
+    blend: float = 1
     method: int = 0
     use_slim: bool = False
     use_abf: bool = False
@@ -1808,7 +1800,6 @@ class ParamHandleConstruct:
     def construct_param_handle(cls, isl: 'utypes.AdvIsland'):
         handle = cls()
         umesh = isl.umesh
-        handle.aspect_y = umesh.aspect
 
         # we need the vert indices
         umesh.bm.verts.index_update()
@@ -1820,6 +1811,27 @@ class ParamHandleConstruct:
 
         for idx, ff in enumerate(isl.faces):
             handle.construct_param_handle_face_add(ff, idx, umesh, get_vert_select)
+
+        handle.construct_param_edge_set_seams(isl)
+        handle.uv_parametrizer_construct_end()
+
+        return handle
+
+    @classmethod
+    def construct_param_handle_by_tag(cls, isl: 'utypes.AdvIsland'):
+        """Tagged = Unwrapped, Untagged = Pinned"""
+        handle = cls()
+        umesh = isl.umesh
+
+        # we need the vert indices
+        umesh.bm.verts.index_update()
+
+        uv = umesh.uv
+        for f in isl:
+            handle.uvedit_prepare_pinned_indices_by_tag(f, uv)
+
+        for idx, ff in enumerate(isl.faces):
+            handle.construct_param_handle_face_add_by_tag(ff, idx, umesh)
 
         handle.construct_param_edge_set_seams(isl)
         handle.uv_parametrizer_construct_end()
@@ -1854,6 +1866,30 @@ class ParamHandleConstruct:
             for idx, sel_state in enumerate(select):
                 if not sel_state:
                     pin[idx] = True
+
+        self.uv_parametrizer_face_add(face_index, vkeys, coord_3d, coord_uv, weight, pin, select)
+
+    def construct_param_handle_face_add_by_tag(self, f: BMFace, face_index: ParamKey | int, umesh: 'utypes.UMesh'):
+        vkeys: list[ParamKey] = []
+        pin: list[bool] = []
+        select: list[bool] = [True] * len(f.loops)
+        coord_3d: list[Vector] = []
+        coord_uv: list[Vector] = []
+        weight: list[float] = [1.0] * len(f.loops)
+
+        # let parametrizer split the ngon, it can make better decisions
+        # about which split is best for unwrapping than poly-fill. */
+
+        uv = umesh.uv
+        for crn in f.loops:
+            v = crn.vert
+            crn_uv = crn[uv]
+            uv_co = crn_uv.uv
+
+            vkeys.append(self.uv_find_pin_index(v.index, uv_co))
+            coord_3d.append(v.co)
+            coord_uv.append(uv_co)
+            pin.append(not crn.tag)
 
         self.uv_parametrizer_face_add(face_index, vkeys, coord_3d, coord_uv, weight, pin, select)
 
@@ -2210,6 +2246,14 @@ class ParamHandleConstruct:
                 uv_co = crn[uv].uv
                 self.uv_prepare_pin_index(vert_idx, uv_co)
 
+    def uvedit_prepare_pinned_indices_by_tag(self, f: BMFace, uv):
+        """Prepare unique indices for each unique pinned UV, even if it shares a BMVert."""
+        for crn in f.loops:
+            if not crn.tag:
+                vert_idx = crn.vert.index
+                uv_co = crn[uv].uv
+                self.uv_prepare_pin_index(vert_idx, uv_co)
+
 
 class ParamHandleSolve(ParamHandleConstruct):
 
@@ -2232,14 +2276,21 @@ class ParamHandleSolve(ParamHandleConstruct):
                 continue
 
             if chart.lscm_solve():
-                pass
-                # if not chart.has_pins:
-                #     # Every call to LSCM will eventually call uv_pack, so rotating here might be redundant.
-                #     p_chart_rotate_minimum_area(chart)
-                #
-                # elif chart.single_pin:
-                #     p_chart_rotate_fit_aabb(chart)
-                #     p_chart_lscm_transform_single_pin(chart)
+                if not chart.has_pins:
+                    old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges)
+                    new_bbox = utypes.BBox.calc_bbox(v.uv for v in chart.verts)
+
+                    delta = old_bbox.center - new_bbox.center
+                    for v in chart.verts:
+                        v.uv.xy += delta
+
+                elif chart.single_pin:
+                    delta = chart.origin - chart.single_pin.uv
+                    for v in chart.verts:
+                        v.uv.xy += delta
+
+                    # p_chart_rotate_fit_aabb(chart)
+                    # p_chart_lscm_transform_single_pin(chart)
             else:
                 pass
                 # count_failed += 1
@@ -2249,14 +2300,17 @@ class ParamHandleSolve(ParamHandleConstruct):
             if not chart.skip_flush:
                 self.p_flush_uvs(chart)
 
-    def p_flush_uvs(self, chart: PChart):
-        blend: float = self.blend
-        inv_blend: float = 1.0 - blend
-        inv_blend_x: float = inv_blend / self.aspect_y
-        for e in chart.edges:
-            if e.orig_uv:
-                e.orig_uv[0] = blend * e.old_uv[0] + inv_blend_x * e.vert.uv[0]
-                e.orig_uv[1] = blend * e.old_uv[1] + inv_blend * e.vert.uv[1]
+    @staticmethod
+    def p_flush_uvs(chart: PChart):
+        blend: float = UnwrapOptions.blend
+        if blend == 1.0:
+            for e in chart.edges:
+                if e.orig_uv:  # avoid full boundary loops ???
+                    e.orig_uv.xy = e.vert.uv
+        else:
+            for e in chart.edges:
+                if e.orig_uv:
+                    e.orig_uv.xy = e.old_uv.lerp(e.vert.uv, blend)
 
         # if chart.collapsed_edges:
         #     p_chart_flush_collapsed_uvs(chart)

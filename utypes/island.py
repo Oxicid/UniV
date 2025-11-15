@@ -136,7 +136,7 @@ class SaveTransform:
 
         return corners, pinned_corners
 
-    def inplace(self, axis='BOTH'):
+    def inplace(self):
         if not self.rotate:
             return
         uv = self.island.umesh.uv
@@ -177,34 +177,20 @@ class SaveTransform:
 
             old_center = self.bbox.center
             new_center = new_bbox.center
-            if axis == 'BOTH':
-                if self.bbox.width > self.bbox.height:
-                    if new_bbox.width:
-                        scale = self.bbox.width / new_bbox.width
-                        self.island.scale(Vector((scale, scale)), new_bbox.center)
-                    else:
-                        set_texel()
+
+            if self.bbox.width > self.bbox.height:
+                if new_bbox.width:
+                    scale = self.bbox.width / new_bbox.width
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
                 else:
-                    if new_bbox.height:
-                        scale = self.bbox.height / new_bbox.height
-                        self.island.scale(Vector((scale, scale)), new_bbox.center)
-                    else:
-                        set_texel()
-                self.island.set_position(old_center, new_center)
+                    set_texel()
             else:
-                if axis == 'X':
-                    if new_bbox.height:
-                        scale = self.bbox.height / new_bbox.height
-                        self.island.scale(Vector((scale, scale)), new_bbox.center)
-                    else:
-                        set_texel()
+                if new_bbox.height:
+                    scale = self.bbox.height / new_bbox.height
+                    self.island.scale(Vector((scale, scale)), new_bbox.center)
                 else:
-                    if new_bbox.width:
-                        scale = self.bbox.width / new_bbox.width
-                        self.island.scale(Vector((scale, scale)), new_bbox.center)
-                    else:
-                        set_texel()
-                self.island.set_position(old_center, new_center)
+                    set_texel()
+            self.island.set_position(old_center, new_center)
 
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
@@ -262,47 +248,24 @@ class SaveTransform:
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
 
-    def save_coords(self, axis, mix):
-        if mix == 1:
+    def save_coords(self, mix: float):
+        if mix == 1.0:
             return
         uv = self.island.umesh.uv
-        if axis == 'X':
-            self.old_crn_pos = [crn[uv].uv.x for f in self.island for crn in f.loops]
-        elif axis == 'Y':
-            self.old_crn_pos = [crn[uv].uv.y for f in self.island for crn in f.loops]
-        else:
-            self.old_crn_pos = [crn[uv].uv.copy() for f in self.island for crn in f.loops]
+        self.old_crn_pos = [crn[uv].uv.copy() for f in self.island for crn in f.loops]
 
-    def apply_saved_coords(self, axis, mix):
+    def apply_saved_coords(self, mix):
         uv = self.island.umesh.uv
         corners = (crn[uv].uv for f in self.island for crn in f.loops)
 
-        if axis == 'BOTH':
-            if mix == 1:
-                return
-            if mix == 0:
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.xy = old_co
-            else:
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv[:] = old_co.lerp(crn_uv, mix)
-            return
-
         if mix == 1:
-            if axis == 'X':
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.x = old_co
-            else:
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.y = old_co
+            return
+        if mix == 0:
+            for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                crn_uv.xy = old_co
         else:
-            from bl_math import lerp
-            if axis == 'X':
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.x = lerp(old_co, crn_uv.x, mix)
-            else:
-                for crn_uv, old_co in zip(corners, self.old_crn_pos):
-                    crn_uv.y = lerp(old_co, crn_uv.y, mix)
+            for crn_uv, old_co in zip(corners, self.old_crn_pos):
+                crn_uv[:] = old_co.lerp(crn_uv, mix)
 
 
 class FaceIsland:
@@ -1683,6 +1646,38 @@ class Islands(IslandsBase):
             if umesh.elem_mode in ('FACE', 'ISLAND'):
                 islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                            if cls.island_filter_is_any_face_selected(i, umesh)]
+            else:
+                islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                           if cls.island_filter_is_any_vert_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_extended_by_context_with_mark_seam(cls, umesh: _umesh.UMesh):
+        """Get islands with vertex select."""
+        if umesh.sync:
+            if umesh.elem_mode in ('FACE', 'ISLAND'):
+                if umesh.is_full_face_deselected:
+                    return cls()
+            elif umesh.elem_mode == 'VERT':
+                if umesh.is_full_vert_deselected:
+                    return cls()
+            else:
+                if umesh.is_full_edge_deselected:
+                    return cls()
+        else:
+            if umesh.is_full_face_deselected:
+                return cls()
+
+        cls.tag_filter_visible(umesh)
+        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
+            islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        else:
+            if umesh.elem_mode in ('FACE', 'ISLAND'):
+                islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                           if cls.island_filter_is_any_face_selected(i, umesh)]
+            elif umesh.elem_mode == 'EDGE':
+                islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
+                           if cls.island_filter_is_any_edge_selected(i, umesh)]
             else:
                 islands = [cls.island_type(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                            if cls.island_filter_is_any_vert_selected(i, umesh)]

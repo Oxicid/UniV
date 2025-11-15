@@ -34,6 +34,12 @@ def stable():
 def experimental():
     return prefs().mode == 'EXPERIMENTAL'
 
+def _update_fastapi(_self, _context):
+    from . import fastapi
+    if prefs().use_fastapi:
+        fastapi.FastAPI.load()
+    else:
+        fastapi.FastAPI.close()
 
 def _update_size_x(_self, _context):
     if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
@@ -295,6 +301,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                        ),
                        default='EXTENDED')
 
+    use_fastapi: bpy.props.BoolProperty(default=True,
+                                         name="Use FastAPI (for unwrap along axis)",
+                                         description="Use fast library", update=_update_fastapi
+                                         )
+
     use_csa_mods: bpy.props.BoolProperty(default=True,
                                          name="Use Modifier Keys",
                                          description="Enable behavior changes based on Ctrl, Shift, and Alt keys when invoking the operator"
@@ -404,6 +415,12 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         if self.tab == 'GENERAL':
             layout.prop(self, 'debug')
             layout.prop(self, 'mode')
+
+            import platform
+            if platform.system() == 'Windows':
+                layout.prop(self, 'use_fastapi')
+            # TODO: Add link
+
             layout.prop(self, 'use_csa_mods')
             layout.separator()
 
