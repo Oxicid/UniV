@@ -3249,6 +3249,8 @@ class UNIV_OT_SelectMode(Operator):
             elem_type = self.type
             if elem_type == 'VERTEX':
                 elem_type = 'VERT'
+            elif elem_type == 'ISLAND':
+                elem_type = 'FACE'
 
             res = bpy.ops.mesh.select_mode(type=elem_type, use_extend=False, use_expand=False)
             if update or res == {'FINISHED'}:
@@ -3285,7 +3287,7 @@ class UNIV_OT_SelectMode(Operator):
         update = False
         tool_settings = bpy.context.scene.tool_settings
         sticky_mode = tool_settings.uv_sticky_select_mode
-        if self.type == 'FACE':
+        if self.type in ('FACE', 'ISLAND'):
             if sticky_mode != 'DISABLED':
                 update = True
                 tool_settings.uv_sticky_select_mode = 'DISABLED'
