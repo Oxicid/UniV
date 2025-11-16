@@ -1167,6 +1167,7 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
                     self.layout.separator()
 
         self.layout.prop(self, 'direction')
+        self.layout.row(align=True).prop(univ_settings(), 'align_island_mode', expand=True)
         self.layout.column(align=True).prop(self, 'mode', expand=True)
 
     def invoke(self, context, event):
@@ -1190,7 +1191,11 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
-        self.is_island_mode = utils.is_island_mode()
+        settings = univ_settings()
+        if settings.align_island_mode == 'FOLLOW':
+            self.is_island_mode = utils.is_island_mode()
+        else:
+            self.is_island_mode = settings.align_island_mode == 'ISLAND'
         return self.align()
 
 
