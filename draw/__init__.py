@@ -274,7 +274,7 @@ def has_crash_modal_running():
     if bpy.app.version >= (4, 2, 0):
         for window in bpy.context.window_manager.windows:
             for op in window.modal_operators:
-                if not op.bl_idname.startswith('UV_OT_univ_'):
+                if not op.bl_idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
                     return True
         return False
     else:
