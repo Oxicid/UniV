@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 14),
+    "version": (3, 9, 15),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -65,10 +65,9 @@ def load_register_types():
     global classes
     try:
         classes.extend([
-            preferences.UNIV_AddonPreferences,
             preferences.UNIV_UV_Layers,
             preferences.UNIV_TexelPreset,
-            preferences.UNIV_Settings,
+            preferences.UNIV_AddonPreferences,
             preferences.UNIV_OT_ShowAddonPreferences,
             keymaps.UNIV_RestoreKeymaps,
             # Checker System
@@ -328,7 +327,7 @@ def register():
     # WARNING: When modules are reloaded, classes are overwritten and have no registration.
     # To avoid this, it is necessary to use initially registered classes.
     # Perhaps it does not allow to reload operators in a normal way.
-    bpy.types.WindowManager.univ_settings = bpy.props.PointerProperty(type=classes[3])
+    # bpy.types.WindowManager.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
     tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09, persistent=True)
     tm_register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1, persistent=True)
@@ -380,7 +379,7 @@ def unregister():
         if handle.__name__.startswith('univ_'):
             bpy.app.handlers.depsgraph_update_post.remove(handle)
 
-    del bpy.types.WindowManager.univ_settings  # noqa
+    # del bpy.types.WindowManager.univ_settings  # noqa
     # for scene in bpy.data.scenes:
     #     if "univ_settings" in scene:
     #         del scene["univ_settings"]

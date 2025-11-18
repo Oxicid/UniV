@@ -15,8 +15,8 @@ def prefs() -> 'UNIV_AddonPreferences':
     return bpy.context.preferences.addons[__package__].preferences
 
 
-def univ_settings() -> 'UNIV_Settings':
-    return bpy.context.window_manager.univ_settings  # noqa
+def univ_settings() -> 'UNIV_AddonPreferences':
+    return bpy.context.preferences.addons[__package__].preferences
 
 
 def force_debug():
@@ -167,7 +167,12 @@ class UNIV_UV_Layers(bpy.types.PropertyGroup):
     flag: IntProperty(name='Flag', default=0, min=0, max=3)
 
 
-class UNIV_Settings(bpy.types.PropertyGroup):
+class UNIV_AddonPreferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
+
+    # Settings
+    # ================================================================================
+
     # Global Settings
     size_x: EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
     size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
@@ -271,9 +276,7 @@ class UNIV_Settings(bpy.types.PropertyGroup):
                                                         fromlist=['inspect']).Inspect.default_value_for_settings()
                                      )
 
-
-class UNIV_AddonPreferences(bpy.types.AddonPreferences):
-    bl_idname = __package__
+    # ================================================================================
 
     tab: EnumProperty(
         items=(
@@ -406,6 +409,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
+
 
     def draw(self, _context):
         layout = self.layout

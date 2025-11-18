@@ -445,7 +445,7 @@ class UNIV_PT_GlobalSettings(Panel):
         col.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
 
         layout.prop(prefs(), 'use_csa_mods')
-        layout.operator('wm.univ_show_addon_preferences')
+        layout.operator('wm.univ_show_addon_preferences', icon='TOOL_SETTINGS')
 
 
 class UNIV_PT_PackSettings(Panel):
