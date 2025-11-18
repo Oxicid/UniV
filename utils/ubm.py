@@ -114,8 +114,8 @@ def calc_total_area_3d(faces, scale):
 
 def calc_max_length_uv_crn_for_save_transform(corners, uv) -> BMLoop:
     length = -1.0
-    crn_ = None
-    prev_co = corners[-1][uv].uv
+    crn_ = corners[-1]
+    prev_co = crn_[uv].uv
     for crn in corners:
         curr_co = crn[uv].uv
         if length < (length_ := (prev_co - curr_co).length_squared):

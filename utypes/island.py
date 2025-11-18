@@ -83,6 +83,7 @@ class SaveTransform:
                 max_uv_area_face = self.target_subisland.calc_max_uv_area_face()
             else:
                 max_uv_area_face = self.island.calc_max_uv_area_face()
+
             max_length_crn = utils.calc_max_length_uv_crn_for_save_transform(max_uv_area_face.loops, uv)
             max_length_crn[uv].pin_uv = True
             self.target_crn = max_length_crn
@@ -711,7 +712,7 @@ class FaceIsland:
     def calc_max_uv_area_face(self):
         uv = self.umesh.uv
         area = -1.0
-        face = None
+        face = self.faces[0]
         for f in self.faces:
             if area < (area_ := utils.calc_face_area_uv(f, uv)):
                 area = area_

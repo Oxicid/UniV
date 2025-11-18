@@ -1420,7 +1420,7 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
 
         info = ''
         if conflicts_counter:
-            info += f"Resolver {conflicts_counter} names conflicts. "
+            info += f"Resolver {conflicts_counter} uv names conflicts. "
         if removed_extra_channels_counter:
             info += f"Removed {removed_extra_channels_counter} extra channels in total."
         if added_uvs_counter:
