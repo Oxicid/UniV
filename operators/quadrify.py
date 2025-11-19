@@ -31,6 +31,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_description = "Align selected UV to rectangular distribution"
     bl_options = {'REGISTER', 'UNDO'}
 
+    mark_seam: bpy.props.BoolProperty(name='Mark Seam', default=True)
+    unlink: bpy.props.BoolProperty(name='Unlink', default=False)
     shear: bpy.props.BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: bpy.props.BoolProperty(name='Scale Independently', default=True,
                                      description='Scale U and V independently')
@@ -53,6 +55,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
+        layout.prop(self, 'mark_seam')
+        layout.prop(self, 'unlink')
         if self.shear or self.xy_scale:
             layout.prop(self, 'use_aspect')
         layout.prop(self, 'shear')
@@ -93,12 +97,14 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             umesh.update_tag = False
             if dirt_islands := AdvIslands.calc_extended_with_mark_seam(umesh):
                 uv = umesh.uv
+                is_boundary = utils.is_boundary_func(umesh)
                 umesh.value = umesh.check_uniform_scale(report=self.report)
                 umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
                 edge_lengths = []
                 for d_island in dirt_islands:
-                    links_static_with_quads, static_faces, non_quad_selected, quad_islands = self.split_by_static_faces_and_quad_islands(
-                        d_island)
+                    links_static_with_quads, static_faces, non_quad_selected, quad_islands = (
+                        self.split_by_static_faces_and_quad_islands(d_island))
+
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
@@ -117,10 +123,17 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     for isl in quad_islands:
                         utils.set_global_texel(isl)
 
-                    for static_crn, quad_corners in links_static_with_quads:
-                        static_co = static_crn[uv].uv
-                        min_dist_quad_crn = min(quad_corners, key=lambda q_crn: (q_crn[uv].uv - static_co).length)
-                        static_co[:] = min_dist_quad_crn[uv].uv
+                    if not self.unlink:
+                        for static_crn, quad_corners in links_static_with_quads:
+                            static_co = static_crn[uv].uv
+                            min_dist_quad_crn = min(quad_corners, key=lambda q_crn: (q_crn[uv].uv - static_co).length)
+                            static_co[:] = min_dist_quad_crn[uv].uv
+
+                    if self.mark_seam:
+                        for crn in d_island.corners_iter():
+                            crn.edge.seam = is_boundary(crn)
+
+
 
         if selected_non_quads_counter:
             self.report({'WARNING'}, f"Ignored {selected_non_quads_counter} non-quad faces")
