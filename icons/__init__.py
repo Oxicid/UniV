@@ -421,7 +421,7 @@ class IconsCreator:
     so achieving high quality often requires a lot of manual work."""
 
     @classmethod
-    def convert_svg_to_png_builtin(cls, icon_size=32, mono=False, antialiasing=2):
+    def convert_svg_to_png_builtin(cls, icon_size=32, mono=False, antialiasing=2, scale_mul=1.0):
         base_path = Path(__file__).resolve().parent
         svg_folder = base_path / ('svg_mono' if mono else 'svg')
         png_folder = base_path / ('png_mono' if mono else 'png')
@@ -470,7 +470,7 @@ class IconsCreator:
                 try:
                     fb = gpu.state.active_framebuffer_get()
                     fb.clear(color=(0.0, 0.0, 0.0, 0.0))
-                    cls.draw_image(tris, colors, 32)
+                    cls.draw_image(tris, colors, 32, scale_mul)
 
                     pixel_data = fb.read_color(0, 0, icon_size * antialiasing, icon_size * antialiasing, 4, 0, 'UBYTE')
                     pixel_data.dimensions = (icon_size * antialiasing) * (icon_size * antialiasing) * 4
@@ -517,17 +517,17 @@ class IconsCreator:
         return all_tris, all_colors
 
     @classmethod
-    def draw_image(cls, coords, colors, icon_size):
+    def draw_image(cls, coords, colors, icon_size, scale_mul=1.0):
         gpu.state.blend_set('ALPHA')
 
         with gpu.matrix.push_pop():
-            gpu.matrix.load_matrix(cls.get_normalize_uvs_matrix(icon_size))
+            gpu.matrix.load_matrix(cls.get_normalize_uvs_matrix(icon_size, scale_mul))
             gpu.matrix.load_projection_matrix(Matrix.Identity(4))
             cls.draw_background_colors(coords, colors)
         gpu.state.blend_set('NONE')
 
     @classmethod
-    def get_normalize_uvs_matrix(cls, icon_size):
+    def get_normalize_uvs_matrix(cls, icon_size, scale_mul=1.0):
         """Matrix maps x and y coordinates from [0, 1] to [-1, 1]"""
         matrix = Matrix.Identity(4)
         matrix.col[3][0] = -1
@@ -546,7 +546,8 @@ class IconsCreator:
         filled_scale.append(1)
         fit_matrix = Matrix.Diagonal(filled_scale).to_4x4()
 
-        return matrix @ fit_matrix
+        center_scale = Matrix.Scale(scale_mul, 4)
+        return center_scale @ matrix @ fit_matrix
 
     @classmethod
     def save_pixels(cls, filepath, pixel_data, width, height, antialiasing):
@@ -646,7 +647,8 @@ class UNIV_OT_IconsGenerator(bpy.types.Operator):
             IconsCreator.convert_svg_to_png_builtin(
                 icon_size=int(prefs().icon_size),
                 mono=prefs().color_mode == 'MONO',
-                antialiasing=int(prefs().icon_antialiasing)
+                antialiasing=int(prefs().icon_antialiasing),
+                scale_mul=prefs().icon_scale
             )
             icons.unregister_icons_()
             icons.register_icons_()

@@ -327,6 +327,9 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                              items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
                              default='COLOR',
                              update=lambda self, _: __import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
+
+    icon_scale: FloatProperty(name='Icon Scale', default=1.0, min=1.0, soft_max=1.25, max=2.0)
+
     icon_size: EnumProperty(name='Icon Size',
                             items=(('32', '32', ''), ('64', '64', ''), ('128', '128', ''), ('256', '256', '')),
                             default='32')
@@ -472,12 +475,19 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             col.prop(self, "icon_white_color", text="")
             col.prop(self, "icon_select_arrow_color", text="")
 
-            box_split = box.row()
-            box_split.prop(self, 'icon_size')
-            box_split.prop(self, 'icon_antialiasing', text='AA')
-            box_split = box.row(align=True)
-            box_split.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
-            box_split.operator('wm.univ_icons_generator',
+
+            box_split = box.split(factor=0.25)
+            box_split.prop(self, 'icon_scale', text='Scale')
+
+            box_split_sub = box_split.split(factor=0.75)
+            row = box_split_sub.row(heading='Resolution:')
+            row.prop(self, 'icon_size', text='')
+            box_split_sub.prop(self, 'icon_antialiasing', text='AA')
+
+
+            box_row = box.row(align=True)
+            box_row.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
+            box_row.operator('wm.univ_icons_generator',
                                text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
 
         elif self.tab == 'KEYMAPS':
