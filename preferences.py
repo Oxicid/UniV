@@ -58,13 +58,16 @@ def _update_lock_size(_self, _context):
 
 def update_panel(_self, _context):
     from .ui import UNIV_PT_General_VIEW_3D as Panel
+    from .ui import UNIV_PT_TD_PresetsManager_VIEW3D as PresetPanel
+
     if Panel.bl_category != prefs().panel_3d_view_category:
         try:
-            if "bl_rna" in Panel.__dict__:
-                bpy.utils.unregister_class(Panel)
+            for panel in (Panel, PresetPanel):
+                if "bl_rna" in panel.__dict__:
+                    bpy.utils.unregister_class(panel)
 
-            Panel.bl_category = prefs().panel_3d_view_category
-            bpy.utils.register_class(Panel)
+                panel.bl_category = prefs().panel_3d_view_category
+                bpy.utils.register_class(panel)
         except Exception as e:
             print(f'UniV: Updating Panel View 3D category has failed:\n{e}')
 

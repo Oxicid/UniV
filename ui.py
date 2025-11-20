@@ -726,6 +726,10 @@ class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
     bl_options = {'INSTANCED'}
     bl_category = 'UniV'
 
+    @classmethod
+    def poll(cls, context):
+        return prefs().show_view_3d_panel
+
     def draw(self, context):
         UNIV_PT_TD_PresetsManager.draw_ex(self.layout, 'mesh')
 
