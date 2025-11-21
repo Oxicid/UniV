@@ -954,6 +954,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         for umesh in self.umeshes:
             if umesh.sync:
                 if not umesh.sync_valid and umesh.elem_mode in ('VERT', 'EDGE'):
+                    view_box_sync_block.skip_from_param(umesh, selected)
                     if umesh.elem_mode == 'VERT':
                         corners = utils.calc_selected_uv_vert(umesh)
                         corners = view_box_sync_block.filter_verts(corners, umesh.uv)
@@ -1375,8 +1376,8 @@ class UNIV_OT_Rotate(Operator):
                      "\t\tDefault - Rotate\n" \
                      "\t\tCtrl - By Cursor\n" \
                      "\t\tShift - Individual\n" \
-                     "\t\tAlt - CCW" \
-                     "Has [5] keymap"
+                     "\t\tAlt - CCW\n\n" \
+                     "Has [5, Alt+5, Shift+5, Ctrl+5] keymaps"
     bl_options = {'REGISTER', 'UNDO'}
 
     mode: EnumProperty(name='Mode',
@@ -2866,11 +2867,13 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         self.mouse_pos: Vector | None = None
         self.max_distance: float | None = None
         self.umeshes: UMeshes | None = None
+        self.view_box_sync_block = utils.ViewBoxSyncBlock(None)
 
     def execute(self, context):
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
+        self.view_box_sync_block = utils.ViewBoxSyncBlock.from_area(context.area)
 
         selected_edges = []
         selected_faces, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -2896,36 +2899,34 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
                 self.orient_islands_with_selected_edges()
             else:
                 return self.orient_pick_or_visible()
+
         self.umeshes.update(info="All islands oriented")
+        self.view_box_sync_block.draw_if_blocked()
         return {'FINISHED'}
 
     def orient_islands_with_selected_faces(self):
-        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         for umesh in self.umeshes:
-            view_box_sync_block.skip_from_param(umesh, True)
+            self.view_box_sync_block.skip_from_param(umesh, True)
             islands = AdvIslands.calc_extended_with_mark_seam(umesh)
-            view_box_sync_block.filter_by_isect_islands(islands)
+            self.view_box_sync_block.filter_by_isect_islands(islands)
             for island in islands:
                 self.orient_island(island)
 
-        view_box_sync_block.draw_if_blocked()
 
     def orient_islands_with_selected_edges(self):
-        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         for umesh in self.umeshes:
-            view_box_sync_block.skip_from_param(umesh, True)
+            self.view_box_sync_block.skip_from_param(umesh, True)
             islands = Islands.calc_extended_any_edge_with_markseam(umesh)
 
             for isl in islands:
                 corners = isl.calc_selected_edge_corners_iter()
-                if not view_box_sync_block.skip:
-                    corners = view_box_sync_block.filter_edges(list(corners), umesh)
+                if not self.view_box_sync_block.skip:
+                    corners = self.view_box_sync_block.filter_edges(list(corners), umesh)
                 isl.value = utils.calc_max_length_uv_crn_with_dist(corners, umesh.uv)
 
             for island in islands:
                 self.orient_edge(island)
 
-        view_box_sync_block.draw_if_blocked()
 
     def orient_pick_or_visible(self):
         hit = IslandHit(self.mouse_pos, self.max_distance)
@@ -2960,11 +2961,10 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
     def orient_islands_with_selected_faces_overlap(self, extended):
         islands_of_mesh = []
-        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
         for umesh in self.umeshes:
-            view_box_sync_block.skip_from_param(umesh, extended)
+            self.view_box_sync_block.skip_from_param(umesh, extended)
             islands = AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
-            view_box_sync_block.filter_by_isect_islands(islands)
+            self.view_box_sync_block.filter_by_isect_islands(islands)
 
             if islands:
                 islands.calc_tris()
@@ -2973,19 +2973,18 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
         for overlapped_isl in self.calc_overlapped_island_groups(islands_of_mesh):
             self.orient_island(overlapped_isl)
-        view_box_sync_block.draw_if_blocked()
 
     def orient_islands_with_selected_edges_overlap(self):
         islands_of_mesh = []
-        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
+
         for umesh in self.umeshes:
-            view_box_sync_block.skip_from_param(umesh, True)
+            self.view_box_sync_block.skip_from_param(umesh, True)
 
             islands = AdvIslands.calc_extended_any_edge_with_markseam(umesh)
             for isl in islands:
                 corners = isl.calc_selected_edge_corners_iter()
-                if not view_box_sync_block.skip:
-                    corners = view_box_sync_block.filter_edges(list(corners), umesh)
+                if not self.view_box_sync_block.skip:
+                    corners = self.view_box_sync_block.filter_edges(list(corners), umesh)
                 isl.value = utils.calc_max_length_uv_crn_with_dist(corners, umesh.uv)
 
             if islands:

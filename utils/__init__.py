@@ -196,10 +196,10 @@ class ViewBoxSyncBlock:
                 n_panel_width = next(r.width for r in area.regions if r.type == 'UI')
                 tools_width = next(r.width for r in area.regions if r.type == 'TOOLS')
 
-                view_rect = BBox.init_from_minmax(
-                    Vector(reg.view2d.region_to_view(reg.x+tools_width, reg.y)),
-                    Vector(reg.view2d.region_to_view(reg.x + (reg.width - n_panel_width), reg.y + reg.height))
-                )
+                min_v = Vector(reg.view2d.region_to_view(tools_width, 0))
+                max_v = Vector(reg.view2d.region_to_view(reg.width - n_panel_width, reg.height))
+
+                view_rect = BBox.init_from_minmax(min_v, max_v)
                 view_rect.scale(0.6)
                 return cls(view_rect)
 
@@ -209,6 +209,7 @@ class ViewBoxSyncBlock:
 
     def draw_if_blocked(self):
         if self.has_blocked:
+            update_area_by_type('IMAGE_EDITOR')
             from ..draw import LinesDrawSimple
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,0.5))
 
@@ -436,6 +437,7 @@ class ViewBoxSyncBlock:
         l1_a, l1_b, l2_a, l2_b, l3_a, l3_b, l4_a, l4_b = self.view_box.draw_data_lines()
         from mathutils.geometry import intersect_line_line_2d
 
+        is_invisible = is_invisible_func(umesh)
         is_boundary = is_boundary_func(umesh, with_seam=False)
         filtered_corners = set()
         for crn in corners:
@@ -445,6 +447,9 @@ class ViewBoxSyncBlock:
             if not is_boundary(crn):
                 filtered_corners.add(crn)
                 filtered_corners.add(crn.link_loop_radial_prev)
+                continue
+            elif crn.edge.is_boundary or is_invisible(crn.link_loop_radial_prev.face):
+                filtered_corners.add(crn)
                 continue
 
             pt_1 = crn[uv].uv
