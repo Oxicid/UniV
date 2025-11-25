@@ -2277,7 +2277,7 @@ class ParamHandleSolve(ParamHandleConstruct):
 
             if chart.lscm_solve():
                 if not chart.has_pins:
-                    old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges)
+                    old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
                     new_bbox = utypes.BBox.calc_bbox(v.uv for v in chart.verts)
 
                     delta = old_bbox.center - new_bbox.center
