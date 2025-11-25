@@ -4,6 +4,7 @@
 import math
 import heapq
 import typing
+import numpy as np
 from bmesh.types import BMFace
 from mathutils import Vector, Matrix
 
@@ -1007,38 +1008,29 @@ class PChart:
             else:
                 v.flag &= ~PVERT_INTERIOR
 
-        for f in self.faces:
-            e1 = f.edge
-            e2 = e1.next
-            e3 = e2.next
-            f.id = sys.n_faces
-            sys.n_faces += 1
+        i = 0
+        base_angle = 0
 
-            # angle ids are conveniently stored in half edges
-            e1.id = sys.n_angles
-            sys.n_angles +=1
-            e2.id = sys.n_angles
-            sys.n_angles +=1
-            e3.id = sys.n_angles
-            sys.n_angles +=1
+        for i, f in enumerate(self.faces):
+            f.id = i
+
+            e = f.edge
+            e.id = base_angle
+            e = e.next
+            e.id = base_angle + 1
+            e = e.next
+            e.id = base_angle + 2
+
+            base_angle += 3
+
+        sys.n_faces = i + 1
+        sys.n_angles = base_angle
 
 
         sys.p_abf_setup_system()
 
         # compute initial angles
-        for f in self.faces:
-            e1 = f.edge
-            e2 = e1.next
-            e3 = e2.next
-            a1, a2, a3 = f.calc_angles()
-
-            sys.alpha[e1.id] = sys.beta[e1.id] = a1
-            sys.alpha[e2.id] = sys.beta[e2.id] = a2
-            sys.alpha[e3.id] = sys.beta[e3.id] = a3
-
-            sys.weight[e1.id] = 2.0 / (a1 * a1)
-            sys.weight[e2.id] = 2.0 / (a2 * a2)
-            sys.weight[e3.id] = 2.0 / (a3 * a3)
+        self.compute_initial_angles(sys)
 
 
         for v in self.verts:
@@ -1074,12 +1066,11 @@ class PChart:
                 if norm < limit:
                     break
 
-
                 if not sys.matrix_invert(self):
                     print("UniV: ABF failed to invert matrix")
                     # p_abf_free_system(sys)
                     return False
-
+                # print(i, norm)
                 sys.compute_sines()
 
             else:
@@ -1091,6 +1082,26 @@ class PChart:
         sys.alpha = []
 
         return True
+
+    def compute_initial_angles(self, sys: 'PAbfSystem'):
+        angles = []
+        for f in self.faces:
+            # NOTE: Edge indices are increasing, so there's no need to insert the angle by edge index.
+            # Instead, it's better to use the faster append.
+            angles.append(f.calc_angles())
+
+        angles = np.array(angles, dtype=float)
+        angles = angles.reshape(-1)
+
+        sys.alpha = angles.tolist()
+        sys.beta = sys.alpha.copy()
+
+        # weight = 2.0 / pow(angle, 2)
+        np.square(angles, out=angles)
+        np.reciprocal(angles, out=angles)
+        angles *= 2.0
+        sys.weight = angles.tolist()
+
 
     def symmetry_pins(self, outer: PEdge, pin1: list[PVert], pin2: list[PVert]) -> bool:
         max_e1: PEdge | None= None
@@ -1425,11 +1436,11 @@ class PAbfSystem:
 
     def p_abf_setup_system(self):
         # NOTE: Use np.empty
-        self.alpha = self.n_angles * [None]
-        self.beta = self.n_angles * [None]
-        self.sine = self.n_angles * [None]
-        self.cosine = self.n_angles * [None]
-        self.weight = self.n_angles * [None]
+        # self.alpha = self.n_angles * [None]
+        # self.beta = self.n_angles * [None]
+        # self.sine = self.n_angles * [None]
+        # self.cosine = self.n_angles * [None]
+        # self.weight = self.n_angles * [None]
 
         self.bAlpha = self.n_angles * [None]
         self.bTriangle = self.n_faces * [None]
@@ -1453,7 +1464,6 @@ class PAbfSystem:
                 f"{self.lambdaPlanar = }\n {self.lambdaLength = }\n {self.J2dt = }\n {self.bstar = }\n {self.dstar = }")
 
     def compute_sines(self):
-        import numpy as np
         eix = np.exp(1j *  np.array(self.alpha))
         self.sine = eix.imag.tolist()
         self.cosine = eix.real.tolist()
