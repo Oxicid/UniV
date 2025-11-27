@@ -47,12 +47,10 @@ def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
     return all(math.isclose(component, 0.0, abs_tol=abs_tol) for component in delta)
 
 
-def safe_div(a, b):
-    return a / b if b != 0 else 0
+def safe_divide(a: int | float, b: int | float) -> float:
+    return a / b if b else 0.0
 
 # Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
-
-
 def inv_lerp(a: float, b: float, v: float) -> float:  # ratio
     ratio_range = b - a
     return ((v - a) / ratio_range) if ratio_range else 0
@@ -299,7 +297,7 @@ class LinearSolver:
         self.state = 'MATRIX_CONSTRUCT'
 
     def matrix_add(self, row: int, col: int, value: float):
-        assert self.state == 'MATRIX_CONSTRUCT'
+        # assert self.state == 'MATRIX_CONSTRUCT'
 
         # if not least_squares and variable[row] is locked -> ignore
         if (not self.least_squares) and self.variable[row].locked:

@@ -510,7 +510,7 @@ class PEdge:
             angle -= angle_v3v3v3(v1.co, v.co, v2.co)
 
             we = we.next.next.pair
-            if not (we and (we != v.edge)):
+            if not we or we == v.edge:
                 break
 
         return angle
@@ -688,7 +688,7 @@ class PChart:
         self.origin: Vector = Vector((0.0, 0.0))
 
         self.context: LinearSolver | None = None
-        self.abf_alpha: list[float]  = [] # list of alpha ???
+        self.abf_alpha: list[tuple[float, float, float]] | np.ndarray = []
 
         self.pin1: PVert | None = None
         self.pin2: PVert | None = None
@@ -950,28 +950,21 @@ class PChart:
         flip_faces: bool = (area_pinned_down > area_pinned_up)
 
         # Construct matrix.
-        alpha: list[float] = self.abf_alpha
+        if not len(self.abf_alpha):
+            angles = np.array([f.calc_angles() for f in self.faces], dtype=float)
+        else:
+            # Use abf angles if present.
+            angles = self.abf_alpha.reshape(-1, 3)
+
 
         row: int = 0
-        ii = 0
-        for f in self.faces:
+        for f, (a1, a2, a3) in zip(self.faces, angles):
             e1: PEdge = f.edge
             e2: PEdge = e1.next
             e3: PEdge = e2.next
             v1: PVert = e1.vert
             v2: PVert = e2.vert
             v3: PVert = e3.vert
-
-            if alpha:
-                # Use abf angles if present.
-                a1 = alpha[ii]
-                ii += 1
-                a2 = alpha[ii]
-                ii += 1
-                a3 = alpha[ii]
-                ii += 1
-            else:
-                a1, a2, a3 = f.calc_angles()
 
             if flip_faces:
                 # swap
@@ -987,14 +980,14 @@ class PChart:
                 v.uv[0] = context.variable_get(2 * v.id)
                 v.uv[1] = context.variable_get(2 * v.id + 1)
             return True
-
-        for v in self.verts:
-            v.uv.xy = (0.0, 0.0)
-
-        return False
+        else:
+            for v in self.verts:
+                v.uv.xy = (0.0, 0.0)
+            return False
 
     def abf_solve(self) -> bool:
         from math import pi
+        from .umath import safe_divide
         sys = PAbfSystem()
         limit: float = 1.0 if (self.n_faces > 100) else 0.001
         # lastnorm: float = 1.0 if (chart.n_faces > 100) else 0.001
@@ -1041,16 +1034,16 @@ class PChart:
                 while True:
                     angle_sum += sys.beta[e.id]
                     e = e.next.next.pair
-                    if not (e and (e != v.edge)):
+                    if not e or e == v.edge:
                         break
 
-                scale: float = 2.0 * pi / angle_sum if angle_sum else 0.0  # safe divide
+                scale: float = safe_divide(2.0 * pi, angle_sum)
 
                 e = v.edge
                 while True:
                     sys.beta[e.id] = sys.alpha[e.id] = sys.beta[e.id] * scale
                     e = e.next.next.pair
-                    if not (e and (e != v.edge)):
+                    if not e or e == v.edge:
                         break
 
         if sys.n_interior > 0:
@@ -1079,7 +1072,6 @@ class PChart:
                 return False
 
         self.abf_alpha = sys.alpha
-        sys.alpha = []
 
         return True
 
@@ -1093,15 +1085,37 @@ class PChart:
         angles = np.array(angles, dtype=float)
         angles = angles.reshape(-1)
 
-        sys.alpha = angles.tolist()
-        sys.beta = sys.alpha.copy()
+        sys.alpha = angles.copy()
+        sys.beta = angles.copy()
 
         # weight = 2.0 / pow(angle, 2)
         np.square(angles, out=angles)
         np.reciprocal(angles, out=angles)
         angles *= 2.0
-        sys.weight = angles.tolist()
+        sys.weight = angles.copy()
 
+        np.reciprocal(angles, out=angles)
+        sys.inv_weight = angles.copy()
+
+        # si = J1 d*J1t
+        # si = 1.0 / (wi1 + wi2 + wi3)
+        inv_weight = angles.reshape(-1, 3)
+        inv_weight_sum = np.sum(inv_weight, axis=-1)
+        np.reciprocal(inv_weight_sum, out=inv_weight_sum)
+        sys.dstar = inv_weight_sum
+
+
+        # create list of weight matrices with diagonal fill
+        # |si-w1,  si,     si   |
+        # |si,     si-w2,  si   |
+        # |si,     si,     si-w3|
+
+        W = sys.dstar.repeat(9).reshape(-1, 3, 3)  # noqa
+
+        fill = (sys.dstar.repeat(3) - sys.weight).reshape(-1, 3)  # noqa
+        idx = np.arange(3)
+        W[np.arange(len(W))[:, None], idx, idx] = fill
+        sys.W = W
 
     def symmetry_pins(self, outer: PEdge, pin1: list[PVert], pin2: list[PVert]) -> bool:
         max_e1: PEdge | None= None
@@ -1172,7 +1186,7 @@ class PChart:
                 be2 = be2.boundary_edge_prev
                 len2 += be2.length_3d
 
-            if not (be1 != be2):
+            if be1 == be2:
                 break
 
         pin1[0] = be1.vert
@@ -1192,7 +1206,7 @@ class PChart:
                 len2 += be2.length_3d
                 be2 = be2.boundary_edge_next
 
-            if not (be1 != be2):
+            if be1 == be2:
                 break
 
         pin2[0] = be1.vert
@@ -1290,7 +1304,7 @@ class PChart:
                 be.flag |= PEDGE_FILLED
                 be = be.next.vert.edge
                 n_edges += 1
-                if not (be != e):
+                if be == e:
                     break
 
             if e != outer:
@@ -1393,9 +1407,9 @@ class PAbfSystem:
 
         # Alpha - is the current angle (optimization variable).
         # These are the angles that the algorithm corrects so that the scan turns out to be 'flat'.
-        self.alpha: list[float] = []
+        self.alpha: np.ndarray = np.array([])
         # Beta - is the target angle value (from the 3D model). That is, the initial angle between the edges in 3D.
-        self.beta: list[float] = []
+        self.beta: np.ndarray = np.array([])
 
         # Sine, Cosine - are the precalculated values of the sine/cosine of the angles' alpha.
         self.sine: list[float] = []
@@ -1404,14 +1418,15 @@ class PAbfSystem:
         # Weight - is the weight of the angle in the objective function
         # (usually depends on the length of the edges and the area of the triangle).
         # More important angles contribute more to optimization.
-        self.weight: list[float] = []
+        self.weight: np.ndarray | list[float] = []
+        self.inv_weight: np.ndarray | list[float] = []
 
         # These are residual vectors for various types of constraints in a system of linear equations
 
         # bAlpha - residual according to the “angle difference” equation (α - β), i.e., how much the current angles deviate from the target angles.
-        self.bAlpha: list[float] = []
+        self.bAlpha: np.ndarray | list[float] = []
         # bTriangle - the residual according to the equations of the sum of angles in a triangle (should be π).
-        self.bTriangle: list[float] = []
+        self.bTriangle: np.ndarray | list[float] = []
         # bInterior - the residual according to the equations of the sum of angles around a vertex (should be 2π for interior angles, < 2π for boundary angles).
         self.bInterior: list[float] = []
 
@@ -1432,7 +1447,18 @@ class PAbfSystem:
         self.bstar: list[float] = []
         # dstar - result of solving the linear system (changes in variables α, λ, etc.).
         self.dstar: list[float] = []
+        self.W: list[float] = []
 
+        # precompute j2 entries quickly, using cache for sine products
+        self.sin_product_cache: dict[tuple[int, int], float] = {}
+
+    # def get_or_compute_sin_product(self, v: PVert, eid: int):
+    #     key = (v.id, eid)
+    #     val = self.sin_product_cache.get(key)
+    #     if val is None:
+    #         val = self.compute_sin_product(v, eid)
+    #         self.sin_product_cache[key] = val
+    #     return val
 
     def p_abf_setup_system(self):
         # NOTE: Use np.empty
@@ -1442,9 +1468,9 @@ class PAbfSystem:
         # self.cosine = self.n_angles * [None]
         # self.weight = self.n_angles * [None]
 
-        self.bAlpha = self.n_angles * [None]
-        self.bTriangle = self.n_faces * [None]
-        self.bInterior = self.n_interior * 2 * [None]
+        # self.bAlpha = self.n_angles * [None]
+        # self.bTriangle = self.n_faces * [None]
+        self.bInterior = np.zeros(self.n_interior * 2, dtype=float)
 
         self.lambdaTriangle = self.n_faces * [0.0]
         self.lambdaPlanar = self.n_interior * [0.0]
@@ -1456,12 +1482,6 @@ class PAbfSystem:
 
         for i in range(self.n_interior):
             self.lambdaLength[i] = 1.0
-
-    def __str__(self):
-        return (f"{self.n_interior = }\n {self.n_angles = } \n {self.n_faces = }\n "
-                f"{self.alpha = }\n {self.beta = } \n {self.sine = }\n {self.cosine = }\n {self.weight = } "
-                f"\n {self.bAlpha = }\n {self.bTriangle = } {self.bInterior = }\n {self.lambdaTriangle = }\n "
-                f"{self.lambdaPlanar = }\n {self.lambdaLength = }\n {self.J2dt = }\n {self.bstar = }\n {self.dstar = }")
 
     def compute_sines(self):
         eix = np.exp(1j *  np.array(self.alpha))
@@ -1505,7 +1525,7 @@ class PAbfSystem:
         v1: PVert = e.next.vert
         v2: PVert = e.next.next.vert
 
-        deriv: float = (self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id]
+        deriv: float = float((self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id])
         deriv += self.lambdaTriangle[f.id]
 
         if v.flag & PVERT_INTERIOR:
@@ -1525,31 +1545,32 @@ class PAbfSystem:
 
     def compute_gradient(self, chart: PChart) -> float:
         from math import pi
-        norm: float = 0.0
 
+        g_alphas: list[float] = []
         for f in chart.faces:
             e1: PEdge = f.edge
             e2: PEdge = e1.next
             e3: PEdge = e2.next
 
-            g_alpha1: float = self.compute_grad_alpha(f, e1)
-            g_alpha2: float = self.compute_grad_alpha(f, e2)
-            g_alpha3: float = self.compute_grad_alpha(f, e3)
+            g_alphas.append(self.compute_grad_alpha(f, e1))
+            g_alphas.append(self.compute_grad_alpha(f, e2))
+            g_alphas.append(self.compute_grad_alpha(f, e3))
 
-            self.bAlpha[e1.id] = -g_alpha1
-            self.bAlpha[e2.id] = -g_alpha2
-            self.bAlpha[e3.id] = -g_alpha3
+        self.bAlpha = np.array(g_alphas, dtype=float)
+        norm = np.dot(self.bAlpha, self.bAlpha)
+        np.negative(self.bAlpha, out=self.bAlpha)
 
-            norm += g_alpha1 * g_alpha1 + g_alpha2 * g_alpha2 + g_alpha3 * g_alpha3
+        # g_triangle = a1 + a2 + a3 - pi
+        g_triangle = self.alpha.reshape(-1, 3).sum(axis=1)
+        g_triangle -= pi
 
-            g_triangle: float = self.alpha[e1.id] + self.alpha[e2.id] + self.alpha[e3.id] - pi
-            self.bTriangle[f.id] = -g_triangle
-            norm += g_triangle * g_triangle
+        self.bTriangle = -g_triangle
+        norm += np.dot(g_triangle, g_triangle)
 
-
+        n_interior = self.n_interior
         for v in chart.verts:
             if v.flag & PVERT_INTERIOR:
-                g_planar: float = -2 * pi
+                g_planar: float = -2.0 * pi
 
                 e: PEdge = v.edge
                 while True:
@@ -1558,40 +1579,52 @@ class PAbfSystem:
                     if not e or e == v.edge:
                         break
 
-                self.bInterior[v.id] = -g_planar
-                norm += g_planar * g_planar
+                self.bInterior[v.id] = g_planar
 
                 g_length: float = self.compute_sin_product(v, -1)
-                self.bInterior[self.n_interior + v.id] = -g_length
-                norm += g_length * g_length
+                self.bInterior[n_interior + v.id] = g_length
 
-        return norm
+        norm += np.square(self.bInterior).sum()
+
+        np.negative(self.bInterior, out=self.bInterior)
+
+        return float(norm)
 
     def adjust_alpha(self, id_: int, d_lambda1: float, pre: float):
-        alpha: float = self.alpha[id_]
+        alpha: float = float(self.alpha[id_])
         dalpha: float = (self.bAlpha[id_] - d_lambda1)
         alpha += dalpha / self.weight[id_] - pre
         self.alpha[id_] = clamp(alpha, 0.0, pi)
 
 
     def matrix_invert(self, chart: PChart) -> bool:
-
         n_interior: int = self.n_interior
-        n_var: int = 2 * n_interior
-        context: LinearSolver = LinearSolver.new(0, n_var, 1)
+        context: LinearSolver = LinearSolver.new(0, 2 * n_interior, 1)
 
-        for i in range(n_var):
-            context.right_hand_side_add(i, self.bInterior[i])
+        for i, v in enumerate(self.bInterior):
+            context.right_hand_side_add(i, v)
 
+        j2 = Matrix.Identity(3)
+        row1 = [0.0] * 6
+        row2 = [0.0] * 6
+        row3 = [0.0] * 6
 
-        for f in chart.faces:
-            beta: Vector = Vector()
-            j2: Matrix = Matrix.Identity(3)
+        non_init_ids: list[int] = [-1] * 6
 
-            row1: Vector = Vector.Fill(6, 0.0)
-            row2: Vector = Vector.Fill(6, 0.0)
-            row3: Vector = Vector.Fill(6, 0.0)
-            vid: list[int] = [-1] * 6
+        # bstar1 = (J1 dInv*bAlpha - bTriangle)
+        # use this later for computing other lambda's
+        from .umath import np_vec_dot
+        self.bstar = np_vec_dot(self.inv_weight.reshape(-1, 3), self.bAlpha.reshape(-1, 3))  # noqa
+        self.bstar -= self.bTriangle
+
+        # J1t = si*bstar1 - bAlpha
+        J1t = (self.dstar * self.bstar).repeat(3) - self.bAlpha
+
+        inv_weight_per_face = self.inv_weight.reshape(-1, 3)  # noqa
+        J1t_per_face = J1t.reshape(-1, 3)
+
+        for f, (wi1, wi2, wi3), (beta1, beta2, beta3), W in zip(chart.faces, inv_weight_per_face, J1t_per_face, self.W):
+            v_id = non_init_ids.copy()
 
             e1: PEdge = f.edge
             e2: PEdge = e1.next
@@ -1600,125 +1633,79 @@ class PAbfSystem:
             v2: PVert = e2.vert
             v3: PVert = e3.vert
 
-            wi1: float = 1.0 / self.weight[e1.id]
-            wi2: float = 1.0 / self.weight[e2.id]
-            wi3: float = 1.0 / self.weight[e3.id]
+            e1_id = e1.id
+            e2_id = e2.id
+            e3_id = e3.id
 
-            # bstar1 = (J1 dInv*bAlpha - bTriangle)
-            b: float = self.bAlpha[e1.id] * wi1
-            b += self.bAlpha[e2.id] * wi2
-            b += self.bAlpha[e3.id] * wi3
-            b -= self.bTriangle[f.id]
-
-            # si = J1 d*J1t
-            si: float = 1.0 / (wi1 + wi2 + wi3)
-
-            # J1t si*bstar1 - bAlpha
-            beta[0] = b * si - self.bAlpha[e1.id]
-            beta[1] = b * si - self.bAlpha[e2.id]
-            beta[2] = b * si - self.bAlpha[e3.id]
-
-            # use this later for computing other lambda's
-            self.bstar[f.id] = b
-            self.dstar[f.id] = si
-
-            # set matrix
-            W = Matrix([[si] * 3] * 3)
-
-            W[0][0] = si - self.weight[e1.id]
-            W[1][1] = si - self.weight[e2.id]
-            W[2][2] = si - self.weight[e3.id]
+            W = Matrix(W)
 
             if v1.flag & PVERT_INTERIOR:
-                vid[0] = v1.id
-                vid[3] = n_interior + v1.id
+                v_id[0] = v1.id
+                v_id[3] = n_interior + v1.id
 
-                self.J2dt[e1.id][0] = j2[0][0] = 1.0 * wi1
-                self.J2dt[e2.id][0] = j2[1][0] = self.compute_sin_product(v1, e2.id) * wi2
-                self.J2dt[e3.id][0] = j2[2][0] = self.compute_sin_product(v1, e3.id) * wi3
+                self.J2dt[e1_id][0] = j2[0][0] = wi1
+                self.J2dt[e2_id][0] = j2[1][0] = self.compute_sin_product(v1, e2_id) * wi2
+                self.J2dt[e3_id][0] = j2[2][0] = self.compute_sin_product(v1, e3_id) * wi3
 
-                context.right_hand_side_add(v1.id, j2[0][0] * beta[0])
-                context.right_hand_side_add(n_interior + v1.id, j2[1][0] * beta[1] + j2[2][0] * beta[2])
+                context.right_hand_side_add(v1.id, j2[0][0] * beta1)
+                context.right_hand_side_add(n_interior + v1.id, j2[1][0] * beta2 + j2[2][0] * beta3)
 
-                row1[0] = j2[0][0] * W[0][0]
-                row2[0] = j2[0][0] * W[1][0]
-                row3[0] = j2[0][0] * W[2][0]
-
-                row1[3] = j2[1][0] * W[0][1] + j2[2][0] * W[0][2]
-                row2[3] = j2[1][0] * W[1][1] + j2[2][0] * W[1][2]
-                row3[3] = j2[1][0] * W[2][1] + j2[2][0] * W[2][2]
-
+                row1[0], row2[0], row3[0] = j2[0][0] * W.col[0]
+                row1[3], row2[3], row3[3] = j2[1][0] * W.col[1] + j2[2][0] * W.col[2]
 
             if v2.flag & PVERT_INTERIOR:
-                vid[1] = v2.id
-                vid[4] = n_interior + v2.id
+                v_id[1] = v2.id
+                v_id[4] = n_interior + v2.id
 
-                self.J2dt[e1.id][1] = j2[0][1] = self.compute_sin_product(v2, e1.id) * wi1
-                self.J2dt[e2.id][1] = j2[1][1] = 1.0 * wi2
-                self.J2dt[e3.id][1] = j2[2][1] = self.compute_sin_product(v2, e3.id) * wi3
+                self.J2dt[e1_id][1] = j2[0][1] = self.compute_sin_product(v2, e1_id) * wi1
+                self.J2dt[e2_id][1] = j2[1][1] = wi2
+                self.J2dt[e3_id][1] = j2[2][1] = self.compute_sin_product(v2, e3_id) * wi3
 
-                context.right_hand_side_add(v2.id, j2[1][1] * beta[1])
-                context.right_hand_side_add(n_interior + v2.id, j2[0][1] * beta[0] + j2[2][1] * beta[2])
+                context.right_hand_side_add(v2.id, j2[1][1] * beta2)
+                context.right_hand_side_add(n_interior + v2.id, j2[0][1] * beta1 + j2[2][1] * beta3)
 
-                row1[1] = j2[1][1] * W[0][1]
-                row2[1] = j2[1][1] * W[1][1]
-                row3[1] = j2[1][1] * W[2][1]
-
-                row1[4] = j2[0][1] * W[0][0] + j2[2][1] * W[0][2]
-                row2[4] = j2[0][1] * W[1][0] + j2[2][1] * W[1][2]
-                row3[4] = j2[0][1] * W[2][0] + j2[2][1] * W[2][2]
-
+                row1[1], row2[1], row3[1] = j2[1][1] * W.col[1]
+                row1[4], row2[4], row3[4] = j2[0][1] * W.col[0] + j2[2][1] * W.col[2]
 
             if v3.flag & PVERT_INTERIOR:
-                vid[2] = v3.id
-                vid[5] = n_interior + v3.id
+                v_id[2] = v3.id
+                v_id[5] = n_interior + v3.id
 
-                self.J2dt[e1.id][2] = j2[0][2] = self.compute_sin_product(v3, e1.id) * wi1
-                self.J2dt[e2.id][2] = j2[1][2] = self.compute_sin_product(v3, e2.id) * wi2
-                self.J2dt[e3.id][2] = j2[2][2] = 1.0 * wi3
+                self.J2dt[e1_id][2] = j2[0][2] = self.compute_sin_product(v3, e1_id) * wi1
+                self.J2dt[e2_id][2] = j2[1][2] = self.compute_sin_product(v3, e2_id) * wi2
+                self.J2dt[e3_id][2] = j2[2][2] = wi3
 
-                context.right_hand_side_add(v3.id, j2[2][2] * beta[2])
-                context.right_hand_side_add(n_interior + v3.id, j2[0][2] * beta[0] + j2[1][2] * beta[1])
+                context.right_hand_side_add(v3.id, j2[2][2] * beta3)
+                context.right_hand_side_add(n_interior + v3.id, j2[0][2] * beta1 + j2[1][2] * beta2)
 
-                row1[2] = j2[2][2] * W[0][2]
-                row2[2] = j2[2][2] * W[1][2]
-                row3[2] = j2[2][2] * W[2][2]
+                row1[2], row2[2], row3[2] = j2[2][2] * W.col[2]
+                row1[5], row2[5], row3[5] = j2[0][2] * W.col[0] + j2[1][2] * W.col[1]
 
-                row1[5] = j2[0][2] * W[0][0] + j2[1][2] * W[0][1]
-                row2[5] = j2[0][2] * W[1][0] + j2[1][2] * W[1][1]
-                row3[5] = j2[0][2] * W[2][0] + j2[1][2] * W[2][1]
-
-
-            for i in range(3):
-                r: int = vid[i]
-
-                if r == -1:
+            for i, row in zip(range(3), v_id):
+                if row == -1:
                     continue
 
-                for j in range(6):
-                    c: int = vid[j]
-
-                    if c == -1:
+                for j, col in zip(range(6), v_id):
+                    if col == -1:
                         continue
 
                     if i == 0:
-                        context.matrix_add(r, c, j2[0][i] * row1[j])
+                        context.matrix_add(row, col, j2[0][i] * row1[j])
                     else:
-                        context.matrix_add(r + n_interior, c, j2[0][i] * row1[j])
+                        context.matrix_add(row + n_interior, col, j2[0][i] * row1[j])
 
                     if i == 1:
-                        context.matrix_add(r, c, j2[1][i] * row2[j])
+                        context.matrix_add(row, col, j2[1][i] * row2[j])
                     else:
-                        context.matrix_add(r + n_interior, c, j2[1][i] * row2[j])
-
+                        context.matrix_add(row + n_interior, col, j2[1][i] * row2[j])
 
                     if i == 2:
-                        context.matrix_add(r, c, j2[2][i] * row3[j])
+                        context.matrix_add(row, col, j2[2][i] * row3[j])
                     else:
-                        context.matrix_add(r + n_interior, c, j2[2][i] * row3[j])
+                        context.matrix_add(row + n_interior, col, j2[2][i] * row3[j])
 
         if success := context.solve():
-            for f in chart.faces:
+            for face_idx, f in enumerate(chart.faces):
                 e1: PEdge = f.edge
                 e2: PEdge = e1.next
                 e3: PEdge = e2.next
@@ -1726,35 +1713,41 @@ class PAbfSystem:
                 v2: PVert = e2.vert
                 v3: PVert = e3.vert
 
-                pre: Vector = Vector()
+                e1_id = e1.id
+                e2_id = e2.id
+                e3_id = e3.id
+
+                pre1: float = 0.0
+                pre2: float = 0.0
+                pre3: float = 0.0
 
                 if v1.flag & PVERT_INTERIOR:
                     x: float = context.variable_get(v1.id)
                     x2: float = context.variable_get(n_interior + v1.id)
-                    pre[0] += self.J2dt[e1.id][0] * x
-                    pre[1] += self.J2dt[e2.id][0] * x2
-                    pre[2] += self.J2dt[e3.id][0] * x2
+                    pre1 = self.J2dt[e1_id][0] * x
+                    pre2 = self.J2dt[e2_id][0] * x2
+                    pre3 = self.J2dt[e3_id][0] * x2
 
                 if v2.flag & PVERT_INTERIOR:
                     x: float = context.variable_get(v2.id)
                     x2: float = context.variable_get(n_interior + v2.id)
-                    pre[0] += self.J2dt[e1.id][1] * x2
-                    pre[1] += self.J2dt[e2.id][1] * x
-                    pre[2] += self.J2dt[e3.id][1] * x2
+                    pre1 += self.J2dt[e1_id][1] * x2
+                    pre2 += self.J2dt[e2_id][1] * x
+                    pre3 += self.J2dt[e3_id][1] * x2
 
                 if v3.flag & PVERT_INTERIOR:
                     x: float = context.variable_get(v3.id)
                     x2: float = context.variable_get(n_interior + v3.id)
-                    pre[0] += self.J2dt[e1.id][2] * x2
-                    pre[1] += self.J2dt[e2.id][2] * x2
-                    pre[2] += self.J2dt[e3.id][2] * x
+                    pre1 += self.J2dt[e1_id][2] * x2
+                    pre2 += self.J2dt[e2_id][2] * x2
+                    pre3 += self.J2dt[e3_id][2] * x
 
-                d_lambda1 = self.dstar[f.id] * (self.bstar[f.id] - sum(pre))
-                self.lambdaTriangle[f.id] += d_lambda1
+                d_lambda1 = self.dstar[face_idx] * (self.bstar[face_idx] - (pre1 + pre2 + pre3))
+                self.lambdaTriangle[face_idx] += d_lambda1
 
-                self.adjust_alpha(e1.id, d_lambda1, pre[0])
-                self.adjust_alpha(e2.id, d_lambda1, pre[1])
-                self.adjust_alpha(e3.id, d_lambda1, pre[2])
+                self.adjust_alpha(e1_id, d_lambda1, pre1)
+                self.adjust_alpha(e2_id, d_lambda1, pre2)
+                self.adjust_alpha(e3_id, d_lambda1, pre3)
 
 
             for i in range(n_interior):
@@ -2288,7 +2281,7 @@ class ParamHandleSolve(ParamHandleConstruct):
             if chart.lscm_solve():
                 if not chart.has_pins:
                     old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
-                    new_bbox = utypes.BBox.calc_bbox(v.uv for v in chart.verts)
+                    new_bbox = utypes.BBox.calc_bbox(e.vert.uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
 
                     delta = old_bbox.center - new_bbox.center
                     for v in chart.verts:
@@ -2301,6 +2294,7 @@ class ParamHandleSolve(ParamHandleConstruct):
 
                     # p_chart_rotate_fit_aabb(chart)
                     # p_chart_lscm_transform_single_pin(chart)
+
             else:
                 pass
                 # count_failed += 1
