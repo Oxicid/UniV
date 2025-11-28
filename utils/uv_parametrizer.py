@@ -490,7 +490,7 @@ class PEdge:
             pair_e = handle.hash_edges.next(key, pair_e)
 
         if r_pair[0] and self.vert == r_pair[0].vert:
-            if r_pair[0].next.pair or r_pair[0].next.next.pair:
+            if r_pair[0].next.pair or r_pair[0].wheel_edge_next:
                 # non-unfoldable, maybe mobius ring or klein bottle
                 r_pair[0] = None
                 return False
@@ -509,7 +509,7 @@ class PEdge:
             v2: PVert = we.next.next.vert
             angle -= angle_v3v3v3(v1.co, v.co, v2.co)
 
-            we = we.next.next.pair
+            we = we.wheel_edge_next
             if not we or we == v.edge:
                 break
 
@@ -1033,7 +1033,7 @@ class PChart:
                 e: PEdge = v.edge
                 while True:
                     angle_sum += sys.beta[e.id]
-                    e = e.next.next.pair
+                    e = e.wheel_edge_next
                     if not e or e == v.edge:
                         break
 
@@ -1042,7 +1042,7 @@ class PChart:
                 e = v.edge
                 while True:
                     sys.beta[e.id] = sys.alpha[e.id] = sys.beta[e.id] * scale
-                    e = e.next.next.pair
+                    e = e.wheel_edge_next
                     if not e or e == v.edge:
                         break
 
@@ -1095,27 +1095,40 @@ class PChart:
         sys.weight = angles.copy()
 
         np.reciprocal(angles, out=angles)
-        sys.inv_weight = angles.copy()
+        inv_weight = angles.reshape(-1, 3)
+        sys.inv_weight = inv_weight.copy()
 
         # si = J1 d*J1t
         # si = 1.0 / (wi1 + wi2 + wi3)
-        inv_weight = angles.reshape(-1, 3)
         inv_weight_sum = np.sum(inv_weight, axis=-1)
         np.reciprocal(inv_weight_sum, out=inv_weight_sum)
         sys.dstar = inv_weight_sum
 
+        # Per-face coupling matrix W:
 
-        # create list of weight matrices with diagonal fill
         # |si-w1,  si,     si   |
         # |si,     si-w2,  si   |
         # |si,     si,     si-w3|
+
+        # where 'si = 1 / (w1 + w2 + w3)' and wi are per-corner weights.
+        # W encodes how a face's contribution is distributed between its three vertices
+        # when assembling the local J2^T * W * J2 blocks (i.e. local mass/weight matrix).
+
 
         W = sys.dstar.repeat(9).reshape(-1, 3, 3)  # noqa
 
         fill = (sys.dstar.repeat(3) - sys.weight).reshape(-1, 3)  # noqa
         idx = np.arange(3)
         W[np.arange(len(W))[:, None], idx, idx] = fill
-        sys.W = W
+        W_lst = []
+        for m in W:
+            W_lst.append((
+                Vector(m[:, 0]),
+                Vector(m[:, 1]),
+                Vector(m[:, 2])
+                       ))
+
+        sys.W = W_lst
 
     def symmetry_pins(self, outer: PEdge, pin1: list[PVert], pin2: list[PVert]) -> bool:
         max_e1: PEdge | None= None
@@ -1447,18 +1460,12 @@ class PAbfSystem:
         self.bstar: list[float] = []
         # dstar - result of solving the linear system (changes in variables α, λ, etc.).
         self.dstar: list[float] = []
-        self.W: list[float] = []
+        self.W: list[tuple[Vector, Vector, Vector]] = []
 
         # precompute j2 entries quickly, using cache for sine products
         self.sin_product_cache: dict[tuple[int, int], float] = {}
 
-    # def get_or_compute_sin_product(self, v: PVert, eid: int):
-    #     key = (v.id, eid)
-    #     val = self.sin_product_cache.get(key)
-    #     if val is None:
-    #         val = self.compute_sin_product(v, eid)
-    #         self.sin_product_cache[key] = val
-    #     return val
+
 
     def p_abf_setup_system(self):
         # NOTE: Use np.empty
@@ -1474,26 +1481,33 @@ class PAbfSystem:
 
         self.lambdaTriangle = self.n_faces * [0.0]
         self.lambdaPlanar = self.n_interior * [0.0]
-        self.lambdaLength = self.n_interior * [0.0]
+        self.lambdaLength = self.n_interior * [1.0]
 
         self.J2dt = [Vector() for _ in range(self.n_angles)]
-        self.bstar = self.n_faces * [None]
-        self.dstar = self.n_faces * [None]
-
-        for i in range(self.n_interior):
-            self.lambdaLength[i] = 1.0
 
     def compute_sines(self):
         eix = np.exp(1j *  np.array(self.alpha))
         self.sine = eix.imag.tolist()
         self.cosine = eix.real.tolist()
 
-    def compute_sin_product(self, v: PVert, aid: int) -> float:
+    def compute_sin_product(self, v: PVert, eid: int):
+        """NOTE: Cache provides a significant increase, but causes slight asymmetry, which is not critical for Unwrap Along Axis."""
+        key = (v.id, eid)
+        val = self.sin_product_cache.get(key)
+        if val is None:
+            val = self.compute_sin_product_ex(v, eid)
+            self.sin_product_cache[key] = val
+        return val
+
+    def compute_sin_product_ex(self, v: PVert, aid: int) -> float:
         sin1 = 1.0
         sin2 = 1.0
+
         cosine = self.cosine
         sine = self.sine
-        e: PEdge = v.edge
+
+        first_edge: PEdge = v.edge
+        e: PEdge = first_edge
         while True:
             e1: PEdge = e.next
             e2: PEdge = e1.next
@@ -1514,7 +1528,28 @@ class PAbfSystem:
                 sin2 *= sine[e2_id]
 
             e = e2.pair
-            if not e or e == v.edge:
+            if not e or e == first_edge:  # wheel_edge_next
+                break
+
+        return sin1 - sin2
+
+    def compute_sin_product_v2(self, v: PVert) -> float:
+        sin1 = 1.0
+        sin2 = 1.0
+
+        sine = self.sine
+
+        first_edge: PEdge = v.edge
+        e: PEdge = first_edge
+        while True:
+            e1: PEdge = e.next
+            e2: PEdge = e1.next
+
+            sin1 *= sine[e1.id]
+            sin2 *= sine[e2.id]
+
+            e = e2.pair
+            if not e or e == first_edge:  # wheel_edge_next
                 break
 
         return sin1 - sin2
@@ -1525,7 +1560,7 @@ class PAbfSystem:
         v1: PVert = e.next.vert
         v2: PVert = e.next.next.vert
 
-        deriv: float = float((self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id])
+        deriv: float = (self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id]
         deriv += self.lambdaTriangle[f.id]
 
         if v.flag & PVERT_INTERIOR:
@@ -1541,7 +1576,7 @@ class PAbfSystem:
             product: float = self.compute_sin_product(v2, e_id)
             deriv += self.lambdaLength[v2.id] * product
 
-        return deriv
+        return float(deriv)
 
     def compute_gradient(self, chart: PChart) -> float:
         from math import pi
@@ -1575,13 +1610,14 @@ class PAbfSystem:
                 e: PEdge = v.edge
                 while True:
                     g_planar += self.alpha[e.id]
-                    e = e.next.next.pair
+                    e = e.wheel_edge_next
                     if not e or e == v.edge:
                         break
 
                 self.bInterior[v.id] = g_planar
 
-                g_length: float = self.compute_sin_product(v, -1)
+                # g_length: float = self.compute_sin_product(v, -1)
+                g_length: float = self.compute_sin_product_v2(v)
                 self.bInterior[n_interior + v.id] = g_length
 
         norm += np.square(self.bInterior).sum()
@@ -1614,17 +1650,16 @@ class PAbfSystem:
         # bstar1 = (J1 dInv*bAlpha - bTriangle)
         # use this later for computing other lambda's
         from .umath import np_vec_dot
-        self.bstar = np_vec_dot(self.inv_weight.reshape(-1, 3), self.bAlpha.reshape(-1, 3))  # noqa
+        self.bstar = np_vec_dot(self.inv_weight, self.bAlpha.reshape(-1, 3))  # noqa
         self.bstar -= self.bTriangle
 
         # J1t = si*bstar1 - bAlpha
         J1t = (self.dstar * self.bstar).repeat(3) - self.bAlpha
 
-        inv_weight_per_face = self.inv_weight.reshape(-1, 3)  # noqa
         J1t_per_face = J1t.reshape(-1, 3)
 
-        for f, (wi1, wi2, wi3), (beta1, beta2, beta3), W in zip(chart.faces, inv_weight_per_face, J1t_per_face, self.W):
-            v_id = non_init_ids.copy()
+        for f, (wi1, wi2, wi3), (beta1, beta2, beta3), (col1, col2, col3) in zip(chart.faces, self.inv_weight, J1t_per_face, self.W):
+            v_ids = non_init_ids.copy()
 
             e1: PEdge = f.edge
             e2: PEdge = e1.next
@@ -1637,73 +1672,54 @@ class PAbfSystem:
             e2_id = e2.id
             e3_id = e3.id
 
-            W = Matrix(W)
-
             if v1.flag & PVERT_INTERIOR:
-                v_id[0] = v1.id
-                v_id[3] = n_interior + v1.id
+                v_ids[0] = v1.id
+                v_ids[3] = n_interior + v1.id
 
                 self.J2dt[e1_id][0] = j2[0][0] = wi1
                 self.J2dt[e2_id][0] = j2[1][0] = self.compute_sin_product(v1, e2_id) * wi2
                 self.J2dt[e3_id][0] = j2[2][0] = self.compute_sin_product(v1, e3_id) * wi3
 
-                context.right_hand_side_add(v1.id, j2[0][0] * beta1)
+                context.right_hand_side_add(v1.id, wi1 * beta1)
                 context.right_hand_side_add(n_interior + v1.id, j2[1][0] * beta2 + j2[2][0] * beta3)
 
-                row1[0], row2[0], row3[0] = j2[0][0] * W.col[0]
-                row1[3], row2[3], row3[3] = j2[1][0] * W.col[1] + j2[2][0] * W.col[2]
+                row1[0], row2[0], row3[0] = wi1 * col1
+                row1[3], row2[3], row3[3] = j2[1][0] * col2 + j2[2][0] * col3
 
             if v2.flag & PVERT_INTERIOR:
-                v_id[1] = v2.id
-                v_id[4] = n_interior + v2.id
+                v_ids[1] = v2.id
+                v_ids[4] = n_interior + v2.id
 
                 self.J2dt[e1_id][1] = j2[0][1] = self.compute_sin_product(v2, e1_id) * wi1
                 self.J2dt[e2_id][1] = j2[1][1] = wi2
                 self.J2dt[e3_id][1] = j2[2][1] = self.compute_sin_product(v2, e3_id) * wi3
 
-                context.right_hand_side_add(v2.id, j2[1][1] * beta2)
+                context.right_hand_side_add(v2.id, wi2 * beta2)
                 context.right_hand_side_add(n_interior + v2.id, j2[0][1] * beta1 + j2[2][1] * beta3)
 
-                row1[1], row2[1], row3[1] = j2[1][1] * W.col[1]
-                row1[4], row2[4], row3[4] = j2[0][1] * W.col[0] + j2[2][1] * W.col[2]
+                row1[1], row2[1], row3[1] = wi2 * col2
+                row1[4], row2[4], row3[4] = j2[0][1] * col1 + j2[2][1] * col3
 
             if v3.flag & PVERT_INTERIOR:
-                v_id[2] = v3.id
-                v_id[5] = n_interior + v3.id
+                v_ids[2] = v3.id
+                v_ids[5] = n_interior + v3.id
 
                 self.J2dt[e1_id][2] = j2[0][2] = self.compute_sin_product(v3, e1_id) * wi1
                 self.J2dt[e2_id][2] = j2[1][2] = self.compute_sin_product(v3, e2_id) * wi2
                 self.J2dt[e3_id][2] = j2[2][2] = wi3
 
-                context.right_hand_side_add(v3.id, j2[2][2] * beta3)
+                context.right_hand_side_add(v3.id, wi3 * beta3)
                 context.right_hand_side_add(n_interior + v3.id, j2[0][2] * beta1 + j2[1][2] * beta2)
 
-                row1[2], row2[2], row3[2] = j2[2][2] * W.col[2]
-                row1[5], row2[5], row3[5] = j2[0][2] * W.col[0] + j2[1][2] * W.col[1]
+                row1[2], row2[2], row3[2] = wi3 * col3
+                row1[5], row2[5], row3[5] = j2[0][2] * col1 + j2[1][2] * col2
 
-            for i, row in zip(range(3), v_id):
-                if row == -1:
-                    continue
+            self.matrix_invert_matrix_add(context, j2, n_interior, row1, row2, row3, v_ids)
 
-                for j, col in zip(range(6), v_id):
-                    if col == -1:
-                        continue
+        success = self.matrix_invert_solve(chart, context, n_interior)
+        return success
 
-                    if i == 0:
-                        context.matrix_add(row, col, j2[0][i] * row1[j])
-                    else:
-                        context.matrix_add(row + n_interior, col, j2[0][i] * row1[j])
-
-                    if i == 1:
-                        context.matrix_add(row, col, j2[1][i] * row2[j])
-                    else:
-                        context.matrix_add(row + n_interior, col, j2[1][i] * row2[j])
-
-                    if i == 2:
-                        context.matrix_add(row, col, j2[2][i] * row3[j])
-                    else:
-                        context.matrix_add(row + n_interior, col, j2[2][i] * row3[j])
-
+    def matrix_invert_solve(self, chart: PChart, context: LinearSolver, n_interior: int):
         if success := context.solve():
             for face_idx, f in enumerate(chart.faces):
                 e1: PEdge = f.edge
@@ -1749,11 +1765,36 @@ class PAbfSystem:
                 self.adjust_alpha(e2_id, d_lambda1, pre2)
                 self.adjust_alpha(e3_id, d_lambda1, pre3)
 
-
             for i in range(n_interior):
                 self.lambdaPlanar[i] += context.variable_get(i)
                 self.lambdaLength[i] += context.variable_get(n_interior + i)
         return success
+
+    @staticmethod
+    def matrix_invert_matrix_add(context: 'LinearSolver', j2: Matrix, n_interior: int,
+                                 row1: list[float], row2: list[float], row3: list[float], v_id: list[int]):
+        for i, row in zip(range(3), v_id):
+            if row == -1:
+                continue
+
+            for j, col in zip(range(6), v_id):
+                if col == -1:
+                    continue
+
+                if i == 0:
+                    context.matrix_add(row, col, j2[0][i] * row1[j])
+                else:
+                    context.matrix_add(row + n_interior, col, j2[0][i] * row1[j])
+
+                if i == 1:
+                    context.matrix_add(row, col, j2[1][i] * row2[j])
+                else:
+                    context.matrix_add(row + n_interior, col, j2[1][i] * row2[j])
+
+                if i == 2:
+                    context.matrix_add(row, col, j2[2][i] * row3[j])
+                else:
+                    context.matrix_add(row + n_interior, col, j2[2][i] * row3[j])
 
 
 class GeoUVPinIndex:
