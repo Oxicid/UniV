@@ -1064,7 +1064,7 @@ class PChart:
                     # p_abf_free_system(sys)
                     return False
                 # print(i, norm)
-                sys.compute_sines()
+                # sys.compute_sines()  # TODO: Implement true compute_sin_product without cache
 
             else:
                 print("UniV: ABF maximum iterations reached")
@@ -1479,14 +1479,14 @@ class PAbfSystem:
         # self.bTriangle = self.n_faces * [None]
         self.bInterior = np.zeros(self.n_interior * 2, dtype=float)
 
-        self.lambdaTriangle = self.n_faces * [0.0]
+        self.lambdaTriangle = np.zeros(self.n_faces, dtype=float)
         self.lambdaPlanar = self.n_interior * [0.0]
         self.lambdaLength = self.n_interior * [1.0]
 
         self.J2dt = [Vector() for _ in range(self.n_angles)]
 
     def compute_sines(self):
-        eix = np.exp(1j *  np.array(self.alpha))
+        eix = np.exp(1j *  self.alpha)
         self.sine = eix.imag.tolist()
         self.cosine = eix.real.tolist()
 
@@ -1500,6 +1500,8 @@ class PAbfSystem:
         return val
 
     def compute_sin_product_ex(self, v: PVert, aid: int) -> float:
+        """Sines and cosines are recalculated at each iteration, so it is impossible to cache the result."""
+
         sin1 = 1.0
         sin2 = 1.0
 
@@ -1554,27 +1556,26 @@ class PAbfSystem:
 
         return sin1 - sin2
 
-    def compute_grad_alpha(self, f: PFace, e: PEdge) -> float:
+    def compute_grad_alpha(self, e: PEdge) -> float:
         e_id = e.id
-        v: PVert = e.vert
-        v1: PVert = e.next.vert
-        v2: PVert = e.next.next.vert
+        v1: PVert = e.vert
+        v2: PVert = e.next.vert
+        v3: PVert = e.next.next.vert
 
-        deriv: float = (self.alpha[e_id] - self.beta[e_id]) * self.weight[e_id]
-        deriv += self.lambdaTriangle[f.id]
-
-        if v.flag & PVERT_INTERIOR:
-            deriv += self.lambdaPlanar[v.id]
-
+        deriv: float = 0.0
 
         if v1.flag & PVERT_INTERIOR:
-            product: float = self.compute_sin_product(v1, e_id)
-            deriv += self.lambdaLength[v1.id] * product
+            deriv += self.lambdaPlanar[v1.id]
 
 
         if v2.flag & PVERT_INTERIOR:
             product: float = self.compute_sin_product(v2, e_id)
             deriv += self.lambdaLength[v2.id] * product
+
+
+        if v3.flag & PVERT_INTERIOR:
+            product: float = self.compute_sin_product(v3, e_id)
+            deriv += self.lambdaLength[v3.id] * product
 
         return float(deriv)
 
@@ -1587,11 +1588,19 @@ class PAbfSystem:
             e2: PEdge = e1.next
             e3: PEdge = e2.next
 
-            g_alphas.append(self.compute_grad_alpha(f, e1))
-            g_alphas.append(self.compute_grad_alpha(f, e2))
-            g_alphas.append(self.compute_grad_alpha(f, e3))
+            g_alphas.append(self.compute_grad_alpha(e1))
+            g_alphas.append(self.compute_grad_alpha(e2))
+            g_alphas.append(self.compute_grad_alpha(e3))
 
         self.bAlpha = np.array(g_alphas, dtype=float)
+
+        # Compute the remaining derivative outside compute_grad_alpha, taking advantage of numpy speed advantages.
+        deriv = (self.alpha - self.beta)
+        deriv *= self.weight
+        deriv += self.lambdaTriangle.repeat(3)  # noqa
+        self.bAlpha += deriv # noqa
+
+
         norm = np.dot(self.bAlpha, self.bAlpha)
         np.negative(self.bAlpha, out=self.bAlpha)
 
@@ -1627,10 +1636,10 @@ class PAbfSystem:
         return float(norm)
 
     def adjust_alpha(self, id_: int, d_lambda1: float, pre: float):
-        alpha: float = float(self.alpha[id_])
+        alpha = self.alpha[id_]
         dalpha: float = (self.bAlpha[id_] - d_lambda1)
         alpha += dalpha / self.weight[id_] - pre
-        self.alpha[id_] = clamp(alpha, 0.0, pi)
+        self.alpha[id_] = clamp(alpha, 0.0, pi)  # noqa
 
 
     def matrix_invert(self, chart: PChart) -> bool:
