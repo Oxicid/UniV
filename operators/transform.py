@@ -1200,17 +1200,16 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
         return self.align()
 
 
-class UNIV_OT_Flip(Operator):
-    bl_idname = 'uv.univ_flip'
+class UNIV_OT_Flip_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_flip'
     bl_label = 'Flip'
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "FlipX and FlipY.\n\n" \
                      "Default - Flip island.\n" \
                      "Shift - Individual flip.\n" \
                      "Ctrl - Flip by cursor.\n" \
                      "Alt - Flip by Y axis.\n\n" \
-                     "Shift and Ctrl conflict between them"
-
-    bl_options = {'REGISTER', 'UNDO'}
+                     "Shift and Ctrl conflict between them."
 
     mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
@@ -1220,10 +1219,6 @@ class UNIV_OT_Flip(Operator):
     ))
 
     axis: EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
         self.layout.row(align=True).prop(self, 'axis', expand=True)
@@ -1252,42 +1247,71 @@ class UNIV_OT_Flip(Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
-        self.scale = Vector((1, 1))
+        self.scale = Vector()
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
+        self.calc_island_type = AdvIslands
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
-        self.scale = self.get_flip_scale_from_axis(self.axis)
+        self.scale = Vector((-1, 1)) if self.axis == 'X' else Vector((1, -1))
 
-        self.umeshes = UMeshes(report=self.report)
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        if self.umeshes.is_edit_mode:
+            if not self.bl_idname.startswith('UV'):
+                self.umeshes.set_sync()
+                self.umeshes.sync_invalidate()
 
-        if not self.umeshes:
-            return self.umeshes.update()
-        if not selected_umeshes and self.mouse_pos:
-            return self.pick_flip()
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            if selected_umeshes:
+                self.calc_island_type = AdvIslands.calc_extended_with_mark_seam
+                if self.mode == 'FLIPPED':
+                    self.calc_island_type = self.calc_selected_flipped_islands_with_mark_seam
+            else:
+                self.calc_island_type = AdvIslands.calc_visible_with_mark_seam
+                if self.mode == 'FLIPPED':
+                    self.calc_island_type = self.calc_visible_flipped_islands_with_mark_seam
+
+            if not self.umeshes:
+                return self.umeshes.update()
+            if not selected_umeshes and self.mouse_pos:
+                return self.pick_flip()
+        else:
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            self.umeshes.ensure()
+            self.calc_island_type = AdvIslands.calc_with_hidden_with_mark_seam
+            if self.mode == 'FLIPPED':
+                self.calc_island_type = self.calc_with_hidden_flipped_islands_with_mark_seam
 
         match self.mode:
             case 'DEFAULT':
-                self.flip_ex(extended=selected_umeshes)
+                self.flip_default()
             case 'BY_CURSOR':
                 if not (cursor_loc := utils.get_cursor_location()):
                     self.umeshes.report({'INFO'}, "Cursor not found")
                     return {'FINISHED'}
-                self.flip_by_cursor(cursor=cursor_loc, extended=selected_umeshes)
+                self.flip_by_cursor(cursor=cursor_loc)
             case 'INDIVIDUAL':
-                self.flip_individual(extended=selected_umeshes)
+                self.flip_individual()
             case _:  # 'FLIPPED':
-                self.flip_flipped(extended=selected_umeshes)
-        return self.umeshes.update()
+                self.flip_flipped()
 
-    def flip_ex(self, extended):
+        self.umeshes.update()
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
+    def flip_default(self):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -1296,22 +1320,22 @@ class UNIV_OT_Flip(Operator):
         for islands in islands_of_mesh:
             islands.scale(scale=self.scale, pivot=pivot)
 
-    def flip_by_cursor(self, cursor, extended):
+    def flip_by_cursor(self, cursor):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
-    def flip_individual(self, extended):
+    def flip_individual(self):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
 
-    def flip_flipped(self, extended):
+    def flip_flipped(self):
         for umesh in self.umeshes:
-            if islands := self.calc_extended_or_visible_flipped_islands_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
@@ -1320,38 +1344,47 @@ class UNIV_OT_Flip(Operator):
             return self.report({'INFO'}, 'Flipped islands not found')
 
     @staticmethod
-    def calc_extended_or_visible_flipped_islands_with_mark_seam(umesh, extended):
+    def calc_visible_flipped_islands_with_mark_seam(umesh):
         uv = umesh.uv
-        if extended:
-            if umesh.is_full_face_deselected:
-                return AdvIslands()
-
         AdvIslands.tag_filter_visible(umesh)
 
-        for f_ in umesh.bm.faces:
-            if f_.tag:
-                f_.tag = utils.is_flipped_uv(f_, uv)
+        for f in umesh.bm.faces:
+            if f.tag:
+                f.tag = utils.is_flipped_uv(f, uv)
 
-        if extended:
-            islands_ = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh) if
-                        AdvIslands.island_filter_is_any_face_selected(i, umesh)]
-        else:
-            islands_ = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh)]
+        islands_ = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh)]
         return AdvIslands(islands_, umesh)
 
     @staticmethod
-    def get_flip_scale_from_axis(axis):
-        return Vector((-1, 1)) if axis == 'X' else Vector((1, -1))
+    def calc_selected_flipped_islands_with_mark_seam(umesh):
+        uv = umesh.uv
+        if umesh.is_full_face_deselected:
+            return AdvIslands()
+
+        AdvIslands.tag_filter_selected(umesh)
+
+        for f in umesh.bm.faces:
+            if f.tag:
+                f.tag = utils.is_flipped_uv(f, uv)
+
+        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh) if
+                    AdvIslands.island_filter_is_any_face_selected(i, umesh)]
+        return AdvIslands(islands, umesh)
+
+    @staticmethod
+    def calc_with_hidden_flipped_islands_with_mark_seam(umesh):
+        uv = umesh.uv
+        for f in umesh.bm.faces:
+            f.tag = utils.is_flipped_uv(f, uv)
+
+        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_with_markseam_iter_ex(umesh)]
+        return AdvIslands(islands, umesh)
 
     def pick_flip(self):
         hit = IslandHit(self.mouse_pos, self.max_distance)
-        if self.mode == 'FLIPPED':
-            islands_calc_type = self.calc_extended_or_visible_flipped_islands_with_mark_seam
-        else:
-            islands_calc_type = AdvIslands.calc_extended_or_visible_with_mark_seam
 
         for umesh in self.umeshes:
-            for isl in islands_calc_type(umesh, extended=False):
+            for isl in self.calc_island_type(umesh):
                 hit.find_nearest_island_by_crn(isl)
 
         if not hit:
@@ -1368,17 +1401,22 @@ class UNIV_OT_Flip(Operator):
         return {'FINISHED'}
 
 
-class UNIV_OT_Rotate(Operator):
-    bl_idname = 'uv.univ_rotate'
+class UNIV_OT_Flip(UNIV_OT_Flip_VIEW3D):
+    bl_idname = 'uv.univ_flip'
+    bl_description = UNIV_OT_Flip_VIEW3D.bl_description + "\n\nHas [F] keymap"
+
+
+class UNIV_OT_Rotate_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_rotate'
     bl_label = 'Rotate'
+    bl_options = {'REGISTER', 'UNDO'}
     bl_description = "Rotate CW and Rotate CCW\n\n" \
                      "Context keymaps on button:\n" \
                      "\t\tDefault - Rotate\n" \
                      "\t\tCtrl - By Cursor\n" \
                      "\t\tShift - Individual\n" \
-                     "\t\tAlt - CCW\n\n" \
-                     "Has [5, Alt+5, Shift+5, Ctrl+5] keymaps"
-    bl_options = {'REGISTER', 'UNDO'}
+                     "\t\tAlt - CCW"
+
 
     mode: EnumProperty(name='Mode',
                        default='DEFAULT',
@@ -1483,7 +1521,7 @@ class UNIV_OT_Rotate(Operator):
     def rotate_by_cursor(self):
         if not (cursor := utils.get_cursor_location()):
             self.report({'INFO'}, "Cursor not found")
-            return {'FINISHED'}
+            return
         for umesh in self.umeshes:
             if islands := self.calc_island_type(umesh):
                 islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
@@ -1512,14 +1550,9 @@ class UNIV_OT_Rotate(Operator):
         return {'FINISHED'}
 
 
-class UNIV_OT_Rotate_VIEW3D(UNIV_OT_Rotate):
-    bl_idname = 'mesh.univ_rotate'
-    bl_description = "Rotate CW and Rotate CCW\n\n" \
-                     "Context keymaps on button:\n" \
-                     "\t\tDefault - Rotate\n" \
-                     "\t\tCtrl - By Cursor\n" \
-                     "\t\tShift - Individual\n" \
-                     "\t\tAlt - CCW"
+class UNIV_OT_Rotate(UNIV_OT_Rotate_VIEW3D):
+    bl_idname = 'uv.univ_rotate'
+    bl_description = UNIV_OT_Rotate_VIEW3D.bl_description + "\n\nHas [5, Alt+5, Shift+5, Ctrl+5] keymaps"
 
 
 class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):

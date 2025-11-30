@@ -332,7 +332,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
             row = col_align.row(align=True)
             row.operator('mesh.univ_rotate', icon_value=icons.rotate)
-            # row.operator('mesh.univ_flip', icon_value=icons.flip)
+            row.operator('mesh.univ_flip', icon_value=icons.flip)
 
             col_align.separator(factor=0.25)
 
