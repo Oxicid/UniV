@@ -896,9 +896,9 @@ class PChart:
     def lscm_solve(self) -> bool:
         context: LinearSolver = self.context
 
-        for v in self.verts:
-            if v.flag & PVERT_PIN:
-                v.load_pin_select_uvs() # Reload for Live Unwrap.
+        # for v in self.verts:
+        #     if v.flag & PVERT_PIN:
+        #         v.load_pin_select_uvs() # Reload for Live Unwrap.
 
         if self.single_pin:
             # If only one pin, save location as origin.
@@ -1061,7 +1061,7 @@ class PChart:
 
                 if not sys.matrix_invert(self):
                     print("UniV: ABF failed to invert matrix")
-                    # p_abf_free_system(sys)
+
                     return False
                 # print(i, norm)
                 # sys.compute_sines()  # TODO: Implement true compute_sin_product without cache

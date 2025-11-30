@@ -189,7 +189,7 @@ class ViewBoxSyncBlock:
 
     @classmethod
     def from_area(cls, area):
-        if area and area.ui_type == 'UV':
+        if area and area.ui_type == 'UV' and not USE_GENERIC_UV_SYNC:
             reg = area.regions[-1]
             if reg.type == 'WINDOW':
                 from ..utypes import BBox
@@ -214,7 +214,7 @@ class ViewBoxSyncBlock:
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,0.5))
 
     def skip_from_param(self, umesh: 'utypes.UMesh', select: bool):
-        if select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
+        if not USE_GENERIC_UV_SYNC and select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
             self.skip = False
         else:
             self.skip = True
