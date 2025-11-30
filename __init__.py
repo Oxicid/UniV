@@ -88,6 +88,7 @@ def load_register_types():
             stitch_and_weld.UNIV_OT_Stitch_VIEW3D,
             stitch_and_weld.UNIV_OT_Stitch,
             # Transforms
+            transform.UNIV_OT_Orient_VIEW3D,
             transform.UNIV_OT_Orient,
             transform.UNIV_OT_Gravity,
             transform.UNIV_OT_Align,

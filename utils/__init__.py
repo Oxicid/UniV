@@ -214,10 +214,11 @@ class ViewBoxSyncBlock:
             LinesDrawSimple.draw_register(self.view_box.draw_data_lines(), (.1,1,1,0.5))
 
     def skip_from_param(self, umesh: 'utypes.UMesh', select: bool):
-        if not USE_GENERIC_UV_SYNC and select and umesh.elem_mode in ('VERT', 'EDGE') and not umesh.sync_valid:
-            self.skip = False
-        else:
-            self.skip = True
+        self.skip = True
+        if not USE_GENERIC_UV_SYNC and select and not umesh.sync_valid:
+            if self.view_box and umesh.is_edit_bm:
+                if umesh.elem_mode in ('VERT', 'EDGE'):
+                    self.skip = False
 
     def filter_by_isect_islands(self, islands):
         if not self.skip:

@@ -2827,8 +2827,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_orient'
     bl_label = 'Orient'
     bl_description = "Rotated to a minimal rectangle, either vertical or horizontal\n\n" \
-                     "Default - Fit by Islands\n" \
-                     "Alt - Orient by Edge\n" \
+                     "Shift - Lock Overlaps\n" \
                      "Has [O] keymap"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -2856,10 +2855,6 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         self.lock_overlap = event.shift
         return self.execute(context)
 
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.aspect: float = 1.0
@@ -2875,33 +2870,53 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         self.umeshes.update_tag = False
         self.view_box_sync_block = utils.ViewBoxSyncBlock.from_area(context.area)
 
-        selected_edges = []
-        selected_faces, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-        self.umeshes = selected_faces if selected_faces else visible
-        if not selected_faces:
-            selected_edges, visible = visible.filtered_by_selected_and_visible_uv_edges()
-            self.umeshes = selected_edges if selected_edges else visible
+        if self.umeshes.is_edit_mode:
+            if not self.bl_idname.startswith('UV'):
+                self.umeshes.set_sync()
+                self.umeshes.sync_invalidate()
 
-        if not self.umeshes:
-            return self.umeshes.update()
+            selected_edges = []
+            selected_faces, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_faces if selected_faces else visible
+            if not selected_faces:
+                selected_edges, visible = visible.filtered_by_selected_and_visible_uv_edges()
+                self.umeshes = selected_edges if selected_edges else visible
 
-        if self.lock_overlap:
-            if selected_faces:
-                self.orient_islands_with_selected_faces_overlap(extended=True)
-            elif selected_edges:
-                self.orient_islands_with_selected_edges_overlap()
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            if self.lock_overlap:
+                if selected_faces:
+                    self.orient_islands_with_selected_faces_overlap(extended=True)
+                elif selected_edges:
+                    self.orient_islands_with_selected_edges_overlap()
+                else:
+                    self.orient_islands_with_selected_faces_overlap(extended=False)
             else:
-                self.orient_islands_with_selected_faces_overlap(extended=False)
+                if selected_faces:
+                    self.orient_islands_with_selected_faces()
+                elif selected_edges:
+                    self.orient_islands_with_selected_edges()
+                else:
+                    return self.orient_pick_or_visible()
         else:
-            if selected_faces:
-                self.orient_islands_with_selected_faces()
-            elif selected_edges:
-                self.orient_islands_with_selected_edges()
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            self.umeshes.set_sync()
+            self.umeshes.ensure()  # TODO: Check without ensure
+            if self.lock_overlap:
+                self.orient_islands_overlap_obj_mode()
             else:
-                return self.orient_pick_or_visible()
+                self.orient_islands_obj_mode()
 
         self.umeshes.update(info="All islands oriented")
         self.view_box_sync_block.draw_if_blocked()
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
         return {'FINISHED'}
 
     def orient_islands_with_selected_faces(self):
@@ -2974,6 +2989,24 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         for overlapped_isl in self.calc_overlapped_island_groups(islands_of_mesh):
             self.orient_island(overlapped_isl)
 
+    def orient_islands_overlap_obj_mode(self):
+        islands_of_mesh = []
+        for umesh in self.umeshes:
+            islands = AdvIslands.calc_with_hidden_with_mark_seam(umesh)
+
+            if islands:
+                islands.calc_tris()
+                islands.calc_flat_coords(save_triplet=True)
+                islands_of_mesh.extend(islands)
+
+        for overlapped_isl in self.calc_overlapped_island_groups(islands_of_mesh):
+            self.orient_island(overlapped_isl)
+
+    def orient_islands_obj_mode(self):
+        for umesh in self.umeshes:
+            for isl in AdvIslands.calc_with_hidden_with_mark_seam(umesh):
+                self.orient_island(isl)
+
     def orient_islands_with_selected_edges_overlap(self):
         islands_of_mesh = []
 
@@ -3037,12 +3070,12 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         boundary_coords_for_pivot = []
 
         iter_isl = island if isinstance(island, UnionIslands) else (island, )
-        for isl_ in iter_isl:
-            uv = isl_.umesh.uv
+        for isl in iter_isl:
+            uv = isl.umesh.uv
             vec_aspect = Vector((self.aspect, 1.0))
 
-            is_boundary = utils.is_boundary_func(isl_.umesh)
-            boundary_corners = (crn for f in isl_ for crn in f.loops if is_boundary(crn))
+            is_boundary = utils.is_boundary_func(isl.umesh, invisible_check=isl.umesh.is_edit_bm)
+            boundary_corners = (crn for f in isl for crn in f.loops if is_boundary(crn))
             for crn in boundary_corners:
                 v1 = crn[uv].uv
                 v2 = crn.link_loop_next[uv].uv
@@ -3072,6 +3105,12 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
             if bbox.width*self.aspect > bbox.height:
                 final_angle = pi/2 if angle < 0 else -pi/2
                 island.umesh.update_tag |= island.rotate(final_angle, bbox.center, self.aspect)
+
+
+class UNIV_OT_Orient_VIEW3D(UNIV_OT_Orient):
+    bl_idname = 'mesh.univ_orient'
+    bl_description = "Rotated to a minimal rectangle, either vertical or horizontal\n\n" \
+                     "Shift - Lock Overlaps"
 
 
 # The code was taken and modified from the TexTools addon:
