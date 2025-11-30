@@ -1390,10 +1390,6 @@ class UNIV_OT_Rotate(Operator):
     user_angle: FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
 
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
-
     def draw(self, context):
         self.layout.prop(self, 'user_angle', slider=True)
         self.layout.prop(self, 'use_correct_aspect', toggle=1)
@@ -1424,32 +1420,58 @@ class UNIV_OT_Rotate(Operator):
         self.aspect = 1.0
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
+        self.calc_island_type = AdvIslands
 
     def execute(self, context):
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
         self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         self.umeshes = UMeshes(report=self.report)
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
-        if not self.umeshes:
-            return self.umeshes.update()
-        if not selected_umeshes and self.mouse_pos:
-            return self.pick_rotate()
+        if self.umeshes.is_edit_mode:
+            if not self.bl_idname.startswith('UV'):
+                self.umeshes.set_sync()
+                self.umeshes.sync_invalidate()
+
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            if selected_umeshes:
+                self.calc_island_type = AdvIslands.calc_extended_with_mark_seam
+            else:
+                self.calc_island_type = AdvIslands.calc_visible_with_mark_seam
+
+            if not self.umeshes:
+                return self.umeshes.update()
+            if not selected_umeshes and self.mouse_pos:
+                return self.pick_rotate()
+        else:
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            self.umeshes.ensure()
+            self.calc_island_type = AdvIslands.calc_with_hidden_with_mark_seam
 
         if self.mode == 'DEFAULT':
-            return self.rotate(extended=selected_umeshes)
+            self.rotate()
         elif self.mode == 'BY_CURSOR':
-            return self.rotate_by_cursor(extended=selected_umeshes)
+            self.rotate_by_cursor()
         else:
-            return self.rotate_individual(extended=selected_umeshes)
+            self.rotate_individual()
 
-    def rotate(self, extended):
+        self.umeshes.update()
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
+    def rotate(self):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -1457,25 +1479,22 @@ class UNIV_OT_Rotate(Operator):
         pivot = general_bbox.center
         for islands in islands_of_mesh:
             islands.rotate(self.angle, pivot=pivot, aspect=self.aspect)
-        return self.umeshes.update()
 
-    def rotate_by_cursor(self, extended):
+    def rotate_by_cursor(self):
         if not (cursor := utils.get_cursor_location()):
             self.report({'INFO'}, "Cursor not found")
             return {'FINISHED'}
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
             umesh.update_tag = bool(islands)
-        return self.umeshes.update()
 
-    def rotate_individual(self, extended):
+    def rotate_individual(self):
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if islands := self.calc_island_type(umesh):
                 for island in islands:
                     island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=self.aspect)
             umesh.update_tag = bool(islands)
-        return self.umeshes.update()
 
     def pick_rotate(self):
         hit = IslandHit(self.mouse_pos, self.max_distance)
@@ -1491,6 +1510,16 @@ class UNIV_OT_Rotate(Operator):
         hit.island.rotate(self.angle, pivot, self.aspect)
         hit.island.umesh.update()
         return {'FINISHED'}
+
+
+class UNIV_OT_Rotate_VIEW3D(UNIV_OT_Rotate):
+    bl_idname = 'mesh.univ_rotate'
+    bl_description = "Rotate CW and Rotate CCW\n\n" \
+                     "Context keymaps on button:\n" \
+                     "\t\tDefault - Rotate\n" \
+                     "\t\tCtrl - By Cursor\n" \
+                     "\t\tShift - Individual\n" \
+                     "\t\tAlt - CCW"
 
 
 class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
