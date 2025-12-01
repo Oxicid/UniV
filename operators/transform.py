@@ -2068,10 +2068,6 @@ class UNIV_OT_Home(Operator):
 
     to_cursor: BoolProperty(name='To Cursor', default=False)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -2110,6 +2106,11 @@ class UNIV_OT_Home(Operator):
 
         self.umeshes = UMeshes()
         self.umeshes.update_tag = False
+
+        if not self.bl_idname.startswith('UV'):
+            self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
+
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
         else:
@@ -2223,6 +2224,10 @@ class UNIV_OT_Home(Operator):
         return counter
 
 
+class UNIV_OT_Home_VIEW3D(UNIV_OT_Home):
+    bl_idname = 'mesh.univ_home'
+
+
 class UNIV_OT_Shift(Operator):
     bl_idname = "uv.univ_shift"
     bl_label = 'Shift'
@@ -2241,10 +2246,6 @@ class UNIV_OT_Shift(Operator):
     array_shift: BoolProperty(name='Array', default=True, description='U Offset')
     mirror_shift: BoolProperty(name='Mirror', default=True, description='U Offset')
     warp_shift: BoolProperty(name='Warp', default=True, description='U Offset')
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -2279,6 +2280,10 @@ class UNIV_OT_Shift(Operator):
 
         # TODO: Remove gn modifier when shift without modifier
         self.umeshes = UMeshes()
+        if not self.bl_idname.startswith('UV'):
+            self.umeshes.set_sync()
+            self.umeshes.sync_invalidate()
+
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
         else:
@@ -2583,6 +2588,10 @@ class UNIV_OT_Shift(Operator):
         return self.create_shift_node_group()
 
 
+class UNIV_OT_Shift_VIEW3D(UNIV_OT_Shift):
+    bl_idname = "mesh.univ_shift"
+
+
 class UNIV_OT_Random(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_random"
     bl_label = "Random"
@@ -2612,10 +2621,6 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     bool_bounds: BoolProperty(name="Within Image Bounds", default=False,
                               description="Keep the UV faces/islands within the 0-1 UV domain.", )
     rand_seed: IntProperty(name='Seed', default=0)
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout

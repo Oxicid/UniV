@@ -336,6 +336,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_rotate', icon_value=icons.rotate)
             row.operator('mesh.univ_flip', icon_value=icons.flip)
 
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_home', icon_value=icons.home)
+            row.operator('mesh.univ_shift', icon_value=icons.shift)
+
             col_align.operator('mesh.univ_random', icon_value=icons.random)
 
             col_align.separator(factor=0.25)
