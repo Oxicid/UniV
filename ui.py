@@ -323,7 +323,11 @@ class UNIV_PT_General_VIEW_3D(Panel):
         if panel := draw_panel(layout, 'Transform'):
             col_align = panel.column(align=True)
             col_align.operator('mesh.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
-            col_align.operator('mesh.univ_gravity', icon_value=icons.gravity)
+
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_gravity', icon_value=icons.gravity).axis = 'Z'
+            row.operator('mesh.univ_gravity', text='', icon_value=icons.x).axis = 'X'
+            row.operator('mesh.univ_gravity', text='', icon_value=icons.y).axis = 'Y'
 
             row = col_align.row(align=True)
             row.operator('mesh.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'

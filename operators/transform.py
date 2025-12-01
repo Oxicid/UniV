@@ -18,7 +18,7 @@ from bpy.types import Operator
 from bpy.props import *
 
 from math import pi, sin, cos, atan2, isclose, radians as to_rad
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from collections import defaultdict
 
 from .. import utils
@@ -3196,27 +3196,23 @@ class UNIV_OT_Gravity(Operator):
     bl_description = "Align selected UV islands or faces to world / gravity directions"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # axis: bpy.props.EnumProperty(name="Axis", default='AUTO', items=(
-    #                                 ('AUTO', 'Auto', 'Detect World axis to align to.'),
-    #                                 ('U', 'X', 'Align to the X axis of the World.'),
-    #                                 ('V', 'Y', 'Align to the Y axis of the World.'),
-    #                                 ('W', 'Z', 'Align to the Z axis of the World.')))
+    axis: bpy.props.EnumProperty(name="Axis", default='Z', items=(
+                                    ('Z', 'Up', ''),
+                                    ('X', 'Side', ''),
+                                    ('Y', 'Front', '')))
+    flip: BoolProperty(name='Flip', default=False)
     additional_angle: FloatProperty(name='Additional Angle', default=0.0, soft_min=-pi/2, soft_max=pi, subtype='ANGLE')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True,
                                      description='Gets Aspect Correct from the active image from the shader node editor')
 
     def draw(self, context):
+        self.layout.prop(self, 'flip')
         self.layout.prop(self, 'additional_angle', slider=True)
         self.layout.prop(self, 'use_correct_aspect', toggle=1)
         self.layout.row().prop(self, 'axis', expand=True)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.axis = 'AUTO'
         self.skip_count: int = 0
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: UMeshes | None = None
@@ -3225,18 +3221,18 @@ class UNIV_OT_Gravity(Operator):
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.set_sync(True)
 
-        if not self.is_edit_mode:
-            self.umeshes.ensure(face=True)
-            self.world_orient(extended=False)
-            if self.skip_count == len(self.umeshes):
-                self.umeshes.free()
-                return self.umeshes.update(info="Faces not found")
-        else:
+        if self.is_edit_mode:
             self.world_orient(extended=True)
             if self.skip_count == len(self.umeshes):
                 self.world_orient(extended=False)
                 if self.skip_count == len(self.umeshes):
                     return self.umeshes.update(info="No uv for manipulate")
+        else:
+            self.umeshes.ensure(face=True)
+            self.world_orient(extended=False)
+            if self.skip_count == len(self.umeshes):
+                self.umeshes.free()
+                return self.umeshes.update(info="Faces not found")
 
         self.umeshes.update(info="All islands oriented")
 
@@ -3248,6 +3244,15 @@ class UNIV_OT_Gravity(Operator):
 
     def world_orient(self, extended):
         self.skip_count = 0
+
+        flip_angle = pi if self.flip else 0
+        if self.axis == 'Z':
+            axis_mtx = Matrix.Rotation(flip_angle, 3, (1,0,0))
+        elif self.axis == 'Y':
+            axis_mtx = Matrix.Rotation((pi/2.0) + flip_angle, 3, (1,0,0))
+        else:
+            axis_mtx = Matrix.Rotation((-pi/2.0) + flip_angle, 3, (0,1,0))
+
         for umesh in self.umeshes:
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
@@ -3259,7 +3264,7 @@ class UNIV_OT_Gravity(Operator):
             if islands:
                 uv = islands.umesh.uv
                 _, r, _ = umesh.obj.matrix_world.decompose()
-                mtx = r.to_matrix()
+                mtx = r.to_matrix() @ axis_mtx
 
                 for island in islands:
                     if extended:
@@ -3279,11 +3284,11 @@ class UNIV_OT_Gravity(Operator):
                     x, y, z = 0, 1, 2
                     max_size = max(avg_normal, key=lambda v: abs(v))
 
-                    if (self.axis == 'AUTO' and avg_normal.z == max_size) or self.axis == 'W':
+                    if avg_normal.z == max_size:
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, y, False, avg_normal.z < 0, aspect)
-                    elif (self.axis == 'AUTO' and avg_normal.y == max_size) or self.axis == 'V':
+                    elif avg_normal.y == max_size:
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, x, z, avg_normal.y > 0, False, aspect)
-                    else:  # (self.axis == 'AUTO' and avg_normal.x == max_size) or self.axis == 'U':
+                    else:  # avg_normal.x == max_size:
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False, aspect)
 
                     if angle := (angle + self.additional_angle):
