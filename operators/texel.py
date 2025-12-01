@@ -47,10 +47,6 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
     axis: EnumProperty(name='Axis', default='XY', items=(('XY', 'Both', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -91,7 +87,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                 umesh.ensure(face=True)
 
         if self.use_aspect:
-            self.umeshes.calc_aspect_ratio(from_mesh=False)
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
 
         for umesh in self.umeshes:
             adv_islands = islands_calc_type(umesh)
@@ -255,10 +251,6 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     shear: BoolProperty(name='Shear', default=False, description='Reduce shear within islands')
     xy_scale: BoolProperty(name='Scale Independently', default=True, description='Scale U and V independently')
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -550,10 +542,6 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                      "Default - Average Islands Scale\n" \
                      "Shift - Lock Overlaps"
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def invoke(self, context, event):
         if self.bl_idname.startswith('UV'):
             self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
@@ -794,10 +782,6 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
     td_preset_idx: IntProperty(name='TD Preset Index', default=-1, options={'HIDDEN'})
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -954,10 +938,6 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_get"
     bl_label = 'Get'
     bl_description = "Get Texel Density"
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
