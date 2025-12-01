@@ -103,6 +103,7 @@ def load_register_types():
             transform.UNIV_OT_Distribute,
             transform.UNIV_OT_Home,
             transform.UNIV_OT_Shift,
+            transform.UNIV_OT_Random_VIEW3D,
             transform.UNIV_OT_Random,
             transform.UNIV_OT_Pack,
             # Texel

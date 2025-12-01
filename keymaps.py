@@ -170,8 +170,6 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
     keys.append((km, kmi))
 
-    # Rotate
-    # Default. CW.
     kmi = km.keymap_items.new('uv.univ_select_mode', 'ONE', 'PRESS')
     kmi.properties.type = 'VERTEX'
     keys.append((km, kmi))
@@ -188,6 +186,8 @@ def add_keymaps():
     kmi.properties.type = 'ISLAND'
     keys.append((km, kmi))
 
+    # Rotate
+    # Default. CW.
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
     kmi.properties.rot_dir = 'CW'
     kmi.properties.mode = 'DEFAULT'
@@ -197,18 +197,6 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', alt=True)
     kmi.properties.rot_dir = 'CCW'
     kmi.properties.mode = 'DEFAULT'
-    keys.append((km, kmi))
-
-    # Default. CW. By Cursor.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True)
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'BY_CURSOR'
-    keys.append((km, kmi))
-
-    # Default. CCW. By Cursor.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.rot_dir = 'CCW'
-    kmi.properties.mode = 'BY_CURSOR'
     keys.append((km, kmi))
 
     # Default. CW. Individual.

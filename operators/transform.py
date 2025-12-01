@@ -1455,16 +1455,16 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
         super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
         self.angle = 0.0
-        self.aspect = 1.0
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
         self.calc_island_type = AdvIslands
 
     def execute(self, context):
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
-        self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
         self.umeshes = UMeshes(report=self.report)
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
 
         if self.umeshes.is_edit_mode:
             if not self.bl_idname.startswith('UV'):
@@ -1516,7 +1516,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
 
         pivot = general_bbox.center
         for islands in islands_of_mesh:
-            islands.rotate(self.angle, pivot=pivot, aspect=self.aspect)
+            islands.rotate(self.angle, pivot=pivot, aspect=islands.umesh.aspect)
 
     def rotate_by_cursor(self):
         if not (cursor := utils.get_cursor_location()):
@@ -1524,14 +1524,14 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
             return
         for umesh in self.umeshes:
             if islands := self.calc_island_type(umesh):
-                islands.rotate(self.angle, pivot=cursor, aspect=self.aspect)
+                islands.rotate(self.angle, pivot=cursor, aspect=umesh.aspect)
             umesh.update_tag = bool(islands)
 
     def rotate_individual(self):
         for umesh in self.umeshes:
             if islands := self.calc_island_type(umesh):
                 for island in islands:
-                    island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=self.aspect)
+                    island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=island.umesh.aspect)
             umesh.update_tag = bool(islands)
 
     def pick_rotate(self):
@@ -1545,14 +1545,14 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
             return {'CANCELLED'}
 
         pivot = utils.get_cursor_location() if self.mode == 'BY_CURSOR' else hit.island.bbox.center
-        hit.island.rotate(self.angle, pivot, self.aspect)
+        hit.island.rotate(self.angle, pivot, hit.island.umesh.aspect)
         hit.island.umesh.update()
         return {'FINISHED'}
 
 
 class UNIV_OT_Rotate(UNIV_OT_Rotate_VIEW3D):
     bl_idname = 'uv.univ_rotate'
-    bl_description = UNIV_OT_Rotate_VIEW3D.bl_description + "\n\nHas [5, Alt+5, Shift+5, Ctrl+5] keymaps"
+    bl_description = UNIV_OT_Rotate_VIEW3D.bl_description + "\n\nHas [5, Alt+5, Shift+5] keymaps"
 
 
 class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
@@ -2660,7 +2660,6 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.seed = 1000
-        self.aspect = 1.0
         self.non_valid_counter = 0
         self.umeshes: UMeshes | None = None
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
@@ -2674,9 +2673,14 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             self.report({'WARNING'}, 'Objects not found')
             return {'CANCELLED'}
 
-        self.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=not self.bl_idname.startswith('UV'))
 
-        if not self.is_edit_mode:
+        if self.is_edit_mode:
+            if not self.bl_idname.startswith('UV'):
+                self.umeshes.set_sync()
+                self.umeshes.sync_invalidate()
+        else:
             self.umeshes.ensure(face=True)
 
         self.random_preprocessing()
@@ -2751,8 +2755,8 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                         elif angle < -self.rotation:
                             angle += self.rotation_steps
 
-                    if island.rotate(angle, vec_origin, self.aspect):
-                        bb.rotate_expand(angle, self.aspect)
+                    if island.rotate(angle, vec_origin, island.umesh.aspect):
+                        bb.rotate_expand(angle, island.umesh.aspect)
 
                 scale = bl_math.lerp(1.0, rand_scale, self.scale_factor)
 
@@ -2843,7 +2847,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
                         elif angle < -self.rotation:
                             angle += self.rotation_steps
 
-                    island.rotate(angle, vec_origin, self.aspect)
+                    island.rotate(angle, vec_origin, island.umesh.aspect)
                     # if island.rotate(angle, vec_origin):
                     #     bb.rotate_expand(angle)
                 if self.bound_between != 'CROP':
@@ -2883,6 +2887,10 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 
             crop_scale = min(width_scale, height_scale)
             island.scale(Vector((crop_scale, crop_scale)), bb.center)
+
+
+class UNIV_OT_Random_VIEW3D(UNIV_OT_Random):
+    bl_idname = "mesh.univ_random"
 
 
 class UNIV_OT_Orient(Operator, utils.OverlapHelper):

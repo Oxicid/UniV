@@ -330,9 +330,13 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
             row.operator('mesh.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
 
+            col_align.separator(factor=0.25)
+
             row = col_align.row(align=True)
             row.operator('mesh.univ_rotate', icon_value=icons.rotate)
             row.operator('mesh.univ_flip', icon_value=icons.flip)
+
+            col_align.operator('mesh.univ_random', icon_value=icons.random)
 
             col_align.separator(factor=0.25)
 
