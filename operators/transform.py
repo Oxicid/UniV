@@ -1461,6 +1461,8 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
 
     def execute(self, context):
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
+        if not self.bl_idname.startswith('UV'):
+            self.angle = -self.angle
 
         self.umeshes = UMeshes(report=self.report)
         if self.use_correct_aspect:
