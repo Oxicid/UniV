@@ -67,6 +67,9 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mode: str = 'DEFAULT'
+        self.proportional: bool = True
+        self.umeshes: UMeshes | None = None
+        self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -86,7 +89,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         self.mode_preprocessing()
         self.calc_padding()
         self.report_padding()
-        return self.crop(self.mode, self.axis, self.padding, proportional=True, report=self.report)
+        return self.crop()
 
     def mode_preprocessing(self):
         if all((self.to_cursor, self.inplace)):
@@ -105,84 +108,65 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case False, True, True:
                 self.mode = 'INDIVIDUAL_INPLACE'
 
-    @staticmethod
-    def crop(mode, axis, padding, proportional, report=None):
-        umeshes = UMeshes(report=report)
-        crop_args = [axis, padding, umeshes, proportional]
+    def crop(self):
+        offset = None
+        if self.mode in ('TO_CURSOR', 'TO_CURSOR_INDIVIDUAL'):
+            if not (offset := utils.get_tile_from_cursor()):
+                self.report({'INFO'}, "Cursor not found")
+                return {'CANCELLED'}
 
-        match mode:
+        self.umeshes = UMeshes(report=self.report)
+
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        if selected_umeshes:
+            self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
+        else:
+            self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
+
+        match self.mode:
             case 'DEFAULT':
-                UNIV_OT_Crop.crop_default(*crop_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_default(*crop_args, extended=False)
+                self.crop_default(inplace=False)
             case 'TO_CURSOR':
-                if not (offset := utils.get_tile_from_cursor()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                UNIV_OT_Crop.crop_default(*crop_args, offset=offset, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_default(*crop_args, offset=offset, extended=False)
+                self.crop_default(inplace=False, offset=offset)
             case 'TO_CURSOR_INDIVIDUAL':
-                if not (offset := utils.get_tile_from_cursor()):
-                    if report:
-                        report({'INFO'}, "Cursor not found")
-                    return {'CANCELLED'}
-                UNIV_OT_Crop.crop_individual(*crop_args, offset=offset, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_individual(*crop_args, offset=offset, extended=False)
+                self.crop_individual(offset=offset, inplace=False)
             case 'INDIVIDUAL':
-                UNIV_OT_Crop.crop_individual(*crop_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_individual(*crop_args, extended=False)
+                self.crop_individual(inplace=False)
             case 'INDIVIDUAL_INPLACE':
-                UNIV_OT_Crop.crop_individual(*crop_args, inplace=True, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_individual(*crop_args, inplace=True, extended=False)
+                self.crop_individual(inplace=True)
             case 'INPLACE':
-                UNIV_OT_Crop.crop_inplace(*crop_args, extended=True)
-                if not umeshes.final():
-                    UNIV_OT_Crop.crop_inplace(*crop_args, extended=False)
+                self.crop_inplace()
             case _:
-                raise NotImplementedError(mode)
+                raise NotImplementedError(self.mode)
 
-        return umeshes.update()
+        return self.umeshes.update()
 
-    @staticmethod
-    def crop_default(axis, padding, umeshes, proportional, offset=Vector((0, 0)), inplace=False, extended=True):
+    def crop_default(self, inplace, offset=Vector((0, 0))):
         islands_of_mesh = []
         general_bbox = BBox()
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
-                general_bbox.union(islands.calc_bbox())
-                islands_of_mesh.append(islands)
-            umesh.update_tag = bool(islands)
+        for umesh in self.umeshes:
+            islands = self.calc_island_method(umesh)
+            general_bbox.union(islands.calc_bbox())
+            islands_of_mesh.append(islands)
 
-        if not islands_of_mesh:
-            return
+        self.crop_ex(self.axis, general_bbox, inplace, islands_of_mesh, offset, self.padding, self.proportional)
 
-        UNIV_OT_Crop.crop_ex(axis, general_bbox, inplace, islands_of_mesh, offset, padding, proportional)
+    def crop_individual(self, inplace, offset=Vector((0, 0))):
+        for umesh in self.umeshes:
+            for island in self.calc_island_method(umesh):
+                self.crop_ex(self.axis, island.calc_bbox(), inplace, (island, ), offset, self.padding, self.proportional)
 
-    @staticmethod
-    def crop_individual(axis, padding, umeshes, proportional, offset=Vector((0, 0)), inplace=False, extended=True):
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
-                for island in islands:
-                    UNIV_OT_Crop.crop_ex(axis, island.calc_bbox(), inplace, (island, ), offset, padding, proportional)
-            umesh.update_tag = bool(islands)
-
-    @staticmethod
-    def crop_inplace(axis, padding, umeshes, proportional, inplace=True, extended=True):
+    def crop_inplace(self):
         islands_of_tile: dict[int, list[tuple[FaceIsland, BBox]]] = {}
-        for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
-                for island in islands:
-                    bbox = island.calc_bbox()
-                    islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
-            umesh.update_tag = bool(islands)
-
-        if not islands_of_tile:
-            return
+        for umesh in self.umeshes:
+            for island in self.calc_island_method(umesh):
+                bbox = island.calc_bbox()
+                islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
 
         for tile, islands_and_bboxes in islands_of_tile.items():
             islands = []
@@ -191,7 +175,8 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 islands.append(island)
                 general_bbox.union(bbox)
 
-            UNIV_OT_Crop.crop_ex(axis, general_bbox, inplace, islands, Vector((0, 0)), padding, proportional)
+            self.crop_ex(self.axis, general_bbox, True, islands, Vector((0, 0)), self.padding, self.proportional)
+
 
     @staticmethod
     def crop_ex(axis, bbox, inplace, islands_of_mesh, offset, padding, proportional):
@@ -207,33 +192,38 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 scale_x = scale_y = scale_y
         else:
             if axis == 'X':
-                scale_y = 1
+                scale_y = 1.0
             if axis == 'Y':
-                scale_x = 1
+                scale_x = 1.0
 
         scale = Vector((scale_x, scale_y))
         bbox.scale(scale)
 
-        pos_x = utils.wrap_line(bbox.min.x, bbox.width+padding, 0, 1, default=0)
-        pos_y = utils.wrap_line(bbox.min.y, bbox.height+padding, 0, 1, default=0)
+        pos_x = utils.wrap_line(bbox.min.x, bbox.width + padding, 0, 1, default=0)
+        pos_y = utils.wrap_line(bbox.min.y, bbox.height + padding, 0, 1, default=0)
 
-        set_pos = Vector((pos_x, pos_y)) + Vector((padding, padding)) / 2
-        set_pos += offset
-        if axis == 'XY':
-            if inplace:
+        set_pos = Vector((pos_x, pos_y)) + (Vector((padding, padding)) / 2)
+
+        if inplace:
+            if axis == 'XY':
                 set_pos += bbox.tile_from_center
-        elif axis == 'X':
-            set_pos.y = 0
-            if inplace:
-                set_pos.x += math.floor(bbox.center_x)
-        else:
-            set_pos.x = 0
-            if inplace:
-                set_pos.y += math.floor(bbox.center_y)
+            elif axis == 'X':
+                set_pos.x += math.floor(bbox.center.x)
+            else:
+                set_pos.y += math.floor(bbox.center.y)
 
+        delta = set_pos - bbox.min
+
+        if axis == 'X':
+            delta.y = 0
+        elif axis == 'Y':
+            delta.x = 0
+
+        delta += offset
         for islands in islands_of_mesh:
             islands.scale(scale, bbox.center)
-            islands.set_position(set_pos, bbox.min)
+            islands.move(delta)
+
 
     @staticmethod
     def get_event_info():
@@ -247,10 +237,11 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        self.proportional: bool = False
         self.mode_preprocessing()
         self.calc_padding()
         self.report_padding()
-        return self.crop(self.mode, self.axis, self.padding, proportional=False, report=self.report)
+        return self.crop()
 
     @staticmethod
     def get_event_info():
