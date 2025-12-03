@@ -497,22 +497,14 @@ class FaceIsland:
                 return True
         return False
 
-    def is_full_flipped(self, partial=False) -> bool:
-        counter = 0
+    def calc_signed_area(self) -> bool:
         uv = self.umesh.uv
+        signed_area = 0.0
         for f in self.faces:
-            area = 0.0
-            uvs = [crn[uv].uv for crn in f.loops]
+            uvs: list[Vector] = [crn[uv].uv for crn in f.loops]
             for i in range(len(uvs)):
-                area += uvs[i - 1].cross(uvs[i])
-            if area < 0:
-                counter += 1
-
-        if partial:
-            if counter != 0 and counter != len(self):
-                return True
-            return False
-        return counter == len(self)
+                signed_area += uvs[i - 1].cross(uvs[i])
+        return signed_area
 
     def calc_bbox(self) -> BBox:
         return BBox.calc_bbox_uv(self.faces, self.umesh.uv)

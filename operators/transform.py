@@ -3214,6 +3214,8 @@ class UNIV_OT_Gravity(Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.skip_count: int = 0
+        self.skip_zero = 0
+        self.count_flipped = 0
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.umeshes: UMeshes | None = None
 
@@ -3236,6 +3238,11 @@ class UNIV_OT_Gravity(Operator):
 
         self.umeshes.update(info="All islands oriented")
 
+        if self.skip_zero:
+            self.report({'WARNING'}, f'Found {self.skip_zero} zero area islands')
+        if self.count_flipped:
+            self.report({'WARNING'}, f'Found {self.count_flipped} islands with flipped faces, the result may be incorrect')
+
         if not self.is_edit_mode:
             self.umeshes.free()
             bpy.context.area.tag_redraw()
@@ -3244,6 +3251,8 @@ class UNIV_OT_Gravity(Operator):
 
     def world_orient(self, extended):
         self.skip_count = 0
+        self.skip_zero = 0
+        self.count_flipped = 0
 
         flip_angle = pi if self.flip else 0
         if self.axis == 'Z':
@@ -3257,9 +3266,9 @@ class UNIV_OT_Gravity(Operator):
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
             if self.is_edit_mode:
-                islands = Islands.calc_extended_or_visible(umesh, extended=extended)
+                islands = AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
             else:
-                islands = Islands.calc_with_hidden(umesh)
+                islands = AdvIslands.calc_with_hidden_with_mark_seam(umesh)
 
             if islands:
                 uv = islands.umesh.uv
@@ -3267,6 +3276,17 @@ class UNIV_OT_Gravity(Operator):
                 mtx = r.to_matrix() @ axis_mtx
 
                 for island in islands:
+                    signed_area = island.calc_signed_area()
+                    if math.isclose(signed_area, 0.0, abs_tol=1e-8):
+                        if math.isclose(island.bbox.area, 0.0, abs_tol=1e-8):
+                            self.skip_zero += 1
+                            continue
+
+                    if signed_area < 0.0:
+                        island.scale(Vector((1, -1)), island.bbox.center)
+                        if island.has_flip_with_noflip():
+                            self.count_flipped += 1
+
                     if extended:
                         pre_calc_faces = (f for f in island if f.select)
                     else:
@@ -3292,16 +3312,16 @@ class UNIV_OT_Gravity(Operator):
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False, aspect)
 
                     if angle := (angle + self.additional_angle):
-                        umesh.update_tag |= island.rotate(angle, pivot=island.calc_bbox().center, aspect=aspect)
+                        umesh.update_tag |= island.rotate(angle, pivot=island.bbox.center, aspect=aspect)
             else:
                 self.skip_count += 1
 
     @staticmethod
-    def calc_world_orient_angle(uv, mtx, loops, x=0, y=1, flip_x=False, flip_y=False, aspect=1.0):
+    def calc_world_orient_angle(uv, mtx, loops, x: int, y: int, flip_x: bool, flip_y: bool, aspect: float):
         vec_aspect = Vector((aspect, 1.0))
-
+        eps = pi - 1e-8
         n_edges = 0
-        avg_angle = 0
+        sum_angle = 0
         for loop in loops:
             co0 = mtx @ loop.vert.co
             co1 = mtx @ loop.link_loop_next.vert.co
@@ -3315,38 +3335,30 @@ class UNIV_OT_Gravity(Operator):
                 uv0 = loop[uv].uv
                 uv1 = loop.link_loop_next[uv].uv
 
-                delta_verts = Vector((0, 0))
-                if not flip_x:
-                    delta_verts.x = co1[x] - co0[x]
-                else:
-                    delta_verts.x = co0[x] - co1[x]
-                if not flip_y:
-                    delta_verts.y = co1[y] - co0[y]
-                else:
-                    delta_verts.y = co0[y] - co1[y]
+                delta_vert_x = co0[x] - co1[x] if flip_x else co1[x] - co0[x]
+                delta_vert_y = co0[y] - co1[y] if flip_y else co1[y] - co0[y]
 
                 delta_uvs = uv1 - uv0
                 delta_uvs *= vec_aspect
 
-                a0 = atan2(*delta_verts)
-                a1 = atan2(*delta_uvs)
-
-                a_delta = atan2(sin(a0 - a1), cos(a0 - a1))
+                angle_diff = atan2(delta_vert_x, delta_vert_y) - atan2(*delta_uvs)
+                angle = atan2(sin(angle_diff), cos(angle_diff))
 
                 # Consolidation (atan2 gives the lower angle between -Pi and Pi,
-                # this triggers errors when using the average avg_angle /= n_edges for rotation angles close to Pi)
+                # this triggers errors when using the average sum_angle /= n_edges for rotation angles close to Pi)
                 if n_edges > 1:
-                    if abs((avg_angle / (n_edges - 1)) - a_delta) > 3.12:
-                        if a_delta > 0:
-                            avg_angle += (a_delta - pi * 2)
+                    avg_angle = sum_angle / (n_edges - 1)
+                    if abs(avg_angle - angle) > eps:
+                        if angle > 0:
+                            sum_angle += (angle - pi * 2)
                         else:
-                            avg_angle += (a_delta + pi * 2)
+                            sum_angle += (angle + pi * 2)
                     else:
-                        avg_angle += a_delta
+                        sum_angle += angle
                 else:
-                    avg_angle += a_delta
+                    sum_angle += angle
 
-        return avg_angle / n_edges
+        return sum_angle / n_edges
 
 
 class UNIV_OT_Pack(Operator):
