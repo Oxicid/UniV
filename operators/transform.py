@@ -51,10 +51,6 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
     individual: BoolProperty(name='Individual', default=False)
     inplace: BoolProperty(name='Inplace', default=False)
 
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
-
     def draw(self, context):
         layout = self.layout
         layout.row(align=True).prop(self, 'axis', expand=True)
@@ -116,17 +112,23 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 return {'CANCELLED'}
 
         self.umeshes = UMeshes(report=self.report)
+        self.umeshes.update_tag = False
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+            if not self.umeshes:
+                return self.umeshes.update()
 
-        if not self.umeshes:
-            return self.umeshes.update()
-
-        if selected_umeshes:
-            self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
+            if selected_umeshes:
+                self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
+            else:
+                self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
         else:
-            self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
+            if not self.umeshes:
+                return self.umeshes.update()
+            self.umeshes.ensure()
+            self.calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
 
         match self.mode:
             case 'DEFAULT':
@@ -144,7 +146,14 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case _:
                 raise NotImplementedError(self.mode)
 
-        return self.umeshes.update()
+        ot_name_to_report_name = 'cropped' if self.bl_label == 'Crop' else 'filled'
+        self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
 
     def crop_default(self, inplace, offset=Vector((0, 0))):
         islands_of_mesh = []
@@ -195,14 +204,16 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 scale_y = 1.0
             if axis == 'Y':
                 scale_x = 1.0
-
         scale = Vector((scale_x, scale_y))
         bbox.scale(scale)
 
-        pos_x = utils.wrap_line(bbox.min.x, bbox.width + padding, 0, 1, default=0)
-        pos_y = utils.wrap_line(bbox.min.y, bbox.height + padding, 0, 1, default=0)
-
-        set_pos = Vector((pos_x, pos_y)) + (Vector((padding, padding)) / 2)
+        eps = 0.000005
+        if not padding:
+            eps = 0.0
+        half_pad = padding * 0.5
+        pos_x = utils.wrap_line(bbox.min.x, bbox.width, half_pad-eps, 1-half_pad + eps, default=0)
+        pos_y = utils.wrap_line(bbox.min.y, bbox.height, half_pad-eps, 1-half_pad + eps, default=0)
+        set_pos = Vector((pos_x, pos_y))
 
         if inplace:
             if axis == 'XY':
@@ -220,9 +231,9 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             delta.x = 0
 
         delta += offset
-        for islands in islands_of_mesh:
-            islands.scale(scale, bbox.center)
-            islands.move(delta)
+        for isl in islands_of_mesh:
+            isl.umesh.update_tag |= isl.scale(scale, bbox.center)
+            isl.umesh.update_tag |= isl.move(delta)
 
 
     @staticmethod
