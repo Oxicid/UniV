@@ -1137,6 +1137,11 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
                     self.report({'WARNING'}, "Sizes not found")
                 return ret
 
+            # TODO: Fix toolbox.get_context
+            # p = __import__("poliigon-addon-blender")
+            # self = p.toolbox.cTB
+            # asset_data = self._asset_index.get_asset(7787)
+            # asset_data.specifications.get("physical_size_cm", {})
             # TODO: Implement cache system (and save them in txt)
             url = f"https://www.poliigon.com/texture/.../{poliigon_id}"
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}

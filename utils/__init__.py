@@ -504,6 +504,14 @@ def set_global_texel(isl: 'utypes.AdvIsland', calc_bbox=True):
     res = isl.set_texel(univ_settings().texel_density, texture_size)
     return bool(res)
 
+def get_scale_from_texel() -> float:
+    from ..preferences import prefs
+    if prefs().use_texel:
+        size_x = int(prefs().size_x)
+        size_y = int(prefs().size_y)
+        target_texel = (size_x + size_y) / 2
+        return prefs().texel_density / target_texel
+    return 1.0
 
 def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync

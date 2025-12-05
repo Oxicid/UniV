@@ -17,7 +17,7 @@ from ..utypes import BBox, MeshIsland, MeshIslands
 from bpy.props import *
 from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
-from ..preferences import univ_settings
+from ..preferences import prefs, univ_settings
 
 
 class UNIV_OT_Normal(bpy.types.Operator):
@@ -261,7 +261,8 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         col.prop(self, 'move', expand=True)
         col.prop(self, 'avoid_flip')
         col.separator()
-        col.prop(self, 'use_correct_aspect', toggle=1)
+        col.prop(prefs(), 'use_texel')
+        col.prop(self, 'use_correct_aspect')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -314,6 +315,7 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
     def get_box_transforms(self, umesh):
         move = Vector(self.move) * -1
         scale = Vector(self.scale_individual) * self.scale
+        scale *= utils.get_scale_from_texel()
 
         mtx_from_prop_x = Matrix.LocRotScale(move, Euler((self.rotation[0], 0, 0)), scale)
         mtx_from_prop_y = Matrix.LocRotScale(move, Euler((0, self.rotation[1], 0)), scale)
