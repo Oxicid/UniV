@@ -38,6 +38,18 @@ class UNIV_OT_Normal(bpy.types.Operator):
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
+    def draw(self, context):
+        col = self.layout.column(align=True)
+        if not prefs().use_texel:
+            col.prop(self, 'crop')
+        col.prop(self, 'orient')
+        col.prop(self, 'individual')
+        col.prop(self, 'mark_seam')
+
+        col.separator()
+        col.prop(prefs(), 'use_texel')
+        col.prop(self, 'use_correct_aspect')
+
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
@@ -122,10 +134,14 @@ class UNIV_OT_Normal(bpy.types.Operator):
             aspect_mtx = Matrix.Diagonal((1, aspect))
         mtx = aspect_mtx.to_4x4() @ rot_mtx_from_normal @ adv_island.umesh.obj.matrix_world
 
+        if prefs().use_texel:
+            td_scale = utils.get_scale_from_texel()
+            mtx = mtx @ Matrix.Diagonal([td_scale]*3).to_4x4()
+
         points = []
         points_append = points.append
 
-        if self.orient or self.crop:
+        if self.orient or (self.crop and not prefs().use_texel):
             for f in adv_island:
                 for crn in f.loops:
                     uv_co = (mtx @ crn.vert.co).to_2d()
@@ -148,7 +164,10 @@ class UNIV_OT_Normal(bpy.types.Operator):
         global_bbox.union(bbox)
 
     def crop_islands(self, adv_islands_of_mesh: list[utypes.AdvIsland], bbox):
-        if not self.crop or not adv_islands_of_mesh:
+        if not self.crop:
+            return
+
+        if prefs().use_texel:
             return
 
         if self.mark_seam:

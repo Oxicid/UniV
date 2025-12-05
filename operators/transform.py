@@ -188,7 +188,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
 
 
     @staticmethod
-    def crop_ex(axis, bbox, inplace, islands_of_mesh, offset, padding, proportional):
+    def crop_ex(axis: str, bbox: BBox, inplace: bool, islands_of_mesh, offset: Vector, padding: float, proportional: bool):
         scale_x = ((1.0 - padding) / w) if (w := bbox.width) else 1
         scale_y = ((1.0 - padding) / h) if (h := bbox.height) else 1
 
