@@ -5,6 +5,8 @@ import bpy
 
 from .. import utypes
 from .. import utils
+from ..preferences import prefs, checker_generated_types
+
 # Patterns for future
 # _ARS-10.5  # Arrow Scale
 # _C(1,2,3)-FFFFFF_  # Color
@@ -15,26 +17,6 @@ from .. import utils
 # UniV_ColorGrid_2K_
 # UniV_Grid_2Kx512_
 
-generated_types = (
-    ('UV_GRID', 'Grid', ''),
-    ('COLOR_GRID', 'Color Grid', ''),
-)
-
-
-def _update_size_x(self, _context):
-    if self.lock_size and self.size_y != self.size_x:
-        self.size_y = self.size_x
-
-
-def _update_size_y(self, _context):
-    if self.lock_size and self.size_x != self.size_y:
-        self.size_x = self.size_y
-
-
-def _update_lock_size(self, _context):
-    if self.lock_size and self.size_y != self.size_x:
-        self.size_y = self.size_x
-
 
 class UNIV_OT_Checker(bpy.types.Operator):
     bl_idname = "mesh.univ_checker"
@@ -42,27 +24,21 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_description = "Used as a texture for testing UV maps"
     bl_options = {'REGISTER', 'UNDO'}
 
-    toggle: bpy.props.BoolProperty(name='Toggle', default=True, description='Off/On checker modifier')
-    generated_type: bpy.props.EnumProperty(name='Texture', default='UV_GRID', items=generated_types)
-    size_x: bpy.props.EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
-    size_y: bpy.props.EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
-    lock_size: bpy.props.BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
-
     @classmethod
     def poll(cls, context):
         return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(self, 'toggle')
+        layout.prop(prefs(), 'checker_toggle')
         row = layout.row(align=True, heading='Texture Type')
         row.scale_x = 0.92
-        row.prop(self, 'generated_type', expand=True)
+        row.prop(prefs(), 'checker_generated_type', expand=True)
 
         row = layout.row(align=True, heading='Size')
-        row.prop(self, 'size_x', text='')
-        row.prop(self, 'lock_size', text='', icon='LOCKED' if self.lock_size else 'UNLOCKED')
-        row.prop(self, 'size_y', text='')
+        row.prop(prefs(), 'size_x', text='')
+        row.prop(prefs(), 'lock_size', text='', icon='LOCKED' if prefs().lock_size else 'UNLOCKED')
+        row.prop(prefs(), 'size_y', text='')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -73,10 +49,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
         self.int_size_y: int = -1
 
     def execute(self, context):
-        self.int_size_x = int(self.size_x)
-        self.int_size_y = int(self.size_y)
+        self.int_size_x = int(prefs().size_x)
+        self.int_size_y = int(prefs().size_y)
 
-        self.pattern_name = self.get_name_from_gen_type_idname(self.generated_type)
+        self.pattern_name = self.get_name_from_gen_type_idname(prefs().checker_generated_type)
         self.resolution_name: str = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
         self.full_pattern_name = f"UniV_{self.pattern_name}_{self.resolution_name}"
 
@@ -84,7 +60,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
-            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=self.toggle)
+            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=prefs().checker_toggle)
 
         def set_active_image():
             if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
@@ -95,7 +71,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
                         space_data.image = node.image
                         break
 
-        if self.toggle:
+        if prefs().checker_toggle:
             if self.all_has_enable_gn_checker_modifier():
                 self.disable_all_gn_checker_modifier()
             else:
@@ -314,27 +290,27 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     @staticmethod
     def get_name_from_gen_type_idname(name):
-        for gt in generated_types:
+        for gt in checker_generated_types:
             if gt[0] == name:
                 return gt[1]
         raise NotImplementedError(f'Texture {name} not implement')
 
     def _generate_checker_texture(self):
-        idname = self.get_name_from_gen_type_idname(self.generated_type)
+        idname = self.get_name_from_gen_type_idname(prefs().checker_generated_type)
         res_name = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
         full_image_name = f"UniV_{idname}_{res_name}"
 
-        if self.generated_type in ('UV_GRID', 'COLOR_GRID'):
+        if prefs().checker_generated_type in ('UV_GRID', 'COLOR_GRID'):
             before = set(bpy.data.images)
             bpy.ops.image.new(
                 name=full_image_name,
                 width=self.int_size_x,
                 height=self.int_size_y,
                 alpha=False,
-                generated_type=self.generated_type)
+                generated_type=prefs().checker_generated_type)
             return tuple(set(bpy.data.images) - before)[0]
         else:
-            raise NotImplementedError(f'Texture {self.generated_type} not implement')
+            raise NotImplementedError(f'Texture {prefs().checker_generated_type} not implement')
 
     @staticmethod
     def update_views():

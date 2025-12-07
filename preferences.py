@@ -136,11 +136,16 @@ def _update_uv_layers_active_idx(self, context):
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
+checker_generated_types = (
+    ('UV_GRID', 'Grid', ''),
+    ('COLOR_GRID', 'Color Grid', ''),
+)
 
 _udim_source = [
     ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
     ('ACTIVE_UDIM', 'Active UDIM', "Pack islands to active UDIM image tile or UDIM grid tile where 2D cursor is located")
 ]
+
 copy_to_layers_uv_channels_items_from = [
     ('0', 'Active', ''),
     ('1', '1', ''),
@@ -152,6 +157,7 @@ copy_to_layers_uv_channels_items_from = [
     ('7', '7', ''),
     ('8', '8', ''),
 ]
+
 copy_to_layers_uv_channels_items_to = copy_to_layers_uv_channels_items_from.copy()
 copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
 
@@ -180,6 +186,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     size_x: EnumProperty(name='X', default='2048', items=utils.resolutions, update=_update_size_x)
     size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
+
+    # Checker Texture
+    checker_toggle: bpy.props.BoolProperty(name='Toggle', default=True, description='Off/On checker modifier')
+    checker_generated_type: bpy.props.EnumProperty(name='Texture Type', default='UV_GRID', items=checker_generated_types)
 
     # Texel Settings
     use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')
