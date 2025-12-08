@@ -25,6 +25,23 @@ else:
         layout.label(text=_name)
         return layout
 
+if bpy.app.version >= (4, 1, 0):
+    def draw_trim_panel(layout, _name) -> bpy.types.UILayout:
+        pref = prefs()
+        header, panel = layout.panel("UniV_"+_name, default_closed=not pref.use_trims)
+
+        row = header.row(align=True)
+        row.prop(pref, 'use_trims', text='')
+        row.label(text=_name)
+        return panel
+else:
+    def draw_trim_panel(layout, _name) -> bpy.types.UILayout:
+        row = layout.row(align=True)
+        row.prop(prefs(), 'use_trims', text='')
+        row.label(text=_name)
+        return layout
+
+
 class UNIV_PT_General(Panel):
     bl_label = ''
     bl_idname = 'UNIV_PT_General'
@@ -128,6 +145,49 @@ class UNIV_PT_General(Panel):
         col.separator(factor=0.25)
         col.popover(panel='UNIV_PT_layers_manager', text='', icon_value=icons.settings_a)
 
+    @staticmethod
+    def draw_trims(panel):
+        settings = prefs()
+        # col = layout.column()
+
+        row = panel.row()
+        col = row.column()
+
+        col.scale_x = 0.5
+        col.template_list(
+            listtype_name="UNIV_UL_TrimPresetsManager",
+            list_id="",
+            dataptr=settings,  # noqa
+            propname="trims_presets",
+            active_dataptr=settings,  # noqa
+            active_propname="active_trim_index",
+            rows=4
+        )
+
+        col = row.column(align=True)
+        col.operator('scene.univ_trim_presets_processing', icon='ADD', text="").operation_type = 'ADD'
+        col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
+        col.separator()
+        col.operator('scene.univ_trim_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+
+
+        td_idx = univ_settings().active_trim_index
+        if td_idx < 0:
+            return
+
+        trims_presets = univ_settings().trims_presets
+        if len(trims_presets) >= td_idx + 1:
+            preset = trims_presets[td_idx]
+
+            row = panel.row(align=True)
+            col = row.column(align=True)
+            col.prop(preset, 'x')
+            col.prop(preset, 'y')
+
+            col = row.column(align=True)
+            col.prop(preset, 'width')
+            col.prop(preset, 'height')
+
     def draw_header(self, context):
         layout = self.layout
         row = layout.row()
@@ -144,8 +204,8 @@ class UNIV_PT_General(Panel):
         # layout = layout.column(align=True)
 
 
-        # Transform
-        if panel := draw_panel(layout, 'Transform'):
+        # Transforms
+        if panel := draw_panel(layout, 'Transforms'):
             col_align = panel.column(align=True)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
@@ -294,6 +354,10 @@ class UNIV_PT_General(Panel):
         if panel := draw_panel(layout, 'UV Maps'):
             self.draw_uv_layers(panel,draw_label=False)
 
+        if univ_pro:
+            # Trim
+            if panel := draw_trim_panel(layout, 'Trims'):
+                self.draw_trims(panel)
 
 class UNIV_PT_General_VIEW_3D(Panel):
     bl_label = ''
@@ -320,7 +384,7 @@ class UNIV_PT_General_VIEW_3D(Panel):
             layout.operator_context = 'EXEC_DEFAULT'
         # col = layout.column(align=True)
 
-        if panel := draw_panel(layout, 'Transform'):
+        if panel := draw_panel(layout, 'Transforms'):
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -443,35 +507,48 @@ class UNIV_PT_GlobalSettings(Panel):
 
     @staticmethod
     def draw_global_settings(layout):
-        settings = univ_settings()
+        indent_px = 16
+        indent = indent_px / bpy.context.region.width
+
+        pref = prefs()
         if univ_pro:
-            layout.prop(settings, 'overlay_2d_enable')
-            layout.prop(settings, 'overlay_3d_enable')
-            layout.prop(settings, 'overlay_3d_uv_vert_color')
-            layout.prop(settings, 'overlay_3d_uv_edge_color')
-            layout.prop(settings, 'overlay_3d_uv_face_color')
-            layout.prop(settings, 'overlay_toggle_xray')
+            layout.prop(pref, 'overlay_2d_enable')
+            layout.prop(pref, 'overlay_3d_enable')
+            layout.prop(pref, 'overlay_3d_uv_vert_color')
+            layout.prop(pref, 'overlay_3d_uv_edge_color')
+            layout.prop(pref, 'overlay_3d_uv_face_color')
+            layout.prop(pref, 'overlay_toggle_xray')
+
+            layout.prop(pref, 'use_trims')
+            split = layout.split(factor=indent)
+            _ = split.column()
+            col = split.column()
+            col.active = pref.use_trims
+            col.prop(pref, 'trim_line_width')
+            col.prop(pref, 'trim_line_opacity')
+            col.prop(pref, 'trim_tris_opacity')
+
             layout.separator()
 
         row = layout.row(align=True, heading='Global Size')
-        row.prop(settings, 'size_x', text='')
-        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
-        row.prop(settings, 'size_y', text='')
+        row.prop(pref, 'size_x', text='')
+        row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
+        row.prop(pref, 'size_y', text='')
 
-        layout.prop(settings, 'use_texel', text='Use Texel in operators')
+        layout.prop(pref, 'use_texel', text='Use Texel in operators')
 
-        layout.prop(settings, 'padding', slider=True)
+        layout.prop(pref, 'padding', slider=True)
         layout.separator()
-        layout.prop(settings, 'uv_layers_show')
+        layout.prop(pref, 'uv_layers_show')
 
-        indent_px = 16
-        split = layout.split(factor=indent_px / bpy.context.region.width)
+
+        split = layout.split(factor=indent)
         _ = split.column()
         col = split.column()
-        col.active = settings.uv_layers_show
-        col.prop(prefs(), 'enable_uv_layers_sync_borders_seam')
+        col.active = pref.uv_layers_show
+        col.prop(pref, 'enable_uv_layers_sync_borders_seam')
 
-        layout.prop(prefs(), 'use_csa_mods')
+        layout.prop(pref, 'use_csa_mods')
         layout.operator('wm.univ_show_addon_preferences', icon='TOOL_SETTINGS')
 
 
@@ -637,6 +714,16 @@ class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
         row = layout.row(align=True)
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'texel', text='TD', emboss=False)
+
+class UNIV_UL_TrimPresetsManager(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+        split = layout.split(factor=0.11, align=True)
+        split.prop(item, 'color', text='', emboss=True)
+
+        row = split.row(align=False)
+        row.scale_x = 1.3
+        row.prop(item, 'name', text='', emboss=False)
+        row.prop(item, 'visible', text='')
 
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):

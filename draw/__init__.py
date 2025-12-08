@@ -12,8 +12,8 @@ import contextlib
 from . import shaders
 from . import mesh_extract
 from .text import TextDraw
-from ..utypes import UMesh
-from ..preferences import univ_settings
+from ..utypes import UMesh, BBox
+from ..preferences import univ_settings, prefs
 from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
 from mathutils import Vector
 from gpu_extras.batch import batch_for_shader
@@ -205,6 +205,116 @@ class DrawCall3D:
             self.draw_fn(self.shader, self.batch, self.color, self.world_matrix)
         if self.batch_extend:
             self.draw_fn(self.shader, self.batch_extend, self.color, self.world_matrix)
+
+
+class TrimDrawer:
+    shader = None
+    batch_lines = None
+    batch_tris = None
+    handler = None
+    pause = False  # for updates
+
+    @classmethod
+    def data_to_batch(cls):
+        if not cls.is_enable():
+            return
+
+        boxes_lines = []
+        boxes_lines_colors = []
+
+        boxes_tris = []
+        boxes_tris_color = []
+        active = prefs().active_trim_index
+
+        line_opacity = prefs().trim_line_opacity
+        tris_opacity = prefs().trim_tris_opacity
+
+        from .. import utils
+        aspect = utils.get_aspect_ratio()
+        aspect_x = min(1.0, 1.0 / aspect)
+        aspect_y = min(1.0, aspect)
+
+        for idx, trim in enumerate(prefs().trims_presets):
+            if trim.visible:
+                bb = BBox(trim.x, trim.x+trim.width, trim.y, trim.y+trim.height)
+                boxes_lines.extend(bb.draw_data_lines())
+                boxes_tris.extend(bb.draw_data_tris())
+
+                if idx == active:
+                    center = bb.center
+                    cursor_width = min(bb.min_length / 3, 0.01)
+
+                    off_x = cursor_width * aspect_x
+                    off_y = cursor_width * aspect_y
+
+                    boxes_lines.append(center - Vector((off_x, 0)))
+                    boxes_lines.append(center + Vector((off_x, 0)))
+                    boxes_lines.append(center - Vector((0, off_y)))
+                    boxes_lines.append(center + Vector((0, off_y)))
+
+                    boxes_lines_colors.extend([[*trim.color, line_opacity+0.3]] * 12)
+                    boxes_tris_color.extend([[*trim.color, tris_opacity+0.15]] * 6)
+                else:
+                    boxes_lines_colors.extend([[*trim.color, line_opacity]] * 8)
+                    boxes_tris_color.extend([[*trim.color, tris_opacity]] * 6)
+
+        if cls.shader is None:
+            cls.shader = cls.get_shader()
+        cls.batch_lines = batch_for_shader(cls.shader, 'LINES', {"pos": boxes_lines, 'color': boxes_lines_colors})
+        cls.batch_tris = batch_for_shader(cls.shader, 'TRIS', {"pos": boxes_tris, 'color': boxes_tris_color})
+
+    @staticmethod
+    def get_shader():
+        return gpu.shader.from_builtin('SMOOTH_COLOR')
+
+    @staticmethod
+    def is_enable():
+        try:
+            from .. import univ_pro
+            return univ_settings().use_trims
+        except ImportError:
+            return False
+
+    @staticmethod
+    def univ_drawer_2d_callback():
+        if bpy.context.area.ui_type == 'UV':
+            line_width = prefs().trim_line_width
+            shaders.set_line_width(line_width)
+            shaders.blend_set_alpha()
+            TrimDrawer.shader.bind()
+
+            shaders.set_line_width_vk(TrimDrawer.shader, line_width)
+            TrimDrawer.batch_lines.draw(TrimDrawer.shader)
+            TrimDrawer.batch_tris.draw(TrimDrawer.shader)
+
+            shaders.set_line_width(1)
+            shaders.blend_set_none()
+
+    @classmethod
+    def register(cls):
+        cls.unregister()
+        if cls.is_enable():
+            cls.data_to_batch()
+            cls.handler = bpy.types.SpaceImageEditor.draw_handler_add(
+                cls.univ_drawer_2d_callback, (), 'WINDOW', 'POST_VIEW')
+
+    @classmethod
+    def unregister(cls):
+        if cls.handler:
+            try:
+                bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, 'WINDOW')
+            except Exception as e:
+                print(e)
+
+        cls.handler = None
+
+    @staticmethod
+    def append_handler_with_delay():
+        try:
+            TrimDrawer.register()
+        except Exception as e:
+            print('UniV: Failed to add a handler for Drawer2D system.', e)
+
 
 class DrawerSubscribeRNA:
     sync_owner = None

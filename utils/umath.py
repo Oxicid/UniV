@@ -190,6 +190,30 @@ def np_vec_dot(a, b):
 def np_vec_normalized(a, keepdims=True):
     return np.linalg.norm(a, axis=1, keepdims=keepdims)
 
+
+def largest_gap_midpoint_for_hue(values: list[float]):
+    if not values:
+        return 0.0
+    if len(values) == 1:
+        return 0.65 if values[0] < 0.5 else 0.35
+
+    values.insert(0, 0.0)
+    values.append(1.0)
+    values.sort()
+
+    mid = 0.5
+    max_gap = -1
+
+    for i in range(len(values) - 1):
+        a = values[i]
+        b = values[i+1]
+
+        if (gap := (b - a)) > max_gap:
+            max_gap = gap
+            mid = (a + b) / 2
+    return mid
+
+
 def pack_rgba_to_uint32(rgba) -> int:
     r = int(rgba[0] * 255.0) & 0xFF
     g = int(rgba[1] * 255.0) & 0xFF

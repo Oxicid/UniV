@@ -85,6 +85,11 @@ def _update_overlay_3d_uv_face_color(self, context):
     draw.shaders.Shaders.init_flat_shading_uniform_color()
     draw.Drawer3D.update_data(self, context)
 
+def _update_trim_system(_self, _context):
+    from . import draw
+    if not draw.TrimDrawer.pause:
+        draw.TrimDrawer.register()
+
 def _update_uv_layers_show(_self, _context):
     from .operators.misc import UNIV_OT_UV_Layers_Manager
     if _self.uv_layers_show:
@@ -164,6 +169,17 @@ copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
 if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
+class UNIV_TrimPreset(bpy.types.PropertyGroup):
+    name: StringProperty(name='Name', default='Trim')
+    color: FloatVectorProperty(name='Color', default=(0.9, 0, 0), subtype="COLOR", size=3, min=0.0, max=1.0, update=_update_trim_system)
+    # flags: IntProperty(name='Flags', default=0)
+    visible: BoolProperty(name='Hidden', default=True, update=_update_trim_system)
+
+    x: FloatProperty(name='X', default=0, min=0, max=1, update=_update_trim_system)
+    y: FloatProperty(name='Y', default=0, min=0, max=1, update=_update_trim_system)
+    width: FloatProperty(name='Width', default=1, min=0.005, max=1, update=_update_trim_system)
+    height: FloatProperty(name='Height', default=0.25, min=0.005, max=1, update=_update_trim_system)
+
 
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
@@ -197,8 +213,17 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
+
     texture_physical_size: FloatVectorProperty(name='TD from Physical Size', default=(2.5, 0.0), min=0.0,
                                                     soft_max=6, size=2, subtype='TRANSLATION')
+
+    # Trim System
+    use_trims: BoolProperty(name="Use Trim System", default=False, update=_update_trim_system)
+    trims_presets: CollectionProperty(name="Trims Presets", type=UNIV_TrimPreset)
+    trim_line_width: FloatProperty(name='Line Width', default=1.5, min=0.5, soft_min=1, soft_max=2, max=4, update=_update_trim_system)
+    trim_line_opacity: FloatProperty(name='Line Opacity', default=0.5, min=0.0, max=1, update=_update_trim_system)
+    trim_tris_opacity: FloatProperty(name='Filled Opacity', default=0.05, min=0.0, soft_max=0.5, max=0.9, update=_update_trim_system)
+    active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
 
     # Drawer
     overlay_2d_enable: BoolProperty(name='Overlay 2D', default=True, update=_update_drawer_2d_enable)

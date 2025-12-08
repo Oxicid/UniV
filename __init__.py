@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 27),
+    "version": (3, 9, 28),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -66,6 +66,7 @@ def load_register_types():
     try:
         classes.extend([
             preferences.UNIV_UV_Layers,
+            preferences.UNIV_TrimPreset,
             preferences.UNIV_TexelPreset,
             preferences.UNIV_AddonPreferences,
             preferences.UNIV_OT_ShowAddonPreferences,
@@ -231,6 +232,10 @@ def load_register_types():
 
         if univ_pro:
             classes.extend((
+                # UI
+                ui.UNIV_UL_TrimPresetsManager,
+                # Trim
+                univ_pro.trim.UNIV_OT_TD_PresetsProcessing,
                 # Stack
                 univ_pro.stack.UNIV_OT_Stack,
                 univ_pro.stack.UNIV_OT_Stack_VIEW3D,
@@ -342,6 +347,7 @@ def register():
         tm_register(draw.DrawerSubscribeRNA.subscribe, first_interval=0.15)  # NOTE: Call after register_handler
         tm_register(draw.Drawer2D.append_handler_with_delay, first_interval=0.1, persistent=True)
         tm_register(draw.Drawer3D.append_handler_with_delay, first_interval=0.1, persistent=True)
+        tm_register(draw.TrimDrawer.append_handler_with_delay, first_interval=0.1, persistent=True)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -380,6 +386,7 @@ def unregister():
     draw.DrawerSubscribeRNA.unregister_handler()
     draw.Drawer2D.unregister()
     draw.Drawer3D.unregister()
+    draw.TrimDrawer.unregister()
 
     for handle in reversed(bpy.app.handlers.depsgraph_update_post):
         if handle.__name__.startswith('univ_'):
