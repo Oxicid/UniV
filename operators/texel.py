@@ -131,6 +131,10 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         # TODO: The threshold can be made lower if the triangulation (tessellation) is performed using the UV topology.
         from bl_math import clamp
         aspect = isl.umesh.aspect
+        clamp_value = aspect * 0.5
+        if aspect > 1.0:
+            clamp_value = (1 / aspect) * 0.5
+
         new_center = isl.value.copy()
 
         transform_acc = Matrix.Identity(2)
@@ -146,6 +150,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         weights = np.array(list(isl.weights) if isinstance(
             isl.weights, itertools.chain) else isl.weights, dtype=np.float32)
 
+        prev_err = float('inf')
         for _ in range(10):
             m00 = flat_uv_coords[:, 0, 0] - flat_uv_coords[:, 2, 0]
             m01 = flat_uv_coords[:, 0, 1] - flat_uv_coords[:, 2, 1]
@@ -185,11 +190,18 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             if axis != 'XY':
                 scale_factor_u **= 2
 
-            tolerance = 1e-5  # Trade accuracy for performance.
+            # Trade accuracy for performance and for avoid stretches when aspect != 1.0.
+            if aspect == 1.0:
+                tolerance = 1e-10
+            elif aspect > 1.0:
+                tolerance = 0.005 * aspect
+            else:
+                tolerance = 0.0005 * (1 / aspect)
+
             if shear:
                 t = Matrix.Identity(2)
                 t[0][0] = scale_factor_u
-                t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -0.5 * aspect, 0.5 * aspect)
+                t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -clamp_value, clamp_value)
                 t[0][1] = 0
                 t[1][1] = 1 / scale_factor_u
 
@@ -203,8 +215,9 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                     t[0][0] = 1
 
                 err = abs(t[0][0] - 1.0) + abs(t[1][0]) + abs(t[0][1]) + abs(t[1][1] - 1.0)
-                if err < tolerance:
+                if err < tolerance or prev_err < err:
                     break
+                prev_err = err
 
                 # Transform
                 transform_acc @= t
