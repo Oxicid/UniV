@@ -220,6 +220,10 @@ def split_by_similarity(lst, key=None):
         return [list(group) for _, group in groupby(lst)]
 
 
+def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
+    return list(zip(*[iter(lst)] * 2))  # noqa
+
+
 def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so', 'dylib'] | None=None):
     if lib_ext is None:
         import platform

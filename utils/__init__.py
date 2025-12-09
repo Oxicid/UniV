@@ -625,20 +625,13 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
     return objects
 
 
-UNIT_CONVERTION = {
-    'mm': (0.001, 1000),
-    'cm': (0.01, 100),
-    'm': (1, 1),
-    'km': (1000, 0.001),
-    'in': (0.0254, 39.3701),
-    'ft': (0.3048, 3.28084),
-    'yd': (0.9144, 1.09361),
-    'mi': (1609.34, 0.000621371),
-}
+def get_trim_bboxes():
+    from .. import preferences
+    from ..utypes import BBox
 
-UNITS = '(mi|mm|cm|m|km|in|ft|yd)'
-UNITS_T = typing.Literal['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi',]
-
-
-def unit_conversion(value: float, from_type: UNITS_T, to_type: UNITS_T) -> float:
-    return value * UNIT_CONVERTION[from_type.lower()][0] * UNIT_CONVERTION[to_type.lower()][1]
+    trims = []
+    for trim in preferences.prefs().trims_presets:
+        if trim.visible:
+            bb = BBox(trim.x, trim.x + trim.width, trim.y, trim.y + trim.height)
+            trims.append(bb)
+    return trims

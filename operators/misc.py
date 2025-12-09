@@ -525,6 +525,9 @@ class UNIV_OT_SetCursor2D(Operator):
         max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
         mouse_pos = Vector(context.region.view2d.region_to_view(*int_mouse_pos))
 
+        # Set active trim
+        self.set_active_trim(mouse_pos)
+
         pt = None
         min_dist = max_distance
         mouse_pos = mouse_pos
@@ -545,9 +548,13 @@ class UNIV_OT_SetCursor2D(Operator):
                     pt = grid_pt
                     min_dist = grid_dist
 
+        # TODO: Implement Object Mode
         if context.mode == 'EDIT_MESH' and REPEAT_MOUSE_POS_COUNT == 0:
+            umeshes = UMeshes()
+            pt, min_dist = self.snap_to_trim(pt, mouse_pos, min_dist, umeshes.elem_mode)
+
             zero_pt = Vector((0.0, 0.0))
-            for umesh in (umeshes := UMeshes()):
+            for umesh in umeshes:
                 uv = umesh.uv
                 if prefs().snap_points_default == 'ALL':
                     for f in utils.calc_visible_uv_faces_iter(umesh):
@@ -624,6 +631,81 @@ class UNIV_OT_SetCursor2D(Operator):
             draw.TextDraw.max_draw_time = 1.8
             draw.TextDraw.draw(f"Switch Pivot to 'Cursor'")
         return {'FINISHED'}
+
+    @staticmethod
+    def snap_to_trim(pt, mouse_pos, min_dist, mode):
+        if not prefs().use_trims:
+            return pt, min_dist
+
+        if prefs().snap_points_default == 'ALL':
+            for trim in utils.get_trim_bboxes():
+                center = trim.center
+                if (dist := (center - mouse_pos).length) < min_dist:
+                    pt = center
+                    min_dist = dist
+
+                for crn_pt in trim.draw_data_verts():
+                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                        pt = crn_pt
+                        min_dist = dist
+
+                for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
+                    line_center = (line_a + line_b) * 0.5
+                    if (dist := (line_center - mouse_pos).length) < min_dist:
+                        pt = line_center
+                        min_dist = dist
+
+        elif mode == 'VERT':
+            for trim in utils.get_trim_bboxes():
+                for crn_pt in trim.draw_data_verts():
+                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                        pt = crn_pt
+                        min_dist = dist
+        elif mode == 'EDGE':
+            for trim in utils.get_trim_bboxes():
+                for crn_pt in trim.draw_data_verts():
+                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                        pt = crn_pt
+                        min_dist = dist
+
+                for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
+                    line_center = (line_a + line_b) * 0.5
+                    if (dist := (line_center - mouse_pos).length) < min_dist:
+                        pt = line_center
+                        min_dist = dist
+        else:
+            for trim in utils.get_trim_bboxes():
+                center = trim.center
+                if (dist := (center - mouse_pos).length) < min_dist:
+                    pt = center
+                    min_dist = dist
+
+                for crn_pt in trim.draw_data_verts():
+                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                        pt = crn_pt
+                        min_dist = dist
+        return pt, min_dist
+
+
+    @staticmethod
+    def set_active_trim(mouse_pos):
+        idx = -1
+        min_dist = float('inf')
+        if prefs().use_trims:
+            for i, trim in enumerate(preferences.prefs().trims_presets):
+                if not trim.visible:
+                    continue
+                bb = BBox(trim.x, trim.x + trim.width, trim.y, trim.y + trim.height)
+
+                if mouse_pos in bb:
+                    for (l_a, l_b) in utils.reshape_to_pair(bb.draw_data_lines()):
+                        _, dist = utils.intersect_point_line_segment(mouse_pos, l_a, l_b)
+                        if dist < min_dist:
+                            min_dist = dist
+                            idx = i
+
+            if idx != -1:
+                prefs().active_trim_index = idx
 
 
 class UNIV_OT_Focus(Operator):
