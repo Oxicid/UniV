@@ -180,6 +180,9 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
     width: FloatProperty(name='Width', default=1, min=0.005, max=1, update=_update_trim_system)
     height: FloatProperty(name='Height', default=0.25, min=0.005, max=1, update=_update_trim_system)
 
+    def to_bbox(self):
+        from . import utypes
+        return utypes.BBox(self.x, self.x + self.width, self.y, self.y + self.height)
 
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)

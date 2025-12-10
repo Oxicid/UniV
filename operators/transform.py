@@ -53,23 +53,42 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
 
     def draw(self, context):
         layout = self.layout
+
         layout.row(align=True).prop(self, 'axis', expand=True)
+        if utils.is_pro_version_support():
+            if prefs().use_trims:
+                # Global Trim System Settings
+                layout.prop(self, 'individual')
+                layout.prop(self, 'inplace')
+
+                self.draw_padding()
+                layout.separator()
+                layout.prop(prefs(), 'use_trims')
+                return
+
+        # Operator Settings
         layout.prop(self, 'to_cursor')
         layout.prop(self, 'individual')
         if not self.to_cursor:
             layout.prop(self, 'inplace')
+
         self.draw_padding()
+
+        if utils.is_pro_version_support():
+            layout.separator()
+            layout.prop(prefs(), 'use_trims')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mode: str = 'DEFAULT'
-        self.proportional: bool = True
+        self.is_crop: bool = True
         self.umeshes: UMeshes | None = None
         self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
+        self.is_crop = self.bl_label == 'Crop'
 
         self.to_cursor = event.ctrl
         self.individual = event.shift
@@ -82,27 +101,31 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         return self.execute(context)
 
     def execute(self, context):
-        self.mode_preprocessing()
+        self.is_crop = self.bl_label == 'Crop'
+
         self.calc_padding()
         self.report_padding()
-        return self.crop()
 
-    def mode_preprocessing(self):
-        if all((self.to_cursor, self.inplace)):
-            self.inplace = False
-        match self.to_cursor, self.individual, self.inplace:
-            case False, False, False:
-                self.mode = 'DEFAULT'
-            case True, False, False:
-                self.mode = 'TO_CURSOR'
-            case True, True, False:
-                self.mode = 'TO_CURSOR_INDIVIDUAL'
-            case False, True, False:
-                self.mode = 'INDIVIDUAL'
-            case False, False, True:
-                self.mode = 'INPLACE'
-            case False, True, True:
-                self.mode = 'INDIVIDUAL_INPLACE'
+        if utils.is_pro_version_support():
+            if prefs().use_trims:
+                self.mode_preprocessing_trim()
+                if self.mode in ('DEFAULT', 'INDIVIDUAL'):
+                    if not utils.has_visible_active_trim(report=self.report):
+                        return {'FINISHED'}
+                else:
+                    if not utils.has_visible_trim_bboxes():
+                        self.report({'WARNING'}, 'Trim presets not found')
+                        return {'FINISHED'}
+
+                self.crop_trims()
+
+                return {'FINISHED'}
+
+        self.mode_preprocessing()
+        self.crop()
+
+        return {'FINISHED'}
+
 
     def crop(self):
         offset = None
@@ -146,29 +169,28 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case _:
                 raise NotImplementedError(self.mode)
 
-        ot_name_to_report_name = 'cropped' if self.bl_label == 'Crop' else 'filled'
+        ot_name_to_report_name = 'cropped' if self.is_crop == 'Crop' else 'filled'
         self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
 
         if not self.umeshes.is_edit_mode:
             self.umeshes.free()
             utils.update_area_by_type('VIEW_3D')
 
-        return {'FINISHED'}
-
     def crop_default(self, inplace, offset=Vector((0, 0))):
         islands_of_mesh = []
+
         general_bbox = BBox()
         for umesh in self.umeshes:
             islands = self.calc_island_method(umesh)
             general_bbox.union(islands.calc_bbox())
             islands_of_mesh.append(islands)
 
-        self.crop_ex(self.axis, general_bbox, inplace, islands_of_mesh, offset, self.padding, self.proportional)
+        self.crop_ex(self.axis, general_bbox, inplace, islands_of_mesh, offset, self.padding, self.is_crop)
 
     def crop_individual(self, inplace, offset=Vector((0, 0))):
         for umesh in self.umeshes:
             for island in self.calc_island_method(umesh):
-                self.crop_ex(self.axis, island.calc_bbox(), inplace, (island, ), offset, self.padding, self.proportional)
+                self.crop_ex(self.axis, island.calc_bbox(), inplace, (island, ), offset, self.padding, self.is_crop)
 
     def crop_inplace(self):
         islands_of_tile: dict[int, list[tuple[FaceIsland, BBox]]] = {}
@@ -184,13 +206,19 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 islands.append(island)
                 general_bbox.union(bbox)
 
-            self.crop_ex(self.axis, general_bbox, True, islands, Vector((0, 0)), self.padding, self.proportional)
-
+            self.crop_ex(self.axis, general_bbox, True, islands, Vector((0, 0)), self.padding, self.is_crop)
 
     @staticmethod
-    def crop_ex(axis: str, bbox: BBox, inplace: bool, islands_of_mesh, offset: Vector, padding: float, proportional: bool):
-        scale_x = ((1.0 - padding) / w) if (w := bbox.width) else 1
-        scale_y = ((1.0 - padding) / h) if (h := bbox.height) else 1
+    def crop_ex(axis: str,
+                bbox: BBox,
+                inplace: bool,
+                islands_of_mesh,
+                offset: Vector,
+                padding: float,
+                proportional: bool,
+                tar_bb: BBox = BBox(0.0, 1.0, 0.0, 1.0)):
+        scale_x = ((tar_bb.width - padding) / w) if (w := bbox.width) else 1
+        scale_y = ((tar_bb.height - padding) / h) if (h := bbox.height) else 1
 
         if proportional:
             if axis == 'XY':
@@ -208,11 +236,9 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         bbox.scale(scale)
 
         eps = 0.000005
-        if not padding:
-            eps = 0.0
         half_pad = padding * 0.5
-        pos_x = utils.wrap_line(bbox.min.x, bbox.width, half_pad-eps, 1-half_pad + eps, default=0)
-        pos_y = utils.wrap_line(bbox.min.y, bbox.height, half_pad-eps, 1-half_pad + eps, default=0)
+        pos_x = utils.wrap_line(bbox.min.x, bbox.width, tar_bb.xmin+half_pad-eps, tar_bb.xmax-half_pad+eps, default=0)
+        pos_y = utils.wrap_line(bbox.min.y, bbox.height, tar_bb.ymin+half_pad-eps, tar_bb.ymax-half_pad+eps, default=0)
         set_pos = Vector((pos_x, pos_y))
 
         if inplace:
@@ -236,9 +262,124 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             isl.umesh.update_tag |= isl.move(delta)
 
 
-    @staticmethod
-    def get_event_info():
-        return info.operator.crop_event_info_ex
+
+    def get_event_info(self):
+        if self.is_crop:
+            return info.operator.crop_event_info_ex
+        else:
+            return info.operator.fill_event_info_ex
+
+    def mode_preprocessing(self):
+        if all((self.to_cursor, self.inplace)):
+            self.inplace = False
+        match self.to_cursor, self.individual, self.inplace:
+            case False, False, False:
+                self.mode = 'DEFAULT'
+            case True, False, False:
+                self.mode = 'TO_CURSOR'
+            case True, True, False:
+                self.mode = 'TO_CURSOR_INDIVIDUAL'
+            case False, True, False:
+                self.mode = 'INDIVIDUAL'
+            case False, False, True:
+                self.mode = 'INPLACE'
+            case False, True, True:
+                self.mode = 'INDIVIDUAL_INPLACE'
+
+    # Trim
+    def crop_trims(self):
+        skipped_counter = 0
+        self.umeshes = UMeshes(report=self.report)
+        self.umeshes.update_tag = False
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            if not self.umeshes:
+                return self.umeshes.update()
+
+            if selected_umeshes:
+                self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
+            else:
+                self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
+        else:
+            if not self.umeshes:
+                return self.umeshes.update()
+            self.umeshes.ensure()
+            self.calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
+
+
+        match self.mode:
+            case 'DEFAULT':
+                active_trim_bbox = utils.get_active_trim().to_bbox()
+                general_bbox = BBox()
+                islands_of_mesh = []
+                for umesh in self.umeshes:
+                    islands = self.calc_island_method(umesh)  # noqa # pycharm moment
+                    general_bbox.union(islands.calc_bbox())
+                    islands_of_mesh.append(islands)
+                self.crop_ex(self.axis, general_bbox, False, islands_of_mesh, Vector((0.0, 0.0)), self.padding, self.is_crop, active_trim_bbox)
+
+            case 'INDIVIDUAL':
+                active_trim_bbox = utils.get_active_trim().to_bbox()
+                for umesh in self.umeshes:
+                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                        self.crop_ex(self.axis, isl.bbox, False, (isl,), Vector((0, 0)), self.padding, self.is_crop, active_trim_bbox)
+
+            case 'INDIVIDUAL_INPLACE':
+                bboxes = utils.get_trim_bboxes()
+                for umesh in self.umeshes:
+                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                        idx = utils.get_inplace_trim_by_isl(bboxes, isl)
+                        if idx == -1:
+                            skipped_counter += 1
+                            continue
+                        tar_bb = bboxes[idx]
+
+                        self.crop_ex(self.axis, isl.bbox, False, (isl,), Vector((0, 0)), self.padding, self.is_crop, tar_bb)
+
+            case 'INPLACE':
+                bboxes = utils.get_trim_bboxes()
+                islands_of_tile: dict[BBox, list[AdvIsland]] = {}
+
+                for umesh in self.umeshes:
+                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                        idx = utils.get_inplace_trim_by_isl(bboxes, isl)
+                        if idx == -1:
+                            skipped_counter += 1
+                            continue
+                        bbox = bboxes[idx]
+                        islands_of_tile.setdefault(bbox, []).append(isl)
+
+                for tar_bbox, islands in islands_of_tile.items():
+                    general_bbox = BBox()
+                    for isl in islands:
+                        general_bbox.union(isl.bbox)
+
+                    self.crop_ex(self.axis, general_bbox, False, islands, Vector((0, 0)), self.padding, self.is_crop, tar_bbox)
+            case _:
+                raise NotImplementedError(self.mode)
+
+        ot_name_to_report_name = 'cropped' if self.is_crop else 'filled'
+        self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
+
+        if skipped_counter:
+            self.report({'WARNING'}, f"Found {skipped_counter} islands for which no trim was found")
+
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+    def mode_preprocessing_trim(self):
+        match self.individual, self.inplace:
+            case False, False:
+                self.mode = 'DEFAULT'
+            case True, False:
+                self.mode = 'INDIVIDUAL'
+            case False, True:
+                self.mode = 'INPLACE'
+            case _:
+                self.mode = 'INDIVIDUAL_INPLACE'
 
 
 class UNIV_OT_Fill(UNIV_OT_Crop):
@@ -246,17 +387,6 @@ class UNIV_OT_Fill(UNIV_OT_Crop):
     bl_label = 'Fill'
     bl_description = info.operator.fill_info
     bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        self.proportional: bool = False
-        self.mode_preprocessing()
-        self.calc_padding()
-        self.report_padding()
-        return self.crop()
-
-    @staticmethod
-    def get_event_info():
-        return info.operator.fill_event_info_ex
 
 
 class Align_by_Angle:

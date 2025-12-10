@@ -638,6 +638,9 @@ class BBox:
             return NotImplemented
         return self.min == other.min and self.max == other.max
 
+    def __hash__(self):
+        return hash(self.xmin + self.ymin + self.xmax + self.ymax)
+
     def __and__(self, other: 'BBox'):
         return self.isect(other)
 

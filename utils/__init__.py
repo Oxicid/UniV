@@ -158,24 +158,24 @@ class PaddingHelper:
         layout = self.layout  # noqa
         if self.padding_multiplayer:
             from .. import preferences
-            settings = preferences.univ_settings()
+            pref = preferences.prefs()
             layout.separator(factor=0.35)
-            layout.label(text=f"Global Texture Size = {min(int(settings.size_x), int(settings.size_y))}")
-            layout.label(text=f"Padding = {settings.padding}({int(settings.padding * self.padding_multiplayer)})px")
+            layout.label(text=f"Global Texture Size = {min(int(pref.size_x), int(pref.size_y))}")
+            layout.label(text=f"Padding = {pref.padding}({int(pref.padding * self.padding_multiplayer)})px")
 
         layout.prop(self, "padding_multiplayer", slider=True)
 
     def calc_padding(self):
         from .. import preferences
-        settings = preferences.univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / \
-            min(int(settings.size_x), int(settings.size_y))
+        pref = preferences.prefs()
+        self.padding = int(pref.padding * self.padding_multiplayer) / \
+            min(int(pref.size_x), int(pref.size_y))
 
     def report_padding(self):
         if self.padding and (img_size := get_active_image_size()):  # TODO: Get active image size from material id
             from .. import preferences
-            settings = preferences.univ_settings()
-            if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
+            pref = preferences.prefs()
+            if min(int(pref.size_x), int(pref.size_y)) != min(img_size):
                 self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
                                          'which will result in incorrect padding.')
 
@@ -635,3 +635,73 @@ def get_trim_bboxes():
             bb = BBox(trim.x, trim.x + trim.width, trim.y, trim.y + trim.height)
             trims.append(bb)
     return trims
+
+def has_visible_trim_bboxes():
+    from .. import preferences
+
+    for trim in preferences.prefs().trims_presets:
+        if trim.visible:
+            return True
+    return False
+
+def has_visible_active_trim(report=None):
+    from .. import preferences
+    pref = preferences.prefs()
+
+    trim_presets = pref.trims_presets
+    if not trim_presets:
+        if report:
+            report({'WARNING'}, 'Trims preset is empty')
+        return False
+
+    if len(trim_presets) >= (idx := pref.active_trim_index)+1:
+        if trim_presets[idx].visible:
+            return True
+        if report:
+            report({'WARNING'}, 'Active trim is invisible')
+        return False
+
+    if report:
+        report({'WARNING'}, 'Active trim index out of range')
+    return False
+
+def get_active_trim():
+    from .. import preferences
+    pref = preferences.prefs()
+    return pref.trims_presets[pref.active_trim_index]
+
+def is_pro_version_support():
+    """Check Pro version support and sanitize Trim System"""
+    try:
+        from .. import univ_pro
+        return True
+    except ImportError:
+        from .. import preferences
+        if preferences.prefs().use_trims:
+            preferences.prefs().use_trims = False
+        return False
+
+def get_inplace_trim_by_isl(bboxes, isl):
+    isl_bbox = isl.bbox
+    isl_center = isl_bbox.center
+
+    idx = -1
+    min_dist = float('inf')
+
+    for i, bb in enumerate(bboxes):
+        if isl_center in bb:
+            for (l_a, l_b) in reshape_to_pair(bb.draw_data_lines()):
+                _, dist = intersect_point_line_segment(isl_center, l_a, l_b)
+                if dist < min_dist:
+                    min_dist = dist
+                    idx = i
+
+    if idx == -1:
+        for i, bb in enumerate(bboxes):
+            for (l_a, l_b) in reshape_to_pair(bb.draw_data_lines()):
+                _, dist = intersect_point_line_segment(isl_center, l_a, l_b)
+                if dist < min_dist:
+                    min_dist = dist
+                    idx = i
+
+    return idx
