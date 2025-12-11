@@ -378,21 +378,29 @@ class PEdge:
     def key(self, v):
         self.id = v
 
-    @property
-    def nextcollapse(self):
-        """Simplification."""
-        return self.id
-
-    @nextcollapse.setter
-    def nextcollapse(self, v):
-        self.id = v
 
     @property
     def length_3d(self):
         return (self.vert.co - self.next.vert.co).length
 
     @property
-    def wheel_edge_next(self) -> 'PEdge':
+    def wheel_edge_next(self) -> 'PEdge | None':
+        # PEdge doesn't have a prev field. To get the logical "previous" edge
+        # we walk two steps via next (self.next.next). The wheel-next edge
+        # is the pair of that prev edge.
+
+        #                  *
+        #                . . .
+        #              .   .   .     /\
+        #            .     .     .    \\ next
+        #          .    /\ .       .
+        #        . pair || . || next .
+        #      .           . \/        .
+        #    .             .             .
+        #   *  .  .  .  .  *  .  .  .  .  *
+        #                         =>
+        #                        self
+
         return self.next.next.pair
 
     @property
@@ -406,16 +414,12 @@ class PEdge:
     @property
     def boundary_edge_prev(self: 'PEdge') -> 'PEdge':
         we: PEdge = self
-        last: PEdge
 
         while True:
-            last = we
+            last: PEdge = we
             we = we.wheel_edge_next
             if not we or we == self:
-                break
-
-        return last.next.next
-
+                return last.next.next
 
     def implicit_seam(self, e_pair: 'PEdge') -> bool:
         uv1 = self.orig_uv
@@ -1327,26 +1331,26 @@ class PChart:
         heap = []
 
         # Initial insertion of all boundary edges
-        e: PEdge = be
+        curr_edge: PEdge = be
         while True:
-            angle = e.boundary_angle()
-            item = HeapItem(angle, e)
-            e.heaplink = item
+            angle = curr_edge.boundary_angle()
+            item = HeapItem(angle, curr_edge)
+            curr_edge.heaplink = item
             heapq.heappush(heap, item)
 
-            e = e.boundary_edge_next
-            if e == be:
+            curr_edge = curr_edge.boundary_edge_next
+            if curr_edge == be:
                 break
 
         # Isolated seam case (2 edges)
         if n_edges == 2:
-            e = be.next.vert.edge
+            curr_edge = be.next.vert.edge
 
-            e.pair = be
-            be.pair = e
+            curr_edge.pair = be
+            be.pair = curr_edge
 
             # lazily mark elements as deleted
-            e.heaplink.removed = True
+            curr_edge.heaplink.removed = True
             be.heaplink.removed = True
             return
 
@@ -1357,49 +1361,49 @@ class PChart:
                 item = heapq.heappop(heap)
                 if not item.removed:
                     break
-            e = item.edge
+            curr_edge = item.edge
 
-            e1 = e.boundary_edge_prev
-            e2 = e.boundary_edge_next
+            prev_wheel_edge = curr_edge.boundary_edge_prev
+            next_wheel_edge = curr_edge.boundary_edge_next
 
             # remove e1 and e2
-            e1.heaplink.removed = True
-            e2.heaplink.removed = True
+            prev_wheel_edge.heaplink.removed = True
+            next_wheel_edge.heaplink.removed = True
 
-            e.flag |= PEDGE_FILLED
-            e1.flag |= PEDGE_FILLED
+            curr_edge.flag |= PEDGE_FILLED
+            prev_wheel_edge.flag |= PEDGE_FILLED
 
-            f = PFace.add_fill(self, e.vert, e1.vert, e2.vert)
+            f = PFace.add_fill(self, curr_edge.vert, prev_wheel_edge.vert, next_wheel_edge.vert)
             f.flag |= PFACE_FILLED
 
             # new edges
-            ne = f.edge.next.next
-            ne1 = f.edge
-            ne2 = f.edge.next
+            new_curr_edge = f.edge.next.next
+            new_next_edge = f.edge
+            new_prev_edge = f.edge.next
 
-            ne.flag = ne1.flag = ne2.flag = PEDGE_FILLED
+            new_curr_edge.flag = new_next_edge.flag = new_prev_edge.flag = PEDGE_FILLED
 
-            e.pair = ne
-            ne.pair = e
-            e1.pair = ne1
-            ne1.pair = e1
+            curr_edge.pair = new_curr_edge
+            new_curr_edge.pair = curr_edge
+            prev_wheel_edge.pair = new_next_edge
+            new_next_edge.pair = prev_wheel_edge
 
-            ne.vert = e2.vert
-            ne1.vert = e.vert
-            ne2.vert = e1.vert
+            new_curr_edge.vert = next_wheel_edge.vert
+            new_next_edge.vert = curr_edge.vert
+            new_prev_edge.vert = prev_wheel_edge.vert
 
             if n_edges == 3:
-                e2.pair = ne2
-                ne2.pair = e2
+                next_wheel_edge.pair = new_prev_edge
+                new_prev_edge.pair = next_wheel_edge
             else:
-                ne2.vert.edge = ne2
+                new_prev_edge.vert.edge = new_prev_edge
 
-                # put ne2 and e2 back into the heap
-                it1 = HeapItem(ne2.boundary_angle(), ne2)
-                it2 = HeapItem(e2.boundary_angle(), e2)
+                # put `new_prev_edge` and `next_wheel_edge` back into the heap
+                it1 = HeapItem(new_prev_edge.boundary_angle(), new_prev_edge)
+                it2 = HeapItem(next_wheel_edge.boundary_angle(), next_wheel_edge)
 
-                ne2.heaplink = it1
-                e2.heaplink = it2
+                new_prev_edge.heaplink = it1
+                next_wheel_edge.heaplink = it2
 
                 heapq.heappush(heap, it1)
                 heapq.heappush(heap, it2)
