@@ -86,6 +86,13 @@ class UNIV_OT_Select_By_Cursor(Operator):
     ))
     face_mode: BoolProperty(name='Face Mode', default=False)
 
+    def draw(self, context):
+        self.layout.prop(self, 'mode')
+        self.layout.prop(self, 'face_mode')
+        if utils.is_pro_version_support():
+            self.layout.separator()
+            self.layout.prop(prefs(), 'use_trims')
+
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
@@ -110,6 +117,19 @@ class UNIV_OT_Select_By_Cursor(Operator):
             self.report({'INFO'}, f"UV area not found")
             return {'CANCELLED'}
 
+        tile_co = utils.get_tile_from_cursor()
+        view_rect = BBox.init_from_minmax(tile_co, tile_co + Vector((1, 1)))
+
+        if utils.is_pro_version_support():
+            if prefs().use_trims:
+                if not utils.has_visible_active_trim(report=self.report):
+                    return {'FINISHED'}
+                trim = utils.get_active_trim()
+                view_rect = trim.to_bbox()
+
+        view_rect.pad(Vector((-2e-08, -2e-08)))
+
+
         umeshes = UMeshes(report=self.report)
         need_sync_validation_check = False
         if umeshes.sync:
@@ -118,9 +138,6 @@ class UNIV_OT_Select_By_Cursor(Operator):
             else:
                 umeshes.elem_mode = 'FACE'
 
-        tile_co = utils.get_tile_from_cursor()
-        view_rect = BBox.init_from_minmax(tile_co, tile_co + Vector((1, 1)))
-        view_rect.pad(Vector((-2e-08, -2e-08)))
 
         if self.mode == 'SELECT':
             umeshes.filter_by_visible_uv_faces()
