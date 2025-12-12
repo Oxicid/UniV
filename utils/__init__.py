@@ -702,18 +702,23 @@ def get_inplace_trim_by_isl(bboxes, isl):
 
     return idx
 
-def get_transform_from_box(src_bbox: 'utypes.BBox',
-                           tar_bb: 'utypes.BBox',
-                           proportional: bool,
-                           axis,
-                           padding,
+def get_transform_from_box(src: 'utypes.BBox',
+                           tar: 'utypes.BBox',
+                           is_crop: bool,
+                           axis: str,
+                           pad: float,
                            inplace: bool,
                            offset: Vector
                            ) -> tuple[Vector, Vector, Vector]:
+    # Padding may be too large for small trims, and if the length is exceeded, it causes negative scaling.
+    # Therefore, attenuate the padding.
+    pad_x = attenuate_padding(pad, tar.width)
+    pad_y = attenuate_padding(pad, tar.height)
 
-    scale_x = ((tar_bb.width - padding) / w) if (w := src_bbox.width) else 1
-    scale_y = ((tar_bb.height - padding) / h) if (h := src_bbox.height) else 1
-    if proportional:
+    scale_x = ((tar.width - pad_x) / w) if (w := src.width) else 1
+    scale_y = ((tar.height - pad_y) / h) if (h := src.height) else 1
+
+    if is_crop:
         if axis == 'XY':
             scale_x = scale_y = min(scale_x, scale_y)
         elif axis == 'X':
@@ -726,31 +731,29 @@ def get_transform_from_box(src_bbox: 'utypes.BBox',
         elif axis == 'Y':
             scale_x = 1.0
 
-    pivot = src_bbox.center
+    pivot = src.center
 
     scale = Vector((scale_x, scale_y))
-    src_bbox = src_bbox.copy()
-    src_bbox.scale(scale)
+    src = src.copy()
+    src.scale(scale)
 
-    eps = 0.000005
-    half_pad = padding * 0.5
-    x_min_bound = tar_bb.xmin + (half_pad - eps)
-    x_max_bound = tar_bb.xmax - (half_pad + eps)
-    y_min_bound = tar_bb.ymin + (half_pad - eps)
-    y_max_bound = tar_bb.ymax - (half_pad + eps)
-    pos_x = wrap_line_nearest(src_bbox.min.x, src_bbox.width, x_min_bound, x_max_bound)
-    pos_y = wrap_line_nearest(src_bbox.min.y, src_bbox.height, y_min_bound, y_max_bound)
+    # Half padding.
+    pad_x *= 0.5
+    pad_y *= 0.5
+
+    pos_x = wrap_line_nearest(src.min.x, src.width, tar.xmin + pad_x, tar.xmax - pad_x)
+    pos_y = wrap_line_nearest(src.min.y, src.height, tar.ymin + pad_y, tar.ymax - pad_y)
     set_pos = Vector((pos_x, pos_y))
 
     if inplace:  # TODO: Delete inplace
         if axis == 'XY':
-            set_pos += src_bbox.tile_from_center
+            set_pos += src.tile_from_center
         elif axis == 'X':
-            set_pos.x += math.floor(src_bbox.center.x)
+            set_pos.x += math.floor(src.center.x)
         else:
-            set_pos.y += math.floor(src_bbox.center.y)
+            set_pos.y += math.floor(src.center.y)
 
-    delta = set_pos - src_bbox.min
+    delta = set_pos - src.min
     if axis == 'X':
         delta.y = 0
     elif axis == 'Y':

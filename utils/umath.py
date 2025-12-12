@@ -105,7 +105,7 @@ def wrap_line(start, width, min_bound, max_bound, default=None):
         else:
             return default
 
-def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: float, eps=1e-6) -> float:
+def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: float, eps=1e-8) -> float:
     """Returns a position within [min_bound, max_bound - width].
     If the original segment fits within the given segment, returns start.
     Otherwise, returns either the wrap version or the clamped version (closest to start).
@@ -123,6 +123,30 @@ def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: f
         return wrapped
     else:
         return clamped
+
+def attenuate_padding(padding: float, size: float, allowed_padding_ratio: float = 0.25, beta: float = 2.0) -> float:
+    """
+    Compresses total padding (on both sides) depending on size.
+
+    padding: total padding (left + right)
+    size: target size along the axis (width or height)
+    allowed_padding_ratio: the proportion of the size that we leave untouched
+    beta: attenuation force — greater -> stronger reduce excess padding
+    """
+
+    r = padding / size
+
+    if r <= allowed_padding_ratio:
+        return padding
+
+    excess = r - allowed_padding_ratio
+    attenuated_excess = excess / (1.0 + beta * excess)
+
+    r_eff = allowed_padding_ratio + attenuated_excess
+    # do not allow to exceed the size
+    if r_eff >= 0.999999:
+        r_eff = 0.999999
+    return r_eff * size
 
 
 def power_of_2_round(val: int) -> int:
