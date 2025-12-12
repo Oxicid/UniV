@@ -105,6 +105,25 @@ def wrap_line(start, width, min_bound, max_bound, default=None):
         else:
             return default
 
+def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: float, eps=1e-6) -> float:
+    """Returns a position within [min_bound, max_bound - width].
+    If the original segment fits within the given segment, returns start.
+    Otherwise, returns either the wrap version or the clamped version (closest to start).
+    """
+    if min_bound <= start and start + width <= max_bound:
+        return start
+
+    rng = max_bound - min_bound - width
+    if rng <= eps:
+        return max(min(start, min_bound + rng), min_bound)
+
+    wrapped = (start - min_bound) % rng + min_bound
+    clamped = max(min(start, min_bound + rng), min_bound)
+    if abs(wrapped - start) <= abs(clamped - start):
+        return wrapped
+    else:
+        return clamped
+
 
 def power_of_2_round(val: int) -> int:
     if not val:

@@ -369,6 +369,21 @@ class FaceIsland:
                 crn_co += diff
         return True
 
+    def scale_with_move(self, scale: Vector, delta: Vector,  pivot: Vector) -> bool:
+        """Scale a list of faces by pivot"""
+        if umath.vec_isclose_to_uniform(scale) and umath.vec_isclose_to_zero(delta):
+            return False
+        diff = pivot - pivot * scale
+        diff += delta
+
+        uv = self.umesh.uv
+        for face in self.faces:
+            for crn in face.loops:
+                crn_co = crn[uv].uv
+                crn_co *= scale
+                crn_co += diff
+        return True
+
     def scale_simple(self, scale: Vector) -> bool:
         """Scale a list of faces by world center"""
         if umath.vec_isclose_to_uniform(scale):
@@ -1849,6 +1864,9 @@ class Islands(IslandsBase):
 
     def set_position(self, to, _from):
         return bool(sum(island.set_position(to, _from) for island in self.islands))
+
+    def scale_with_move(self, scale: Vector, delta: Vector,  pivot: Vector) -> bool:
+        return bool(sum(island.scale_with_move(scale, delta, pivot) for island in self.islands))
 
     def scale_simple(self, scale: Vector):
         return bool(sum(island.scale_simple(scale) for island in self.islands))

@@ -701,3 +701,60 @@ def get_inplace_trim_by_isl(bboxes, isl):
                     idx = i
 
     return idx
+
+def get_transform_from_box(src_bbox: 'utypes.BBox',
+                           tar_bb: 'utypes.BBox',
+                           proportional: bool,
+                           axis,
+                           padding,
+                           inplace: bool,
+                           offset: Vector
+                           ) -> tuple[Vector, Vector, Vector]:
+
+    scale_x = ((tar_bb.width - padding) / w) if (w := src_bbox.width) else 1
+    scale_y = ((tar_bb.height - padding) / h) if (h := src_bbox.height) else 1
+    if proportional:
+        if axis == 'XY':
+            scale_x = scale_y = min(scale_x, scale_y)
+        elif axis == 'X':
+            scale_x = scale_y = scale_x
+        else:
+            scale_x = scale_y = scale_y
+    else:
+        if axis == 'X':
+            scale_y = 1.0
+        elif axis == 'Y':
+            scale_x = 1.0
+
+    pivot = src_bbox.center
+
+    scale = Vector((scale_x, scale_y))
+    src_bbox = src_bbox.copy()
+    src_bbox.scale(scale)
+
+    eps = 0.000005
+    half_pad = padding * 0.5
+    x_min_bound = tar_bb.xmin + (half_pad - eps)
+    x_max_bound = tar_bb.xmax - (half_pad + eps)
+    y_min_bound = tar_bb.ymin + (half_pad - eps)
+    y_max_bound = tar_bb.ymax - (half_pad + eps)
+    pos_x = wrap_line_nearest(src_bbox.min.x, src_bbox.width, x_min_bound, x_max_bound)
+    pos_y = wrap_line_nearest(src_bbox.min.y, src_bbox.height, y_min_bound, y_max_bound)
+    set_pos = Vector((pos_x, pos_y))
+
+    if inplace:  # TODO: Delete inplace
+        if axis == 'XY':
+            set_pos += src_bbox.tile_from_center
+        elif axis == 'X':
+            set_pos.x += math.floor(src_bbox.center.x)
+        else:
+            set_pos.y += math.floor(src_bbox.center.y)
+
+    delta = set_pos - src_bbox.min
+    if axis == 'X':
+        delta.y = 0
+    elif axis == 'Y':
+        delta.x = 0
+    delta += offset  # TODO: Delete offset
+
+    return scale, delta, pivot

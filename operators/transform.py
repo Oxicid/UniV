@@ -210,56 +210,16 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
 
     @staticmethod
     def crop_ex(axis: str,
-                bbox: BBox,
+                curr_bbox: BBox,
                 inplace: bool,
                 islands_of_mesh,
                 offset: Vector,
                 padding: float,
                 proportional: bool,
                 tar_bb: BBox = BBox(0.0, 1.0, 0.0, 1.0)):
-        scale_x = ((tar_bb.width - padding) / w) if (w := bbox.width) else 1
-        scale_y = ((tar_bb.height - padding) / h) if (h := bbox.height) else 1
-
-        if proportional:
-            if axis == 'XY':
-                scale_x = scale_y = min(scale_x, scale_y)
-            elif axis == 'X':
-                scale_x = scale_y = scale_x
-            else:
-                scale_x = scale_y = scale_y
-        else:
-            if axis == 'X':
-                scale_y = 1.0
-            if axis == 'Y':
-                scale_x = 1.0
-        scale = Vector((scale_x, scale_y))
-        bbox.scale(scale)
-
-        eps = 0.000005
-        half_pad = padding * 0.5
-        pos_x = utils.wrap_line(bbox.min.x, bbox.width, tar_bb.xmin+half_pad-eps, tar_bb.xmax-half_pad+eps, default=0)
-        pos_y = utils.wrap_line(bbox.min.y, bbox.height, tar_bb.ymin+half_pad-eps, tar_bb.ymax-half_pad+eps, default=0)
-        set_pos = Vector((pos_x, pos_y))
-
-        if inplace:
-            if axis == 'XY':
-                set_pos += bbox.tile_from_center
-            elif axis == 'X':
-                set_pos.x += math.floor(bbox.center.x)
-            else:
-                set_pos.y += math.floor(bbox.center.y)
-
-        delta = set_pos - bbox.min
-
-        if axis == 'X':
-            delta.y = 0
-        elif axis == 'Y':
-            delta.x = 0
-
-        delta += offset
+        scale, delta, pivot = utils.get_transform_from_box(curr_bbox, tar_bb, proportional, axis, padding, inplace, offset)
         for isl in islands_of_mesh:
-            isl.umesh.update_tag |= isl.scale(scale, bbox.center)
-            isl.umesh.update_tag |= isl.move(delta)
+            isl.umesh.update_tag |= isl.scale_with_move(scale, delta, pivot)
 
 
 
