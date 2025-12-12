@@ -19,7 +19,7 @@ from bmesh.types import BMFace, BMLoop
 from .. import utils
 from ..draw import shaders
 from ..preferences import debug, prefs
-from ..utypes import KDMesh, KDData, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup, UMeshes
+from ..utypes import KDMesh, KDData, TrimKDTree, KDMeshes, Islands, UnionIslands, FaceIsland, View2D, LoopGroup, UnionLoopGroup, UMeshes
 
 
 class eSnapPointMode(enum.IntFlag):
@@ -80,7 +80,8 @@ class QuickSnap_KDMeshes:
     def __init__(self):
         self.sync = True
         self.umeshes = None
-        self.kdmeshes = None
+        self.kdmeshes: KDMeshes | None = None
+        self.trim_kdtree: TrimKDTree | None = None
         self.visible = None
         self.radius = None
         self.mouse_position = None
@@ -174,7 +175,10 @@ class QuickSnap_KDMeshes:
         self.kdmeshes = KDMeshes(kdmeshes)
 
     def find(self):
-        pt: tuple[Vector, int, float] = tuple((Vector((inf, inf, inf)), 0, inf))
+        min_pt = Vector((inf, inf, inf))
+        min_idx = 0
+        min_dist = inf
+
         elem: BMFace | BMLoop | None = None
         r_kdmesh: KDMesh | None = None
 
@@ -182,35 +186,53 @@ class QuickSnap_KDMeshes:
         co = self.mouse_position.to_3d()
 
         for kdmesh in self.kdmeshes:
-            if self.snap_points_mode & eSnapPointMode.VERTEX and (min_res_ := kdmesh.kdtree_crn_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.corners_vert[min_res_[1]]
-                    r_kdmesh = kdmesh
+            if self.snap_points_mode & eSnapPointMode.VERTEX:
+                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_points.find(co)
+                if find_pt:
+                    if find_dist <= r and find_dist < min_dist:
+                        min_pt = find_pt
+                        min_idx = find_idx
+                        min_dist = find_dist
+                        elem = kdmesh.corners_vert[find_idx]
+                        r_kdmesh = kdmesh
 
-            if self.snap_points_mode & eSnapPointMode.EDGE and (
-                    min_res_ := kdmesh.kdtree_crn_center_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.corners_center[min_res_[1]]
-                    r_kdmesh = kdmesh
-            if self.snap_points_mode & eSnapPointMode.FACE and (min_res_ := kdmesh.kdtree_face_points.find(co))[0]:
-                if min_res_[2] <= r and min_res_[2] < pt[2]:
-                    pt = min_res_
-                    elem = kdmesh.faces[min_res_[1]]
-                    r_kdmesh = kdmesh
+            if self.snap_points_mode & eSnapPointMode.EDGE:
+                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_center_points.find(co)
+                if find_pt:
+                    if find_dist <= r and find_dist < min_dist:
+                        min_pt = find_pt
+                        min_idx = find_idx
+                        min_dist = find_dist
+                        elem = kdmesh.corners_center[find_idx]
+                        r_kdmesh = kdmesh
 
-        return KDData(pt, elem, r_kdmesh)
+            if self.snap_points_mode & eSnapPointMode.FACE:
+                find_pt, find_idx, find_dist = kdmesh.kdtree_face_points.find(co)
+                if find_pt:
+                    if find_dist <= r and find_dist < min_dist:
+                        min_pt = find_pt
+                        min_idx = find_idx
+                        min_dist = find_dist
+                        elem = kdmesh.faces[find_idx]
+                        r_kdmesh = kdmesh
+
+        return KDData((min_pt, min_idx, min_dist), elem, r_kdmesh)
 
     def find_nearest_target_pt(self):
         kd_data = self.find()
 
         m_pos = self.mouse_position.to_2d()
-        zoom = View2D.get_zoom(self.view)
-        divider = 1/8 if zoom <= 1600 else 1 / 64
-        divider = divider if zoom <= 12800 else 1 / 64 / 8
-        pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
-        dist = (pos - m_pos).length
+
+        if self.grid_snap:
+            zoom = View2D.get_zoom(self.view)
+            divider = 1/8 if zoom <= 1600 else 1 / 64
+            divider = divider if zoom <= 12800 else 1 / 64 / 8
+            pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
+            dist_to_grid = (pos - m_pos).length
+
+            if dist_to_grid <= self.radius and dist_to_grid < kd_data.distance:
+                kd_data.found = (pos, 0, dist_to_grid)
+                kd_data.kdmesh = True  # for __bool__
 
         if cursor_loc := utils.get_cursor_location():
             dist_to_cursor = (cursor_loc - m_pos).length
@@ -218,9 +240,14 @@ class QuickSnap_KDMeshes:
                 kd_data.found = (cursor_loc, 0, dist_to_cursor)
                 kd_data.kdmesh = True  # for __bool__
 
-        if self.grid_snap and dist <= self.radius and dist < kd_data.distance:
-            kd_data.found = (pos, 0, 0.0)
-            kd_data.kdmesh = True  # for __bool__
+        if self.trim_kdtree and prefs().use_trims:
+            if self.trim_kdtree.elem_flag != self.snap_points_mode:
+                self.trim_kdtree.calc(self.snap_points_mode)
+            find_pt, find_idx, dist_to_trim = self.trim_kdtree.kdtree.find(m_pos.to_3d())
+            if find_pt:
+                if dist_to_trim <= self.radius and dist_to_trim < kd_data.distance:
+                    kd_data.found = (find_pt, 0, dist_to_trim)
+                    kd_data.kdmesh = True  # for __bool__
 
         return kd_data
 
@@ -243,6 +270,24 @@ class QuickSnap_KDMeshes:
                 coords = self.kdmeshes.range_to_coords(res)
         return coords
 
+    def calc_trim_coords(self):
+        coords = []
+        if eSnapPointMode.VERTEX in self.snap_points_mode:
+            res = self.kdmeshes.find_range_vert(self.mouse_position, self.radius)
+            coords = self.kdmeshes.range_to_coords(res)
+        if eSnapPointMode.EDGE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_crn_center(self.mouse_position, self.radius)
+            if coords:
+                coords.extend(self.kdmeshes.range_to_coords(res))
+            else:
+                coords = self.kdmeshes.range_to_coords(res)
+        if eSnapPointMode.FACE in self.snap_points_mode:
+            res = self.kdmeshes.find_range_face_center(self.mouse_position, self.radius)
+            if coords:
+                coords.extend(self.kdmeshes.range_to_coords(res))
+            else:
+                coords = self.kdmeshes.range_to_coords(res)
+        return coords
 
 class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
@@ -259,6 +304,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
+        # KDTree Trim automatically calcs by snap_points_mode (by default set None)
+        self.trim_kdtree: TrimKDTree | None = None
         self.kdmeshes: KDMeshes | None = None
 
         self.area: bpy.types.Area | None = None
@@ -293,10 +340,15 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.view = context.region.view2d
         self.sync = utils.sync()
         self.shader = shaders.POINT_UNIFORM_COLOR
+
         self.refresh_draw_points()
         self.register_draw()
 
         self.snap_mode_init()
+
+        # Trim Init
+        if utils.is_pro_version_support():
+            self.trim_kdtree = TrimKDTree()
 
         self.umeshes = UMeshes()
         self.preprocessing()

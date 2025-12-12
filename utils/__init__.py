@@ -627,14 +627,9 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
 
 def get_trim_bboxes():
     from .. import preferences
-    from ..utypes import BBox
+    trim: preferences.UNIV_TrimPreset
+    return [trim.to_bbox() for trim in preferences.prefs().trims_presets if trim.visible]
 
-    trims = []
-    for trim in preferences.prefs().trims_presets:
-        if trim.visible:
-            bb = BBox(trim.x, trim.x + trim.width, trim.y, trim.y + trim.height)
-            trims.append(bb)
-    return trims
 
 def has_visible_trim_bboxes():
     from .. import preferences
@@ -668,7 +663,8 @@ def has_visible_active_trim(report=None):
 def get_active_trim():
     from .. import preferences
     pref = preferences.prefs()
-    return pref.trims_presets[pref.active_trim_index]
+    trim: preferences.UNIV_TrimPreset = pref.trims_presets[pref.active_trim_index]
+    return trim
 
 def is_pro_version_support():
     """Check Pro version support and sanitize Trim System"""

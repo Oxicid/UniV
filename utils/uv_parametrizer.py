@@ -389,15 +389,15 @@ class PEdge:
         # we walk two steps via next (self.next.next). The wheel-next edge
         # is the pair of that prev edge.
 
-        #                  *
-        #                . . .
-        #              .   .   .     /\
-        #            .     .     .    \\ next
-        #          .    /\ .       .
-        #        . pair || . || next .
-        #      .           . \/        .
-        #    .             .             .
-        #   *  .  .  .  .  *  .  .  .  .  *
+        #                  o
+        #                * * *
+        #              *   *   *     /\
+        #            *     *     *    \\ next
+        #          *    /\ *       *
+        #        * pair || * || next *
+        #      *           * \/        *
+        #    *             *             *
+        #  o   *  *  *  *  o  *  *  *  *   o
         #                         =>
         #                        self
 

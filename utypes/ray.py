@@ -27,7 +27,7 @@ from ..utils import closest_pt_to_line, point_inside_face
 
 
 class KDData:
-    def __init__(self, found, elem, kdmesh):
+    def __init__(self, found: tuple[Vector, int, float], elem: BMFace | BMLoop | None, kdmesh: 'KDMesh'):
         self.found: tuple[Vector, int, float] = found  # pt, index, distance
         self.elem: BMFace | BMLoop | None = elem
         self.kdmesh: KDMesh | None | bool = kdmesh
@@ -304,6 +304,38 @@ class KDMeshes:
 
     def __str__(self):
         return f'KD Meshes count = {len(self.kdmeshes)}'
+
+
+class TrimKDTree:
+    def __init__(self):
+        from ..operators.quick_snap import eSnapPointMode
+        self.kdtree = KDTree(0)
+        self.kdtree.balance()
+        self.elem_flag: eSnapPointMode = eSnapPointMode.NONE
+
+    def calc(self, flag):
+        from ..operators.quick_snap import eSnapPointMode
+
+        coords = []
+        self.elem_flag = flag
+        for bb in utils.get_trim_bboxes():
+            if eSnapPointMode.VERTEX in flag:
+                for pt in bb.draw_data_verts():
+                    coords.append(pt.to_3d())
+            if eSnapPointMode.EDGE in flag:
+                for (line_a, line_b) in utils.reshape_to_pair(bb.draw_data_lines()):
+                    line_center = (line_a + line_b) * 0.5
+                    coords.append(line_center.to_3d())
+            if eSnapPointMode.FACE in flag:
+                coords.append(bb.center.to_3d())
+
+
+        self.kdtree = KDTree(len(coords))
+
+        insert = self.kdtree.insert
+        for i, co in enumerate(coords):
+            insert(co, i)
+        self.kdtree.balance()
 
 
 class IslandHit:
