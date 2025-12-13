@@ -481,6 +481,10 @@ class ViewBoxSyncBlock:
     def __str__(self):
         return f"View Box={self.view_box}, Skip={self.skip}, Has Blocked={self.has_blocked}"
 
+def get_pad():
+    from .. import preferences
+    pref = preferences.prefs()
+    return int(pref.padding) / min(int(pref.size_x), int(pref.size_y))
 
 def set_global_texel(isl: 'utypes.AdvIsland', calc_bbox=True):
     from ..preferences import univ_settings
