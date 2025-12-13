@@ -29,6 +29,8 @@ class eSnapPointMode(enum.IntFlag):
     FACE = 1 << 3
     ALL = VERTEX | EDGE | FACE
 
+class GlobalSnapFlags:
+    grid_snap: bool = False
 
 class SnapMode:
     def __init__(self):
@@ -87,7 +89,6 @@ class QuickSnap_KDMeshes:
         self.mouse_position = None
         self.snap_points_mode = None
         self.view = None
-        self.grid_snap = None
 
     def calc_elem_kdmeshes_sync(self):
         assert self.sync
@@ -223,7 +224,7 @@ class QuickSnap_KDMeshes:
 
         m_pos = self.mouse_position.to_2d()
 
-        if self.grid_snap:
+        if GlobalSnapFlags.grid_snap:
             zoom = View2D.get_zoom(self.view)
             divider = 1/8 if zoom <= 1600 else 1 / 64
             divider = divider if zoom <= 12800 else 1 / 64 / 8
@@ -326,7 +327,6 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.visible: bool | None = None
         self.radius: float = 0.0
         self.axis: str = ''
-        self.grid_snap: bool = False
 
         self._cancel: bool = False
 
@@ -402,7 +402,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     self.axis = 'Y'
 
         if event.type == 'G' and event.value == 'PRESS':
-            self.grid_snap ^= 1
+            GlobalSnapFlags.grid_snap ^= 1
             self.area.tag_redraw()
 
         if event.value == 'PRESS' and event.type in {'ONE', 'TWO', 'THREE', 'FOUR'}:
@@ -808,7 +808,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         blf.draw(font_id, 'G')
         blf.position(font_id, second_col, 20 + text_y_size*2, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
-        blf.draw(font_id, f"Grid: {'Enabled' if self.grid_snap else 'Disabled'}")
+        blf.draw(font_id, f"Grid: {'Enabled' if GlobalSnapFlags.grid_snap else 'Disabled'}")
 
         if (text := self.snap_points_mode.name if self.snap_points_mode else 'NONE') is None:
             text = str(self.snap_points_mode).split('.')[1]
