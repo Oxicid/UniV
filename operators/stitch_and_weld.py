@@ -146,7 +146,7 @@ class Stitch:
             trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(ref_lg, uv)
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
 
             if bbox.width > bbox.height:
@@ -235,7 +235,7 @@ class Stitch:
             trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_corners(ref_lg, uv)
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
 
             if bbox.width > bbox.height:

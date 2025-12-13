@@ -692,6 +692,7 @@ def get_inplace_trim_by_isl(bboxes, isl):
                     min_dist = dist
                     idx = i
 
+    # TODO: Get by BBox.isect (by area coverage) ???
     if idx == -1:
         for i, bb in enumerate(bboxes):
             for (l_a, l_b) in reshape_to_pair(bb.draw_data_lines()):
