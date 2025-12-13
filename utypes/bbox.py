@@ -50,12 +50,9 @@ class BBox:
         return cls(xmin, xmax, ymin, ymax)
 
     @classmethod
-    def calc_bbox_with_corners(
-            cls,
-            corners: typing.Iterable[BMLoop] | typing.Any,
-            uv: BMLayerItem) -> 'tuple[BBox, typing.Sequence[BMLoop]]':
+    def calc_bbox_with_corners(cls, corners, uv: BMLayerItem) -> 'tuple[BBox, tuple[BMLoop, ...]]':
         first_co: Vector = corners[0][uv].uv
-        xmin = xmax = ymin = ymax = first_co
+        xmin = xmax = ymin = ymax = first_co   # TODO: Optimize this
         xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
         for crn in corners:
             co: Vector = crn[uv].uv
@@ -73,6 +70,32 @@ class BBox:
                 ymax_crn = crn
 
         return cls(xmin.x, xmax.x, ymin.y, ymax.y), (xmin_crn, xmax_crn, ymin_crn, ymax_crn)
+
+    @classmethod
+    def calc_bbox_with_extrema_coords(cls, coords: list[Vector]) -> 'tuple[BBox, list[Vector]]':
+        xmin = math.inf
+        xmax = -math.inf
+        ymin = math.inf
+        ymax = -math.inf
+        xmin_co = xmax_co = ymin_co = ymax_co = coords[0]
+
+        for co in coords:
+            x, y = co
+            if x < xmin:
+                xmin = x
+                xmin_co = co
+            if x > xmax:
+                xmax = x
+                xmax_co = co
+
+            if co.y < ymin:
+                ymin = y
+                ymin_co = co
+            if co.y > ymax:
+                ymax = y
+                ymax_co = co
+
+        return cls(xmin, xmax, ymin, ymax), [xmin_co, xmax_co, ymin_co, ymax_co]
 
     @classmethod
     def calc_bbox_uv_corners(cls, group, uv):

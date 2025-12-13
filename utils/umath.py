@@ -124,7 +124,7 @@ def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: f
     else:
         return clamped
 
-def attenuate_padding(padding: float, size: float, allowed_padding_ratio: float = 0.25, beta: float = 2.0) -> float:
+def attenuate_padding(pad: float, size: float, allowed_padding_ratio: float = 0.25, beta: float = 2.0) -> float:
     """
     Compresses total padding (on both sides) depending on size.
 
@@ -134,10 +134,10 @@ def attenuate_padding(padding: float, size: float, allowed_padding_ratio: float 
     beta: attenuation force — greater -> stronger reduce excess padding
     """
 
-    r = padding / size
+    r = pad / size
 
     if r <= allowed_padding_ratio:
-        return padding
+        return pad
 
     excess = r - allowed_padding_ratio
     attenuated_excess = excess / (1.0 + beta * excess)

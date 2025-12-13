@@ -702,6 +702,23 @@ def get_inplace_trim_by_isl(bboxes, isl):
 
     return idx
 
+def get_nearest_contained_bbox_idx(bboxes, pt):
+    """NOTE: The bbox index needs to be checked for the value -1."""
+    isl_center = pt
+
+    idx = -1
+    min_dist = float('inf')
+
+    for i, bb in enumerate(bboxes):
+        if isl_center in bb:
+            for (l_a, l_b) in reshape_to_pair(bb.draw_data_lines()):
+                _, dist = intersect_point_line_segment(isl_center, l_a, l_b)
+                if dist < min_dist:
+                    min_dist = dist
+                    idx = i
+
+    return idx
+
 def get_transform_from_box(src: 'utypes.BBox',
                            tar: 'utypes.BBox',
                            is_crop: bool,
