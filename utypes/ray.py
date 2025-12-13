@@ -314,20 +314,17 @@ class TrimKDTree:
         self.elem_flag: eSnapPointMode = eSnapPointMode.NONE
 
     def calc(self, flag):
-        from ..operators.quick_snap import eSnapPointMode
-
         coords = []
         self.elem_flag = flag
         for bb in utils.get_trim_bboxes():
-            if eSnapPointMode.VERTEX in flag:
-                for pt in bb.draw_data_verts():
-                    coords.append(pt.to_3d())
-            if eSnapPointMode.EDGE in flag:
-                for (line_a, line_b) in utils.reshape_to_pair(bb.draw_data_lines()):
-                    line_center = (line_a + line_b) * 0.5
-                    coords.append(line_center.to_3d())
-            if eSnapPointMode.FACE in flag:
-                coords.append(bb.center.to_3d())
+            for pt in bb.draw_data_verts():
+                coords.append(pt.to_3d())
+
+            for line_a, line_b in utils.reshape_to_pair(bb.draw_data_lines()):
+                line_center = (line_a + line_b) * 0.5
+                coords.append(line_center.to_3d())
+
+            coords.append(bb.center.to_3d())
 
 
         self.kdtree = KDTree(len(coords))
