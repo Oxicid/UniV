@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
-from math import inf
+from math import inf, floor
 import copy
 import typing
 from mathutils import Vector, Matrix
@@ -188,9 +188,14 @@ class BBox:
     def center(self):
         return Vector(((self.xmin + self.xmax) * 0.5, (self.ymin + self.ymax) * 0.5))
 
-    @property
-    def tile_from_center(self):
-        return Vector((math.floor(self.center_x), math.floor(self.center_y))).freeze()
+    def get_tile_start_pos_from_center(self):
+        return Vector((floor(self.center_x), floor(self.center_y))).freeze()
+
+    @classmethod
+    def from_center(cls, center: Vector | tuple[float, float]):
+        xmin = floor(center[0])
+        ymin = floor(center[1])
+        return cls(xmin, xmin+1.0, ymin, ymin+1.0)
 
     @center.setter
     def center(self, new_center):

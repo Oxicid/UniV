@@ -10,7 +10,6 @@ import math
 
 from math import pi, cos, sin
 from bl_math import clamp
-from . import transform
 from .. import utils
 from .. import utypes
 from ..utypes import BBox, MeshIsland, MeshIslands
@@ -174,18 +173,22 @@ class UNIV_OT_Normal(bpy.types.Operator):
             for isl in adv_islands_of_mesh:
                 isl.mark_seam()
 
+        pad = utils.get_pad()
         pivot = bbox.left_bottom
         for island in adv_islands_of_mesh:
             if island.umesh.aspect != 1.0:
                 if island.umesh.aspect < 1:
-                    bbox_ = bbox.copy()
-                    bbox_.scale(Vector((1, island.umesh.aspect)), pivot=pivot)
+                    src_bb = bbox.copy()
+                    src_bb.scale(Vector((1, island.umesh.aspect)), pivot=pivot)
                 else:
-                    bbox_ = bbox.copy()
-                    bbox_.scale(Vector((1 / island.umesh.aspect, 1)), pivot=pivot)
+                    src_bb = bbox.copy()
+                    src_bb.scale(Vector((1 / island.umesh.aspect, 1)), pivot=pivot)
             else:
-                bbox_ = bbox
-            transform.UNIV_OT_Crop.crop_ex('XY', bbox_, inplace=False, islands_of_mesh=[island], offset=Vector((0, 0)), padding=0.001, proportional=True)
+                src_bb = bbox
+
+            tar_bb = BBox.from_center((0.5, 0.5))
+            scale, delta, pivot = utils.get_transform_from_box(src_bb, tar_bb, axis='XY', pad=pad, use_crop=True)
+            island.umesh.update_tag |= island.scale_with_move(scale, delta, pivot)
 
     def avg_normal_and_calc_faces_individual(self):
         if self.umeshes.is_edit_mode:

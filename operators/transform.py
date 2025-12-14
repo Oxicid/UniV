@@ -81,14 +81,14 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mode: str = 'DEFAULT'
-        self.is_crop: bool = True
+        self.use_crop: bool = True
         self.umeshes: UMeshes | None = None
         self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.is_crop = self.bl_label == 'Crop'
+        self.use_crop = self.bl_label == 'Crop'
 
         self.to_cursor = event.ctrl
         self.individual = event.shift
@@ -101,7 +101,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         return self.execute(context)
 
     def execute(self, context):
-        self.is_crop = self.bl_label == 'Crop'
+        self.use_crop = self.bl_label == 'Crop'
 
         self.calc_padding()
         self.report_padding()
@@ -169,7 +169,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case _:
                 raise NotImplementedError(self.mode)
 
-        ot_name_to_report_name = 'cropped' if self.is_crop == 'Crop' else 'filled'
+        ot_name_to_report_name = 'cropped' if self.use_crop == 'Crop' else 'filled'
         self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
 
         if not self.umeshes.is_edit_mode:
@@ -185,19 +185,32 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             general_bbox.union(islands.calc_bbox())
             islands_of_mesh.append(islands)
 
-        self.crop_ex(self.axis, general_bbox, inplace, islands_of_mesh, offset, self.padding, self.is_crop)
+        if inplace:
+            tar_box = BBox.from_center(general_bbox.center)
+        else:
+            tar_box = BBox.from_center(Vector((0.5, 0.5)))
+        tar_box.move(offset)
+
+        self.crop_ex(general_bbox, tar_box, islands_of_mesh)
 
     def crop_individual(self, inplace, offset=Vector((0, 0))):
         for umesh in self.umeshes:
             for island in self.calc_island_method(umesh):
-                self.crop_ex(self.axis, island.calc_bbox(), inplace, (island, ), offset, self.padding, self.is_crop)
+                cur_bbox = island.calc_bbox()
+                if inplace:
+                    tar_box = BBox.from_center(cur_bbox.center)
+                else:
+                    tar_box = BBox.from_center(Vector((0.5, 0.5)))
+                tar_box.move(offset)
+
+                self.crop_ex(cur_bbox, tar_box, (island, ))
 
     def crop_inplace(self):
         islands_of_tile: dict[int, list[tuple[FaceIsland, BBox]]] = {}
         for umesh in self.umeshes:
             for island in self.calc_island_method(umesh):
                 bbox = island.calc_bbox()
-                islands_of_tile.setdefault(bbox.tile_from_center, []).append((island, bbox))
+                islands_of_tile.setdefault(bbox.get_tile_start_pos_from_center(), []).append((island, bbox))
 
         for tile, islands_and_bboxes in islands_of_tile.items():
             islands = []
@@ -206,25 +219,17 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 islands.append(island)
                 general_bbox.union(bbox)
 
-            self.crop_ex(self.axis, general_bbox, True, islands, Vector((0, 0)), self.padding, self.is_crop)
+            tar_box = BBox.from_center(general_bbox.center)
+            self.crop_ex(general_bbox, tar_box, islands)
 
-    @staticmethod
-    def crop_ex(axis: str,
-                curr_bbox: BBox,
-                inplace: bool,
-                islands_of_mesh,
-                offset: Vector,
-                padding: float,
-                proportional: bool,
-                tar_bb: BBox = BBox(0.0, 1.0, 0.0, 1.0)):
-        scale, delta, pivot = utils.get_transform_from_box(curr_bbox, tar_bb, proportional, axis, padding, inplace, offset)
+    def crop_ex(self,curr_bbox: BBox, tar_bb: BBox, islands_of_mesh):
+        scale, delta, pivot = utils.get_transform_from_box(curr_bbox, tar_bb, self.axis, self.padding, self.use_crop)
         for isl in islands_of_mesh:
             isl.umesh.update_tag |= isl.scale_with_move(scale, delta, pivot)
 
 
-
     def get_event_info(self):
-        if self.is_crop:
+        if self.use_crop:
             return info.operator.crop_event_info_ex
         else:
             return info.operator.fill_event_info_ex
@@ -278,13 +283,13 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                     islands = self.calc_island_method(umesh)  # noqa # pycharm moment
                     general_bbox.union(islands.calc_bbox())
                     islands_of_mesh.append(islands)
-                self.crop_ex(self.axis, general_bbox, False, islands_of_mesh, Vector((0.0, 0.0)), self.padding, self.is_crop, active_trim_bbox)
+                self.crop_ex(general_bbox, active_trim_bbox, islands_of_mesh)
 
             case 'INDIVIDUAL':
                 active_trim_bbox = utils.get_active_trim().to_bbox()
                 for umesh in self.umeshes:
                     for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
-                        self.crop_ex(self.axis, isl.bbox, False, (isl,), Vector((0, 0)), self.padding, self.is_crop, active_trim_bbox)
+                        self.crop_ex(isl.bbox, active_trim_bbox, (isl,))
 
             case 'INDIVIDUAL_INPLACE':
                 bboxes = utils.get_trim_bboxes()
@@ -296,7 +301,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                             continue
                         tar_bb = bboxes[idx]
 
-                        self.crop_ex(self.axis, isl.bbox, False, (isl,), Vector((0, 0)), self.padding, self.is_crop, tar_bb)
+                        self.crop_ex(isl.bbox, tar_bb, (isl,))
 
             case 'INPLACE':
                 bboxes = utils.get_trim_bboxes()
@@ -316,11 +321,11 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                     for isl in islands:
                         general_bbox.union(isl.bbox)
 
-                    self.crop_ex(self.axis, general_bbox, False, islands, Vector((0, 0)), self.padding, self.is_crop, tar_bbox)
+                    self.crop_ex(general_bbox, tar_bbox, islands)
             case _:
                 raise NotImplementedError(self.mode)
 
-        ot_name_to_report_name = 'cropped' if self.is_crop else 'filled'
+        ot_name_to_report_name = 'cropped' if self.use_crop else 'filled'
         self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
 
         if skipped_counter:
@@ -2900,7 +2905,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             if not self.bool_bounds:
                 island.move(randmove)
             else:
-                min_bb_prev = island.bbox.tile_from_center
+                min_bb_prev = island.bbox.get_tile_start_pos_from_center()
                 bb = island.calc_bbox()
                 wrap_x = utils.wrap_line(bb.xmin+randmove.x, bb.width, min_bb_prev.x, min_bb_prev.x+1, default=bb.min.x)
                 wrap_y = utils.wrap_line(bb.ymin+randmove.y, bb.height, min_bb_prev.y,

@@ -726,11 +726,9 @@ def get_nearest_contained_bbox_idx(bboxes, pt):
 
 def get_transform_from_box(src: 'utypes.BBox',
                            tar: 'utypes.BBox',
-                           is_crop: bool,
                            axis: str,
                            pad: float,
-                           inplace: bool,
-                           offset: Vector
+                           use_crop: bool
                            ) -> tuple[Vector, Vector, Vector]:
     # Padding may be too large for small trims, and if the length is exceeded, it causes negative scaling.
     # Therefore, attenuate the padding.
@@ -740,7 +738,7 @@ def get_transform_from_box(src: 'utypes.BBox',
     scale_x = ((tar.width - pad_x) / w) if (w := src.width) else 1
     scale_y = ((tar.height - pad_y) / h) if (h := src.height) else 1
 
-    if is_crop:
+    if use_crop:
         if axis == 'XY':
             scale_x = scale_y = min(scale_x, scale_y)
         elif axis == 'X':
@@ -767,19 +765,11 @@ def get_transform_from_box(src: 'utypes.BBox',
     pos_y = wrap_line_nearest(src.min.y, src.height, tar.ymin + pad_y, tar.ymax - pad_y)
     set_pos = Vector((pos_x, pos_y))
 
-    if inplace:  # TODO: Delete inplace
-        if axis == 'XY':
-            set_pos += src.tile_from_center
-        elif axis == 'X':
-            set_pos.x += math.floor(src.center.x)
-        else:
-            set_pos.y += math.floor(src.center.y)
 
     delta = set_pos - src.min
     if axis == 'X':
         delta.y = 0
     elif axis == 'Y':
         delta.x = 0
-    delta += offset  # TODO: Delete offset
 
     return scale, delta, pivot
