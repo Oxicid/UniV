@@ -941,6 +941,9 @@ class IMAGE_MT_PIE_univ_align(Menu):
         row = col.row(align=True)
         row.alignment = 'CENTER'
         row.prop(univ_settings(), 'align_island_mode', expand=True, icon_only=True)
+        # TODO: Uncomment this after add keymap for Non-Edit mode in UV Editor
+        # row.active = _context.mode == 'EDIT_MESH'
+
         col.separator(factor=0.2)
         row = col.row(align=True)
         row.prop(univ_settings(), 'align_mode', expand=True, icon_only=True)

@@ -562,7 +562,7 @@ def calc_min_align_angle_pt(points):
     return find_min_rotate_angle(align_angle_pre)
 
 
-def get_cursor_location() -> Vector | None:
+def get_cursor_location() -> Vector:
     if bpy.context.area.ui_type == 'UV':
         return bpy.context.space_data.cursor_location.copy()
     for window in bpy.context.window_manager.windows:
@@ -570,6 +570,8 @@ def get_cursor_location() -> Vector | None:
         for area in screen.areas:
             if area.ui_type == 'UV':
                 return area.spaces.active.cursor_location.copy()
+    print('UniV: Not found cursor location, used zero coordinates.')  # TODO: Replace with log
+    return Vector((0.0, 0.0))
 
 
 def get_mouse_pos(context, event):

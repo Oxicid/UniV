@@ -86,13 +86,6 @@ def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):
             return
 
 
-def is_island_mode():
-    ts = bpy.context.scene.tool_settings
-    if ts.use_uv_select_sync:
-        return ts.mesh_select_mode[:] == (False, False, True)
-    return ts.uv_select_mode in ('FACE', 'ISLAND')
-
-
 T_mesh_select_modes = typing.Literal["VERT", "EDGE", "FACE"]
 
 

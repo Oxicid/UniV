@@ -97,8 +97,8 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
 
             # Set pivots
             for isl in islands:
-                if self.by_cursor and (loc := utils.get_cursor_location()):
-                    isl.value = loc
+                if self.by_cursor:
+                    isl.value = utils.get_cursor_location()
                 else:
                     if self.axis_uv == '-X to +X':
                         pivot_u = math.floor(isl.bbox.center.x)

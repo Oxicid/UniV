@@ -235,11 +235,11 @@ class QuickSnap_KDMeshes:
                 kd_data.found = (pos, 0, dist_to_grid)
                 kd_data.kdmesh = True  # for __bool__
 
-        if cursor_loc := utils.get_cursor_location():
-            dist_to_cursor = (cursor_loc - m_pos).length
-            if dist_to_cursor <= self.radius and dist_to_cursor < kd_data.distance:
-                kd_data.found = (cursor_loc, 0, dist_to_cursor)
-                kd_data.kdmesh = True  # for __bool__
+        cursor_loc = utils.get_cursor_location()
+        dist_to_cursor = (cursor_loc - m_pos).length
+        if dist_to_cursor <= self.radius and dist_to_cursor < kd_data.distance:
+            kd_data.found = (cursor_loc, 0, dist_to_cursor)
+            kd_data.kdmesh = True  # for __bool__
 
         if self.trim_kdtree and prefs().use_trims:
             if self.trim_kdtree.elem_flag != self.snap_points_mode:
