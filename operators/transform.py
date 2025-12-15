@@ -1311,7 +1311,8 @@ align_event_info_ex = \
     "\t\t\tCenter button collects islands in Island mode.\n" \
     "\t\t\tH/V buttons - align edges by angle in Island mode.\n" \
     "Ctrl - Align to cursor\n" \
-    "Ctrl+Shift+Alt - Align to cursor union"
+    "Ctrl+Shift+Alt - Align to cursor union\n" \
+    "In Non-Edit Mode, operations proceed as in Island Mode.\n"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 
 
@@ -1787,7 +1788,6 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         super().__init__(*args, **kwargs)
         self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
         self.update_tag: bool = False
-        self.cursor_loc: Vector | None = None
         self.umeshes: UMeshes | None = None
 
     def execute(self, context):
@@ -1796,10 +1796,6 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.calc_padding()
         self.report_padding()
 
-        if self.to_cursor:
-            self.cursor_loc = utils.get_cursor_location()
-        else:
-            self.cursor_loc = None
 
         if self.subgroup_type != 'NONE':
             self.lock_overlap = False
@@ -1845,7 +1841,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 general_bbox.union(bb)
 
         is_horizontal = self.is_horizontal(general_bbox, union_islands_groups)
-        margin = general_bbox.min if (self.cursor_loc is None) else self.cursor_loc
+        margin = utils.get_cursor_location() if self.to_cursor else general_bbox.min
         self.sort_islands(is_horizontal, margin, union_islands_groups)
 
     def sort_individual_preprocessing(self, extended=True):
@@ -1883,7 +1879,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             return
 
         is_horizontal = self.is_horizontal(general_bbox, _islands)
-        margin = general_bbox.min if (self.cursor_loc is None) else self.cursor_loc
+        margin = utils.get_cursor_location() if self.to_cursor else general_bbox.min
 
         if self.subgroup_type == 'NONE':
             self.sort_islands(is_horizontal, margin, _islands)
@@ -2035,13 +2031,9 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.calc_padding()
         self.report_padding()
 
+        self.cursor_loc = None
         if self.to_cursor and not self.break_:
-            if not (cursor_loc := utils.get_cursor_location()):
-                self.report({'INFO'}, "Cursor not found")
-                return {'CANCELLED'}
-            self.cursor_loc = cursor_loc
-        else:
-            self.cursor_loc = None
+            self.cursor_loc = utils.get_cursor_location()
 
         if self.break_:
             max_angle = max(umesh.smooth_angle for umesh in self.umeshes)

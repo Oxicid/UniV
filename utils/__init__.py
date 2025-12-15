@@ -579,8 +579,7 @@ def get_mouse_pos(context, event):
 
 
 def get_tile_from_cursor() -> Vector | None:
-    if cursor := get_cursor_location():
-        return Vector((math.floor(val) for val in cursor))
+    return Vector((math.floor(val) for val in get_cursor_location()))
 
 
 def set_cursor_location(loc):
