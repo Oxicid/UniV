@@ -420,50 +420,25 @@ class Stitch:
                 end_filtered.append(max(g, key=lambda lg__: lg__.length_3d))
         return end_filtered
 
-    @staticmethod
-    def set_boundary_tag_with_exclude_face_idx(isl, exclude_idx: set):
-        uv = isl.umesh.uv
-        is_boundary = utils.is_boundary_sync if isl.umesh.sync else utils.is_boundary_non_sync
-        for f in isl:
-            for crn in f.loops:
-                if crn.link_loop_radial_prev.face.index in exclude_idx:
-                    crn.tag = False
-                    continue
-                crn.tag = crn.edge.seam or is_boundary(crn, uv)
-
     def set_selected_boundary_tag_with_exclude_face_idx(self, isl, exclude_idx: set):
-        uv = isl.umesh.uv
+        """Sets tags for the segments that will be used for stitching. Islands that have already been stitched are ignored."""
+        is_bound = utils.is_boundary_func(isl.umesh, with_flipped_check=False)  # TODO: Check with flipped
         if self.between:
-            if isl.umesh.sync:
-                for f in isl:
-                    for crn in f.loops:
-                        pair = crn.link_loop_radial_prev
-                        if pair.face.index in exclude_idx:
-                            crn.tag = False
-                            continue
-                        crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
-            else:
-                for f in isl:
-                    for crn in f.loops:
-                        if crn.link_loop_radial_prev.face.index in exclude_idx:
-                            crn.tag = False
-                            continue
-                        crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
+            for f in isl:
+                for crn in f.loops:
+                    pair = crn.link_loop_radial_prev
+                    if pair.face.index in exclude_idx:
+                        crn.tag = False
+                        continue
+                    crn.tag = is_bound(crn)
         else:
-            if isl.umesh.sync:
-                for f in isl:
-                    for crn in f.loops:
-                        if not crn.edge.select or crn.link_loop_radial_prev.face.index in exclude_idx:
-                            crn.tag = False
-                            continue
-                        crn.tag = crn.edge.seam or utils.is_boundary_sync(crn, uv)
-            else:
-                for f in isl:
-                    for crn in f.loops:
-                        if not crn[uv].select_edge or crn.link_loop_radial_prev.face.index in exclude_idx:
-                            crn.tag = False
-                            continue
-                        crn.tag = crn.edge.seam or utils.is_boundary_non_sync(crn, uv)
+            get_edge_select = utils.edge_select_get_func(isl.umesh)
+            for f in isl:
+                for crn in f.loops:
+                    if not get_edge_select(crn) or crn.link_loop_radial_prev.face.index in exclude_idx:
+                        crn.tag = False
+                        continue
+                    crn.tag = is_bound(crn)
 
     def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         is_flipped = trans_lg.is_flipped_3d
