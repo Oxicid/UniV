@@ -819,5 +819,6 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
 
                 message = f'Disable {counter} keymaps' if counter else 'Not found keymaps'
 
+        bpy.context.preferences.is_dirty = True
         self.report({'INFO'}, message)
         return {'FINISHED'}
