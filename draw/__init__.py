@@ -208,7 +208,8 @@ class DrawCall3D:
 
 
 class TrimDrawer:
-    shader = None
+    line_shader = None
+    tris_shader = None
     batch_lines = None
     batch_tris = None
     handler = None
@@ -258,14 +259,15 @@ class TrimDrawer:
                     boxes_lines_colors.extend([[*trim.color, line_opacity]] * 8)
                     boxes_tris_color.extend([[*trim.color, tris_opacity]] * 6)
 
-        if cls.shader is None:
-            cls.shader = cls.get_shader()
-        cls.batch_lines = batch_for_shader(cls.shader, 'LINES', {"pos": boxes_lines, 'color': boxes_lines_colors})
-        cls.batch_tris = batch_for_shader(cls.shader, 'TRIS', {"pos": boxes_tris, 'color': boxes_tris_color})
+        if cls.line_shader is None:
+            cls.tris_shader, cls.line_shader = cls.get_shader()
+        cls.batch_lines = batch_for_shader(cls.line_shader, 'LINES', {"pos": boxes_lines, 'color': boxes_lines_colors})
+        cls.batch_tris = batch_for_shader(cls.tris_shader, 'TRIS', {"pos": boxes_tris, 'color': boxes_tris_color})
 
     @staticmethod
     def get_shader():
-        return gpu.shader.from_builtin('SMOOTH_COLOR')
+        # TODO: Standardize
+        return gpu.shader.from_builtin('SMOOTH_COLOR'), gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
 
     @staticmethod
     def is_enable():
@@ -278,16 +280,19 @@ class TrimDrawer:
     @staticmethod
     def univ_drawer_2d_callback():
         if bpy.context.area.ui_type == 'UV':
-            line_width = prefs().trim_line_width
-            shaders.set_line_width(line_width)
+            # shaders.set_line_width(line_width)
             shaders.blend_set_alpha()
-            TrimDrawer.shader.bind()
+            TrimDrawer.line_shader.bind()
 
-            shaders.set_line_width_vk(TrimDrawer.shader, line_width)
-            TrimDrawer.batch_lines.draw(TrimDrawer.shader)
-            TrimDrawer.batch_tris.draw(TrimDrawer.shader)
+            # shaders.set_line_width_vk(TrimDrawer.shader, line_width)
+            try:
+                TrimDrawer.line_shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
+                TrimDrawer.line_shader.uniform_float("lineWidth", prefs().trim_line_width)
+            except: pass  # noqa
+            TrimDrawer.batch_lines.draw(TrimDrawer.line_shader)
+            TrimDrawer.batch_tris.draw(TrimDrawer.tris_shader)
 
-            shaders.set_line_width(1)
+            # shaders.set_line_width(1)
             shaders.blend_set_none()
 
     @classmethod

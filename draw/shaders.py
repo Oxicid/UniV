@@ -84,7 +84,15 @@ class Shaders:
         if draw_engine_type := getattr(gpu.platform, "backend_type_get", None):
             VK_ENABLED = draw_engine_type() == "VULKAN"
 
-        if not VK_ENABLED:
+        if VK_ENABLED:
+            global set_line_width_vk
+
+            def _set_line_width_vk(shader, width=2.0):
+                shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
+                shader.uniform_float('lineWidth', width)
+
+            set_line_width_vk = _set_line_width_vk
+        else:
             global set_line_width
             global set_point_size
 
@@ -100,15 +108,6 @@ class Shaders:
 
                 blend_set_alpha = lambda: bgl.glEnable(bgl.GL_ALPHA)
                 blend_set_none = lambda: bgl.glDisable(bgl.GL_BLEND)
-        else:
-            global set_line_width_vk
-
-            def _set_line_width_vk(shader, width=2.0):
-                shader.uniform_float('lineWidth', width)
-                shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
-
-            set_line_width_vk = _set_line_width_vk
-
 
         cls.init_flat_shading_uniform_color()
 
