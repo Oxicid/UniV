@@ -201,6 +201,18 @@ def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
     return min_edge, min_dist
 
 
+def find_nearest(a, v: float) -> float | None:
+    idx = np.searchsorted(a, v)
+    if not idx:
+        if not len(a):
+            return None
+        return a[0]
+
+    if idx == len(a):
+        return a[-1]
+    return a[idx] if abs(a[idx] - v) < abs(a[idx - 1] - v) else a[idx - 1]
+
+
 def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
     prj = rv3d.perspective_matrix @ Vector((*coord, 1.0))
 

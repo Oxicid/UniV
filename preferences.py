@@ -5,6 +5,7 @@ import bpy
 import rna_keymap_ui  # type: ignore[import-untyped]
 
 from . import utils
+from .utils import ENUM
 from . import keymaps
 from bpy.props import *
 
@@ -207,7 +208,8 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
     # Checker Texture
-    checker_toggle: bpy.props.BoolProperty(name='Toggle', default=True, description='Off/On checker modifier')
+    checker_toggle: EnumProperty(name='Toggle', default='TOGGLE', items=ENUM('TOGGLE', 'OVERWRITE'),
+                                           description='Off/On checker modifier')
     checker_generated_type: bpy.props.EnumProperty(name='Texture Type', default='UV_GRID', items=checker_generated_types)
 
     # Texel Settings

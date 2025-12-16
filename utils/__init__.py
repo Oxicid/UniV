@@ -481,6 +481,57 @@ class ViewBoxSyncBlock:
     def __str__(self):
         return f"View Box={self.view_box}, Skip={self.skip}, Has Blocked={self.has_blocked}"
 
+
+store_for_avoid_gc: list[list[tuple[str, ...] | None]] = []
+def ENUM(*items: str | None | tuple[str, ...] | tuple[tuple[str, str] | tuple[str, str, str]]):
+    """Convert str and tuple to items for bpy.props.EnumProperty
+    Examples:
+        ENUM('WHITE', 'ORANGE')                                             # (('WHITE', 'White', 'White'), ('ORANGE', 'Orange', 'Orange'))
+        ENUM('WHITE_COLOR', ...)                                            # (('WHITE', 'White Color', 'White Color'), ...)
+        ENUM(('WHITE', 'White Color'), ...)                                 # (('WHITE', 'White Color', ''), ...)
+        ENUM(('WHITE', 'White Color', ''), ...)                             # (('WHITE', 'White Color', ''), ...)
+        ENUM(('WHITE', '', ''), ...)                                        # (('WHITE', '', ''), ...)
+
+        ENUM(('WHITE', '', 'White Color'), ...)                             # (('WHITE', '', 'White Color'), ...)
+        ENUM(('WHITE', '', '', 'EMPTY', 10), ...)                           # (('WHITE', '', '', 'EMPTY', 10), ...)
+        ENUM(('WHITE', '', '', 'EMPTY'), ('ORANGE', '', '', 'HIDE_ON'))     # (('WHITE', '', '', 'EMPTY', 0), ('ORANGE', '', '', 'HIDE_ON', 1))
+
+        # None used like separator
+        ENUM('WHITE', None, ...)                                            # (('WHITE', 'White', 'White'), None, ...)
+    """
+    def idname_to_name(s) -> str:
+        return ' '.join(x.capitalize() for x in s.split('_'))
+
+    ret_enum = []
+    for i, v in enumerate(items):
+        match v:
+            case str():
+                name = idname_to_name(v)
+                ret_enum.append((v, name, name))
+
+            case str(), str():
+                idname, name = v
+                assert name, "UniV: Expected a non-empty name when two arguments are passed to EnumProperty"
+                ret_enum.append((*v, ''))
+
+            case str(), str(), str():
+                idname, name, descr = v  # Default behavior.
+                ret_enum.append((idname, name, descr))
+
+            case str(), str(), str(), str():
+                idname, name, descr, icon = v
+                assert icon
+                ret_enum.append((idname, name, descr, icon, str(i)))
+            case None:
+                ret_enum.append(None)  # Separator
+            case _:
+                raise NotImplementedError(f"Type {type(v).__qualname__} not implement for enum, items: {v}")
+
+    global store_for_avoid_gc
+    store_for_avoid_gc.append(ret_enum)
+    return ret_enum
+
+
 def get_pad():
     from .. import preferences
     pref = preferences.prefs()

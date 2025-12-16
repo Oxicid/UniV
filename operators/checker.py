@@ -30,7 +30,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.prop(prefs(), 'checker_toggle')
+        row = layout.row(align=True, heading='Apply Method')
+        row.scale_x = 0.92
+        row.prop(prefs(), 'checker_toggle', expand=True)
+
         row = layout.row(align=True, heading='Texture Type')
         row.scale_x = 0.92
         row.prop(prefs(), 'checker_generated_type', expand=True)
@@ -60,7 +63,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
-            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=prefs().checker_toggle)
+            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker',
+                                                  toggle_enable=prefs().checker_toggle == 'TOGGLE')
 
         def set_active_image():
             if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
@@ -71,13 +75,14 @@ class UNIV_OT_Checker(bpy.types.Operator):
                         space_data.image = node.image
                         break
 
-        if prefs().checker_toggle:
+        if prefs().checker_toggle == 'TOGGLE':
             if self.all_has_enable_gn_checker_modifier():
                 self.disable_all_gn_checker_modifier()
             else:
                 set_active_image()
                 self.enable_and_set_gn_checker_modifier(node_group, mtl)
         else:
+            # TODO: Add Overwrite with toggle
             set_active_image()
             self.create_gn_checker_modifier(node_group, mtl)
         self.update_views()
