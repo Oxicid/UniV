@@ -14,7 +14,7 @@ from bl_math import clamp
 from .ubm import polyfill_beautify
 from . import bm_select
 from .. import utypes
-from .umath import LinearSolver
+from .solver import LinearSolver
 
 
 T = typing.TypeVar("T", "PFace", "PEdge", "PVert")

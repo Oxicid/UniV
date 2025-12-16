@@ -21,6 +21,7 @@ from .ubm import *
 from .bm_select import *
 from .bm_tag import *
 from .bm_iterable import *
+from .solver import *
 from .bm_walk import *
 from .umath import *
 from . import uv_parametrizer
