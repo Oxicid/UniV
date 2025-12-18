@@ -253,6 +253,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
 
     # Trim
     def crop_trims(self):
+        found_in_active_trim = False
         skipped_counter = 0
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
@@ -270,6 +271,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         else:
             if not self.umeshes:
                 return self.umeshes.update()
+            selected_umeshes = []
             self.umeshes.ensure()
             self.calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
 
@@ -278,18 +280,22 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case 'DEFAULT':
                 active_trim_bbox = utils.get_active_trim().to_bbox()
                 general_bbox = BBox()
-                islands_of_mesh = []
+                islands = []
                 for umesh in self.umeshes:
-                    islands = self.calc_island_method(umesh)  # noqa # pycharm moment
-                    general_bbox.union(islands.calc_bbox())
-                    islands_of_mesh.append(islands)
-                self.crop_ex(general_bbox, active_trim_bbox, islands_of_mesh)
+                    for isl in self.calc_island_method(umesh):  # noqa # pycharm moment
+                        if selected_umeshes or active_trim_bbox.isect_island(isl):
+                            found_in_active_trim = True
+                            general_bbox.union(isl.bbox)
+                            islands.append(isl)
+                self.crop_ex(general_bbox, active_trim_bbox, islands)
 
             case 'INDIVIDUAL':
                 active_trim_bbox = utils.get_active_trim().to_bbox()
                 for umesh in self.umeshes:
                     for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
-                        self.crop_ex(isl.bbox, active_trim_bbox, (isl,))
+                        if selected_umeshes or active_trim_bbox.isect_island(isl):
+                            found_in_active_trim = True
+                            self.crop_ex(isl.bbox, active_trim_bbox, (isl,))
 
             case 'INDIVIDUAL_INPLACE':
                 bboxes = utils.get_trim_bboxes()
@@ -325,8 +331,11 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
             case _:
                 raise NotImplementedError(self.mode)
 
-        ot_name_to_report_name = 'cropped' if self.use_crop else 'filled'
-        self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
+        if not selected_umeshes and not found_in_active_trim and self.mode in ('DEFAULT', 'INDIVIDUAL'):
+            self.report({'WARNING'}, 'Not found islands in active trim')
+        else:
+            ot_name_to_report_name = 'cropped' if self.use_crop else 'filled'
+            self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
 
         if skipped_counter:
             self.report({'WARNING'}, f"Found {skipped_counter} islands for which no trim was found")
