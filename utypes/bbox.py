@@ -451,6 +451,23 @@ class BBox:
                     return True
         return False
 
+    def isect_island(self, island):
+        isl_bbox: BBox = island.bbox
+
+        if not self.isect(isl_bbox):
+            return False
+
+        if self.isect_x(isl_bbox.xmin) and self.isect_x(isl_bbox.xmax):
+            return True
+        if self.isect_y(isl_bbox.ymin) and self.isect_y(isl_bbox.ymax):
+            return True
+
+        if not island.flat_coords:
+            island.calc_tris_simple()
+            island.calc_flat_coords(save_triplet=True)
+
+        return self.isect_triangles(island.flat_coords)
+
     def length_x(self, x) -> float:
         if x < self.xmin:
             return self.xmin - x
