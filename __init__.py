@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 40),
+    "version": (3, 9, 41),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -235,7 +235,8 @@ def load_register_types():
                 # UI
                 ui.UNIV_UL_TrimPresetsManager,
                 # Trim
-                univ_pro.trim.UNIV_OT_TD_PresetsProcessing,
+                univ_pro.trim.UNIV_OT_TrimPresetsProcessing,
+                univ_pro.trim.UNIV_OT_TrimFromMesh,
                 # Stack
                 univ_pro.stack.UNIV_OT_Stack,
                 univ_pro.stack.UNIV_OT_Stack_VIEW3D,

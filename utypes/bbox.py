@@ -520,11 +520,12 @@ class BBox:
         matrix[3][1] = (self.ymin - dst.ymin) * matrix[1][1]
         return matrix
 
-    def pad(self, pad: Vector):
-        self.xmin -= pad.x
-        self.ymin -= pad.y
-        self.xmax += pad.x
-        self.ymax += pad.y
+    def pad(self, pad: Vector | tuple[float, float]):
+        """Extend padding"""
+        self.xmin -= pad[0]
+        self.ymin -= pad[1]
+        self.xmax += pad[0]
+        self.ymax += pad[1]
 
     def pad_y(self, boundary_size, pad_min, pad_max):
         assert (pad_max >= 0.0)
@@ -648,6 +649,14 @@ class BBox:
 
         if xmax >= xmin:
             return xmin, xmax
+
+    @property
+    def aspect(self):
+        min_length = self.min_length
+
+        if not min_length:
+            return 0.0
+        return self.max_length / min_length
 
     def draw_data_verts(self):
         return [self.left_bottom, self.left_upper, self.right_upper, self.right_bottom]
