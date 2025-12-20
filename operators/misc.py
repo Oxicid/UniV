@@ -551,7 +551,7 @@ class UNIV_OT_SetCursor2D(Operator):
         # TODO: Implement Object Mode
         if context.mode == 'EDIT_MESH' and REPEAT_MOUSE_POS_COUNT == 0:
             umeshes = UMeshes()
-            pt, min_dist = self.snap_to_trim(pt, mouse_pos, min_dist, umeshes.elem_mode)
+            pt, min_dist = self.snap_to_trim(pt, mouse_pos, min_dist)
 
             zero_pt = Vector((0.0, 0.0))
             for umesh in umeshes:
@@ -633,57 +633,27 @@ class UNIV_OT_SetCursor2D(Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def snap_to_trim(pt, mouse_pos, min_dist, mode):
+    def snap_to_trim(pt, mouse_pos, min_dist):
         if not prefs().use_trims:
             return pt, min_dist
 
-        if prefs().snap_points_default == 'ALL':
-            for trim in utils.get_trim_bboxes():
-                center = trim.center
-                if (dist := (center - mouse_pos).length) < min_dist:
-                    pt = center
+        for trim in utils.get_trim_bboxes():
+            center = trim.center
+            if (dist := (center - mouse_pos).length) < min_dist:
+                pt = center
+                min_dist = dist
+
+            for crn_pt in trim.draw_data_verts():
+                if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                    pt = crn_pt
                     min_dist = dist
 
-                for crn_pt in trim.draw_data_verts():
-                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
-                        pt = crn_pt
-                        min_dist = dist
-
-                for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
-                    line_center = (line_a + line_b) * 0.5
-                    if (dist := (line_center - mouse_pos).length) < min_dist:
-                        pt = line_center
-                        min_dist = dist
-
-        elif mode == 'VERT':
-            for trim in utils.get_trim_bboxes():
-                for crn_pt in trim.draw_data_verts():
-                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
-                        pt = crn_pt
-                        min_dist = dist
-        elif mode == 'EDGE':
-            for trim in utils.get_trim_bboxes():
-                for crn_pt in trim.draw_data_verts():
-                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
-                        pt = crn_pt
-                        min_dist = dist
-
-                for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
-                    line_center = (line_a + line_b) * 0.5
-                    if (dist := (line_center - mouse_pos).length) < min_dist:
-                        pt = line_center
-                        min_dist = dist
-        else:
-            for trim in utils.get_trim_bboxes():
-                center = trim.center
-                if (dist := (center - mouse_pos).length) < min_dist:
-                    pt = center
+            for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
+                line_center = (line_a + line_b) * 0.5
+                if (dist := (line_center - mouse_pos).length) < min_dist:
+                    pt = line_center
                     min_dist = dist
 
-                for crn_pt in trim.draw_data_verts():
-                    if (dist := (crn_pt - mouse_pos).length) < min_dist:
-                        pt = crn_pt
-                        min_dist = dist
         return pt, min_dist
 
 

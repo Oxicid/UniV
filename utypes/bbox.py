@@ -137,6 +137,9 @@ class BBox:
     def __str__(self):
         return f"xmin={self.xmin:.6}, xmax={self.xmax:.6}, ymin={self.ymin:.6}, ymax={self.ymax:.6}, width={self.width:.6}, height={self.height:.6}"
 
+    def __repr__(self):
+        return str(self)
+
     @property
     def is_valid(self) -> bool:
         return (self.xmin <= self.xmax) and (self.ymin <= self.ymax)

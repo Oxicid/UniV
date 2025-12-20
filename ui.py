@@ -165,11 +165,12 @@ class UNIV_PT_General(Panel):
         )
 
         col = row.column(align=True)
-        col.operator('scene.univ_trim_presets_processing', icon='ADD', text="").operation_type = 'ADD'
-        col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
+        col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
+        col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
         col.separator()
-        col.operator('scene.univ_trim_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
-        col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN', text="")
+        col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
+        col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN', text='')
+        col.operator('scene.univ_trim_presets_from_svg', icon='FILE_NEW', text='')
 
 
         td_idx = univ_settings().active_trim_index

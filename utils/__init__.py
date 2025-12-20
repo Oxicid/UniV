@@ -27,6 +27,8 @@ from .umath import *
 from . import uv_parametrizer
 from .. import utypes
 
+from mathutils import Vector, Matrix
+
 resolutions = (('256', '256', ''), ('512', '512', ''), ('1024', '1024', ''),
                ('2048', '2048', ''), ('4096', '4096', ''), ('8192', '8192', ''))
 resolution_name_to_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
@@ -481,6 +483,157 @@ class ViewBoxSyncBlock:
 
     def __str__(self):
         return f"View Box={self.view_box}, Skip={self.skip}, Has Blocked={self.has_blocked}"
+
+class SVG:
+
+    def __init__(self, filepath):
+        """
+        Load specified SVG file
+        """
+        import xml.dom.minidom
+        from mathutils import Matrix
+
+        try:
+            from io_curve_svg import import_svg  # type: ignore[import-untyped]
+        except ImportError:
+            raise ImportError("UniV: Failed to generate icons, possibly the svg module was rewritten in C++")
+
+
+        # import os
+        # svg_name = os.path.basename(filepath)
+
+        node = xml.dom.minidom.parse(filepath)
+
+        m = Matrix()
+        m = m @ Matrix.Scale(1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((1.0, 0.0, 0.0)))
+        m = m @ Matrix.Scale(-1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((0.0, 1.0, 0.0)))
+
+        rect = (0, 0)
+
+        self._context = {'defines': {},
+                         'rects': [rect],
+                         'rect': rect,
+                         'matrix_stack': [],
+                         'matrix': m,
+                         'materials': {},
+                         'styles': [None],
+                         'style': None,
+                         'do_colormanage': True}
+
+        self.loader = import_svg.SVGGeometryContainer(node, self._context)
+        self.loader.parse()
+
+
+    @classmethod
+    def load(cls, filepath, report=None):
+        import xml
+        # error in code should raise exceptions but loading
+        # non SVG files can give useful messages.
+        try:
+            return cls(filepath)
+        except (xml.parsers.expat.ExpatError, UnicodeEncodeError) as e:
+            import traceback
+            traceback.print_exc()
+            error_message = f"UniV: Unable to parse XML, {type(e).__name__}:{e} for file {filepath!r}"
+            if report:
+                report({'ERROR'}, error_message)
+            else:
+                print(error_message)
+            return None
+
+    @staticmethod
+    def get_size(filepath: str):
+        import xml
+        from xml.etree import ElementTree
+
+        try:
+            tree = ElementTree.parse(filepath)
+            firs_line = tree.getroot()
+
+            w = firs_line.get('width', '2048').replace('pt', '')
+            h = firs_line.get('height', '2048').replace('pt', '')
+            return int(w), int(h)
+
+        except (xml.parsers.expat.ExpatError, UnicodeEncodeError):
+            import traceback
+            traceback.print_exc()
+
+            # TODO: Fill to 0..1 box by general boundary box and try get by view box
+            print(f"UniV: SVG: Unable to retrieve texture size, so default values are used. ")
+            return 2048, 2048
+
+    @staticmethod
+    def get_view_box(filepath: str):
+        import xml
+        from xml.etree import ElementTree
+
+        try:
+            tree = ElementTree.parse(filepath)
+            firs_line = tree.getroot()
+
+            view_box = firs_line.get('viewBox', '0 0 32 32')
+            xmin, ymin, xmax, ymax = view_box.split()
+
+            return utypes.BBox(float(xmin), float(xmax), float(ymin), float(ymax))
+
+        except (xml.parsers.expat.ExpatError, UnicodeEncodeError):
+            import traceback
+            traceback.print_exc()
+
+            print(f"UniV: SVG: Unable to retrieve view box, so default values are used. ")
+            return utypes.BBox(0.0, 32.0, 0.0, 32.0)
+
+
+    def to_bboxes(self) -> "list[tuple[utypes.BBox, Vector]]":
+        bboxes_with_color_and_mtx = []
+        for curv in self.loader._geometries:  # noqa # pylint: disable=W0212
+            for geo in curv._geometries:  # noqa # pylint: disable=W0212
+                self._geom_to_box(geo, bboxes_with_color_and_mtx)
+
+        return bboxes_with_color_and_mtx
+
+    @classmethod
+    def _geom_to_box(cls, geo, bboxes_with_color_and_mtx):
+        from io_curve_svg import import_svg
+        if type(geo) == import_svg.SVGGeometryG:
+            for g in geo._geometries:  # noqa # pylint: disable=W0212
+                cls._geom_to_box(g, bboxes_with_color_and_mtx)
+            return
+
+        elif type(geo) == import_svg.SVGGeometryRECT:
+            x, y, w, h = [float(rect_data) for rect_data in geo._rect]  # noqa # pylint: disable=W0212
+            bb = utypes.BBox(x, x + w, y, y + h)
+        elif type(geo) == import_svg.SVGGeometryPATH:
+            bb = utypes.BBox()
+            for spline in geo._splines:  # noqa # pylint: disable=W0212
+                for pt in (spline['points']):
+                    xy = pt['x'], pt['y']
+                    bb.add(xy)
+        elif type(geo) in (import_svg.SVGGeometryCIRCLE, import_svg.SVGGeometryELLIPSE):
+            cx = float(geo._cx)  # noqa # pylint: disable=W0212
+            rx = float(geo._rx)  # noqa # pylint: disable=W0212
+
+            cy = float(geo._cy)  # noqa # pylint: disable=W0212
+            ry = float(geo._ry)  # noqa # pylint: disable=W0212
+
+            bb = utypes.BBox(cx - rx, cx + rx, cy - ry, cy + ry)
+        else:
+            print(f"UniV: Type {type(geo)} not support for creating trim")
+            return
+
+        mtx = geo.getTransformMatrix()
+        if not mtx:
+            mtx = Matrix.Identity(4)
+        color = Vector((1, 1, 1, 0))
+        mtl = geo._styles.get('fill')  # noqa # pylint: disable=W0212
+        if mtl:
+            color = Vector(mtl.diffuse_color)
+
+        # TODO: Apply matrix before convert to box
+        min3d = mtx @ bb.min.to_4d()
+        max3d = mtx @ bb.max.to_4d()
+        bb = utypes.BBox.calc_bbox((min3d.xy, max3d.xy))
+        bboxes_with_color_and_mtx.append((bb, color))
 
 
 store_for_avoid_gc: list[list[tuple[str, ...] | None]] = []
