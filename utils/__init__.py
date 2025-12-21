@@ -518,7 +518,7 @@ class SVG:
                          'materials': {},
                          'styles': [None],
                          'style': None,
-                         'do_colormanage': True}
+                         'do_colormanage': False}
 
         self.loader = import_svg.SVGGeometryContainer(node, self._context)
         self.loader.parse()

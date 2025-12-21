@@ -225,10 +225,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     # Trim System
     use_trims: BoolProperty(name="Use Trim System", default=False, update=_update_trim_system)
     trims_presets: CollectionProperty(name="Trims Presets", type=UNIV_TrimPreset)
+    active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
+
     trim_line_width: FloatProperty(name='Line Width', default=1.5, min=0.5, soft_min=1, soft_max=2, max=4, update=_update_trim_system)
     trim_line_opacity: FloatProperty(name='Line Opacity', default=0.5, min=0.0, max=1, update=_update_trim_system)
-    trim_tris_opacity: FloatProperty(name='Filled Opacity', default=0.05, min=0.0, soft_max=0.5, max=0.9, update=_update_trim_system)
-    active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
+    trim_tris_opacity: FloatProperty(name='Filled Opacity', default=0.05, min=0.0, soft_max=0.5, max=1.0, update=_update_trim_system)
 
     # Drawer
     overlay_2d_enable: BoolProperty(name='Overlay 2D', default=True, update=_update_drawer_2d_enable)

@@ -167,10 +167,9 @@ class UNIV_PT_General(Panel):
         col = row.column(align=True)
         col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
         col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
-        col.separator()
         col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
-        col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN', text='')
-        col.operator('scene.univ_trim_presets_from_svg', icon='FILE_NEW', text='')
+        col.separator(factor=0.25)
+        col.popover(panel='UNIV_PT_trim_manager', text='', icon_value=icons.settings_a)
 
 
         td_idx = univ_settings().active_trim_index
@@ -848,6 +847,22 @@ class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
 
     def draw(self, context):
         UNIV_PT_TD_PresetsManager.draw_ex(self.layout, 'mesh')
+
+
+class UNIV_PT_TrimManager(Panel):
+    bl_label = 'Trim Manager'
+    bl_idname = 'UNIV_PT_trim_manager'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_options = {'INSTANCED'}
+    bl_region_type = 'UI'
+    bl_category = 'UniV'
+
+    def draw(self, context):
+        col = self.layout.column(align=True)
+        col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
+        col.separator(factor=0.25)
+        col.operator('scene.univ_trim_load_from_svg', icon='MOD_MULTIRES')
+        col.operator('scene.univ_trim_save_to_svg', icon='FILE_TICK')
 
 
 class UNIV_PT_TD_LayersManager(Panel):
