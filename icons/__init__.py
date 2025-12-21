@@ -470,7 +470,7 @@ class IconsCreator:
                 try:
                     fb = gpu.state.active_framebuffer_get()
                     fb.clear(color=(0.0, 0.0, 0.0, 0.0))
-                    cls.draw_image(tris, colors, 32, scale_mul)
+                    cls.draw_image(tris, colors, 32, 32, scale_mul)
 
                     pixel_data = fb.read_color(0, 0, icon_size * antialiasing, icon_size * antialiasing, 4, 0, 'UBYTE')
                     pixel_data.dimensions = (icon_size * antialiasing) * (icon_size * antialiasing) * 4
@@ -517,17 +517,23 @@ class IconsCreator:
         return all_tris, all_colors
 
     @classmethod
-    def draw_image(cls, coords, colors, icon_size, scale_mul=1.0):
-        gpu.state.blend_set('ALPHA')
+    def draw_image(cls, coords, colors, icon_size_x, icon_size_y, scale_mul=1.0):
+        from gpu_extras.batch import batch_for_shader
 
+        gpu.state.blend_set('ALPHA')
         with gpu.matrix.push_pop():
-            gpu.matrix.load_matrix(cls.get_normalize_uvs_matrix(icon_size, scale_mul))
+            mtx = cls.get_normalize_uvs_matrix(icon_size_x, icon_size_y, scale_mul)
+            gpu.matrix.load_matrix(mtx)
             gpu.matrix.load_projection_matrix(Matrix.Identity(4))
-            cls.draw_background_colors(coords, colors)
+
+            shader = gpu.shader.from_builtin('FLAT_COLOR')
+            batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
+            batch.draw(shader)
+
         gpu.state.blend_set('NONE')
 
     @classmethod
-    def get_normalize_uvs_matrix(cls, icon_size, scale_mul=1.0):
+    def get_normalize_uvs_matrix(cls, icon_size_x, icon_size_y, scale_mul=1.0):
         """Matrix maps x and y coordinates from [0, 1] to [-1, 1]"""
         matrix = Matrix.Identity(4)
         matrix.col[3][0] = -1
@@ -540,7 +546,7 @@ class IconsCreator:
         svg_matrix = Matrix()
         svg_matrix = svg_matrix @ Matrix.Scale(1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((1.0, 0.0, 0.0)))
         svg_matrix = svg_matrix @ Matrix.Scale(-1.0 / 90.0 * 0.3048 / 12.0, 4, Vector((0.0, 1.0, 0.0)))
-        svg_objects_dimension = svg_matrix @ Vector((icon_size, icon_size, 0))
+        svg_objects_dimension = svg_matrix @ Vector((icon_size_x, icon_size_y, 0))
 
         filled_scale = [1 / abs(component) for component in svg_objects_dimension.xy]
         filled_scale.append(1)
@@ -550,7 +556,7 @@ class IconsCreator:
         return center_scale @ matrix @ fit_matrix
 
     @classmethod
-    def save_pixels(cls, filepath, pixel_data, width, height, antialiasing):
+    def save_pixels(cls, filepath, pixel_data, width: int, height: int, antialiasing: int=1):
         import OpenImageIO as oiio  # type: ignore[import-untyped]
         spec = oiio.ImageSpec(width, height, 4, 'uint8')
         # https://github.com/AcademySoftwareFoundation/OpenImageIO/blob/main/src/png.imageio/pngoutput.cpp
@@ -564,10 +570,11 @@ class IconsCreator:
         oiio.ImageBufAlgo.resize(buf_resized, buf_extended)
         buf_resized.write(filepath)
 
+
     @classmethod
     def draw_background_colors(cls, coords, colors):
-        shader = gpu.shader.from_builtin('FLAT_COLOR')
         from gpu_extras.batch import batch_for_shader
+        shader = gpu.shader.from_builtin('FLAT_COLOR')
         batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
         batch.draw(shader)
 

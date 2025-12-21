@@ -12,7 +12,7 @@ import contextlib
 from . import shaders
 from . import mesh_extract
 from .text import TextDraw
-from ..utypes import UMesh, BBox
+from ..utypes import UMesh
 from ..preferences import univ_settings, prefs
 from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
 from mathutils import Vector
@@ -237,7 +237,7 @@ class TrimDrawer:
 
         for idx, trim in enumerate(prefs().trims_presets):
             if trim.visible:
-                bb = BBox(trim.x, trim.x+trim.width, trim.y, trim.y+trim.height)
+                bb = trim.to_bbox()
                 boxes_lines.extend(bb.draw_data_lines())
                 boxes_tris.extend(bb.draw_data_tris())
 

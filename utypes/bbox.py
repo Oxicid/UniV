@@ -370,7 +370,7 @@ class BBox:
         self.xmax += center[0] + y1
         self.ymax += center[1] - x1
 
-    def scale(self, scale, pivot=None):
+    def scale(self, scale: float, pivot: Vector | tuple[float, float] | None = None):
         center = self.center if pivot is None else pivot
         self.xmin, self.ymin = (self.min - center) * scale + center
         self.xmax, self.ymax = (self.max - center) * scale + center
@@ -677,6 +677,13 @@ class BBox:
         ru = self.right_upper
         rb = self.right_bottom
         return [lu, lb, rb, lu, rb, ru]
+
+    def pixel_snap(self, size_x, size_y):
+        self.xmin = int(self.xmin * size_x) / size_x
+        self.xmax = int((self.xmax * size_x) + 0.999999) / size_x
+
+        self.ymin = int(self.ymin * size_y) / size_y
+        self.ymax = int((self.ymax * size_y) + 0.999999) / size_y
 
     def copy(self):
         return copy.copy(self)
