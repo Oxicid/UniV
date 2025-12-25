@@ -166,21 +166,21 @@ Has [Shift + T] keymap"""
                 self.report({'WARNING'}, 'Splitted area not found')
                 return {'CANCELLED'}
 
-        # Change ui_type to ShaderNodeTree from area_type
+        # Change 'IMAGE_EDITOR' to 'UV'
         elif active_area.type == 'IMAGE_EDITOR' and active_area.ui_type != 'UV':
-            c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(active_area))
             active_area.ui_type = 'UV'
-            if not c_region.alignment:
+            n_panel = ARegion.get_n_panel_from_area(active_area)
+            if n_panel.width == 1:
                 bpy.ops.wm.context_toggle(data_path='space_data.show_region_ui')
             self.category_setter_register(active_area)
             return {'FINISHED'}
 
+        # If there are two 'IMAGE_EDITOR' windows, it switches to VIEW_3D.
         elif active_area.type == 'IMAGE_EDITOR':
-            # If there are two 'IMAGE_EDITOR' windows, it switches to VIEW_3D.
             old_areas = set(context.screen.areas[:])
             for area in old_areas:
                 if (area != active_area) and (area.type == 'IMAGE_EDITOR') and (active_area.height == area.height):
-                    active_area.type = 'VIEW_3D'
+                    area.type = 'VIEW_3D'
                     self.category_setter_register(area)
                     return {'FINISHED'}
 
@@ -196,13 +196,14 @@ Has [Shift + T] keymap"""
             bpy.ops.screen.area_split(direction='VERTICAL', factor=0.5)
             new_area, = set(context.screen.areas[:]) - old_areas
 
-            mouse_in_right_side = self.mouse_x_pos > (active_area.x + active_area.width // 2)
-            if not (prefs().split_toggle_uv_by_cursor and mouse_in_right_side):
-                new_area, active_area = active_area, new_area
+            if prefs().split_toggle_uv_by_cursor:
+                mouse_in_right_side = self.mouse_x_pos > (active_area.x + active_area.width // 2)
+                if mouse_in_right_side:
+                    new_area, active_area = active_area, new_area
 
             active_area.ui_type = 'VIEW_3D'
-            c_region = ARegion.get_fields(ARegion.get_n_panel_from_area(new_area))
-            if c_region.alignment:
+            n_panel = ARegion.get_n_panel_from_area(new_area)
+            if n_panel.width != 1:
                 self.category_setter_register(new_area)
             return {'FINISHED'}
         else:
