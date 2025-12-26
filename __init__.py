@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 44),
+    "version": (3, 9, 45),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -240,6 +240,7 @@ def load_register_types():
                 univ_pro.trim.UNIV_OT_TrimLoadFromSVG,
                 univ_pro.trim.UNIV_OT_TrimSaveToSVG,
                 univ_pro.trim.UNIV_OT_TrimSaveToImage,
+                univ_pro.trim.UNIV_OT_TrimLoadFromImage,
                 univ_pro.trim.UNIV_OT_TrimFromMesh,
                 # Stack
                 univ_pro.stack.UNIV_OT_Stack,

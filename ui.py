@@ -865,6 +865,7 @@ class UNIV_PT_TrimManager(Panel):
         col.operator('scene.univ_trim_save_to_svg', icon='FILE_TICK')
         col.separator(factor=0.25)
         col.operator('scene.univ_trim_save_to_image', icon='OUTPUT')
+        col.operator('scene.univ_trim_load_from_image', icon='SEQ_SPLITVIEW')
 
 
 class UNIV_PT_TD_LayersManager(Panel):
