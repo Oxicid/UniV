@@ -6,9 +6,12 @@ if 'bpy' in locals():
     reload.reload(globals())
 
 import bpy
+import math
+import numpy as np
 
 from .. import utils
 from .. import utypes
+from mathutils import Vector, Matrix
 
 
 class UNIV_OT_Straight(bpy.types.Operator):
@@ -74,20 +77,11 @@ class UNIV_OT_Straight(bpy.types.Operator):
                         to_segmenting_corners.append(crn)
 
                 if to_segmenting_corners:
+                    isl.apply_aspect_ratio()
+
                     segments = utypes.Segments.from_tagged_corners(to_segmenting_corners, umesh)
-                    segments.segments.sort(key=lambda seg__: seg__.length, reverse=True)
-                    segment = segments.segments[0]
-                    if segment.is_circular:  # TODO: Implement circular straight
-                        segments = segment.break_by_cardinal_dir()
-                        segments.segments.sort(key=lambda seg__: seg__.length, reverse=True)
-                        segment = segments.segments[0]
-                        if segment.is_circular:
-                            if need_hide:
-                                temporary_hidden_islands.append(isl)
-                            else:
-                                deselect_islands.append(isl)
-                            zero_length_counter += 1
-                            continue
+                    segment = max(segments.segments, key=lambda seg__: seg__.length_uv)
+
                     isl.sequence = segment
                     straight_islands.append(isl)
                 elif need_hide:
@@ -110,17 +104,20 @@ class UNIV_OT_Straight(bpy.types.Operator):
             return {'CANCELLED'}
 
         for isl in straight_islands:
+            uv = isl.umesh.uv
             segment: utypes.Segment = isl.sequence
-            segment.calc_chain_linked_corners()
+            if segment.is_circular:
+                self.distribute_by_circle(segment)
+            else:
+                segment.calc_chain_linked_corners()
 
-            # Distribute
-            card_vec = utils.vec_to_cardinal(segment.end_co - segment.start_co)
-            start = segment.start_co
-            end = start + (card_vec * segment.length)
-            segment.distribute(start, end, True)
+                # Distribute
+                card_vec = utils.vec_to_cardinal(segment.end_co - segment.start_co)
+                start = segment.start_co
+                end = start + (card_vec * segment.length)
+                segment.distribute(start, end, True)
 
             # Set pins
-            uv = isl.umesh.uv
             for linked in segment.chain_linked_corners:
                 for crn in linked:
                     crn[uv].pin_uv = True
@@ -132,7 +129,6 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     crn.edge.seam = True
 
             isl.select = True
-            isl.apply_aspect_ratio()
 
         bpy.ops.uv.unwrap(method='ANGLE_BASED', fill_holes=True, correct_aspect=False, use_subsurf_data=False, margin=0)
 
@@ -155,7 +151,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
                 else:
                     set_edge_select(adv_crn.crn, True)
 
-            isl._bbox = utypes.BBox.calc_bbox([segment.start_co])
+            isl._bbox = utypes.BBox.calc_bbox([segment.start_co])  # TODO: Get centroid for circularize seq
             utils.set_global_texel(isl, calc_bbox=False)
 
             uv = isl.umesh.uv
@@ -175,3 +171,44 @@ class UNIV_OT_Straight(bpy.types.Operator):
             else:
                 return True
         return False
+
+    @staticmethod
+    def distribute_by_circle(segment: utypes.Segment):
+        segment.calc_chain_linked_corners()
+
+        # Get pivot by weighted centroids, for minimize shifts
+        edge_centroids = np.array([adv_crn.center_uv for adv_crn in segment])
+        edge_weights = np.array(segment.calc_lengths_uv())
+
+        pivot = np.average(edge_centroids, weights=edge_weights, axis=0)
+        pivot = Vector(pivot)
+
+        # Get weighted avg radius
+        radius_seq = np.linalg.norm(edge_centroids - pivot, axis=1)
+        avg_radius = np.average(radius_seq, weights=edge_weights)
+        avg_radius = min(avg_radius, 0.0001)
+
+        tar_adv_crn = segment[0]
+        tar_pt = tar_adv_crn.curr_pt.copy()
+
+        vec = (pivot - tar_pt).normalized()
+        if vec == Vector((0, 0)):
+            vec = Vector((-1, 0))
+
+        start_pt = vec * avg_radius
+
+        start_angle = math.pi
+        last_angle = -math.pi
+        if tar_adv_crn.invert or tar_adv_crn.is_pair:
+            start_angle = -start_angle
+            last_angle = -last_angle
+
+        angles = utils.weighted_linear_space(start_angle, last_angle, edge_weights)
+
+        uv = segment.umesh.uv
+        for corners, angle in zip(segment.chain_linked_corners, angles):
+            rot_matrix = Matrix.Rotation(angle, 2)
+            co = (start_pt @ rot_matrix) + pivot
+
+            for l_crn in corners:
+                l_crn[uv].uv = co

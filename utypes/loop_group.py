@@ -597,8 +597,15 @@ class AdvCorner:
         else:
             return self.crn.edge
 
+    # TODO: Delete
     @property
     def length(self):
+        if self.invert:
+            return (self.crn[self.uv].uv - self.crn.link_loop_prev[self.uv].uv).length
+        return (self.crn[self.uv].uv - self.crn.link_loop_next[self.uv].uv).length
+
+    @property
+    def length_uv(self):
         if self.invert:
             return (self.crn[self.uv].uv - self.crn.link_loop_prev[self.uv].uv).length
         return (self.crn[self.uv].uv - self.crn.link_loop_next[self.uv].uv).length
@@ -650,6 +657,15 @@ class AdvCorner:
             self._vec *= -1
         return self
 
+    def normalize_dir_if_possible(self):
+        if self.invert:
+            if self.is_pair:
+                pass
+            else:
+                self.invert = False
+                self.crn = self.crn.link_loop_prev
+
+
     @property
     def curr_pt(self):
         return self.crn[self.uv].uv
@@ -660,6 +676,10 @@ class AdvCorner:
             return self.crn.link_loop_prev[self.uv].uv
         else:
             return self.crn.link_loop_next[self.uv].uv
+
+    @property
+    def center_uv(self):
+        return self.curr_pt.lerp(self.next_pt, 0.5)
 
     # def normalize(self):
     #     if self.invert:
@@ -695,7 +715,7 @@ class Segment:
         self.lengths_seq: list[float] = []
         self.chain_linked_corners: list[list[BMLoop]] = []
 
-        self._length: float | utils.NoInit = utils.NoInit()
+        self._length_uv: float | utils.NoInit = utils.NoInit()
         self._weight_angle: float | utils.NoInit = utils.NoInit()
         self.value: float | utils.NoInit = utils.NoInit()
 
@@ -734,7 +754,7 @@ class Segment:
         self.angles_seq.extend(other.angles_seq)
         self.lengths_seq.extend(other.lengths_seq)
 
-        self._length += other._length
+        self._length_uv += other._length_uv
         self._weight_angle = utils.NoInit()
 
         self.is_end_lock = other.is_end_lock
@@ -744,21 +764,36 @@ class Segment:
         for adv_crn in self:
             self.angles_seq.append(adv_crn.angle_from_cardinal)
 
-    def calc_lengths(self):
-        for adv_crn in self:
-            self.lengths_seq.append(adv_crn.length)
+    def calc_lengths_uv(self):
+        lengths_seq = self.lengths_seq
+        if not lengths_seq:
+            for adv_crn in self:
+                lengths_seq.append(adv_crn.length)
+        return lengths_seq
 
     @property
     def length(self):
-        if isinstance(self._length, utils.NoInit):
+        if isinstance(self._length_uv, utils.NoInit):
             if not self.lengths_seq:
-                self.calc_lengths()
-            self._length = sum(self.lengths_seq)
-        return self._length
+                self.calc_lengths_uv()
+            self._length_uv = sum(self.lengths_seq)
+        return self._length_uv
 
     @length.setter
     def length(self, value: float):
-        self._length = value
+        self._length_uv = value
+
+    @property
+    def length_uv(self):
+        if isinstance(self._length_uv, utils.NoInit):
+            if not self.lengths_seq:
+                self.calc_lengths_uv()
+            self._length_uv = sum(self.lengths_seq)
+        return self._length_uv
+
+    @length_uv.setter
+    def length_uv(self, value: float):
+        self._length_uv = value
 
     @property
     def weight_angle(self):
@@ -767,7 +802,7 @@ class Segment:
                 self.calc_angles_from_card_dir()
 
             if not self.lengths_seq:
-                self.calc_lengths()
+                self.calc_lengths_uv()
             try:
                 self._weight_angle = np.average(self.angles_seq, weights=self.lengths_seq)
             except ZeroDivisionError:
