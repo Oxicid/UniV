@@ -73,9 +73,9 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.umeshes.filter_by_selected_uv_by_context()
             if self.umeshes.sync:  # noqa pycharm moment
                 if self.umeshes.elem_mode == 'FACE':
-                    self.relax_sync_faces()
+                    self.legacy_sync_relax_faces()
                 else:
-                    self.relax_sync_verts_edges()
+                    self.legacy_sync_relax_verts_or_edges()
             else:
                 self.relax_non_sync()
 
@@ -108,13 +108,14 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)
                 else:
-                    self.unwrap_sync_verts_edges(no_flip=True, iterations=self.iterations)
+                    self.unwrap_sync_verts_or_edges(no_flip=True, iterations=self.iterations)
             else:
                 self.unwrap_non_sync(no_flip=True, iterations=self.iterations)
 
         return self.umeshes.update()
 
-    def relax_sync_verts_edges(self):
+    def legacy_sync_relax_verts_or_edges(self):
+        # TODO: Ignore relax if selected face exist
         crn: bmesh.types.BMLoop
         relax_data: list[RelaxData] = []
 
@@ -137,28 +138,36 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 if v.is_boundary:
                     border_corners.update(v.link_loops)
                     continue
-                if len({crn[uv].uv.copy().freeze() for crn in v.link_loops}) > 1 or any(not crn.face.select for crn in v.link_loops):
+
+                # TODO: Replace with is_boundary_vert_func
+                has_unlinked = len({crn[uv].uv.copy().freeze() for crn in v.link_loops}) > 1
+                if has_unlinked or any(not crn.face.select for crn in v.link_loops):
+                    border_corners.update(v.link_loops)
+                    continue
+
+                has_hidden = any(not crn.face.select for crn in v.link_loops)
+                if has_hidden:
                     border_corners.update(v.link_loops)
 
+            # selected_elem is used to restore the selection flags instead faces_to_select.
             faces_to_select = set()
-            verts_to_select = set()
+            verts_to_select = set()  # TODO: Check without this (Need to verify whether BMFace.select selects linked edges or vertices in different modes.)
 
-            # Extend selected
-            for f in umesh.bm.faces:
-                if f.hide or f.select:
-                    continue
+            # Expand the element selection so that Unwrap works.
+            for f in utils.calc_unselected_uv_faces_iter(umesh):
                 if sum(v.select for v in f.verts) not in (0, len(f.verts)):
                     faces_to_select.add(f)
                     for v in f.verts:
                         if not v.select:
                             verts_to_select.add(v)
 
+            # TODO: Check in Blender 5.0 with sync_valid
             for f in faces_to_select:
                 f.select = True
             for v in verts_to_select:
                 v.select = True
 
-            if self.umeshes.elem_mode == 'EDGE':
+            if self.umeshes.elem_mode == 'EDGE':  # TODO: Check without this
                 for e in umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
@@ -169,18 +178,20 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for crn in border_corners:
                 crn[uv].pin_uv = False
 
-            coords_before = [crn[uv].uv.copy() for crn in border_corners]
 
             save_transform_islands = []
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
-                    save_transform_islands.append(isl.save_transform())
+                    save_transform_islands.append(isl.save_transform(flip_if_needed=True))
+
+            # NOTE: Save coords_before after apply flip_if_needed.
+            coords_before = [crn[uv].uv.copy() for crn in border_corners]
 
             relax_data.append(RelaxData(umesh, selected_elem, coords_before, border_corners, save_transform_islands))
 
-        self.relax_a(relax_data)
+        self.legacy_sync_verts_or_edges_relax_ex(relax_data)
 
-    def relax_a(self, relax_data: list[RelaxData]):
+    def legacy_sync_verts_or_edges_relax_ex(self, relax_data: list[RelaxData]):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
@@ -195,7 +206,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Weld half selected islands
-                isl.inplace()
+                isl.inplace(flip_if_needed=True)
 
                 utils.set_global_texel(isl.island)  # Set Texel without rotate check.
 
@@ -211,9 +222,9 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 for crn in f.loops:
                     crn[uv].pin_uv = False
 
-    def relax_sync_faces(self):
+    def legacy_sync_relax_faces(self):
         assert self.umeshes.elem_mode == 'FACE'
-        from ..utils import linked_crn_uv_unordered, shared_is_linked
+        from ..utils import linked_crn_uv_unordered_included, shared_is_linked
 
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
@@ -228,31 +239,30 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             # Find border from selection corners
             for f in utils.calc_selected_uv_faces(umesh):
                 for crn in f.loops:
-                    linked_crn = linked_crn_uv_unordered(crn, uv)
-                    linked_crn.append(crn)
+                    linked_crn = linked_crn_uv_unordered_included(crn, uv)
                     border = False
-                    for _crn in linked_crn:
-                        if _crn.face.hide:
+                    for l_crn in linked_crn:
+                        if l_crn.face.hide:
                             continue
-                        if (next_linked_disc := _crn.link_loop_radial_prev) == _crn:
+                        if (pair_crn := l_crn.link_loop_radial_prev) == l_crn:
                             border = True
                             continue
 
-                        next_face = next_linked_disc.face
+                        next_face = pair_crn.face
                         if next_face.select:
                             continue
                         if next_face.hide:
                             border = True
                             continue
 
-                        if shared_is_linked(next_linked_disc, _crn, uv):
-                            to_select.add(next_linked_disc.face)
+                        if shared_is_linked(pair_crn, l_crn, uv):
+                            to_select.add(pair_crn.face)
                         border = True
                     if border:
                         border_corners.update(linked_crn)
 
-            for _f in to_select:
-                _f.select = True
+            for f in to_select:
+                f.select = True
 
             for f in umesh.bm.faces:
                 for crn in f.loops:
@@ -261,17 +271,18 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for crn in border_corners:
                 crn[uv].pin_uv = False
 
-            coords_before = [crn[uv].uv.copy() for crn in border_corners]
-
             save_transform_islands = []
             for isl in islands:
-                save_transform_islands.append(isl.save_transform())
+                save_transform_islands.append(isl.save_transform(flip_if_needed=True))
+
+            # NOTE: Save coords_before after apply flip_if_needed.
+            coords_before = [crn[uv].uv.copy() for crn in border_corners]
 
             relax_data.append(RelaxData(umesh, to_select, coords_before, border_corners, save_transform_islands))
 
-        self.relax_b(relax_data)
+        self.legacy_non_sync_or_sync_faces_relax_ex(relax_data)
 
-    def relax_b(self, relax_data: list[RelaxData]):
+    def legacy_non_sync_or_sync_faces_relax_ex(self, relax_data: list[RelaxData]):
         # Relax
         bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
@@ -287,7 +298,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Fix, weld half selected islands
-                isl.inplace()
+                isl.inplace(flip_if_needed=True)
 
                 utils.set_global_texel(isl.island)  # Set Texel without rotate check.
 
@@ -297,10 +308,13 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             rd.remove_all_pins_from_umesh()
 
     def relax_non_sync(self):
-        from ..utils import linked_crn_uv_unordered, is_boundary_non_sync
+        from ..utils import linked_crn_uv_unordered, is_boundary_func, vert_select_get_func, is_visible_func
 
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
+            is_boundary = is_boundary_func(umesh)
+            is_vert_select = vert_select_get_func(umesh)
+            is_visible = is_visible_func(umesh.sync)
             uv = umesh.uv
             islands = AdvIslands.calc_extended_any_elem(umesh)
 
@@ -311,30 +325,29 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             for f in utils.calc_selected_uv_faces(umesh):
                 for crn in f.loops:
-                    crn_uv = crn[uv]
-                    if crn_uv.select:
-                        if is_boundary_non_sync(crn, uv):
-                            border_corners_for_unwrap.add(crn)
-                            for crn_ in linked_crn_uv_unordered(crn, uv):
-                                if crn_.face.select:
-                                    border_corners_for_unwrap.add(crn_)
+                    if is_vert_select(crn) and is_boundary(crn):
+                        border_corners_for_unwrap.add(crn)
+                        for l_crn in linked_crn_uv_unordered(crn, uv):
+                            if is_visible(l_crn.face):
+                                border_corners_for_unwrap.add(l_crn)
 
             for f in umesh.bm.faces:
                 for crn in f.loops:
                     crn[uv].pin_uv = True
 
-            for crn_ in border_corners_for_unwrap:
-                crn_[uv].pin_uv = False
-
-            coords_before = [crn[uv].uv.copy() for crn in border_corners_for_unwrap]
+            for l_crn in border_corners_for_unwrap:
+                l_crn[uv].pin_uv = False
 
             save_transform_islands = []
             for isl in islands:
-                save_transform_islands.append(isl.save_transform())
+                save_transform_islands.append(isl.save_transform(flip_if_needed=True))
+
+            # NOTE: Save coords_before after apply flip_if_needed.
+            coords_before = [crn[uv].uv.copy() for crn in border_corners_for_unwrap]
 
             relax_data.append(RelaxData(umesh, [], coords_before, border_corners_for_unwrap, save_transform_islands))
 
-        self.relax_b(relax_data)
+        self.legacy_non_sync_or_sync_faces_relax_ex(relax_data)
 
 
 class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):

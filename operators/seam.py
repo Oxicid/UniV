@@ -114,12 +114,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             islands = AdvIslands.calc_selected_with_mark_seam(umesh)
             for isl in islands:
                 isl.apply_aspect_ratio()
-                save_transform_islands.append(isl.save_transform())
+                save_transform_islands.append(isl.save_transform(flip_if_needed=True))
 
         if save_transform_islands:
             bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False)
             for isl in save_transform_islands:
-                isl.inplace()
+                isl.inplace(flip_if_needed=True)
                 isl.island.reset_aspect_ratio()
 
                 if isl.rotate:
@@ -238,7 +238,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
             adv_islands = islands.to_adv_islands()
             for isl in adv_islands:
                 isl.apply_aspect_ratio()
-                save_t = isl.save_transform()
+                save_t = isl.save_transform(flip_if_needed=True)
                 save_transform_islands.append(save_t)
 
         if umeshes_without_uv or save_transform_islands:
@@ -248,7 +248,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
                 umesh.value = umesh.check_uniform_scale(report=self.report)
 
             for isl in save_transform_islands:
-                isl.inplace()
+                isl.inplace(flip_if_needed=True)
                 isl.island.reset_aspect_ratio()
                 if isl.rotate:
                     utils.set_global_texel(isl.island)

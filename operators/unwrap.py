@@ -7,6 +7,8 @@ if 'bpy' in locals():
 
 import bpy
 from mathutils import Vector
+from bmesh.types import BMFace
+
 from .. import utypes
 from .. import utils
 from ..preferences import prefs, univ_settings
@@ -91,7 +93,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 if self.umeshes.elem_mode == 'FACE':
                     self.unwrap_sync_faces()
                 else:
-                    self.unwrap_sync_verts_edges()
+                    self.unwrap_sync_verts_or_edges()
             else:
                 self.unwrap_non_sync()
 
@@ -116,29 +118,22 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         isl.select = True
 
-        shared_selected_faces = []
-        pinned_crn_uvs = []
+
+        accidentally_selected_faces = []
+        pinned_crn_from_accidentally_selected_faces = []
         if not utils.USE_GENERIC_UV_SYNC and isl.umesh.sync:
-            if isl.umesh.elem_mode in ('VERT', 'EDGE'):
-                if isl.umesh.total_face_sel != len(isl):
-                    faces = set(isl)
-                    uv = isl.umesh.uv
-                    for f in isl.umesh.bm.faces:
-                        if f.select and f not in faces:
-                            shared_selected_faces.append(f)
-                            for crn in f.loops:
-                                crn_uv = crn[uv]
-                                if not crn_uv.pin_uv:
-                                    crn_uv.pin_uv = True
-                                    pinned_crn_uvs.append(crn_uv)
+            self.prepare_accidentally_selected_islands(
+                isl, accidentally_selected_faces, pinned_crn_from_accidentally_selected_faces
+            )
 
         unique_number_for_multiply = hash(isl[0])  # multiplayer
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
         isl.umesh.value = isl.umesh.check_uniform_scale(report=self.report)
         isl.umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
+
         isl.apply_aspect_ratio()
-        save_t = isl.save_transform()
+        save_t = isl.save_transform(flip_if_needed=True)
         save_t.save_coords(self.blend_factor)
 
         if self.mark_seam_inner_island:
@@ -150,8 +145,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
-        save_t.inplace()
-        save_t.apply_saved_coords(self.blend_factor)
+        save_t.inplace(flip_if_needed=False)
+        save_t.apply_saved_coords(self.blend_factor, flip_if_needed=True)
+
         isl.reset_aspect_ratio()
 
         if save_t.rotate:
@@ -163,13 +159,39 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             if isl.umesh.elem_mode in ('VERT', 'EDGE'):
                 isl.umesh.bm.uv_select_sync_valid = False
 
-        for f in shared_selected_faces:
+        for f in accidentally_selected_faces:
             f.select = False
-        for crn_uv in pinned_crn_uvs:
+        for crn_uv in pinned_crn_from_accidentally_selected_faces:
             crn_uv.pin_uv = False
 
         isl.umesh.update()
         return {'FINISHED'}
+
+    @staticmethod
+    def prepare_accidentally_selected_islands(isl,
+                                              accidentally_selected_faces,
+                                              pinned_crn_from_accidentally_selected_faces,
+                                              faces_set: set[BMFace] | None = None):
+        """
+        In the old sync system, extra faces could be accidentally selected.
+        They are pinned to prevent any effect, and the elements are saved so their flags can be restored.
+        """
+
+        if isl.umesh.elem_mode in ('VERT', 'EDGE'):
+            # It is possible to immediately identify accidentally selected faces
+            # by comparing the number of selected faces in the target island with the total on the mesh.
+            if isl.umesh.total_face_sel != len(isl):
+                if faces_set is None:
+                    faces_set = set(isl)
+                uv = isl.umesh.uv
+                for f in isl.umesh.bm.faces:
+                    if f.select and f not in faces_set:
+                        accidentally_selected_faces.append(f)
+                        for crn in f.loops:
+                            crn_uv = crn[uv]
+                            if not crn_uv.pin_uv:
+                                crn_uv.pin_uv = True
+                                pinned_crn_from_accidentally_selected_faces.append(crn_uv)
 
     # TODO: Implement has unlinked_and_linked_selected_edges
     # TODO: Improve behavior self island unwrap
@@ -189,7 +211,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                         unlinked_has_selected_face = True
         return unlinked_has_selected_face, linked_has_selected_face
 
-    def unwrap_sync_verts_edges(self, **unwrap_kwargs):
+    def unwrap_sync_verts_or_edges(self, **unwrap_kwargs):
         unique_number_for_multiply = 0
         pin_and_inplace = []
         unwrap_data: list[UnwrapData] = []
@@ -256,7 +278,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for isl in islands:
                 if any(v.select for f in isl for v in f.verts):
                     isl.apply_aspect_ratio()
-                    save_t = isl.save_transform()
+                    save_t = isl.save_transform(flip_if_needed=True)
                     save_t.save_coords(self.blend_factor)
                     save_transform_islands.append(save_t)
 
@@ -270,8 +292,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for pin in ud.pins:
                 pin.pin_uv = False
             for isl in ud.islands:
-                isl.inplace()
-                isl.apply_saved_coords(self.blend_factor)
+                isl.inplace(flip_if_needed=False)
+                isl.apply_saved_coords(self.blend_factor, flip_if_needed=True)
                 isl.island.reset_aspect_ratio()
 
                 if isl.rotate:
@@ -343,7 +365,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                 self.unwrap_sync_faces_extend_select_and_set_pins(isl)
 
                 isl.apply_aspect_ratio()
-                save_t = isl.save_transform()
+                save_t = isl.save_transform(flip_if_needed=True)
                 save_t.save_coords(self.blend_factor)
                 all_transform_islands.append(save_t)
 
@@ -357,8 +379,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for f in to_select:
                 f.select = False
 
-            isl.inplace()
-            isl.apply_saved_coords(self.blend_factor)
+            isl.inplace(flip_if_needed=False)
+            isl.apply_saved_coords(self.blend_factor, flip_if_needed=True)
             isl.island.reset_aspect_ratio()
 
             if isl.rotate:
@@ -424,7 +446,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             for isl in islands:
                 isl.apply_aspect_ratio()
-                save_t = isl.save_transform()
+                save_t = isl.save_transform(flip_if_needed=True)
                 save_t.save_coords(self.blend_factor)
                 save_transform_islands.append(save_t)
 
@@ -433,8 +455,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
         for isl in save_transform_islands:
-            isl.inplace()
-            isl.apply_saved_coords(self.blend_factor)
+            isl.inplace(flip_if_needed=False)
+            isl.apply_saved_coords(self.blend_factor, flip_if_needed=True)
             isl.island.reset_aspect_ratio()
 
             if isl.rotate:
@@ -552,20 +574,11 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             for isl in adv_subislands:
                 isl.select = True
 
-            shared_selected_faces = []
-            pinned_crn_uvs = []
-            # In vert/edge selection mode, you can accidentally select extra faces.
-            # To avoid this, we pin them.
-            if umesh.total_face_sel != len(mesh_isl_set):
-                uv = umesh.uv
-                for f in umesh.bm.faces:
-                    if f.select and f not in mesh_isl_set:
-                        shared_selected_faces.append(f)
-                        for crn in f.loops:
-                            crn_uv = crn[uv]
-                            if not crn_uv.pin_uv:
-                                crn_uv.pin_uv = True
-                                pinned_crn_uvs.append(crn_uv)
+            accidentally_selected_faces = []
+            pinned_crn_from_accidentally_selected_faces = []
+            UNIV_OT_Unwrap.prepare_accidentally_selected_islands(
+                mesh_island, accidentally_selected_faces, pinned_crn_from_accidentally_selected_faces, mesh_isl_set
+            )
 
             unique_number_for_multiply = hash(mesh_island[0])  # multiplayer
             UNIV_OT_Unwrap.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
@@ -588,9 +601,9 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
             adv_island.select = False
 
-            for f in shared_selected_faces:
+            for f in accidentally_selected_faces:
                 f.select = False
-            for crn_uv in pinned_crn_uvs:
+            for crn_uv in pinned_crn_from_accidentally_selected_faces:
                 crn_uv.pin_uv = False
         else:
             mesh_island, mesh_isl_set = hit.calc_mesh_island_with_seam()

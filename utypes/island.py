@@ -29,19 +29,25 @@ from . import BBox
 USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
 class SaveTransform:
-    def __init__(self, island: 'FaceIsland | AdvIsland | AdvIslands'):
+    def __init__(self, island: 'FaceIsland | AdvIsland | AdvIslands', flip_if_needed=False):
         self.island = island
         self.old_crn_pos: list[Vector | float] = []  # need for mix co
         self.is_full_selected = False
         self.target_crn: BMLoop | None = None
         self.old_coords: list[Vector] = [Vector((0, 0)), Vector((0, 0))]
         self.rotate = True
+        self.is_flipped_to_preserve_flip = False
 
         if isinstance(island, AdvIslands):
+            # Used for Unwrap 3D
             self.target_subisland = max((i for i in self.island), key=lambda i: i.bbox.area)
             self.calc_target_rotate_corner()
             self.bbox = self.target_subisland.bbox
         else:
+            if flip_if_needed:
+                if island.should_flip_after_unwrap():
+                    self.is_flipped_to_preserve_flip = True
+                    island.scale_simple(Vector((-1.0, 1.0)))
             self.calc_target_rotate_corner()
             self.bbox = self.island.calc_bbox()
 
@@ -137,8 +143,10 @@ class SaveTransform:
 
         return corners, pinned_corners
 
-    def inplace(self):
+    def inplace(self, flip_if_needed=True):
         if not self.rotate:
+            if flip_if_needed and self.is_flipped_to_preserve_flip:
+                self.island.scale_simple(Vector((-1.0, 1.0)))
             return
         uv = self.island.umesh.uv
 
@@ -195,6 +203,9 @@ class SaveTransform:
 
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
+
+        if flip_if_needed and self.is_flipped_to_preserve_flip:
+            self.island.scale_simple(Vector((-1.0, 1.0)))
 
     def inplace_mesh_island(self):
         if not self.rotate:
@@ -255,11 +266,13 @@ class SaveTransform:
         uv = self.island.umesh.uv
         self.old_crn_pos = [crn[uv].uv.copy() for f in self.island for crn in f.loops]
 
-    def apply_saved_coords(self, mix):
+    def apply_saved_coords(self, mix, flip_if_needed=False):
         uv = self.island.umesh.uv
         corners = (crn[uv].uv for f in self.island for crn in f.loops)
 
         if mix == 1:
+            if flip_if_needed and self.is_flipped_to_preserve_flip:
+                self.island.scale_simple(Vector((-1.0, 1.0)))
             return
         if mix == 0:
             for crn_uv, old_co in zip(corners, self.old_crn_pos):
@@ -267,6 +280,9 @@ class SaveTransform:
         else:
             for crn_uv, old_co in zip(corners, self.old_crn_pos):
                 crn_uv[:] = old_co.lerp(crn_uv, mix)
+
+        if flip_if_needed and self.is_flipped_to_preserve_flip:
+            self.island.scale_simple(Vector((-1.0, 1.0)))
 
 
 class FaceIsland:
@@ -290,8 +306,8 @@ class FaceIsland:
             _from = self.calc_bbox().min
         return self.move(to - _from)
 
-    def save_transform(self):
-        return SaveTransform(self)
+    def save_transform(self, flip_if_needed=False):
+        return SaveTransform(self, flip_if_needed)
 
     def apply_aspect_ratio(self):
         scale = Vector((self.umesh.aspect, 1))
