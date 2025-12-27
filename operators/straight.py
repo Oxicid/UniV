@@ -56,7 +56,6 @@ class UNIV_OT_Straight(bpy.types.Operator):
             umeshes.filter_by_selected_uv_faces()
 
         temporary_hidden_islands = []
-
         straight_islands = []
 
         for umesh in umeshes:
@@ -106,7 +105,11 @@ class UNIV_OT_Straight(bpy.types.Operator):
                             if pair_face.index != idx or not get_face_select(pair_face):
                                 crn.tag = True
                                 to_segmenting_corners.append(crn)
+                            else:
+                                crn.tag = False
+
                         else:
+                            crn.tag = False
                             to_deselect_faces.append(crn.face)
                     isl.sequence = to_deselect_faces
 
@@ -117,7 +120,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     segment = max(segments.segments, key=lambda seg: seg.length_uv)
                     # TODO: Join segment (if possible).
                     #  This is necessary to avoid squashing when segment might be circular, but there are also randomly selected non-circle segments.
-
+                    #  Pair not exclude ???
                     straight_isl = StraightIsland(isl, segment)
                     if isl.should_flip_after_unwrap():
                         isl.scale_simple(Vector((-1.0, 1.0)))

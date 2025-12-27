@@ -1009,7 +1009,7 @@ class Segments:
                         if prev_grow not in appended:
                             filtered.append(prev_grow)
 
-                if count >= 3:
+                if count >= 3:  # Break segment by 3 and more selected edges.
                     break
 
                 if len(filtered) == 1:
@@ -1019,7 +1019,7 @@ class Segments:
 
                     seg.append(next_elem)
 
-                    # Add possible CrnGrow variants so that we don't go through them again
+                    # Add possible CrnGrow variants so that we don't go through them again.
                     appended.add(next_elem)
                     if next_elem.invert:
                         appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv))
@@ -1061,7 +1061,7 @@ class Segments:
                         if prev_grow not in appended:
                             filtered.append(prev_grow)
 
-                if count >= 3:
+                if count >= 3:  # See above.
                     break
 
                 if len(filtered) == 1:

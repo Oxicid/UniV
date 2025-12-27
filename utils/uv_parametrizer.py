@@ -932,26 +932,8 @@ class PChart:
                 context.lock_variable(2 * v.id + 1, v.uv[1])
 
         # Detect "up" direction based on pinned vertices.
-        area_pinned_up: float = 0.0
-        area_pinned_down: float = 0.0
-
-        for f in self.faces:
-            e1: PEdge = f.edge
-            e2: PEdge = e1.next
-            e3: PEdge = e2.next
-            v1: PVert = e1.vert
-            v2: PVert = e2.vert
-            v3: PVert = e3.vert
-
-            if (v1.flag & PVERT_PIN) and (v2.flag & PVERT_PIN) and (v3.flag & PVERT_PIN):
-                area: float = f.calc_signed_uv_area()
-
-                if area > 0.0:
-                    area_pinned_up += area
-                else:
-                    area_pinned_down -= area
-
-        flip_faces: bool = (area_pinned_down > area_pinned_up)
+        total_signed_area: float = sum(f.calc_signed_uv_area() for f in self.faces)
+        flip_faces: bool = total_signed_area < 0.0
 
         # Construct matrix.
         if not len(self.abf_alpha):
