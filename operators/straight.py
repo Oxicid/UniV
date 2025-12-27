@@ -13,6 +13,13 @@ from .. import utils
 from .. import utypes
 from mathutils import Vector, Matrix
 
+class StraightIsland:
+    def __init__(self, isl: utypes.AdvIsland, segment: utypes.Segment):
+        self.isl = isl
+        self.segment = segment
+        self.pivot: Vector | None = None
+        self.is_flipped_to_avoid_unflip_after_unwrap = False
+
 
 class UNIV_OT_Straight(bpy.types.Operator):
     bl_idname = "uv.univ_straight"
@@ -45,7 +52,6 @@ class UNIV_OT_Straight(bpy.types.Operator):
         umeshes.fix_context()
         umeshes.filter_by_selected_uv_edges()
 
-        zero_length_counter = 0
         temporary_hidden_islands = []
         deselect_islands = []
 
@@ -82,8 +88,13 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     segments = utypes.Segments.from_tagged_corners(to_segmenting_corners, umesh)
                     segment = max(segments.segments, key=lambda seg__: seg__.length_uv)
 
-                    isl.sequence = segment
-                    straight_islands.append(isl)
+                    straight_isl = StraightIsland(isl, segment)
+                    if isl.should_flip_after_unwrap():
+                        isl.scale_simple(Vector((-1.0, 1.0)))
+                        straight_isl.is_flipped_to_avoid_unflip_after_unwrap = True
+
+                    straight_islands.append(straight_isl)
+
                 elif need_hide:
                     temporary_hidden_islands.append(isl)
 
@@ -97,17 +108,17 @@ class UNIV_OT_Straight(bpy.types.Operator):
                 f.hide_set(True)
 
         if not straight_islands:
-            if zero_length_counter:
-                self.report({'WARNING'}, f"Found {zero_length_counter} loops")
-            else:
-                self.report({'WARNING'}, f"Loops not found")
+            self.report({'WARNING'}, f"Loops not found")
             return {'CANCELLED'}
 
-        for isl in straight_islands:
+        for straight_isl in straight_islands:
+            isl = straight_isl.isl
             uv = isl.umesh.uv
-            segment: utypes.Segment = isl.sequence
+            segment: utypes.Segment = straight_isl.segment
+
             if segment.is_circular:
-                self.distribute_by_circle(segment)
+                pivot = self.distribute_by_circle_and_get_pivot(segment)
+                straight_isl.pivot = pivot
             else:
                 segment.calc_chain_linked_corners()
 
@@ -116,6 +127,8 @@ class UNIV_OT_Straight(bpy.types.Operator):
                 start = segment.start_co
                 end = start + (card_vec * segment.length)
                 segment.distribute(start, end, True)
+
+                straight_isl.pivot = start.copy()
 
             # Set pins
             for linked in segment.chain_linked_corners:
@@ -132,29 +145,39 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
         bpy.ops.uv.unwrap(method='ANGLE_BASED', fill_holes=True, correct_aspect=False, use_subsurf_data=False, margin=0)
 
-        # Deselect islands and restore edge selection and clear pins
-        for isl in straight_islands:
-            isl.reset_aspect_ratio()
-            isl.select = False
+        # Deselect islands and restore edge selection and clear pins.
+        for straight_isl in straight_islands:
+            # NOTE: The aspect ratio must be restored before applying the texel in order to use the correct UV area.
+            straight_isl.isl.reset_aspect_ratio()
+            straight_isl.isl.select = False
 
         for isl in temporary_hidden_islands:
             for f in isl:
                 f.hide_set(False)
 
-        for isl in straight_islands:
-            set_edge_select = utils.edge_select_linked_set_func(isl.umesh)
+        for straight_isl in straight_islands:
+            isl = straight_isl.isl
+            umesh = isl.umesh
+            set_edge_select = utils.edge_select_linked_set_func(umesh)
 
-            segment: utypes.Segment = isl.sequence
+            segment: utypes.Segment = straight_isl.segment
             for adv_crn in segment:
                 if adv_crn.invert:
                     set_edge_select(adv_crn.crn.link_loop_prev, True)
                 else:
                     set_edge_select(adv_crn.crn, True)
 
-            isl._bbox = utypes.BBox.calc_bbox([segment.start_co])  # TODO: Get centroid for circularize seq
+            # Here we compensate the aspect for the pivot, since it was calculated with a normalized aspect ratio.
+            pivot_after_aspect = straight_isl.pivot * Vector((1 / umesh.aspect, 1))
+            isl._bbox = utypes.BBox.calc_bbox([pivot_after_aspect])
+
             utils.set_global_texel(isl, calc_bbox=False)
 
-            uv = isl.umesh.uv
+            # Restore flips
+            if straight_isl.is_flipped_to_avoid_unflip_after_unwrap:
+                isl.scale_simple(Vector((-1.0, 1.0)))
+
+            uv = umesh.uv
             for linked in segment.chain_linked_corners:
                 for crn in linked:
                     crn[uv].pin_uv = False
@@ -173,7 +196,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
         return False
 
     @staticmethod
-    def distribute_by_circle(segment: utypes.Segment):
+    def distribute_by_circle_and_get_pivot(segment: utypes.Segment):
         segment.calc_chain_linked_corners()
 
         # Get pivot by weighted centroids, for minimize shifts
@@ -186,7 +209,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
         # Get weighted avg radius
         radius_seq = np.linalg.norm(edge_centroids - pivot, axis=1)
         avg_radius = np.average(radius_seq, weights=edge_weights)
-        avg_radius = min(avg_radius, 0.0001)
+        avg_radius = max(avg_radius, 0.0001)
 
         tar_adv_crn = segment[0]
         tar_pt = tar_adv_crn.curr_pt.copy()
@@ -212,3 +235,4 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
             for l_crn in corners:
                 l_crn[uv].uv = co
+        return pivot

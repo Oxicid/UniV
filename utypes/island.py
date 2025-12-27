@@ -301,6 +301,11 @@ class FaceIsland:
         scale = Vector((1/self.umesh.aspect, 1))
         return self.scale_simple(scale)
 
+    def should_flip_after_unwrap(self) -> bool:
+        # TODO: It is necessary to determine the need for flipping based on how the parametrizer decides it
+        #  (using pinned triangles and their weighted area), and use that to control flipping.
+        return self.calc_signed_area() < 0.0
+
     def rotate(self, angle: float, pivot: Vector, aspect: float = 1.0) -> bool:
         """Rotate a list of faces by angle (in radians) around a pivot
         :param angle: Angle in radians
