@@ -585,14 +585,13 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
             for isl in adv_subislands:
                 isl.apply_aspect_ratio()
-            save_t = utypes.SaveTransform(adv_subislands)
+            save_t = utypes.SaveTransform(adv_subislands, flip_if_needed=True)
 
             bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
-            umesh.verify_uv()
 
             adv_island = mesh_island.to_adv_island()
             save_t.island = adv_island
-            save_t.inplace()
+            save_t.inplace(flip_if_needed=True)
 
             adv_island.reset_aspect_ratio()
 
@@ -646,12 +645,12 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                     if umesh.total_face_sel:
                         unique_number += self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
                     else:
-                        unique_number += self.unwrap_selected_verts(umesh)
+                        unique_number += self.unwrap_selected_verts_preprocess(umesh)
                 elif self.umeshes.elem_mode == 'EDGE':
                     if umesh.total_face_sel:
                         unique_number += self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
                     else:
-                        unique_number += self.unwrap_selected_edges(umesh)
+                        unique_number += self.unwrap_selected_edges_preprocess(umesh)
                 else:
                     unique_number += self.unwrap_selected_faces_preprocess(umesh)
 
@@ -662,7 +661,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             self.unwrap_selected_faces_postprocess(umesh)
             umesh.bm.select_flush(False)
 
-        self.unwrap_without_uvs(meshes_without_uvs)
+        self.unwrap_without_uvs_postprocess(meshes_without_uvs)
 
     def unwrap_selected_faces_preprocess_vert_edge_mode(self, umesh):
         assert umesh.total_face_sel
@@ -682,7 +681,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             unique_number += hash(mesh_isl[0])
             adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
             adv_islands.apply_aspect_ratio()
-            safe_transform = utypes.SaveTransform(adv_islands)
+            safe_transform = utypes.SaveTransform(adv_islands, flip_if_needed=True)
             save_transform_islands.append(safe_transform)
 
             for f in mesh_isl:
@@ -724,7 +723,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
         return unique_number
 
-    def unwrap_selected_verts(self, umesh):
+    def unwrap_selected_verts_preprocess(self, umesh):
         assert not umesh.total_face_sel
         assert self.umeshes.elem_mode == 'VERT'
         mesh_islands = utypes.MeshIslands.calc_visible_with_mark_seam(umesh)
@@ -743,7 +742,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             unique_number += hash(mesh_isl[0])
             adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
             adv_islands.apply_aspect_ratio()
-            safe_transform = utypes.SaveTransform(adv_islands)
+            safe_transform = utypes.SaveTransform(adv_islands, flip_if_needed=True)
             save_transform_islands.append(safe_transform)
             to_select.extend(mesh_isl)
 
@@ -779,7 +778,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
         return unique_number
 
-    def unwrap_selected_edges(self, umesh):
+    def unwrap_selected_edges_preprocess(self, umesh):
         assert not umesh.total_face_sel
         assert self.umeshes.elem_mode == 'EDGE'
         mesh_islands = utypes.MeshIslands.calc_visible_with_mark_seam(umesh)
@@ -795,13 +794,16 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                 without_selection_islands.append(mesh_isl)
                 continue
             unique_number += hash(mesh_isl[0])
+
             adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
             adv_islands.apply_aspect_ratio()
-            safe_transform = utypes.SaveTransform(adv_islands)
+            safe_transform = utypes.SaveTransform(adv_islands, flip_if_needed=True)
             save_transform_islands.append(safe_transform)
+
             to_select.extend(mesh_isl)
 
             for f in mesh_isl:
+                # Pin unselected faces
                 if all(not v.select for v in f.verts):
                     for crn in f.loops:
                         crn_uv = crn[uv]
@@ -811,18 +813,22 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                         pinned.append(crn_uv)
                     continue
 
+                # Pin partial selected
                 for crn in f.loops:
                     if crn.edge.select:
                         continue
                     crn_uv = crn[uv]
-                    if crn.vert.select:
-                        if crn_uv.pin_uv:
-                            continue
-                        if any(crn_.edge.select for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)):
-                            continue
-
                     if crn_uv.pin_uv:
                         continue
+
+                    if crn.vert.select:
+                        if any(crn_.edge.select for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)):
+                            continue
+                        # Over check after linked_crn_to_vert_with_seam_3d_iter,
+                        # because it returns nothing for vertices without linked faces (see note).
+                        if crn.link_loop_prev.edge.select:
+                            continue
+
                     crn_uv.pin_uv = True
                     pinned.append(crn_uv)
 
@@ -860,7 +866,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             unique_number += hash(mesh_isl[0])
             adv_islands = mesh_isl.calc_adv_subislands_with_mark_seam()
             adv_islands.apply_aspect_ratio()
-            safe_transform = utypes.SaveTransform(adv_islands)
+            safe_transform = utypes.SaveTransform(adv_islands, flip_if_needed=True)
             save_transform_islands.append(safe_transform)
 
             for f in mesh_isl:
@@ -893,7 +899,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             crn_uv.pin_uv = False
 
         for safe_transform in unwrap_data.islands:
-            safe_transform.inplace_mesh_island()
+            safe_transform.inplace_mesh_island(flip_if_needed=True)
             safe_transform.island.reset_aspect_ratio()
 
             if safe_transform.rotate:
@@ -903,8 +909,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                     for isl in safe_transform.island:
                         utils.set_global_texel(isl)
 
-
-    def unwrap_without_uvs(self, umeshes):
+    def unwrap_without_uvs_postprocess(self, umeshes):
         for umesh in umeshes:
             mesh_islands = utypes.MeshIslands.calc_extended_with_mark_seam(umesh)
             umesh.verify_uv()

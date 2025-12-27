@@ -412,6 +412,9 @@ def linked_crn_to_vert_3d_iter(crn: BMLoop):
 
 def linked_crn_to_vert_with_seam_3d_iter(crn: BMLoop):
     """Linked to arg corner by visible faces"""
+    # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).
+    # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)
+
     first_vert = crn.vert
     bm_iter = crn
 

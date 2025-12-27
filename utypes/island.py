@@ -40,6 +40,11 @@ class SaveTransform:
 
         if isinstance(island, AdvIslands):
             # Used for Unwrap 3D
+            if flip_if_needed:
+                if island.should_flip_after_unwrap():
+                    self.is_flipped_to_preserve_flip = True
+                    island.scale_simple(Vector((-1.0, 1.0)))
+
             self.target_subisland = max((i for i in self.island), key=lambda i: i.bbox.area)
             self.calc_target_rotate_corner()
             self.bbox = self.target_subisland.bbox
@@ -207,8 +212,10 @@ class SaveTransform:
         if flip_if_needed and self.is_flipped_to_preserve_flip:
             self.island.scale_simple(Vector((-1.0, 1.0)))
 
-    def inplace_mesh_island(self):
+    def inplace_mesh_island(self, flip_if_needed=True):
         if not self.rotate:
+            if flip_if_needed and self.is_flipped_to_preserve_flip:
+                self.island.scale_simple(Vector((-1.0, 1.0)))
             return
         uv = self.island.umesh.uv
 
@@ -236,7 +243,6 @@ class SaveTransform:
             self.island.set_position(self.bbox.center, pivot)
         else:
             if angle := old_dir.angle_signed(new_dir, 0):
-                pass
                 self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.target_subisland.calc_bbox()
 
@@ -259,6 +265,9 @@ class SaveTransform:
 
         if self.is_full_selected:
             self.target_crn[uv].pin_uv = False
+
+        if flip_if_needed and self.is_flipped_to_preserve_flip:
+            self.island.scale_simple(Vector((-1.0, 1.0)))
 
     def save_coords(self, mix: float):
         if mix == 1.0:
@@ -1929,6 +1938,16 @@ class Islands(IslandsBase):
     def reset_aspect_ratio(self):
         scale = Vector((1 / self.umesh.aspect, 1))
         return self.scale_simple(scale)
+
+    def should_flip_after_unwrap(self) -> bool:
+        # TODO: It is necessary to determine the need for flipping based on how the parametrizer decides it
+        #  (using pinned triangles and their weighted area), and use that to control flipping.
+        assert type(self) in (Islands, AdvIslands)
+
+        uv = self.umesh.uv
+        get_area = utils.calc_signed_face_area_uv
+        signed_area = sum(get_area(f, uv) for f in self.faces_iter())
+        return signed_area < 0.0
 
     def faces_iter(self):
         return (f for isl in self for f in isl)
