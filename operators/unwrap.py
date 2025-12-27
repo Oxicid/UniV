@@ -118,7 +118,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         isl.select = True
 
-
         accidentally_selected_faces = []
         pinned_crn_from_accidentally_selected_faces = []
         if not utils.USE_GENERIC_UV_SYNC and isl.umesh.sync:
@@ -176,11 +175,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         In the old sync system, extra faces could be accidentally selected.
         They are pinned to prevent any effect, and the elements are saved so their flags can be restored.
         """
-
+        # TODO: Hide instead pinning
         if isl.umesh.elem_mode in ('VERT', 'EDGE'):
-            # It is possible to immediately identify accidentally selected faces
-            # by comparing the number of selected faces in the target island with the total on the mesh.
-            if isl.umesh.total_face_sel != len(isl):
+            if isl.umesh.total_face_sel != len(isl):  # Fast check if island single.
                 if faces_set is None:
                     faces_set = set(isl)
                 uv = isl.umesh.uv
