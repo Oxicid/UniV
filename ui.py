@@ -168,6 +168,11 @@ class UNIV_PT_General(Panel):
         col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
         col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
         col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
+
+        from . import utils
+        with utils.operator_context(col, 'INVOKE_REGION_WIN'):
+            col.operator('uv.univ_trim_editor', icon='GREASEPENCIL', text='')
+
         col.separator(factor=0.25)
         col.popover(panel='UNIV_PT_trim_manager', text='', icon_value=icons.settings_a)
 
