@@ -931,9 +931,9 @@ def get_nearest_contained_bbox_idx(bboxes, pt):
 
 def get_transform_from_box(src: 'utypes.BBox',
                            tar: 'utypes.BBox',
-                           axis: str,
-                           pad: float,
-                           use_crop: bool
+                           axis: str = 'XY',
+                           pad: float = 0.0,
+                           use_crop: bool = True
                            ) -> tuple[Vector, Vector, Vector]:
     # Padding may be too large for small trims, and if the length is exceeded, it causes negative scaling.
     # Therefore, attenuate the padding.
@@ -978,3 +978,13 @@ def get_transform_from_box(src: 'utypes.BBox',
         delta.x = 0
 
     return scale, delta, pivot
+
+def wrap_box(src: utypes.BBox, tar: utypes.BBox = utypes.BBox(0.0, 1.0, 0.0, 1.0)) -> Vector:
+
+    pos_x = wrap_line_nearest(src.min.x, src.width, tar.xmin, tar.xmax)
+    pos_y = wrap_line_nearest(src.min.y, src.height, tar.ymin, tar.ymax)
+    set_pos = Vector((pos_x, pos_y))
+
+    delta = set_pos - src.min
+
+    return delta

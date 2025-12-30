@@ -178,8 +178,8 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
 
     x: FloatProperty(name='X', default=0, min=0, max=1, update=_update_trim_system)
     y: FloatProperty(name='Y', default=0, min=0, max=1, update=_update_trim_system)
-    width: FloatProperty(name='Width', default=1, min=0.005, max=1, update=_update_trim_system)
-    height: FloatProperty(name='Height', default=0.25, min=0.005, max=1, update=_update_trim_system)
+    width: FloatProperty(name='Width', default=1, min=0.002, max=1, update=_update_trim_system)
+    height: FloatProperty(name='Height', default=0.25, min=0.002, max=1, update=_update_trim_system)
 
     def to_bbox(self):
         from . import utypes

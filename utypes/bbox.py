@@ -489,18 +489,19 @@ class BBox:
         ymin = self.ymin * aspect_y
         ymax = self.ymax * aspect_y
 
-        dx = 0.0
-        if x < xmin:
-            dx = xmin - x
-        elif x > xmax:
-            dx = x - xmax
+        dx = max(xmin - x, 0.0, x - xmax)
+        dy = max(ymin - y, 0.0, y - ymax)
 
-        dy = 0.0
-        if y < ymin:
-            dy = ymin - y
-        elif y > ymax:
-            dy = y - ymax
+        if dx == 0.0 and dy == 0.0:
+            # Inner
+            return min(
+                x - xmin,
+                xmax - x,
+                y - ymin,
+                ymax - y,
+            )
 
+        # Outer
         return (dx * dx + dy * dy) ** 0.5
 
 
