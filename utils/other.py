@@ -1,16 +1,17 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import typing
 
 import bpy
 import blf
+import typing
+import contextlib
 from mathutils import Vector
 from itertools import groupby
 
 
 def get_aspect_ratio(umesh=None):
-    """Aspect Y"""
+    """Aspect Y. Used for multiply by Y axis."""
     if umesh:
         # Aspect from checker
         if modifiers := [m for m in umesh.obj.modifiers if m.name.startswith('UniV Checker')]:
@@ -161,6 +162,21 @@ def update_univ_panels():
                 else:
                     reg.tag_redraw()
 
+
+@contextlib.contextmanager
+def operator_context(layout, op_context):
+    """Context manager that temporarily overrides the operator context.
+
+    >>> with operator_context(layout, 'INVOKE_REGION_CHANNELS'):
+    ...     layout.operator("anim.channels_delete")
+    """
+
+    orig_context = layout.operator_context
+    layout.operator_context = op_context
+    try:
+        yield
+    finally:
+        layout.operator_context = orig_context
 
 def event_to_string(event, text=''):
     if event.ctrl:

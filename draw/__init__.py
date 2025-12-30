@@ -243,10 +243,10 @@ class TrimDrawer:
 
                 if idx == active:
                     center = bb.center
-                    cursor_width = min(bb.min_length / 3, 0.01)
+                    cursor_size = trim.get_cursor_size()
 
-                    off_x = cursor_width * aspect_x
-                    off_y = cursor_width * aspect_y
+                    off_x = cursor_size * aspect_x
+                    off_y = cursor_size * aspect_y
 
                     boxes_lines.append(center - Vector((off_x, 0)))
                     boxes_lines.append(center + Vector((off_x, 0)))

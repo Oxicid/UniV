@@ -185,6 +185,18 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
         from . import utypes
         return utypes.BBox(self.x, self.x + self.width, self.y, self.y + self.height)
 
+    def from_bbox(self, bb):
+        self.x = bb.xmin
+        self.y = bb.ymin
+
+        self.width = bb.width
+        self.height = bb.height
+
+    def get_cursor_size(self):
+        min_size = min(self.width, self.height)
+        return min(min_size / 3, 0.01)
+
+
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)

@@ -151,9 +151,17 @@ class BBox:
     def max(self):
         return Vector((self.xmax, self.ymax))
 
+    @max.setter
+    def max(self, val: Vector):
+        self.xmax, self.ymax = val
+
     @property
     def min(self):
         return Vector((self.xmin, self.ymin))
+
+    @min.setter
+    def min(self, val: Vector):
+        self.xmin, self.ymin = val
 
     @property
     def left_upper(self):
@@ -370,7 +378,7 @@ class BBox:
         self.xmax += center[0] + y1
         self.ymax += center[1] - x1
 
-    def scale(self, scale: float, pivot: Vector | tuple[float, float] | None = None):
+    def scale(self, scale: Vector, pivot: Vector | tuple[float, float] | None = None):
         center = self.center if pivot is None else pivot
         self.xmin, self.ymin = (self.min - center) * scale + center
         self.xmax, self.ymax = (self.max - center) * scale + center
@@ -471,19 +479,30 @@ class BBox:
 
         return self.isect_triangles(island.flat_coords)
 
-    def length_x(self, x) -> float:
-        if x < self.xmin:
-            return self.xmin - x
-        if x > self.xmax:
-            return x - self.xmax
-        return 0.0
+    def distance(self, pt: Vector | tuple[float, float], aspect_y=1.0) -> float:
+        """Return minimal distance to bounds"""
+        x, y = pt
+        y *= aspect_y
 
-    def length_y(self, y) -> float:
-        if y < self.ymin:
-            return self.ymin - y
-        if y > self.ymax:
-            return y - self.ymax
-        return 0
+        xmin = self.xmin
+        xmax = self.xmax
+        ymin = self.ymin * aspect_y
+        ymax = self.ymax * aspect_y
+
+        dx = 0.0
+        if x < xmin:
+            dx = xmin - x
+        elif x > xmax:
+            dx = x - xmax
+
+        dy = 0.0
+        if y < ymin:
+            dy = ymin - y
+        elif y > ymax:
+            dy = y - ymax
+
+        return (dx * dx + dy * dy) ** 0.5
+
 
     def isect_segment(self, s1: Vector, s2: Vector) -> bool:
         from mathutils.geometry import intersect_line_line_2d as ll_isect

@@ -33,6 +33,41 @@ def all_equal(sequence: typing.Iterable, key: typing.Callable | None = None):
                 return False
     return True
 
+def argmin(sequence: typing.Iterable, key: typing.Callable | None = None) -> int:
+    index = 0
+    sequence_iter = iter(sequence)
+    if key is None:
+        min_value = next(sequence_iter)
+        for i, val, in enumerate(sequence_iter, 1):
+            if val < min_value:
+                index = i
+                min_value = val
+    else:
+        min_value = key(next(sequence_iter))
+        for i, val, in enumerate(sequence_iter, 1):
+            val = key(val)
+            if val < min_value:
+                index = i
+                min_value = val
+    return index
+
+def argmax(sequence: typing.Iterable, key: typing.Callable | None = None) -> int:
+    index = 0
+    sequence_iter = iter(sequence)
+    if key is None:
+        min_value = next(sequence_iter)
+        for i, val, in enumerate(sequence_iter, 1):
+            if val > min_value:
+                index = i
+                min_value = val
+    else:
+        min_value = key(next(sequence_iter))
+        for i, val, in enumerate(sequence_iter, 1):
+            val = key(val)
+            if val > min_value:
+                index = i
+                min_value = val
+    return index
 
 def vec_isclose(a, b, abs_tol: float = 0.00001):
     return all(math.isclose(a1, b1, abs_tol=abs_tol) for a1, b1 in zip(a, b))
