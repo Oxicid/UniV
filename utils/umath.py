@@ -84,6 +84,13 @@ def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
 def safe_divide(a: int | float, b: int | float) -> float:
     return a / b if b else 0.0
 
+def clamp(val, min_val=0.0, max_val=0.0):
+    if val < min_val:
+        return min_val
+    elif val > max_val:
+        return max_val
+    return val
+
 # Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
 def inv_lerp(a: float, b: float, v: float) -> float:  # ratio
     ratio_range = b - a
