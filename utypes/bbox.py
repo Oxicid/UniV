@@ -504,6 +504,9 @@ class BBox:
         # Outer
         return (dx * dx + dy * dy) ** 0.5
 
+    def distance_to_center(self, pt: Vector | tuple[float, float], aspect_y=1.0) -> float:
+        asp = Vector((1.0, aspect_y))
+        return ((self.center - pt) * asp).length
 
     def isect_segment(self, s1: Vector, s2: Vector) -> bool:
         from mathutils.geometry import intersect_line_line_2d as ll_isect
