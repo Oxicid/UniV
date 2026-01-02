@@ -479,7 +479,7 @@ class BBox:
 
         return self.isect_triangles(island.flat_coords)
 
-    def distance(self, pt: Vector | tuple[float, float], aspect_y=1.0) -> float:
+    def distance(self, pt: Vector | tuple[float, float], aspect_y=1.0, with_center=False) -> float:
         """Return minimal distance to bounds"""
         x, y = pt
         y *= aspect_y
@@ -494,12 +494,25 @@ class BBox:
 
         if dx == 0.0 and dy == 0.0:
             # Inner
-            return min(
-                x - xmin,
-                xmax - x,
-                y - ymin,
-                ymax - y,
-            )
+            if with_center:
+                center = Vector((xmin+xmax, ymin+ymax))
+                center *= 0.5
+                dist_to_center = (Vector((x, y)) - center).length
+
+                return min(
+                    x - xmin,
+                    xmax - x,
+                    y - ymin,
+                    ymax - y,
+                    dist_to_center
+                )
+            else:
+                return min(
+                    x - xmin,
+                    xmax - x,
+                    y - ymin,
+                    ymax - y,
+                )
 
         # Outer
         return (dx * dx + dy * dy) ** 0.5

@@ -196,6 +196,11 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
         min_size = min(self.width, self.height)
         return min(min_size / 3, 0.01)
 
+    def get_index(self):
+        for i, t in enumerate(prefs().trims_presets):
+            if t == self:
+                return i
+        return -1
 
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
