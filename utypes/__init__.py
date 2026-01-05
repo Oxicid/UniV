@@ -9,6 +9,7 @@ if 'bpy' in locals():
     from . import mesh_island
     from . import ray
     from . import umesh
+    from . import utexture
     from . import llvm
 
     from .. import reload
@@ -21,6 +22,7 @@ if 'bpy' in locals():
     del loop_group
     del ray
     del umesh
+    del utexture
 
 import bpy  # noqa: F401
 from .btypes import *
@@ -30,4 +32,5 @@ from .loop_group import *
 from .mesh_island import *
 from .ray import *
 from .umesh import *
+from .utexture import *
 from . import llvm

@@ -14,6 +14,7 @@ from ctypes import (
     c_float,
     c_short,
     c_int,
+    c_uint8,
     c_uint,
     c_long,
     c_int64,
@@ -813,5 +814,43 @@ class PyBMesh(StructBase):
     def total_loop(cls, bm):
         return cls.fields(bm).totloop
 
+class ImBufByteBuffer(StructBase):
+    data: POINTER(c_uint8)  # uint8_t
+    ownership: c_int  # ImBufOwnership
+    colorspace: c_void_p  # ColorSpace
+
+
+class ImBuf(StructBase):
+    # Width and Height of our image buffer.
+    x: c_int
+    y: c_int
+
+    #  Active amount of bits/bit-planes.
+    planes: c_char
+
+    #  Number of channels in `rect_float` (0 = 4 channel default)
+    channels: c_int
+
+    #   Controls which components should exist. */
+    flags: c_int
+
+    #  Image pixel buffer (8bit representation):
+    #  - color space defaults to `sRGB`.
+    #  - alpha defaults to 'straight'.
+
+    byte_buffer: ImBufByteBuffer
+
+class Py_ImBuf(StructBase):
+    ob_refcnt: c_long
+    ob_type: c_void_p
+    ob_size: c_long
+    ibuf: POINTER(ImBuf)
+
+    @classmethod
+    def get_fields(cls, py_ibuf) -> ImBuf:
+        ibuf = cls.from_address(id(py_ibuf))
+        # print(ctypes.c_void_p.from_address(c_bm.bm.contents))  # get address by int
+        # ctypes.addressof(c_bm.bm.contents)
+        return ibuf.ibuf.contents
 
 StructBase._init_structs()  # noqa
