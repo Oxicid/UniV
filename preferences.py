@@ -5,11 +5,17 @@ import bpy
 import rna_keymap_ui  # type: ignore[import-untyped]
 
 from . import utils
+from . import utypes
 from .utils import ENUM
 from . import keymaps
 from bpy.props import *
 
 UV_LAYERS_ENABLE = True
+
+try:
+    from . import univ_pro
+except:  # noqa
+    univ_pro = None
 
 
 def prefs() -> 'UNIV_AddonPreferences':
@@ -142,10 +148,32 @@ def _update_uv_layers_active_idx(self, context):
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
-checker_generated_types = (
+checker_generated_types = [
     ('UV_GRID', 'Grid', ''),
     ('COLOR_GRID', 'Color Grid', ''),
-)
+]
+if univ_pro:
+    checker_generated_types.extend((
+            ('SIMPLE_GRID', 'Simple Grid', ''),
+        )
+    )
+
+def get_checker_colors():
+    checker_colors_ = []
+    for name, col in vars(utypes.Colors).items():
+        if name.startswith('_separator'):
+            checker_colors_.append(None)
+        elif not name.startswith('_'):
+            if not hasattr(col, '__len__'):
+                print(f"UniV: Attribute {name!r} not sequence and was skipped.")
+                continue
+
+            if len(col) != 3:
+                print(f"UniV: Expected size 3, given {len(col)}. Color: {name} - {col}")
+                continue
+            checker_colors_.append(name)
+    return tuple(checker_colors_)
+checker_colors_seq = get_checker_colors()
 
 _udim_source = [
     ('CLOSEST_UDIM', 'Closest UDIM', "Pack islands to closest UDIM"),
@@ -228,6 +256,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     checker_toggle: EnumProperty(name='Toggle', default='TOGGLE', items=ENUM('TOGGLE', 'OVERWRITE'),
                                            description='Off/On checker modifier')
     checker_generated_type: bpy.props.EnumProperty(name='Texture Type', default='UV_GRID', items=checker_generated_types)
+    checker_colors: bpy.props.EnumProperty(name='Color', default='red', items=ENUM(*checker_colors_seq))
 
     # Texel Settings
     use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')

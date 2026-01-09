@@ -73,7 +73,7 @@ def load_register_types():
             keymaps.UNIV_RestoreKeymaps,
             # Checker System
             checker.UNIV_OT_Checker,
-            checker.UNIV_OT_CheckerTest,
+            # checker.UNIV_OT_CheckerTest,
             checker.UNIV_OT_CheckerCleanup,
             # Inspect
             inspect.UNIV_OT_BatchInspectFlags,
@@ -236,6 +236,8 @@ def load_register_types():
                 # UI
                 ui.UNIV_UL_TrimPresetsManager,
                 ui.UNIV_PT_TrimManager,
+                ui.UNIV_PT_CheckerSettings,
+                univ_pro.checker.UNIV_OT_CheckerGenerator,
                 # Trim
                 univ_pro.trim.UNIV_OT_TrimPresetsProcessing,
                 univ_pro.trim.UNIV_OT_TrimLoadFromSVG,

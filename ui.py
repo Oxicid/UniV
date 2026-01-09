@@ -350,10 +350,14 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_batch_inspect', icon_value=icons.zero)
             row.popover(panel='UNIV_PT_BatchInspectSettings', text='', icon_value=icons.settings_a)
 
+            col_align.separator(factor=0.25)
+
             row = col_align.row(align=True)
             row.scale_y = 1.35
             row.operator('mesh.univ_checker', icon_value=icons.checker)
             row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
+            if univ_pro:
+                row.popover(panel='UNIV_PT_CheckerSettings', text='', icon_value=icons.settings_a)
 
 
         # UV Maps
@@ -713,6 +717,29 @@ class UNIV_PT_BatchInspectSettings(Panel):
         row = col.row(align=True)
         row.operator('uv.univ_check_other', icon_value=icons.random)
         draw_tag_button(Inspect.Other)
+
+class UNIV_PT_CheckerSettings(Panel):
+    bl_idname = 'UNIV_PT_CheckerSettings'
+    bl_label = 'Checker Settings'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
+
+    def draw(self, context):
+        pref = univ_settings()
+
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+        col = layout.column(align=True)
+
+        row = col.row(align=True)
+        row.prop(pref, 'checker_colors')
+
+        layout.operator('wm.univ_checker_generator')
+
+
+
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
