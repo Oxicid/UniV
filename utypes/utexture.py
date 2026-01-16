@@ -56,6 +56,17 @@ class UTexture:
         buffer = gpu.types.Buffer('FLOAT', self.width * self.height * 4, texture_with_alpha)
         return gpu.types.GPUTexture((self.width, self.height), format='RGBA8', data=buffer)
 
+    def to_4_channels(self):
+        """NOTE: Not create new instance"""
+        if self.channels == 4:
+            return self
+        if self.channels == 3:
+            alpha = np.ones((self.height, self.width, 1), dtype=self.data.dtype)
+            self.data = np.concatenate((self.data, alpha), axis=2)
+            self.channels = 4
+            return self
+        raise NotImplementedError(f'Not implement for {self.channels!r} channels')
+
     def fill(self, color):
         self.data[:] = self._sanitize_color(color)
 
@@ -297,13 +308,17 @@ class UMask:
 
 
 class Colors:
-    gray = (0.25, 0.25, 0.25)  # good
-    black = 0.005, 0.005, 0.005  # good
+    white = (0.8, 0.8, 0.8)  # good
+    gray = (0.55, 0.55, 0.55)  # good
+    gray_dark = (0.35, 0.35, 0.35)  # good
+    dark = (0.2, 0.2, 0.2)  # good
+    black = 0.05, 0.05, 0.05  # good
 
     _separator1 = None
 
-    brown = 0.256, 0.092, 0.0  # good
-    clay = 0.505, 0.325, 0.156  # good, but small lines gray (need light)
+    brown = 0.256, 0.165, 0.115  # good
+    brown_dark = 0.152, 0.117, 0.095  # good
+    clay = 0.505, 0.35, 0.22  # good, but small lines gray (need light)
 
     _separator2 = None
 
@@ -312,8 +327,8 @@ class Colors:
 
     _separator3 = None
 
-    red = (0.576, 0.058, 0.027)  # good, but small lines gray (need light)
-    red_orange = [1, 0.18, 0]  # good
+    red = (0.576, 0.18, 0.157)  # good, but small lines gray (need light)
+    red_orange = [1.0, 0.278, 0.122]  # good
     coral = [1.0, 0.4, 0.31]  # good, but small lines gray (need light)
 
     _separator4 = None
@@ -323,14 +338,14 @@ class Colors:
 
     _separator5 = None
 
-    green = (0.337, 0.51, 0.0115)  # good, but need colorize lines
-    green_darken = (0.08,0.43,0.08)
+    green = (0.416, 0.61, 0.235)  # good, but need colorize lines
+    green_darken = (0.18,0.4,0.18)
     army_green = [0.33, 0.38, 0.12]  # good
     hunter_green = (0.172, 0.372, 0.204)  # good
 
     _separator6 = None
 
-    blue = [0.0, 0.18, 0.58]  # good
+    blue = [0.192, 0.314, 0.58]  # good
     midnight_blue = [0.08, 0.13, 0.37]  # good
     blueprint = (0.188,0.36,0.87)  # good, but need colorize small lines
     azure = [0.35, 0.98, 0.95]  # need colorize lines
@@ -339,19 +354,27 @@ class Colors:
     _separator7 = None
 
     violet = [0.47, 0.3, 0.5]  # good, but lines - not
-    deep_violet = [0.22, 0.04, 0.4]  # good
+    deep_violet = [0.272, 0.139, 0.4]  # good
 
     _separator8 = None
 
-    pink = [0.7, 0.0, 0.22]  # good
+    pink = [1.0, 0.15, 0.38]  # good
+    pink_red = [0.7, 0.0, 0.22]  # good
 
 class ColorsSmallLines:
-    gray = (0.35,0.35,0.35)
-    black = (0.35,0.35,0.35)
+    white = (0.65,0.65,0.65)
+    gray = (0.7,0.7,0.7)
+    gray_dark = (0.4,0.4,0.4)
+    dark = (0.35,0.35,0.35)
+    black = (0.3,0.3,0.3)
 
     brown = Color(Colors.brown)  # good, but small lines gray (need light)
     brown.s *= 0.6
     brown.v *= 2.0
+
+    brown_dark = Color(Colors.brown_dark)  # good, but small lines gray (need light)
+    brown_dark.s *= 0.6
+    brown_dark.v *= 2.0
 
     clay = Color(Colors.clay)  # good, but small lines gray (need light)
     clay.s *= 1.5
@@ -425,9 +448,6 @@ class ColorsSmallLines:
     midnight_blue.v *= 1.75
     midnight_blue.s *= 0.75
 
-
-
-
     aquamarine = Color(Colors.aquamarine)
     aquamarine.v *= 0.65
     aquamarine.s *= 1.5
@@ -447,6 +467,10 @@ class ColorsSmallLines:
     pink = Color(Colors.pink)
     pink.v *= 1.65
     pink.s *= 0.8
+
+    pink_red = Color(Colors.pink_red)
+    pink_red.v *= 1.65
+    pink_red.s *= 0.8
 
 
 
@@ -571,10 +595,15 @@ class TexturePatterns:
             first_char_index = (first_char_index + 1) % len(letters)
 
     @classmethod
-    def simple_line(cls, size=(2048, 2048), color=(0.25, 0.25, 0.25), small_lines_color=(0.4,0.4,0.4)):
+    def simple_grid(cls, size=(2048, 2048), color=(0.25, 0.25, 0.25), small_lines_color=(0.4, 0.4, 0.4), bound_color=(1,1,1)):
         bound_line = UMask(*size)
-        bound_line.draw_vline(0, thickness=5)
-        bound_line.draw_hline(0, thickness=5)
+        max_size = max(size)
+        thickness = 5 if max_size <= 4096 else 7
+        thickness = 3 if max_size <= 1024 else thickness
+        thickness = 1 if max_size <= 256 else thickness
+
+        bound_line.draw_vline(0, thickness=thickness)
+        bound_line.draw_hline(0, thickness=thickness)
 
         medium_lines = UMask(*size)
         cls.draw_lines(medium_lines, step=256, exclude_first=True)
@@ -582,7 +611,13 @@ class TexturePatterns:
         small_lines = UMask(*size)
         cls.draw_lines(small_lines, step=32, exclude_first=True)
 
+        if max_size >= 2048:
+            cls.draw_lines(bound_line, step=1024, thickness=3, exclude_first=True)
+
+        if max_size >= 4096*2:
+            cls.draw_lines(bound_line, step=4096, thickness=5, exclude_first=True)
+
         tex = small_lines.mask_to_texture(small_lines_color, color)
-        tex[medium_lines] = (1,1,1)
-        tex[bound_line] = (1,1,1)
+        tex[medium_lines] = bound_color
+        tex[bound_line] = bound_color
         return tex

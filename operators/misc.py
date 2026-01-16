@@ -131,9 +131,7 @@ class UNIV_OT_TD_PresetsProcessing(Operator):
         my_user.texel = univ_settings().texel_density
         my_user.size_x = univ_settings().size_x
         my_user.size_y = univ_settings().size_y
-        from . import checker
-        size_name = checker.UNIV_OT_Checker.resolution_values_to_name(int(my_user.size_x), int(my_user.size_y))
-        my_user.name += ' ' + size_name
+        my_user.name += ' ' + utils.glob_resolutions_to_name()
 
         if len(td_presets) > 1:
             td_presets.move(len(td_presets), active_td_index + 1)

@@ -2,11 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
-import typing
 
 from .. import utypes
 from .. import utils
-from ..utypes import UMask
 from ..preferences import prefs, checker_generated_types
 
 # Patterns for future
@@ -32,40 +30,39 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
-        row = layout.row(align=True, heading='Apply Method')
-        row.scale_x = 0.92
-        row.prop(prefs(), 'checker_toggle', expand=True)
+        pref = prefs()
 
         row = layout.row(align=True, heading='Texture Type')
         row.scale_x = 0.92
-        row.prop(prefs(), 'checker_generated_type', expand=True)
+        row.prop(pref, 'checker_generated_type', expand=True)
+
+        row = layout.row(align=True, heading='Apply Method')
+        row.scale_x = 0.92
+        row.prop(pref, 'checker_toggle', expand=True)
+
 
         row = layout.row(align=True, heading='Size')
-        row.prop(prefs(), 'size_x', text='')
-        row.prop(prefs(), 'lock_size', text='', icon='LOCKED' if prefs().lock_size else 'UNLOCKED')
-        row.prop(prefs(), 'size_y', text='')
+        row.prop(pref, 'size_x', text='')
+        row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
+        row.prop(pref, 'size_y', text='')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pattern_name: str = ''
-        self.resolution_name: str = ''
         self.full_pattern_name: str = ''
-        self.int_size_x: int = -1
-        self.int_size_y: int = -1
+        self.shader = None
+        self.batch = None
 
     def execute(self, context):
-        return self.checker_default()
-
+        self.checker_default()
+        return {'FINISHED'}
 
     def checker_default(self):
-        self.int_size_x = int(prefs().size_x)
-        self.int_size_y = int(prefs().size_y)
+        if self.sanitize_generated_textures():
+            return
 
-        self.pattern_name = self.get_name_from_gen_type_idname(prefs().checker_generated_type)
-        self.resolution_name: str = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
-        self.full_pattern_name = f"UniV_{self.pattern_name}_{self.resolution_name}"
+        self.full_pattern_name = self.get_full_image_name()
 
-        mtl = self.get_checker_material()
+        mtl = self.get_exist_material_or_create()
 
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
@@ -76,10 +73,11 @@ class UNIV_OT_Checker(bpy.types.Operator):
             if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
                 for node in mtl.node_tree.nodes:
                     if node.bl_idname == 'ShaderNodeTexImage':
-                        assert node.image.name.startswith(self.full_pattern_name)
-                        space_data = area.spaces.active
-                        space_data.image = node.image
-                        break
+                        if node.image:
+                            assert node.image.name.startswith(self.full_pattern_name)
+                            space_data = area.spaces.active
+                            space_data.image = node.image
+                            break
 
         if prefs().checker_toggle == 'TOGGLE':
             if self.all_has_enable_gn_checker_modifier():
@@ -92,60 +90,59 @@ class UNIV_OT_Checker(bpy.types.Operator):
             set_active_image()
             self.create_gn_checker_modifier(node_group, mtl)
         self.update_views()
-        return {'FINISHED'}
 
-    @typing.final
-    def get_checker_texture(self) -> bpy.types.Image:
-        """Get exist checker texture"""
+    def get_exist_texture_or_create(self) -> bpy.types.Image:
         for image in reversed(bpy.data.images):
             if (image_name := image.name).startswith(self.full_pattern_name):
-                image_width, image_height = image.size
-                if self.x_check(image_name) or not image_height or (
-                        image_width != self.int_size_x or image_height != self.int_size_y):
+                if self.has_x_after_resolution(image_name) or tuple(image.size) != prefs().glob_size:
                     if image.users == 0:
                         bpy.data.images.remove(image)
                         print(f"UniV: Checker Image '{image_name}' was removed")
                     continue
 
                 return image
-        return self._generate_checker_texture()
+        return self.generate_checker_texture()
 
-    @typing.final
-    def material_is_changed(self, mtl):
-        if mtl.use_nodes and len(nodes := mtl.node_tree.nodes) == 3:
-            if output_node := [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']:
-                if output_node[0].target == 'ALL' and output_node[0].inputs[0].links:
-                    diffuse = output_node[0].inputs[0].links[0].from_node
-                    if not diffuse.mute and diffuse.bl_idname == 'ShaderNodeBsdfDiffuse':
-                        if diffuse.inputs[0].links:
-                            img_node = diffuse.inputs[0].links[0].from_node
-                            if not img_node.mute and img_node.bl_idname == 'ShaderNodeTexImage':
-                                img = img_node.image
-                                if img and img.name.startswith(self.full_pattern_name) and not self.x_check(img.name):
-                                    if img.size[0] == self.int_size_x and img.size[1] == self.int_size_y:
-                                        return False
+    def material_is_changed_by_context(self, mtl):
+        if getattr(mtl, 'use_nodes', True):
+            if len(nodes := mtl.node_tree.nodes) == 3:
+                # TODO: Log it.
+                if output_node := [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']:
+                    if output_node[0].target == 'ALL' and output_node[0].inputs[0].links:
+                        diffuse = output_node[0].inputs[0].links[0].from_node
+                        if not diffuse.mute and diffuse.bl_idname == 'ShaderNodeBsdfDiffuse':
+                            if diffuse.inputs[0].links:
+                                img_node = diffuse.inputs[0].links[0].from_node
+                                if not img_node.mute and img_node.bl_idname == 'ShaderNodeTexImage':
+                                    img = img_node.image
+                                    if img and img.name.startswith(self.full_pattern_name) and not self.has_x_after_resolution(img.name):
+                                        if tuple(img.size) == prefs().glob_size:
+                                            return False
         return True
 
-    @typing.final
-    def get_checker_material(self) -> bpy.types.Material | None:
-        """Get exist checker material"""
+    def get_exist_material_or_create(self) -> bpy.types.Material | None:
         for mtl in reversed(bpy.data.materials):
             if (mtl_name := mtl.name).startswith(self.full_pattern_name):
-                if self.x_check(mtl_name) or self.material_is_changed(mtl):
+                if self.has_x_after_resolution(mtl_name) or self.material_is_changed_by_context(mtl):
                     if mtl.users == 0:
                         bpy.data.materials.remove(mtl)
                         print(f"UniV: Checker Material '{mtl_name}' was removed")
                 else:
                     return mtl
-        return self._create_checker_material()
 
-    @typing.final
-    def _create_checker_material(self):
+        # Create Material
+        img = self.get_exist_texture_or_create()
 
-        img = self.get_checker_texture()
+        if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+            space_data = area.spaces.active
+            if space_data:
+                if space_data.image != img:
+                    space_data.image = img
+                    area.tag_redraw()
 
         mtl = bpy.data.materials.new(name=self.full_pattern_name)
-        mtl.use_nodes = True
+        if hasattr(mtl, 'use_nodes'):
+            mtl.use_nodes = True
 
         nodes = mtl.node_tree.nodes
         nodes.clear()
@@ -167,7 +164,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return mtl
 
     @staticmethod
-    @typing.final
     def checker_node_group_is_changed(node_group):
         if len(nodes := node_group.nodes) == 3:
             if output_node := [n for n in nodes if n.bl_idname == 'NodeGroupOutput']:
@@ -178,7 +174,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
                             return False
         return True
 
-    @typing.final
     def get_checker_node_group(self):
         """Get exist checker node group"""
         for ng in reversed(bpy.data.node_groups):
@@ -190,8 +185,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     return ng
         return self._create_checker_node_group()
 
+    def sanitize_generated_textures(self):
+        pass
+
     @staticmethod
-    @typing.final
     def _create_checker_node_group():
         node_group = bpy.data.node_groups.new(name='UniV Checker', type='GeometryNodeTree')
 
@@ -222,7 +219,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return node_group
 
     @staticmethod
-    @typing.final
     def create_gn_checker_modifier(node_group, mtl):
         for obj in bpy.context.selected_objects:
             if not obj.type == 'MESH':
@@ -254,7 +250,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     m['Input_1'] = mtl
 
     @staticmethod
-    @typing.final
     def all_has_enable_gn_checker_modifier():
         counter = 0
         for obj in (selected_objects := [obj_ for obj_ in bpy.context.selected_objects if obj_.type == 'MESH']):
@@ -266,7 +261,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return len(selected_objects) == counter
 
     @staticmethod
-    @typing.final
     def enable_and_set_gn_checker_modifier(node_group, mtl):
         for obj in bpy.context.selected_objects:
             if not obj.type == 'MESH':
@@ -293,7 +287,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     m['Input_1'] = mtl
 
     @staticmethod
-    @typing.final
     def disable_all_gn_checker_modifier():
         for obj in bpy.context.selected_objects:
             if obj.type == 'MESH':
@@ -304,33 +297,41 @@ class UNIV_OT_Checker(bpy.types.Operator):
                             m.show_viewport = False
                             break
 
-    @staticmethod
-    @typing.final
-    def resolution_values_to_name(xsize: int, ysize: int):
-        x_size_name = utils.resolution_value_to_name[xsize]
-        y_size_name = utils.resolution_value_to_name[ysize]
-        return f'{x_size_name}x{y_size_name}' if xsize != ysize else x_size_name
 
     @staticmethod
-    @typing.final
     def get_name_from_gen_type_idname(name):
         for gt in checker_generated_types:
             if gt[0] == name:
-                return gt[1]
+                return gt[1].replace(' ', '')
         raise NotImplementedError(f'Texture {name} not implement')
 
-    @typing.final
-    def _generate_checker_texture(self):
-        idname = self.get_name_from_gen_type_idname(prefs().checker_generated_type)
-        res_name = self.resolution_values_to_name(self.int_size_x, self.int_size_y)
-        full_image_name = f"UniV_{idname}_{res_name}"
+    @staticmethod
+    def get_color_name(tex_name):
+        return ''.join([name.capitalize() for name in tex_name.split('_')])
+
+    @classmethod
+    def get_full_image_name(cls):
+        idname = cls.get_name_from_gen_type_idname(prefs().checker_generated_type)
+        res_name = utils.glob_resolutions_to_name()
+
+        match prefs().checker_generated_type:
+            case 'UV_GRID' | 'COLOR_GRID':
+                return f"UniV_{idname}_{res_name}"
+            case 'SIMPLE_GRID':
+                return f"UniV_{idname}_{cls.get_color_name(prefs().checker_colors)}_{res_name}"
+            case _:
+                raise NotImplementedError(f'Texture {idname} not implement')
+
+
+    def generate_checker_texture(self):
+        full_image_name = self.get_full_image_name()
 
         if prefs().checker_generated_type in ('UV_GRID', 'COLOR_GRID'):
             before = set(bpy.data.images)
             bpy.ops.image.new(
                 name=full_image_name,
-                width=self.int_size_x,
-                height=self.int_size_y,
+                width=int(prefs().size_x),
+                height=int(prefs().size_y),
                 alpha=False,
                 generated_type=prefs().checker_generated_type)
             return tuple(set(bpy.data.images) - before)[0]
@@ -338,7 +339,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
             raise NotImplementedError(f'Texture {prefs().checker_generated_type} not implement')
 
     @staticmethod
-    @typing.final
     def update_views():
         changed = False
         for area in utils.get_areas_by_type('VIEW_3D'):
@@ -355,9 +355,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
         if changed:
             bpy.context.view_layer.update()
 
-    @typing.final
-    def x_check(self, name):
-        """Has 'x' after resolution"""
+    def has_x_after_resolution(self, name):
         return len(name) > (x_idx := len(self.full_pattern_name)) and name[x_idx] == 'x'
 
 

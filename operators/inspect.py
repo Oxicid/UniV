@@ -864,7 +864,7 @@ class UNIV_OT_Check_Other(Operator):
                     if not slot.material:
                         aspects[1.0] = 'Default'
                         continue
-                    if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
+                    if getattr(mtl, 'use_nodes', True) and (active_node := mtl.node_tree.nodes.active):
                         if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
                             image_width, image_height = image.size
                             if image_height:
@@ -886,7 +886,7 @@ class UNIV_OT_Check_Other(Operator):
             uv_maps_names = {uv.name for uv in umesh.obj.data.uv_layers}
             uv_maps_names.add('')
             for slot in umesh.obj.material_slots:
-                if (mtl := slot.material) and mtl.use_nodes:
+                if (mtl := slot.material) and getattr(mtl, 'use_nodes', True):
                     if non_valid_names := {f'{node.uv_map!r}' for node in mtl.node_tree.nodes
                                            if node.type == 'UVMAP' and node.uv_map not in uv_maps_names}:
                         error_description += f'Material {mtl.name!r} in {umesh.obj.name!r} object has non-valid UV Map name: '

@@ -12,10 +12,9 @@ from bpy.props import *
 
 UV_LAYERS_ENABLE = True
 
-try:
-    from . import univ_pro
-except:  # noqa
-    univ_pro = None
+from importlib.util import find_spec
+univ_pro = find_spec(f"{__package__}.univ_pro") is not None
+del find_spec
 
 
 def prefs() -> 'UNIV_AddonPreferences':
@@ -503,6 +502,9 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
 
+    @property
+    def glob_size(self) -> tuple[int, int]:
+        return int(prefs().size_x), int(prefs().size_y)
 
     def draw(self, _context):
         layout = self.layout

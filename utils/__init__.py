@@ -35,6 +35,18 @@ resolution_name_to_value = {'256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K'
 resolution_value_to_name = {256: '256', 512: '512', 1024: '1K', 2048: '2K', 4096: '4K', 8192: '8K'}
 
 
+def glob_resolutions_to_name():
+    from ..preferences import prefs
+    x_size_name = resolution_value_to_name[xsize := int(prefs().size_x)]
+    y_size_name = resolution_value_to_name[ysize := int(prefs().size_y)]
+    return f'{x_size_name}x{y_size_name}' if xsize != ysize else x_size_name
+
+def resolutions_to_name(xsize, ysize):
+    x_size_name = resolution_value_to_name[xsize]
+    y_size_name = resolution_value_to_name[ysize]
+    return f'{x_size_name}x{y_size_name}' if xsize != ysize else x_size_name
+
+
 class NoInit:
     def __getattribute__(self, item):
         raise AttributeError(f'Object not initialized')

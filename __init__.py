@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 54),
+    "version": (3, 9, 55),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -72,8 +72,6 @@ def load_register_types():
             preferences.UNIV_OT_ShowAddonPreferences,
             keymaps.UNIV_RestoreKeymaps,
             # Checker System
-            checker.UNIV_OT_Checker,
-            # checker.UNIV_OT_CheckerTest,
             checker.UNIV_OT_CheckerCleanup,
             # Inspect
             inspect.UNIV_OT_BatchInspectFlags,
@@ -237,6 +235,12 @@ def load_register_types():
                 ui.UNIV_UL_TrimPresetsManager,
                 ui.UNIV_PT_TrimManager,
                 ui.UNIV_PT_CheckerSettings,
+                ui.UNIV_PT_CheckerTextures,
+
+                # Checker System
+                univ_pro.checker.UNIV_OT_Checker,
+                univ_pro.checker.UNIV_OT_CheckerSave,
+                univ_pro.checker.UNIV_OT_CheckerUpdate,
                 univ_pro.checker.UNIV_OT_CheckerGenerator,
                 # Trim
                 univ_pro.trim.UNIV_OT_TrimPresetsProcessing,
@@ -272,6 +276,8 @@ def load_register_types():
 
         else:
             classes.extend((
+                # Checker System
+                checker.UNIV_OT_Checker,
                 # Project
                 project.UNIV_OT_BoxProject,
                 # Stack

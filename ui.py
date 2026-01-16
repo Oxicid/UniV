@@ -727,19 +727,43 @@ class UNIV_PT_CheckerSettings(Panel):
     bl_category = "UniV"
 
     def draw(self, context):
-        pref = univ_settings()
-
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
-        col = layout.column(align=True)
+        layout.popover(panel='UNIV_PT_CheckerTextures', icon='IMAGE_DATA')
 
-        row = col.row(align=True)
-        row.prop(pref, 'checker_colors')
+        from .univ_pro.checker import UNIV_OT_Checker
+        UNIV_OT_Checker.draw_checker_layout(layout, True)
 
-        layout.operator('wm.univ_checker_generator')
+        # layout.operator('wm.univ_checker_generator')  # TODO: Improve
 
+class UNIV_PT_CheckerTextures(Panel):
+    bl_idname = 'UNIV_PT_CheckerTextures'
+    bl_label = 'Checker Textures'
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
 
+    def draw(self, context):
+        layout = self.layout
+        for img in bpy.data.images:
+            if (name := img.name).startswith('UniV_'):
+                if name.startswith(('UniV_Grid_', 'UniV_ColorGrid_')):
+                    continue
+                row = layout.row(align=True)
+                if not img.preview:
+                    preview = img.preview_ensure()
+                    if preview:
+                        row.label(text='', icon_value=preview.icon_id)
+                    else:
+                        row.label(text='', icon='BLANK1')
+                else:
+                    row.label(text='', icon_value=img.preview.icon_id)
 
+                row.prop(img, 'name', text='')
+
+                if img.is_dirty:
+                    row.operator('wm.univ_checker_save', icon='FILE_TICK', text='').session_uid = img.session_uid
+                row.operator('wm.univ_checker_update', icon='FILE_REFRESH', text='').session_uid = img.session_uid
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
