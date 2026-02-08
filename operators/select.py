@@ -2924,11 +2924,6 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
 class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
     bl_idname = "mesh.univ_select_by_vertex_count"
 
-    elem_mode: EnumProperty(name='Elem Mode', default='ISLAND', items=(
-        ('FACE', 'Face', ''),
-        ('ISLAND', 'Island', ''),
-    ))
-
     def execute(self, context):
         umeshes = UMeshes.calc_any_unique(verify_uv=False)
         umeshes.set_sync()
