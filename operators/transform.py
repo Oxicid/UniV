@@ -40,9 +40,9 @@ from ..utypes import (
 from ..preferences import prefs, univ_settings
 
 
-class UNIV_OT_Crop(Operator, utils.PaddingHelper):
-    bl_idname = 'uv.univ_crop'
-    bl_label = 'Crop'
+class UNIV_OT_Fit(Operator, utils.PaddingHelper):
+    bl_idname = 'uv.univ_fit'
+    bl_label = 'Fit'
     bl_description = info.operator.crop_info
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -88,7 +88,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.use_crop = self.bl_label == 'Crop'
+        self.use_crop = self.bl_label == 'Fit'
 
         self.to_cursor = event.ctrl
         self.individual = event.shift
@@ -101,7 +101,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
         return self.execute(context)
 
     def execute(self, context):
-        self.use_crop = self.bl_label == 'Crop'
+        self.use_crop = self.bl_label == 'Fit'
 
         self.calc_padding()
         self.report_padding()
@@ -356,7 +356,7 @@ class UNIV_OT_Crop(Operator, utils.PaddingHelper):
                 self.mode = 'INDIVIDUAL_INPLACE'
 
 
-class UNIV_OT_Fill(UNIV_OT_Crop):
+class UNIV_OT_Fill(UNIV_OT_Fit):
     bl_idname = 'uv.univ_fill'
     bl_label = 'Fill'
     bl_description = info.operator.fill_info
