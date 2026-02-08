@@ -215,9 +215,9 @@ class UNIV_PT_General(Panel):
             col_align = panel.column(align=True)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
-            grid.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
-            grid.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
-            grid.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator('uv.univ_fit', icon_value=icons.crop).axis = 'XY'
+            grid.operator('uv.univ_fit', text='', icon_value=icons.x).axis = 'X'
+            grid.operator('uv.univ_fit', text='', icon_value=icons.y).axis = 'Y'
 
             grid.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
             grid.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
@@ -1202,9 +1202,9 @@ class IMAGE_MT_PIE_univ_transform(Menu):
         col.scale_y = 1.35
 
         row = col.row(align=True)
-        row.operator('uv.univ_crop', icon_value=icons.crop).axis = 'XY'
-        row.operator('uv.univ_crop', text='', icon_value=icons.x).axis = 'X'
-        row.operator('uv.univ_crop', text='', icon_value=icons.y).axis = 'Y'
+        row.operator('uv.univ_fit', icon_value=icons.crop).axis = 'XY'
+        row.operator('uv.univ_fit', text='', icon_value=icons.x).axis = 'X'
+        row.operator('uv.univ_fit', text='', icon_value=icons.y).axis = 'Y'
 
         row = col.row(align=True)
         row.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'

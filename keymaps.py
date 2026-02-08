@@ -46,7 +46,7 @@ def add_keymaps():
     global keys
 
     if not (kc := bpy.context.window_manager.keyconfigs.addon):
-        return
+        return  # Can be None in background mode.
 
     try:
         from . import univ_pro
@@ -314,7 +314,7 @@ def add_keymaps():
 def add_keymaps_ws():
     global keys_ws
     if not (kc := bpy.context.window_manager.keyconfigs.addon):
-        return
+        return  # Can be None in background mode.
 
     try:
         from . import univ_pro

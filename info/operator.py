@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 crop_event_info_ex = \
-    "Default - Crop faces/verts\n" \
-    "Shift - Individual Crop faces/verts.\n" \
-    "Ctrl - Crop to cursor.\n" \
-    "Ctrl+Shift - Crop to cursor individual\n" \
-    "Alt - Inplace Crop\n" \
-    "Shift+Alt - Individual Inplace Crop"
-crop_info = "Crop islands\n\n" + crop_event_info_ex
+    "Default - Fit faces/verts\n" \
+    "Shift - Individual Fit faces/verts.\n" \
+    "Ctrl - Fit to cursor.\n" \
+    "Ctrl+Shift - Fit to cursor individual\n" \
+    "Alt - Inplace Fit\n" \
+    "Shift+Alt - Individual Inplace Fit"
+crop_info = "Fit islands\n\n" + crop_event_info_ex
 
 fill_event_info_ex = \
     "Default - Fill faces/verts\n" \
