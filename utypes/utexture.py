@@ -39,12 +39,28 @@ class UTexture:
         return cls(width, height, data, channels=ibuf.channels)
 
     @classmethod
-    def from_frame_buf(cls, width, height, fb):
+    def from_frame_buf(cls, width, height, fb, downscaled=False):
         pixel_data = fb.read_color(0, 0, width, height, 4, 0, 'UBYTE')
         pixel_data.dimensions = width * height * 4
-        t = np.array(pixel_data, dtype=np.uint8) / np.float32(255)
-        t = t.reshape([width, height, 4])
-        return cls(width, height, t, channels=4)
+        if downscaled:
+            import OpenImageIO as oiio
+
+            spec = oiio.ImageSpec(height // 2, width // 2, 4, oiio.UINT8)
+            spec_aa = oiio.ImageSpec(height, width, 4, oiio.UINT8)
+
+            buf_extended = oiio.ImageBuf(spec_aa)
+            buf_resized = oiio.ImageBuf(spec)
+
+            buf_extended.set_pixels(oiio.ROI(0, height, 0, width), pixel_data)
+            oiio.ImageBufAlgo.resize(buf_resized, buf_extended)
+            out = np.array(buf_resized.get_pixels(format=oiio.FLOAT), dtype=np.float32)
+            out.shape = (height // 2, width // 2, 4)
+            return UTexture(width // 2, height // 2, texture=out, channels=4)
+        else:
+
+            t = np.array(pixel_data, dtype=np.uint8) / np.float32(255)
+            t = t.reshape([width, height, 4])
+            return cls(width, height, t, channels=4)
 
     def to_gpu_texture(self):
         texture_with_alpha = self.data
@@ -85,11 +101,48 @@ class UTexture:
         diff = other.data - self.data
         diff *= factor
         diff += self.data
-        return UTexture(self.width, self.height, diff)
+        return UTexture(self.width, self.height, diff, self.channels)
+
+    def alpha_over(self, other):
+        assert self.channels == 4
+        assert other.channels == 4
+
+        bottom = self.data
+        top = other.data
+
+        cb = bottom[..., :3]
+        ab = bottom[..., 3:4]
+
+        ct = top[..., :3]
+        at = top[..., 3:4]
+
+        out_rgb = ct + cb * (1.0 - at)
+        out_a   = at + ab * (1.0 - at)
+
+        out = np.concatenate([out_rgb, out_a], axis=-1)
+
+        return UTexture(self.width, self.height, out, self.channels)
+
+    def apply_mask(self, other, mask: 'UMask'):
+        result = np.where(mask.data[..., None], other.data, self.data)
+        return UTexture(self.width, self.height, result, self.channels)
 
     def offset(self, x: int, y: int):
         self.data = np.roll(self.data, shift=(x, y), axis=(0, 1))
 
+    def downscaled(self):
+        import OpenImageIO as oiio
+
+        spec = oiio.ImageSpec(self.height//2, self.width//2, self.channels, 'float')
+        spec_aa = oiio.ImageSpec(self.height, self.width, self.channels, 'float')
+
+        buf_extended = oiio.ImageBuf(spec_aa)
+        buf_resized = oiio.ImageBuf(spec)
+
+        buf_extended.set_pixels(oiio.ROI(0, self.height, 0, self.width), self.data)
+        oiio.ImageBufAlgo.resize(buf_resized, buf_extended)
+
+        return UTexture(self.width//2, self.height//2, texture=np.array(buf_resized.get_pixels(format='float'), dtype=np.float32), channels=self.channels)
 
     def __add__(self, other: 'typing.Self'):
         if isinstance(other, UTexture):
@@ -595,7 +648,7 @@ class TexturePatterns:
             first_char_index = (first_char_index + 1) % len(letters)
 
     @classmethod
-    def simple_grid(cls, size=(2048, 2048), color=(0.25, 0.25, 0.25), small_lines_color=(0.4, 0.4, 0.4), bound_color=(1,1,1)):
+    def simple_grid(cls, size=(2048, 2048), color=(0.25, 0.25, 0.25), small_lines_color=(0.4, 0.4, 0.4), bound_color=(1,1,1), draw_small_lines=True):
         bound_line = UMask(*size)
         max_size = max(size)
         thickness = 5 if max_size <= 4096 else 7
@@ -609,7 +662,8 @@ class TexturePatterns:
         cls.draw_lines(medium_lines, step=256, exclude_first=True)
 
         small_lines = UMask(*size)
-        cls.draw_lines(small_lines, step=32, exclude_first=True)
+        if draw_small_lines:
+            cls.draw_lines(small_lines, step=32, exclude_first=True)
 
         if max_size >= 2048:
             cls.draw_lines(bound_line, step=1024, thickness=3, exclude_first=True)

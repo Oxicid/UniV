@@ -154,6 +154,7 @@ checker_generated_types = [
 if univ_pro:
     checker_generated_types.extend((
             ('SIMPLE_GRID', 'Simple Grid', ''),
+            ('GRAVITY', 'Gravity', ''),
         )
     )
 

@@ -317,7 +317,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
         match prefs().checker_generated_type:
             case 'UV_GRID' | 'COLOR_GRID':
                 return f"UniV_{idname}_{res_name}"
-            case 'SIMPLE_GRID':
+            case 'SIMPLE_GRID' | 'GRAVITY':
                 return f"UniV_{idname}_{cls.get_color_name(prefs().checker_colors)}_{res_name}"
             case _:
                 raise NotImplementedError(f'Texture {idname} not implement')
