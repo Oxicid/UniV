@@ -378,7 +378,7 @@ class BBox:
         self.xmax += center[0] + y1
         self.ymax += center[1] - x1
 
-    def scale(self, scale: Vector, pivot: Vector | tuple[float, float] | None = None):
+    def scale(self, scale: Vector | float, pivot: Vector | tuple[float, float] | None = None):
         center = self.center if pivot is None else pivot
         self.xmin, self.ymin = (self.min - center) * scale + center
         self.xmax, self.ymax = (self.max - center) * scale + center

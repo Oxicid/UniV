@@ -359,6 +359,11 @@ class UNIV_PT_General(Panel):
             if univ_pro:
                 row.popover(panel='UNIV_PT_CheckerSettings', text='', icon_value=icons.settings_a)
 
+            if sub_panel := getattr(panel, 'panel', None):
+                header, sub_panel = sub_panel("UniV_Specific", default_closed=True)
+                header.label(text='Specific')
+                if sub_panel:
+                    sub_panel.operator('uv.univ_fill_to_pixels')
 
         # UV Maps
         if panel := draw_panel(layout, 'UV Maps'):

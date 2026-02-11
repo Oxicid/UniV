@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 57),
+    "version": (3, 9, 58),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -95,6 +95,7 @@ def load_register_types():
             transform.UNIV_OT_Align_pie,
             transform.UNIV_OT_Fill,
             transform.UNIV_OT_Fit,
+            transform.UNIV_OT_FillToPixels,
             transform.UNIV_OT_Flip,
             transform.UNIV_OT_Flip_VIEW3D,
             transform.UNIV_OT_Rotate,

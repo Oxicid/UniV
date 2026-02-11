@@ -363,6 +363,69 @@ class UNIV_OT_Fill(UNIV_OT_Fit):
     bl_options = {'REGISTER', 'UNDO'}
 
 
+class UNIV_OT_FillToPixels(Operator):
+    bl_idname = 'uv.univ_fill_to_pixels'
+    bl_label = 'Fill to Pixels'
+    bl_description = 'Snap island by boundary box to pixels'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def draw(self, context):
+        pref = prefs()
+        row = self.layout.row(align=True, heading='Global Size')
+        row.prop(pref, 'size_x', text='')
+        row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
+        row.prop(pref, 'size_y', text='')
+
+
+    def execute(self, context):
+        umeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
+
+        if umeshes.is_edit_mode:
+            selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+            umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+
+            if selected_umeshes:
+                calc_island_method = AdvIslands.calc_extended_with_mark_seam
+            else:
+                calc_island_method = AdvIslands.calc_visible_with_mark_seam
+        else:
+            umeshes.ensure()
+            calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
+
+        if not umeshes:
+            return umeshes.update()
+
+        x_step = 1.0 / int(prefs().size_x)
+        y_step = 1.0 / int(prefs().size_y)
+
+        for umesh in umeshes:
+            for isl in calc_island_method(umesh):
+                cur_bbox = isl.calc_bbox()
+                xmin = utils.round_threshold(cur_bbox.xmin, x_step)
+                xmax = utils.round_threshold(cur_bbox.xmax, x_step)
+                if xmin == xmax:
+                    xmax += x_step
+
+                ymin = utils.round_threshold(cur_bbox.ymin, y_step)
+                ymax = utils.round_threshold(cur_bbox.ymax, y_step)
+                if ymin == ymax:
+                    ymax += y_step
+
+                tar_bb = BBox(xmin, xmax, ymin, ymax)
+
+                scale, delta, pivot = utils.get_transform_from_box(cur_bbox, tar_bb, use_crop=False)
+                umesh.update_tag |= isl.scale_with_move(scale, delta, pivot)
+
+        umeshes.update(info=f'All islands snapped to pixels')
+
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
+
 class Align_by_Angle:
 
     angle: FloatProperty(name='Angle', default=to_rad(5), min=to_rad(
