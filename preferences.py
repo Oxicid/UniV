@@ -155,8 +155,13 @@ if univ_pro:
     checker_generated_types.extend((
             ('SIMPLE_GRID', 'Simple Grid', ''),
             ('GRAVITY', 'Gravity', ''),
+            ('ATLUX', 'Atlux', ''),
         )
     )
+
+# NOTE: Not use underscore in palettes (need implement for avoid name conflict)
+# NOTE: Not use numbers in palettes name
+palettes = ('DEFAULT', 'RAINBOW', 'GOLDEN', 'GAMBIT')
 
 def get_checker_colors():
     checker_colors_ = []
@@ -255,8 +260,13 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     # Checker Texture
     checker_toggle: EnumProperty(name='Toggle', default='TOGGLE', items=ENUM('TOGGLE', 'OVERWRITE'),
                                            description='Off/On checker modifier')
-    checker_generated_type: bpy.props.EnumProperty(name='Texture Type', default='UV_GRID', items=checker_generated_types)
-    checker_colors: bpy.props.EnumProperty(name='Color', default='red', items=ENUM(*checker_colors_seq))
+    checker_generated_type: EnumProperty(name='Texture Type', default='UV_GRID', items=checker_generated_types)
+    checker_colors: EnumProperty(name='Color', default='red', items=ENUM(*checker_colors_seq))
+
+    checker_offset: IntProperty(name='Offset', min=0, max=15, default=0)
+    checker_thickness: IntProperty(name='Thickness', min=0, max=15, default=0)
+    checker_frequency: IntProperty(name='Frequency', min=0, max=15, default=2)
+    checker_palettes: EnumProperty(name='Palettes', items=ENUM(*palettes))
 
     # Texel Settings
     use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')

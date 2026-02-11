@@ -317,6 +317,47 @@ def pack_rgba_to_uint32(rgba) -> int:
     a = int(rgba[3] * 255.0) & 0xFF
     return (r << 24) | (g << 16) | (b << 8) | a
 
+
+def luminance(rgb):
+    return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+
+def interp_hue(h1, h2, t):
+    """Interpolate hue by short path"""
+    dh = (h2 - h1 + 0.5) % 1.0 - 0.5
+    return (h1 + t * dh) % 1.0
+
+def interp_hue_long(h1, h2, t):
+    """Interpolate hue by long path"""
+    dh_short = (h2 - h1 + 0.5) % 1.0 - 0.5
+
+    # long arc
+    if dh_short > 0:
+        dh_long = dh_short - 1.0
+    else:
+        dh_long = dh_short + 1.0
+
+    return (h1 + t * dh_long) % 1.0
+
+def rainbow_between(c1, c2, n):
+    from mathutils import Color
+    h1, s1, v1 = c1.hsv
+    h2, s2, v2 = c2.hsv
+
+    ts = np.linspace(0, 1, n)
+
+    colors = []
+    for t in ts:
+        h = interp_hue_long(h1, h2, t)
+        s = s1 + t * (s2 - s1)
+        v = v1 + t * (v2 - v1)
+
+        c = Color()
+        c.hsv = (h, s, v)
+        colors.append((c.r, c.g, c.b))
+
+    return colors
+
+
 if hasattr(mathutils.geometry, 'intersect_point_line_segment'):
     # version >= (5, 0, 0)
     intersect_point_line_segment = mathutils.geometry.intersect_point_line_segment

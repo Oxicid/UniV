@@ -319,6 +319,16 @@ class UNIV_OT_Checker(bpy.types.Operator):
                 return f"UniV_{idname}_{res_name}"
             case 'SIMPLE_GRID' | 'GRAVITY':
                 return f"UniV_{idname}_{cls.get_color_name(prefs().checker_colors)}_{res_name}"
+            case 'ATLUX':
+                palettes = ''
+                if prefs().checker_palettes != 'DEFAULT':
+                    palettes = '_' + prefs().checker_palettes.capitalize()
+                atlux_settings = ''
+                if prefs().checker_offset != 0 or prefs().checker_thickness != 0 or prefs().checker_frequency != 2:
+                    atlux_settings = (f"_{hex(prefs().checker_offset)[2]}"
+                                      f"{hex(min(13, prefs().checker_thickness))[2]}"
+                                      f"{hex(min(4, prefs().checker_frequency))[2]}")
+                return f"UniV_{idname}{palettes}{atlux_settings}_{res_name}"
             case _:
                 raise NotImplementedError(f'Texture {idname} not implement')
 

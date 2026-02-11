@@ -33,7 +33,7 @@ def grid_points_px(width, height, step=128, center=False, include_for_clip=False
         for x in range(start, width + off, step):
             yield x, y
 
-def grid_points_ndc(width, height, step=128, center=False, include_for_clip=False):
+def grid_points_ndc(width, height, step=128, center=False, include_for_clip=False, is_bottom_top=True):
     """ Return Normalized Device Coordinates. """
     from mathutils import Vector
 
@@ -46,11 +46,38 @@ def grid_points_ndc(width, height, step=128, center=False, include_for_clip=Fals
     if not center:
         start = 0
 
-    for y in range(start, height + off, step):
+    y_range = range(start, height + off, step)
+    if not is_bottom_top:
+        y_range = reversed(y_range)
+
+    for y in y_range:
         for x in range(start, width + off, step):
             nx = (x / (width  * 0.5)) - 1.0
             ny = (y / (height * 0.5)) - 1.0
             yield Vector((nx, ny))
+
+def round_rect(size=0.5, offset=0.0, thickness=0.0, segments=12):
+    import bmesh
+    import numpy as np
+
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, size=size)
+
+    if offset:
+        bmesh.ops.bevel(bm, geom=bm.verts, offset=offset, segments=segments, profile=0.5)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+
+    if thickness:
+        face = list(bm.faces)
+        bmesh.ops.inset_individual(bm, faces=bm.faces, thickness=thickness, use_even_offset=True)
+        bmesh.ops.delete(bm, geom=face, context='FACES')
+
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+
+    tris = np.array([v.co.xy.to_tuple() for f in bm.faces for v in f.verts], dtype=np.float32)
+    bm.free()
+    return tris
 
 arrow = (
     (0.0391, 0.0781),
