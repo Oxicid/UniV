@@ -1070,7 +1070,7 @@ class AdvIsland(FaceIsland):
                 total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
         return total_length
 
-    def calc_sub_islands_all(self):
+    def calc_sub_islands_all(self) -> 'AdvIslands':
         self.set_tag()
         islands = [AdvIsland(i, self.umesh) for i in IslandsBase.calc_all_ex(self.umesh)]
         return AdvIslands(islands, self.umesh)

@@ -247,7 +247,9 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_home', icon_value=icons.home)
             row.operator('uv.univ_shift', icon_value=icons.shift)
 
-            col_align.operator('uv.univ_random', icon_value=icons.random)
+            row = col_align.row(align=True)
+            row.operator('uv.univ_random', icon_value=icons.random)
+            row.operator('uv.univ_break')
 
             col_align.separator(factor=0.25)
             row = col_align.row(align=True)

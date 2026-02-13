@@ -1942,13 +1942,10 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
-        self.update_tag: bool = False
         self.umeshes: UMeshes | None = None
         self.islands_calc_type = None
 
     def execute(self, context):
-        self.update_tag = False
         self.umeshes = UMeshes(report=self.report)
         self.calc_padding()
         self.report_padding()
@@ -1975,6 +1972,10 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             self.sort_individual_preprocessing()
 
         self.umeshes.update(info='Islands is sorted')
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
         return {'FINISHED'}
 
     def sort_overlapped_preprocessing(self):
@@ -2069,31 +2070,17 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         if len(islands) <= 1 or expect_groups <= 1:
             return [islands]
 
-        islands.sort(reverse=True, key=lambda a: a.area_uv)
+        values = np.array([isl.area_uv for isl in islands], dtype=np.float32)
+        edges = np.histogram_bin_edges(values, bins=expect_groups)
 
-        groups = []
-        max_area = islands[0].area_uv
-        min_area = islands[-1].area_uv
-        step = (max_area - min_area) / expect_groups
-        min_area += 0.00001
+        idx = np.searchsorted(edges, values, side="right") - 1
+        idx = np.clip(idx, 0, expect_groups - 1)
 
-        for _ in range(expect_groups):
-            if not islands:
-                break
+        groups = [[] for _ in range(expect_groups)]
+        for isl, i in zip(islands, idx):
+            groups[i].append(isl)  # noqa
 
-            seg = []
-            min_area += step
-
-            for isl in reversed(islands):
-                if isl.area_uv <= min_area:
-                    seg.append(islands.pop())
-                else:
-                    break
-            if seg:
-                groups.append(seg)
-
-        assert (not islands), 'Extremal Values'
-        return groups
+        return [g for g in groups if g]
 
     def sort_islands(self, is_horizontal: bool, margin: Vector, islands: list[AdvIsland | UnionIslands] | AdvIslands):
         islands.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
@@ -2102,9 +2089,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 width = island.bbox.width
                 if self.orient and island.bbox.height < width:
                     width = island.bbox.height
-                    self.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
+                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
                     island.calc_bbox()
-                self.update_tag |= island.set_position(margin, _from=island.bbox.min)
+                island.umesh.update_tag |= island.set_position(margin, _from=island.bbox.min)
                 margin.x += self.padding + width
             margin.x += self.sub_padding
         else:
@@ -2112,9 +2099,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 height = island.bbox.height
                 if self.orient and island.bbox.width < height:
                     height = island.bbox.width
-                    self.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
+                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
                     island.calc_bbox()  # TODO: Optimize this
-                self.update_tag |= island.set_position(margin, _from=island.bbox.min)
+                island.umesh.update_tag |= island.set_position(margin, _from=island.bbox.min)
                 margin.y += self.padding + height
             margin.y += self.sub_padding
 
@@ -2146,53 +2133,33 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
                      "Context keymaps on button:\n" \
                      "\t\tDefault - Distribute\n" \
                      "\t\tCtrl - To Cursor\n" \
-                     "\t\tShift - Overlapped\n" \
-                     "\t\tAlt - Break"
+                     "\t\tShift - Overlapped"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     space: EnumProperty(name='Space', default='ALIGN', items=(('ALIGN', 'Align', ''), ('SPACE', 'Space', '')),
                         description='Distribution of islands at equal distances')
     to_cursor: BoolProperty(name='To Cursor', default=False)
-    break_: BoolProperty(name='Break', default=False)
-    angle: FloatProperty(name='Smooth Angle', default=math.radians(
-        66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     def draw(self, context):
-        if not self.break_:
-            layout = self.layout.row()
-            layout.prop(self, 'space', expand=True)
-            layout = self.layout
-            self.draw_overlap()
-            layout.prop(self, 'to_cursor')
-            layout.prop(self, 'break_')
-        else:
-            layout = self.layout.row()
-            layout.prop(self, 'break_')
-            layout.prop(self, 'angle', slider=True)
-
-        layout = self.layout.row()
-        layout.prop(self, 'axis', expand=True)
+        self.layout.row().prop(self, 'space', expand=True)
+        self.draw_overlap()
+        self.layout.prop(self, 'to_cursor')
+        self.layout.row().prop(self, 'axis', expand=True)
         self.draw_padding()
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
         self.to_cursor = event.ctrl
         self.lock_overlap = event.shift
-        self.break_ = event.alt
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sync = bpy.context.scene.tool_settings.use_uv_select_sync
         self.umeshes: UMeshes | None = None
         self.cursor_loc: Vector | None = None
-        self.update_tag = False
+        self.islands_calc_type = None
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
@@ -2200,192 +2167,259 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.report_padding()
 
         self.cursor_loc = None
-        if self.to_cursor and not self.break_:
+        if self.to_cursor:
             self.cursor_loc = utils.get_cursor_location()
 
-        if self.break_:
-            max_angle = max(umesh.smooth_angle for umesh in self.umeshes)
-            self.angle = min(self.angle, max_angle)  # clamp for angle
 
-            self.distribute_break_preprocessing(extended=True)
-            if not self.umeshes.final():
-                self.distribute_break_preprocessing(extended=False)
-        elif self.space == 'SPACE':
-            self.distribute_space(extended=True)
-            if not self.umeshes.final():
-                self.distribute_space(extended=False)
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                self.umeshes = selected_umeshes
+                self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+            else:
+                self.umeshes = unselected_umeshes
+                self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
         else:
-            self.distribute(extended=True)
-            if not self.umeshes.final():
-                self.distribute(extended=False)
-        self.umeshes.update()
+            self.islands_calc_type = AdvIslands.calc_with_hidden_with_mark_seam
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        self.umeshes.update_tag = False
+
+
+        if self.lock_overlap:
+            all_islands, general_bbox = self.distribute_preprocessing_overlap()
+        else:
+            all_islands, general_bbox = self.distribute_preprocessing()
+
+        if len(all_islands) < 2:
+            if len(all_islands) == 1:
+                self.report({'INFO'}, "The number of islands must be greater than one")
+                if not self.umeshes.is_edit_mode:
+                    self.umeshes.free()
+                return {'FINISHED'}
+            self.umeshes.update()
+            if not self.umeshes.is_edit_mode:
+                self.umeshes.free()
+            return {'FINISHED'}
+
+
+        if self.space == 'SPACE':
+            if not self.distribute_space(all_islands, general_bbox):
+                self.report({'INFO'}, "No distance to place islands")
+                if not self.umeshes.is_edit_mode:
+                    self.umeshes.free()
+                return {'FINISHED'}
+        else:
+            self.distribute_ex(all_islands, general_bbox)
+
+
+        self.umeshes.update(info='Islands is distributed')
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
 
-    def distribute_break_preprocessing(self, extended):
-        cancel = False
-        for umesh in self.umeshes:
-            self.update_tag = False
-            angle = min(self.angle, umesh.smooth_angle)
-            umesh.value = angle
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
-                for isl in adv_islands:
-                    if len(isl) == 1:
-                        continue
-                    sub_islands = isl.calc_sub_islands_all()
-                    if len(sub_islands) > 1:
-                        self.distribute_ex(list(sub_islands), isl.bbox)
-            umesh.update_tag = self.update_tag
-            cancel |= bool(adv_islands)
-        if cancel and not any(umesh.update_tag for umesh in self.umeshes):
-            self.umeshes.cancel_with_report(info=f"Islands for break not found")
 
-    def distribute_ex(self, _islands, general_bbox):
-        if len(_islands) < 2:
-            if len(_islands) == 1:
-                self.umeshes.cancel_with_report(info=f"The number of islands must be greater than one")
-            return
-
+    def distribute_ex(self, all_islands, general_bbox):
         cursor_offset = 0
-        if self.is_horizontal(general_bbox, _islands):
-            _islands.sort(key=lambda a: a.bbox.xmin)
+        if self.is_horizontal(all_islands):
+            all_islands.sort(key=lambda a: a.bbox.xmin)
             if self.cursor_loc is None:
                 margin = general_bbox.min.x
             else:
                 margin = self.cursor_loc.x
                 cursor_offset += general_bbox.min.y - self.cursor_loc.y
 
-            for island in _islands:
-                width = island.bbox.width
-                self.update_tag |= island.set_position(
-                    Vector((margin, island.bbox.ymin - cursor_offset)), _from=island.bbox.min)
+            for isl in all_islands:
+                width = isl.bbox.width
+                isl.umesh.update_tag |= isl.set_position(
+                    Vector((margin, isl.bbox.ymin - cursor_offset)), _from=isl.bbox.min)
                 margin += self.padding + width
         else:
-            _islands.sort(key=lambda a: a.bbox.ymin)
+            all_islands.sort(key=lambda a: a.bbox.ymin)
             if self.cursor_loc is None:
                 margin = general_bbox.min.y
             else:
                 margin = self.cursor_loc.y
                 cursor_offset += general_bbox.min.x - self.cursor_loc.x
 
-            for island in _islands:
-                height = island.bbox.height
-                self.update_tag |= island.set_position(
-                    Vector((island.bbox.xmin - cursor_offset, margin)), _from=island.bbox.min)
+            for isl in all_islands:
+                height = isl.bbox.height
+                isl.umesh.update_tag |= isl.set_position(
+                    Vector((isl.bbox.xmin - cursor_offset, margin)), _from=isl.bbox.min)
                 margin += self.padding + height
 
-    def distribute(self, extended=True):
-        self.update_tag = False
-        if self.lock_overlap:
-            func = self.distribute_preprocessing_overlap
-        else:
-            func = self.distribute_preprocessing
-        self.distribute_ex(*func(extended))
-
-        if not self.update_tag and any(umesh.update_tag for umesh in self.umeshes):
-            self.umeshes.cancel_with_report(info='Islands is Distributed')
-
-    def distribute_space(self, extended=True):
-        if self.lock_overlap:
-            func = self.distribute_preprocessing_overlap
-        else:
-            func = self.distribute_preprocessing
-        _islands, general_bbox = func(extended)
-
-        if len(_islands) <= 2:
-            if len(_islands) != 0:
-                self.umeshes.cancel_with_report(
-                    info=f"The number of islands must be greater than two, {len(_islands)} was found")
-            return
-
-        update_tag = False
+    def distribute_space(self, all_islands, general_bbox):
         cursor_offset = 0
-        if self.is_horizontal(general_bbox, _islands):
-            _islands.sort(key=lambda a: a.bbox.xmin)
+        if self.is_horizontal(all_islands):
+            all_islands.sort(key=lambda a: a.bbox.xmin)
 
-            general_bbox.xmax += self.padding * (len(_islands) - 1)
-            start_space = general_bbox.xmin + _islands[0].bbox.half_width
-            end_space = general_bbox.xmax - _islands[-1].bbox.half_width
-            if start_space == end_space:
-                self.umeshes.cancel_with_report(info=f"No distance to place UV")
-                return
+            general_bbox.xmax += self.padding * (len(all_islands) - 1)
+            start_pos = general_bbox.xmin + all_islands[0].bbox.half_width
+            end_pos = general_bbox.xmax - all_islands[-1].bbox.half_width
+            if start_pos == end_pos:
+                return False
 
             if self.cursor_loc:
-                diff = end_space - start_space
-                start_space += self.cursor_loc.x - start_space
-                end_space = start_space + diff
+                diff = end_pos - start_pos
+                start_pos += self.cursor_loc.x - start_pos
+                end_pos = start_pos + diff
                 cursor_offset += general_bbox.ymin - self.cursor_loc.y
-            space_points = np.linspace(start_space, end_space, len(_islands))
+            space_points = np.linspace(start_pos, end_pos, len(all_islands))
 
-            for island, space_point in zip(_islands, space_points):
-                update_tag |= island.set_position(
-                    Vector((space_point, island.bbox.center_y - cursor_offset)), _from=island.bbox.center)
+            for isl, space_point in zip(all_islands, space_points):
+                pos = Vector((space_point, isl.bbox.center_y - cursor_offset))
+                isl.umesh.update_tag |= isl.set_position(pos, _from=isl.bbox.center)
         else:
-            _islands.sort(key=lambda a: a.bbox.ymin)
-            general_bbox.ymax += self.padding * (len(_islands) - 1)
-            start_space = general_bbox.ymin + _islands[0].bbox.half_height
-            end_space = general_bbox.ymax - _islands[-1].bbox.half_height
-            if start_space == end_space:
-                self.umeshes.cancel_with_report(info=f"No distance to place UV")
-                return
-            if self.cursor_loc:
-                start_space += start_space - self.cursor_loc.y
-                end_space += end_space - self.cursor_loc.y
+            all_islands.sort(key=lambda a: a.bbox.ymin)
+            general_bbox.ymax += self.padding * (len(all_islands) - 1)
+            start_pos = general_bbox.ymin + all_islands[0].bbox.half_height
+            end_pos = general_bbox.ymax - all_islands[-1].bbox.half_height
+            if start_pos == end_pos:
+                return False
 
             if self.cursor_loc:
-                diff = end_space - start_space
-                start_space += self.cursor_loc.y - start_space
-                end_space = start_space + diff
+                # TODO: Check why this not in above
+                start_pos += start_pos - self.cursor_loc.y
+                end_pos += end_pos - self.cursor_loc.y
+
+                diff = end_pos - start_pos
+                start_pos += self.cursor_loc.y - start_pos
+                end_pos = start_pos + diff
                 cursor_offset += general_bbox.xmin - self.cursor_loc.x
 
-            space_points = np.linspace(start_space, end_space, len(_islands))
+            space_points = np.linspace(start_pos, end_pos, len(all_islands))
 
-            for island, space_point in zip(_islands, space_points):
-                update_tag |= island.set_position(
-                    Vector((island.bbox.center_x - cursor_offset, space_point)), _from=island.bbox.center)
+            for isl, space_point in zip(all_islands, space_points):
+                pos = Vector((isl.bbox.center_x - cursor_offset, space_point))
+                isl.umesh.update_tag |= isl.set_position(pos, _from=isl.bbox.center)
+        return True
 
-        if not update_tag:
-            self.umeshes.cancel_with_report(info='Islands is Distributed')
-
-    def distribute_preprocessing(self, extended):
-        _islands: list[AdvIsland] = []
+    def distribute_preprocessing(self):
+        all_islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if adv_islands := self.islands_calc_type(umesh):
                 general_bbox.union(adv_islands.calc_bbox())
-                _islands.extend(adv_islands)
-            umesh.update_tag = bool(adv_islands)
-        return _islands, general_bbox
+                all_islands.extend(adv_islands)
+        return all_islands, general_bbox
 
-    def distribute_preprocessing_overlap(self, extended):
-        _islands: list[AdvIsland] = []
+    def distribute_preprocessing_overlap(self):
+        all_islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if adv_islands := self.islands_calc_type(umesh):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
-                _islands.extend(adv_islands)
-            umesh.update_tag = bool(adv_islands)
+                all_islands.extend(adv_islands)
 
         general_bbox = BBox()
-        union_islands_groups = self.calc_overlapped_island_groups(_islands)
+        union_islands_groups = self.calc_overlapped_island_groups(all_islands)
         for union_island in union_islands_groups:
             general_bbox.union(union_island.bbox)
         return union_islands_groups, general_bbox
 
-    def is_horizontal(self, bbox, islands):
+    def is_horizontal(self, islands):
         if self.axis == 'AUTO':
-            if self.break_:
-                return bbox.width > bbox.height
-            else:
-                total_width = 0
-                total_height = 0
-                if type(islands[0]) == AdvIslands:
-                    islands = (isl_ for _islands in islands for isl_ in _islands)
+            total_width = 0
+            total_height = 0
+            if type(islands[0]) == AdvIslands:
+                islands = (isl_ for _islands in islands for isl_ in _islands)
 
-                for isl in islands:
-                    bbox_ = isl.bbox
-                    total_width += bbox_.width
-                    total_height += bbox_.height
-                return total_width < total_height
+            for isl in islands:
+                bbox_ = isl.bbox
+                total_width += bbox_.width
+                total_height += bbox_.height
+            return total_width < total_height
+        else:
+            return self.axis == 'X'
+
+
+class UNIV_OT_Break(Operator, utils.PaddingHelper):
+    bl_idname = 'uv.univ_break'
+    bl_label = 'Break'
+    bl_description = "Break"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
+    angle: FloatProperty(name='Smooth Angle', default=math.radians(
+        66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
+
+    def draw(self, context):
+        self.layout.prop(self, 'angle', slider=True)
+        row = self.layout.row()
+        row.prop(self, 'axis', expand=True)
+        self.draw_padding()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.umeshes: UMeshes | None = None
+        self.islands_calc_type = None
+        self.report_info =  'Not found islands'
+
+    def execute(self, context):
+        self.umeshes = UMeshes(report=self.report)
+        self.calc_padding()
+        self.report_padding()
+
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                self.umeshes = selected_umeshes
+                self.islands_calc_type = AdvIslands.calc_extended
+            else:
+                self.umeshes = unselected_umeshes
+                self.islands_calc_type = AdvIslands.calc_visible
+        else:
+            self.islands_calc_type = AdvIslands.calc_with_hidden
+        if not self.umeshes:
+            return self.umeshes.update()
+
+        self.umeshes.update_tag = False
+
+        max_angle = max(umesh.smooth_angle for umesh in self.umeshes)
+        self.angle = min(self.angle, max_angle)  # clamp for angle
+
+        self.break_distribute()
+
+        self.umeshes.update(info="Not found islands for break")
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+        return {'FINISHED'}
+
+    def break_distribute(self):
+        for umesh in self.umeshes:
+            angle = min(self.angle, umesh.smooth_angle)
+            umesh.value = angle  #  need for AdvIslands.calc_all_ex
+
+            for isl in self.islands_calc_type(umesh):  # noqa
+                if len(isl) < 2:
+                    continue
+
+                if len(sub_islands := isl.calc_sub_islands_all().islands) <= 1:
+                    continue
+
+                if self.is_horizontal(isl.bbox):
+                    sub_islands.sort(key=lambda a: a.bbox.xmin)
+                    margin = isl.bbox.min.x
+
+                    for sub_isl in sub_islands:
+                        bb = sub_isl.bbox
+                        umesh.update_tag |= sub_isl.set_position(Vector((margin, bb.ymin)), _from=bb.min)
+                        margin += self.padding + bb.width
+                else:
+                    sub_islands.sort(key=lambda a: a.bbox.ymin)
+                    margin = isl.bbox.min.y
+
+                    for sub_isl in sub_islands:
+                        bb = sub_isl.bbox
+                        umesh.update_tag |= sub_isl.set_position(Vector((bb.xmin, margin)), _from=bb.min)
+                        margin += self.padding + bb.height
+
+    def is_horizontal(self, bbox):
+        if self.axis == 'AUTO':
+            return bbox.width > bbox.height
         else:
             return self.axis == 'X'
 
