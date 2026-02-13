@@ -1905,7 +1905,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     sub_padding: FloatProperty(name='Sub Padding', default=0.1, min=0, soft_max=0.2,)
-    area_subgroups: IntProperty(name='Area Subgroups', default=4, min=1, max=200, soft_max=8)
+    expected_area_subgroups: IntProperty(name='Expected Area Subgroups', default=4, min=1, max=200, soft_max=8)
     reverse: BoolProperty(name='Reverse', default=True)
     to_cursor: BoolProperty(name='To Cursor', default=False)
     orient: BoolProperty(name='Orient', default=False)
@@ -1928,13 +1928,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         if self.subgroup_type != 'NONE':
             layout.prop(self, 'sub_padding', slider=True)
         if self.subgroup_type == 'AREA':
-            layout.prop(self, 'area_subgroups')
+            layout.prop(self, 'expected_area_subgroups')
         layout = self.layout.row()
         layout.prop(self, 'subgroup_type', expand=True)
-
-    @classmethod
-    def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1949,6 +1945,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.sync: bool = bpy.context.scene.tool_settings.use_uv_select_sync
         self.update_tag: bool = False
         self.umeshes: UMeshes | None = None
+        self.islands_calc_type = None
 
     def execute(self, context):
         self.update_tag = False
@@ -1956,37 +1953,44 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.calc_padding()
         self.report_padding()
 
-
         if self.subgroup_type != 'NONE':
             self.lock_overlap = False
 
-        if not self.lock_overlap:
-            self.sort_individual_preprocessing(extended=True)
-            if not self.umeshes.final():
-                self.sort_individual_preprocessing(extended=False)
+        if self.umeshes.is_edit_mode:
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected_umeshes:
+                self.umeshes = selected_umeshes
+                self.islands_calc_type = AdvIslands.calc_extended_with_mark_seam
+            else:
+                self.umeshes = unselected_umeshes
+                self.islands_calc_type = AdvIslands.calc_visible_with_mark_seam
         else:
-            self.sort_overlapped_preprocessing(extended=True)
-            if not self.umeshes.final():
-                self.sort_overlapped_preprocessing(extended=False)
+            self.islands_calc_type = AdvIslands.calc_with_hidden_with_mark_seam
+        if not self.umeshes:
+            return self.umeshes.update()
 
-        if not self.update_tag:
-            return self.umeshes.cancel_with_report(info='Islands is sorted')  # TODO: Add info when islands not found
-        return self.umeshes.update()
+        if self.lock_overlap:
+            self.sort_overlapped_preprocessing()
+        else:
+            self.sort_individual_preprocessing()
 
-    def sort_overlapped_preprocessing(self, extended=True):
-        _islands: list[AdvIsland] = []
+        self.umeshes.update(info='Islands is sorted')
+        return {'FINISHED'}
+
+    def sort_overlapped_preprocessing(self):
+        all_islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if adv_islands := self.islands_calc_type(umesh):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
-                _islands.extend(adv_islands)
+                all_islands.extend(adv_islands)
             umesh.update_tag = bool(adv_islands)
 
-        if not _islands:
+        if not all_islands:
             return
 
         general_bbox = BBox()
-        union_islands_groups = self.calc_overlapped_island_groups(_islands)
+        union_islands_groups = self.calc_overlapped_island_groups(all_islands)
         for union_island in union_islands_groups:
             if self.orient:
                 isl_coords = union_island.calc_convex_points()
@@ -2004,11 +2008,11 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         margin = utils.get_cursor_location() if self.to_cursor else general_bbox.min
         self.sort_islands(is_horizontal, margin, union_islands_groups)
 
-    def sort_individual_preprocessing(self, extended=True):
-        _islands: list[AdvIsland] | list[AdvIslands] = []
+    def sort_individual_preprocessing(self):
+        all_islands: list[AdvIsland] | list[AdvIslands] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
+            if adv_islands := self.islands_calc_type(umesh):
                 if self.orient:
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
@@ -2020,74 +2024,76 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 else:
                     for island in adv_islands:
                         general_bbox.union(island.bbox)
+
                 if self.subgroup_type == 'OBJECTS':
-                    _islands.append(adv_islands)  # noqa
-                elif self.subgroup_type == 'MATERIALS':
-                    adv_islands.calc_materials(umesh)
-                    _islands.extend(adv_islands)
+                    all_islands.append(adv_islands)
                 elif self.subgroup_type == 'AREA':
                     adv_islands.calc_tris()
                     adv_islands.calc_flat_coords()
                     adv_islands.calc_area_uv()
-                    _islands.extend(adv_islands)
-                else:
-                    _islands.extend(adv_islands)
+                    all_islands.extend(adv_islands)
+                else:  # 'NONE' or 'MATERIALS'
+                    all_islands.extend(adv_islands)
 
-            umesh.update_tag = bool(adv_islands)
-
-        if not _islands:
+        if not all_islands:
             return
 
-        is_horizontal = self.is_horizontal(general_bbox, _islands)
+        is_horizontal = self.is_horizontal(general_bbox, all_islands)
         margin = utils.get_cursor_location() if self.to_cursor else general_bbox.min
 
         if self.subgroup_type == 'NONE':
-            self.sort_islands(is_horizontal, margin, _islands)
+            self.sort_islands(is_horizontal, margin, all_islands)
+
         elif self.subgroup_type == 'OBJECTS':
-            for islands in _islands:
-                self.sort_islands(is_horizontal, margin, islands.islands)  # noqa
+            for islands in all_islands:
+                assert isinstance(islands, AdvIslands)
+                self.sort_islands(is_horizontal, margin, islands.islands)
+
         elif self.subgroup_type == 'MATERIALS':
             subgroups = defaultdict(list)
-            for island in _islands:
-                subgroups[island.info.materials].append(island)  # noqa
+            for island in all_islands:
+                subgroups[island.get_materials()].append(island)
             for islands in subgroups.values():
                 self.sort_islands(is_horizontal, margin, islands)
+
         else:  # 'AREA'
-            subgroups = self.calc_area_subgroups(_islands)
+            subgroups = self.split_islands_to_subgroups_by_area_uv(all_islands, self.expected_area_subgroups)
             if self.reverse:
-                for islands in reversed(subgroups):
-                    self.sort_islands(is_horizontal, margin, islands)
-            else:
-                for islands in subgroups:
-                    self.sort_islands(is_horizontal, margin, islands)
+                subgroups = reversed(subgroups)
 
-    def calc_area_subgroups(self, islands: list[AdvIsland]):
+            for islands in subgroups:
+                self.sort_islands(is_horizontal, margin, islands)
+
+    @staticmethod
+    def split_islands_to_subgroups_by_area_uv(islands: list[AdvIsland], expect_groups: int):
+        if len(islands) <= 1 or expect_groups <= 1:
+            return [islands]
+
         islands.sort(reverse=True, key=lambda a: a.area_uv)
-        splitted = []
-        if len(islands) > 1:
-            start = islands[0].area_uv
-            end = islands[-1].area_uv
-            segment = (start - end) / self.area_subgroups
-            end += 0.00001
 
-            for i in range(self.area_subgroups):
-                seg = []
-                end += segment
-                if not islands:
+        groups = []
+        max_area = islands[0].area_uv
+        min_area = islands[-1].area_uv
+        step = (max_area - min_area) / expect_groups
+        min_area += 0.00001
+
+        for _ in range(expect_groups):
+            if not islands:
+                break
+
+            seg = []
+            min_area += step
+
+            for isl in reversed(islands):
+                if isl.area_uv <= min_area:
+                    seg.append(islands.pop())
+                else:
                     break
+            if seg:
+                groups.append(seg)
 
-                for j in range(len(islands) - 1, -1, -1):
-                    if islands[j].area_uv <= end:
-                        seg.append(islands.pop())
-                    else:
-                        break
-                if seg:
-                    splitted.append(seg)
-
-            assert (not islands), 'Extremal Values'
-        else:
-            splitted = [islands]
-        return splitted
+        assert (not islands), 'Extremal Values'
+        return groups
 
     def sort_islands(self, is_horizontal: bool, margin: Vector, islands: list[AdvIsland | UnionIslands] | AdvIslands):
         islands.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
@@ -2113,6 +2119,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             margin.y += self.sub_padding
 
     def is_horizontal(self, bbox, islands):
+        if not islands:
+            return True
+
         if self.axis == 'AUTO':
             if bbox.width * 1.5 > bbox.height:
                 return True
@@ -2123,9 +2132,8 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                     islands = (isl_ for _islands in islands for isl_ in _islands)
 
                 for isl in islands:
-                    bbox_ = isl.bbox
-                    total_width += bbox_.width
-                    total_height += bbox_.height
+                    total_width += isl.bbox.width
+                    total_height += isl.bbox.height
                 return total_width < total_height
         else:
             return self.axis == 'X'

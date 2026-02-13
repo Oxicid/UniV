@@ -687,20 +687,12 @@ class FaceIsland:
             return self.is_full_vert_deselected()
         return self.is_full_face_deselected()
 
-    def calc_materials(self, umesh: _umesh.UMesh) -> tuple[str, ...]:
-        indexes = set()
-        for f in self.faces:
-            indexes.add(f.material_index)
-        indexes = list(indexes)
+    def get_materials(self) -> tuple[str, ...]:
+        indexes = list({f.material_index for f in self.faces})
         indexes.sort()
 
-        material: list[str] = []
-        for idx in indexes:
-            if idx < len(umesh.obj.material_slots):
-                material.append(umesh.obj.material_slots[idx].name)
-            else:
-                material.append('')
-        return tuple(material)
+        material_slots = self.umesh.obj.material_slots
+        return tuple(material_slots[idx].name if idx < len(material_slots) else '' for idx in indexes)
 
     def mark_seam(self, additional=False):
         uv = self.umesh.uv
@@ -838,12 +830,6 @@ class FaceIsland:
         return hash(self[0])
 
 
-class AdvIslandInfo:
-    def __init__(self):
-        self.edge_length: float | None = -1.0
-        self.scale: Vector | None = None
-
-
 class AdvIsland(FaceIsland):
     def __init__(self, faces: list[BMFace] | tuple | typing.Iterable[BMFace] = (), umesh: _umesh.UMesh | None = None):
         super().__init__(faces, umesh)
@@ -861,7 +847,6 @@ class AdvIsland(FaceIsland):
         self.area_3d: float = -1.0
         self.area_uv: float = -1.0
         self.sequence = []
-        self.info: AdvIslandInfo | None = None
 
     def move(self, delta: Vector) -> bool:
         if self._bbox is not None:
@@ -1084,14 +1069,6 @@ class AdvIsland(FaceIsland):
             for crn in corners:
                 total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
         return total_length
-
-    def calc_materials(self, umesh: _umesh.UMesh):
-        materials = super().calc_materials(umesh)
-        if self.info is None:
-            self.info = AdvIslandInfo()
-
-        self.info.materials = materials
-        return materials
 
     def calc_sub_islands_all(self):
         self.set_tag()
@@ -2307,10 +2284,6 @@ class AdvIslands(Islands):
 
     def calc_area_uv(self):
         return sum(isl.calc_area_uv() for isl in self)
-
-    def calc_materials(self, umesh: _umesh.UMesh):
-        for isl in self:
-            isl.calc_materials(umesh)
 
     def __iter__(self) -> typing.Iterator[AdvIsland]:
         return iter(self.islands)
