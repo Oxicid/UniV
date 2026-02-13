@@ -237,6 +237,7 @@ def add_keymaps():
 
     # Weld
     kmi = km.keymap_items.new('uv.univ_weld', 'W', 'PRESS')
+    kmi.properties.use_by_distance = False
     keys.append((km, kmi))
 
     # Stitch
@@ -365,6 +366,7 @@ def add_keymaps_ws():
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_weld", 'W', 'PRESS')
+    kmi.properties.use_by_distance = False
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_stitch", 'W', 'PRESS', shift=True)

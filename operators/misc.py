@@ -1823,6 +1823,7 @@ class UNIV_OT_Flatten(Operator):
         group_output.is_active_output = True
 
         # node Split Edges
+        # TODO: Use uv_is_boundary
         split_edges = bb.nodes.new("GeometryNodeSplitEdges")
         split_edges.name = "Split Edges"
 
