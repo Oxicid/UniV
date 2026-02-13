@@ -1976,7 +1976,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def sort_overlapped_preprocessing(self, extended=True):
         _islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 _islands.extend(adv_islands)
@@ -2008,7 +2008,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         _islands: list[AdvIsland] | list[AdvIslands] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 if self.orient:
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
@@ -2342,7 +2342,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         _islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 general_bbox.union(adv_islands.calc_bbox())
                 _islands.extend(adv_islands)
             umesh.update_tag = bool(adv_islands)
@@ -2351,7 +2351,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def distribute_preprocessing_overlap(self, extended):
         _islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := AdvIslands.calc_extended_or_visible(umesh, extended=extended):
+            if adv_islands := AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended):
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 _islands.extend(adv_islands)
@@ -3039,9 +3039,9 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
         _islands = []
         for umesh in self.umeshes:
             if self.is_edit_mode:
-                islands = AdvIslands.calc_extended_or_visible(umesh, extended=extended)
+                islands = AdvIslands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
             else:
-                islands = AdvIslands.calc_with_hidden(umesh)
+                islands = AdvIslands.calc_with_hidden_with_mark_seam(umesh)
             if islands:
                 if self.lock_overlap:
                     islands.calc_tris()
