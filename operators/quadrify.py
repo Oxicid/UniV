@@ -554,7 +554,7 @@ def get_ring_corners_from_crn(first_crn: BMLoop):
     while True:
         iter_crn = iter_crn.link_loop_next.link_loop_next
         corners.append(iter_crn)
-        if not iter_crn.tag:
+        if not iter_crn.tag or len(iter_crn.link_loops) >= 2:
             break
 
         iter_crn = iter_crn.link_loop_radial_prev
@@ -572,7 +572,7 @@ def get_ring_corners_from_crn(first_crn: BMLoop):
             iter_crn = iter_crn.link_loop_next.link_loop_next
             corners.append(iter_crn)
 
-            if not iter_crn.tag:
+            if not iter_crn.tag or len(iter_crn.link_loops) >= 2:
                 break
             iter_crn = iter_crn.link_loop_radial_prev
             corners.append(iter_crn)
