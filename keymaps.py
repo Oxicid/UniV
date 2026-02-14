@@ -221,6 +221,8 @@ def add_keymaps():
 
     # Unwrap
     kmi = km.keymap_items.new('uv.univ_unwrap', 'U', 'PRESS')
+    if univ_pro:
+        kmi.properties.unwrap_along = 'UV'
     keys.append((km, kmi))
 
     # Pack
@@ -376,6 +378,8 @@ def add_keymaps_ws():
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_unwrap", 'U', 'PRESS')
+    # if univ_pro:
+    #     kmi.properties.unwrap_along = 'UV'
     keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)
