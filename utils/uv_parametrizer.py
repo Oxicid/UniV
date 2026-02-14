@@ -967,8 +967,17 @@ class PChart:
                 v.uv[1] = context.variable_get(2 * v.id + 1)
             return True
         else:
-            for v in self.verts:
-                v.uv.xy = (0.0, 0.0)
+            self.skip_flush = True
+            # print(f'{self.n_faces = }')
+            # print(f'{self.n_edges = }')
+            # print(f'{self.n_verts = }')
+            # print(f'{self.n_boundaries = }')
+            # for elem in self.verts:
+            #     print(elem.co)
+            #     print(elem.uv)
+            # TODO: Debug this with EIG_linear_solver_print_matrix
+            # for v in self.verts:
+            #     v.uv.xy = (0.0, 0.0)
             return False
 
     def abf_solve(self) -> bool:
@@ -2309,7 +2318,7 @@ class ParamHandleSolve(ParamHandleConstruct):
     def uv_parametrizer_lscm_solve(self):
 
         assert self.state == self.PHANDLE_STATE_LSCM
-
+        count_failed = 0
         for chart in self.charts:
             if not chart.context:
                 continue
@@ -2332,8 +2341,8 @@ class ParamHandleSolve(ParamHandleConstruct):
                     # p_chart_lscm_transform_single_pin(chart)
 
             else:
-                pass
-                # count_failed += 1
+                count_failed += 1
+        return count_failed
 
     def uv_parametrizer_flush(self):
         for chart in self.charts:

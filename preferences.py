@@ -236,7 +236,7 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
         return -1
 
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
-    texel: FloatProperty(name='Texel', default=512, min=1, max=20_000)
+    texel: FloatProperty(name='Texel', default=512, min=1, max=100_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
     size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
@@ -270,7 +270,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     # Texel Settings
     use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')
-    texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=10_000, precision=1,
+    texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=100_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
