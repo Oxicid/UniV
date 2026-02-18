@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2024 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+
 if 'bpy' in locals():
     from .. import reload
     reload.reload(globals())
@@ -31,13 +32,10 @@ class UNIV_OT_Pin(Operator):
         super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def execute(self, context):
         from .transform import UNIV_OT_Align_pie
-        self.umeshes = UMeshes()
+        self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
 
         if context.mode == 'EDIT_MESH':
@@ -89,7 +87,137 @@ class UNIV_OT_Pin(Operator):
                     for crn in corners:
                         crn[uv].pin_uv = True
 
-        return self.umeshes.update()
+        res = self.umeshes.update()
+        if not self.umeshes.is_edit_mode:
+            self.umeshes.free()
+
+        return res
+
+
+class UNIV_OT_RandomColor(Operator):
+    bl_idname = 'uv.univ_random_color'
+    bl_label = 'Random Color'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    island_type: EnumProperty(name='Island Type', default='UV', items=utils.ENUM(('UV', 'UV'), 'MESH'))
+    channel: EnumProperty(name='Channel', items=utils.ENUM(('RGB', 'RGB'), 'R', 'G', 'B', 'A'))
+    random_type: EnumProperty(name='Random Type', items=utils.ENUM('RANDOM', 'PROBABILITY'))
+
+    probability: FloatProperty(name='Probability', min=0, max=1, default=0.5)
+    probability_value: FloatProperty(name='Value', min=0, max=1, default=1.0)
+    probability_color: FloatVectorProperty(name='Color', size=4, min=0, max=0, default=(0.5, 0.0, 0.0, 1.0), subtype='COLOR')
+
+    rand_seed: IntProperty(name='Seed', default=0)
+
+    def draw(self, context):
+        layout = self.layout
+
+        if self.random_type == 'PROBABILITY':
+            layout.prop(self, 'probability', slider=True)
+            if self.channel != 'RGB':
+                layout.prop(self, 'probability_value', slider=True)
+            else:
+                layout.prop(self, 'probability_color', text='')
+            layout.separator()
+
+        layout.row(align=True).prop(self, 'channel', expand=True)
+        layout.row(align=True).prop(self, 'random_type', expand=True)
+        layout.row(align=True).prop(self, 'island_type', expand=True)
+
+        layout.prop(self, 'rand_seed')
+
+
+    def execute(self, context):
+        if self.island_type == 'UV':
+            umeshes = UMeshes(report=self.report)
+            isl_type = utypes.AdvIslands
+        else:
+            umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+            isl_type = utypes.MeshIslands
+
+        if context.mode == 'EDIT_MESH':
+            if self.island_type == 'MESH':
+                umeshes.set_sync(True)
+                for u in umeshes:
+                    u.sync_valid = False
+
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                umeshes = selected
+                calc_islands_type = isl_type.calc_selected_with_mark_seam
+            else:
+                umeshes = visible
+                calc_islands_type = isl_type.calc_visible_with_mark_seam
+        else:
+            calc_islands_type = isl_type.calc_with_hidden_with_mark_seam
+
+
+        seed = sum(id(umesh.obj) for umesh in umeshes) // len(umeshes) + self.rand_seed
+        seed %= 2**28
+
+        import random
+        for umesh in umeshes:
+            color_layer = umesh.bm.loops.layers.color.active
+            if color_layer is None:
+                color_layer = umesh.bm.loops.layers.float_color.active
+            if color_layer is None:
+                color_layer = umesh.bm.loops.layers.color.new('Color')
+
+            attr = umesh.obj.data.attributes
+            if not attr.active_color or attr.active_color.name != color_layer.name:
+                attr.active_color = attr[color_layer.name]
+
+            for isl in calc_islands_type(umesh):
+                seed += 3
+                random.seed(seed)
+
+                if self.random_type == 'PROBABILITY':
+                    random.seed(seed)
+                    if random.choices([True, False], weights=[self.probability, 1 - self.probability], k=1)[0]:
+                        random.seed(seed)
+                        if self.channel == 'RGB':
+                            for crn in isl.corners_iter():
+                                crn[color_layer] = self.probability_color
+                        elif self.channel == 'R':
+                            for crn in isl.corners_iter():
+                                crn[color_layer][0] = self.probability_value
+                        elif self.channel == 'G':
+                            for crn in isl.corners_iter():
+                                crn[color_layer][1] = self.probability_value
+                        elif self.channel == 'B':
+                            for crn in isl.corners_iter():
+                                crn[color_layer][2] = self.probability_value
+                        else:
+                            for crn in isl.corners_iter():
+                                crn[color_layer][3] = self.probability_value
+                else:
+                    if self.channel == 'RGB':
+                        val = (random.random(), random.random(), random.random(), 1.0)
+                        for crn in isl.corners_iter():
+                            crn[color_layer] = val
+                    elif self.channel == 'R':
+                        val = random.random()
+                        for crn in isl.corners_iter():
+                            crn[color_layer][0] = val
+                    elif self.channel == 'G':
+                        val = random.random()
+                        for crn in isl.corners_iter():
+                            crn[color_layer][1] = val
+                    elif self.channel == 'B':
+                        val = random.random()
+                        for crn in isl.corners_iter():
+                            crn[color_layer][2] = val
+                    else:
+                        val = random.random()
+                        for crn in isl.corners_iter():
+                            crn[color_layer][3] = val
+
+        umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
 
 
 class UNIV_OT_TD_PresetsProcessing(Operator):

@@ -365,7 +365,9 @@ class UNIV_PT_General(Panel):
                 header, sub_panel = sub_panel("UniV_Specific", default_closed=True)
                 header.label(text='Specific')
                 if sub_panel:
-                    sub_panel.operator('uv.univ_fill_to_pixels')
+                    col = sub_panel.column(align=True)
+                    col.operator('uv.univ_fill_to_pixels')
+                    col.operator('uv.univ_random_color')
 
         # UV Maps
         if panel := draw_panel(layout, 'UV Maps'):

@@ -732,6 +732,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
             from .icons import icons
 
+            # TODO: Force load, needed?
             try:
                 from . import univ_pro
             except ImportError:

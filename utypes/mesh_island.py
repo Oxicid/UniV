@@ -115,6 +115,9 @@ class MeshIsland:
     def calc_selected_edge_corners_iter(self):
         return (crn for f in self for crn in f.loops if crn.edge.select)
 
+    def corners_iter(self):
+        return (crn for f in self.faces for crn in f.loops)
+
     def __iter__(self):
         return iter(self.faces)
 
@@ -388,6 +391,12 @@ class MeshIslands(MeshIslandsBase):
         else:
             islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)
                        if cls.island_filter_is_any_face_selected(i, umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_with_hidden_with_mark_seam(cls, umesh: _umesh.UMesh) -> 'typing.Self':
+        cls.tag_filter_all(umesh)
+        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
