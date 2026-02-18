@@ -37,7 +37,7 @@ class UMesh:
         self.value: float | int | utils.NoInit = utils.NoInit()  # value for different purposes
         self.other = utils.NoInit()
         self.aspect: float = 1.0
-        self.sequence: list[BMFace | BMEdge | BMLoop] | list['AdvIsland'] = []  # noqa
+        self.sequence: list[BMFace | BMEdge | BMLoop] | list['AdvIsland'] | typing.Any = []  # noqa
 
     def update(self, force=False):
         if not self.update_tag:

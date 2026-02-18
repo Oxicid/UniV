@@ -97,8 +97,8 @@ def inv_lerp(a: float, b: float, v: float) -> float:  # ratio
     return ((v - a) / ratio_range) if ratio_range else 0
 
 
-def remap(i_min: float, i_max: float, o_min: float, o_max: float, v: float) -> float:
-    return lerp(o_min, o_max, inv_lerp(i_min, i_max, v))
+def remap(value: float, input_min: float, input_max: float, output_min: float, output_max: float) -> float:
+    return lerp(output_min, output_max, inv_lerp(input_min, input_max, value))
 
 
 def weighted_linear_space(start, stop, w):

@@ -368,6 +368,7 @@ class UNIV_PT_General(Panel):
                     col = sub_panel.column(align=True)
                     col.operator('uv.univ_fill_to_pixels')
                     col.operator('uv.univ_random_color')
+                    col.operator('uv.univ_linear_gradient')
 
         # UV Maps
         if panel := draw_panel(layout, 'UV Maps'):

@@ -12,6 +12,8 @@ import numpy as np
 from bpy.types import Operator
 from bpy.props import *
 from collections import Counter
+
+from bl_math import clamp
 from .. import utils
 from .. import utypes
 from ..utypes import UMeshes, BBox, BBox3D
@@ -157,15 +159,7 @@ class UNIV_OT_RandomColor(Operator):
 
         import random
         for umesh in umeshes:
-            color_layer = umesh.bm.loops.layers.color.active
-            if color_layer is None:
-                color_layer = umesh.bm.loops.layers.float_color.active
-            if color_layer is None:
-                color_layer = umesh.bm.loops.layers.color.new('Color')
-
-            attr = umesh.obj.data.attributes
-            if not attr.active_color or attr.active_color.name != color_layer.name:
-                attr.active_color = attr[color_layer.name]
+            color_layer = self.create_and_get_color_attribute(umesh)
 
             for isl in calc_islands_type(umesh):
                 seed += 3
@@ -218,6 +212,131 @@ class UNIV_OT_RandomColor(Operator):
             utils.update_area_by_type('VIEW_3D')
 
         return {'FINISHED'}
+
+    @staticmethod
+    def create_and_get_color_attribute(umesh):
+        color_layer = umesh.bm.loops.layers.color.active
+        if color_layer is None:
+            color_layer = umesh.bm.loops.layers.float_color.active
+        if color_layer is None:
+            color_layer = umesh.bm.loops.layers.color.new('Color')
+
+        attr = umesh.obj.data.attributes
+        if not attr.active_color or attr.active_color.name != color_layer.name:
+            attr.active_color = attr[color_layer.name]
+
+        changed = False
+        for area in utils.get_areas_by_type('VIEW_3D'):
+            for space in area.spaces:
+                if space.type == 'VIEW_3D':
+                    if space.shading.type == 'SOLID':
+                        if space.shading.color_type != 'VERTEX':
+                            space.shading.color_type = 'VERTEX'
+                            changed = True
+                    elif space.shading.type == 'WIREFRAME':
+                        space.shading.type = 'SOLID'
+                        space.shading.color_type = 'VERTEX'
+                        changed = True
+        if changed:
+            bpy.context.view_layer.update()
+
+        return color_layer
+
+
+class UNIV_OT_LinearGradient(Operator):
+    bl_idname = 'uv.univ_linear_gradient'
+    bl_label = 'Linear Gradient'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Gradients from boundary box"
+
+    use_union_bbox: BoolProperty(name='Use Union Boundary Box')
+    min_value: FloatProperty(name='Min', soft_min=0, soft_max=1, default=0)
+    max_value: FloatProperty(name='Max', soft_min=0, soft_max=1, default=1)
+    threshold: FloatProperty(name='Threshold', soft_min=0, soft_max=1, default=0)
+    invert: BoolProperty(name='Invert', default=False)
+    axis: EnumProperty(name='Axis', default='VERTICAL', items=utils.ENUM('HORIZONTAL', 'VERTICAL'))
+    channel: EnumProperty(name='Channel', items=utils.ENUM(('RGB', 'RGB'), 'R', 'G', 'B', 'A'))
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, 'use_union_bbox')
+        layout.prop(self, 'min_value', slider=True)
+        layout.prop(self, 'max_value', slider=True)
+        layout.prop(self, 'threshold', slider=True)
+        layout.prop(self, 'invert')
+
+        layout.row(align=True).prop(self, 'axis', expand=True)
+        layout.row(align=True).prop(self, 'channel', expand=True)
+
+    def execute(self, context):
+        umeshes = UMeshes(report=self.report)
+
+        if context.mode == 'EDIT_MESH':
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
+            if selected:
+                umeshes = selected
+                calc_islands_type = utypes.AdvIslands.calc_selected_with_mark_seam
+            else:
+                umeshes = visible
+                calc_islands_type = utypes.AdvIslands.calc_visible_with_mark_seam
+        else:
+            calc_islands_type = utypes.AdvIslands.calc_with_hidden_with_mark_seam
+
+        bb = utypes.BBox()
+        for umesh in umeshes:
+            islands = calc_islands_type(umesh)
+            umesh.sequence = islands
+            bb.union(islands.calc_bbox())
+
+        if self.channel == 'R':
+            set_channel_idx = 0
+        elif self.channel == 'G':
+            set_channel_idx = 1
+        elif self.channel == 'B':
+            set_channel_idx = 2
+        else:
+            set_channel_idx = 3
+
+        if self.invert:
+            output_min, output_max = self.max_value, self.min_value
+        else:
+            output_min, output_max = self.min_value, self.max_value
+
+        is_vertical = self.axis == 'VERTICAL'
+        for umesh in umeshes:
+            uv = umesh.uv
+            islands: utypes.AdvIslands = umesh.sequence
+            color_layer = UNIV_OT_RandomColor.create_and_get_color_attribute(umesh)
+
+            for isl in islands:
+                if not self.use_union_bbox:
+                    bb = isl.bbox
+
+                if is_vertical:
+                    x_or_y_component = 0
+                    input_min = bb.ymin + bb.ymin * self.threshold
+                    input_max = bb.ymax - bb.ymin * self.threshold
+
+                else:
+                    x_or_y_component = 1
+                    input_min = bb.xmin + bb.xmin * self.threshold
+                    input_max = bb.xmax - bb.xmin * self.threshold
+
+                if self.channel == 'RGB':
+                    for crn in isl.corners_iter():
+                        val = clamp(utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max))
+                        crn[color_layer] = Vector((val, val, val, 1.0))
+                else:
+                    for crn in isl.corners_iter():
+                        val = clamp(utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max))
+                        crn[color_layer][set_channel_idx] = val
+        umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
+        return {'FINISHED'}
+
 
 
 class UNIV_OT_TD_PresetsProcessing(Operator):
