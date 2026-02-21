@@ -825,6 +825,11 @@ class ImBuf(StructBase):
     x: c_int
     y: c_int
 
+    if version >= (5, 1, 0):
+        display_size: c_int * 2
+        data_offset: c_int * 2
+        display_offset: c_int * 2
+
     #  Active amount of bits/bit-planes.
     planes: c_char
 
