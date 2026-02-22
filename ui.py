@@ -202,8 +202,8 @@ class UNIV_PT_General(Panel):
 
     def draw(self, context):
         layout = self.layout
-
-        if prefs().use_csa_mods:
+        pref = prefs()
+        if pref.use_csa_mods:
             layout.operator_context = 'INVOKE_DEFAULT'
         else:
             layout.operator_context = 'EXEC_DEFAULT'
@@ -371,8 +371,9 @@ class UNIV_PT_General(Panel):
                     col.operator('uv.univ_linear_gradient')
 
         # UV Maps
-        if panel := draw_panel(layout, 'UV Maps'):
-            self.draw_uv_layers(panel,draw_label=False)
+        if pref.uv_layers_show:
+            if panel := draw_panel(layout, 'UV Maps'):
+                self.draw_uv_layers(panel,draw_label=False)
 
         if univ_pro:
             # Trim
@@ -398,7 +399,8 @@ class UNIV_PT_General_VIEW_3D(Panel):
 
     def draw(self, context):
         layout = self.layout
-        if prefs().use_csa_mods:
+        pref = prefs()
+        if pref.use_csa_mods:
             layout.operator_context = 'INVOKE_DEFAULT'
         else:
             layout.operator_context = 'EXEC_DEFAULT'
@@ -510,8 +512,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_checker', icon_value=icons.checker)
             row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
-        if panel := draw_panel(layout, 'UV Maps'):
-            UNIV_PT_General.draw_uv_layers(panel, draw_label=False)
+        if pref.uv_layers_show:
+            if panel := draw_panel(layout, 'UV Maps'):
+                UNIV_PT_General.draw_uv_layers(panel, draw_label=False)
 
 
 class UNIV_PT_GlobalSettings(Panel):
