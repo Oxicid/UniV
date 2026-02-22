@@ -3745,7 +3745,7 @@ class UNIV_OT_Pack(Operator):
 
     def execute(self, context):
         if univ_settings().use_uvpm:
-            if hasattr(context.scene, 'uvpm3_props'):
+            if hasattr(context.scene, 'uvpm4_props') or hasattr(context.scene, 'uvpm3_props'):
                 return self.pack_uvpm()
             else:
                 univ_settings().use_uvpm = False
@@ -3763,7 +3763,11 @@ class UNIV_OT_Pack(Operator):
         # TODO: Add scale checker for packed meshes
 
         settings = univ_settings()
-        uvpm_settings = bpy.context.scene.uvpm3_props
+
+        if hasattr(bpy.context.scene, 'uvpm4_props'):
+            uvpm_settings = bpy.context.scene.uvpm4_props
+        else:
+            uvpm_settings = bpy.context.scene.uvpm3_props
 
         if hasattr(uvpm_settings, 'default_main_props'):
             uvpm_settings = uvpm_settings.default_main_props
@@ -3796,7 +3800,11 @@ class UNIV_OT_Pack(Operator):
         if uvpm_settings.precision == 500:
             uvpm_settings.precision = 800
 
-        return bpy.ops.uvpackmaster3.pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
+        if hasattr(bpy.context.scene, 'uvpm4_props'):
+            pack = bpy.ops.uvpackmaster4.pack  # noqa
+        else:
+            pack = bpy.ops.uvpackmaster3.pack  # noqa
+        return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
 
     def pack_native(self):
         umeshes = UMeshes.calc(verify_uv=False)

@@ -279,7 +279,15 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
                                                     soft_max=6, size=2, subtype='TRANSLATION')
 
     # Trim System
-    use_trims: BoolProperty(name="Use Trim System", default=False, update=_update_trim_system)
+    use_trims: BoolProperty(name="Use Trim System", default=False, update=_update_trim_system, description="""
+Some operators, can interact with trims:
+    Drag [Alt+LMB] - supports snapping and wrapping to trims (hold Ctrl or Shift)
+    Fit / Fill - supports wrapping to trims
+    Set Cursor [Ctrl+Shift+MMB] - in addition to snapping the cursor to trims, sets the target trim as active
+    QuickSnap [V, Alt+V] - supports snapping to trims
+
+    TODO: Hotspot in the near future"""
+                            )
     trims_presets: CollectionProperty(name="Trims Presets", type=UNIV_TrimPreset)
     active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
 
@@ -745,7 +753,16 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
             else:
                 layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
 
-            layout.label(text="UniV Pro includes such advanced operators as:")
+            layout.label(text="UniV Pro includes such advanced operators and features as:")
+            row = layout.row(align=True)
+            row.label(text='', icon_value=icons.horizontal_c)
+            row.label(text="Constraints System - straightening along supporting edge loops.", icon_value=icons.vertical_b)
+
+            row = layout.row(align=True)
+            row.label(text='', icon_value=icons.x)
+            row.label(text="Unwrap Along Axis.", icon_value=icons.y)
+            layout.label(text="Trim System.", icon='MOD_MULTIRES')
+            layout.label(text="More Checker Textures like: Gravity, Atlux, Simple.", icon_value=icons.checker)
             layout.label(text="Real-time seam display.", icon_value=icons.cut)
             layout.label(text="Real-time display of selected geometry in non-sync mode.", icon_value=icons.arrow)
             layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",

@@ -589,6 +589,8 @@ class UNIV_PT_PackSettings(Panel):
 
         if uvpm_exist := hasattr(context.scene, 'uvpm3_props'):
             layout.prop(settings, 'use_uvpm')
+        elif uvpm_exist := hasattr(context.scene, 'uvpm4_props'):
+            layout.prop(settings, 'use_uvpm')
 
         row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')
@@ -631,7 +633,8 @@ class UNIV_PT_PackSettings(Panel):
     def draw_uvpm(self):
         layout = self.layout
         settings = univ_settings()
-        uvpm_settings = bpy.context.scene.uvpm3_props
+        if not (uvpm_settings := getattr(bpy.context.scene, 'uvpm4_props', None)):
+            uvpm_settings = bpy.context.scene.uvpm3_props
 
         if hasattr(uvpm_settings, 'default_main_props'):
             uvpm_main_props = uvpm_settings.default_main_props
