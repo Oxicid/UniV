@@ -1162,7 +1162,11 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('mesh.loop_multi_select', text='Ring').ring = True
+        if bpy.app.version >= (5, 1, 0):
+            row.operator('mesh.select_edge_ring_multi', text='Ring')
+
+        else:
+            row.operator('mesh.loop_multi_select', text='Ring').ring = True
         row.operator('mesh.loop_to_region', text='Inner')
 
         row = col.row(align=True)
@@ -1184,7 +1188,10 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         if univ_pro:
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
-            pie.operator("mesh.loop_multi_select", text='Loop').ring = False
+            if bpy.app.version >= (5, 1, 0):
+                pie.operator("mesh.loop_multi_select", text='Loop')
+            else:
+                pie.operator("mesh.loop_multi_select", text='Loop').ring = False
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
