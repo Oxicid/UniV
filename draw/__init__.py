@@ -9,56 +9,18 @@ import bpy
 import gpu
 import bmesh
 import contextlib
+
+from mathutils import Vector
+from gpu_extras.batch import batch_for_shader
+
 from . import shaders
 from . import mesh_extract
 from .text import TextDraw
 from ..utypes import UMesh
 from ..preferences import univ_settings, prefs
 from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
-from mathutils import Vector
-from gpu_extras.batch import batch_for_shader
 
-def get_seam_color():
-    view_3d = bpy.context.preferences.themes[0].view_3d
-    if seam_color := getattr(view_3d, 'seam', None):
-        return *seam_color, 0.5
-    return *view_3d.edge_seam, 0.5
 
-class DrawerSeamsProcessing:
-    @staticmethod
-    def draw_fn_2d(shader, batch, color):
-        shaders.set_line_width(2)
-        shaders.blend_set_alpha()
-
-        shader.bind()
-        shader.uniform_float("color", color)
-        shaders.set_line_width_vk(shader)
-        batch.draw(shader)
-
-        shaders.set_line_width(1)
-        shaders.blend_set_none()
-
-    @staticmethod
-    def data_to_batch(data, shader):
-        if not data:
-            return None
-        return batch_for_shader(shader, 'LINES', {"pos": data})
-
-    @staticmethod
-    def get_color():
-        return get_seam_color()
-
-    @staticmethod
-    def get_shader():
-        return shaders.POLYLINE_UNIFORM_COLOR
-
-    @staticmethod
-    def is_enable():
-        try:
-            from .. import univ_pro
-            return univ_settings().overlay_2d_enable
-        except ImportError:
-            return False
 
 class DrawerNonSyncSelectProcessing:
     @staticmethod
@@ -171,22 +133,166 @@ class DrawerNonSyncSelectProcessing:
             return False
 
 
-class DrawCall2D:
-    def __init__(self, draw_fn, shader, color, batch):
-        self.draw_fn = draw_fn
-        self.shader = shader
-        self.color = color
+
+class DrawCallSeams2D:
+    def __init__(self, batch: gpu.types.GPUBatch):
+        self.shader = shaders.POLYLINE_UNIFORM_COLOR
+        self.color = self.get_color()
         self.batch = batch
         # To avoid iterating over all mesh elements again,
         # UniV operators can control Update by adding extended draw elements on top of existing draw elements.
-        self.coords_extend = []
-        self.batch_extend = None
+        # self.coords_extend = []
+        # self.batch_extend = None
 
     def __call__(self):
-        if self.batch:
-            self.draw_fn(self.shader, self.batch, self.color)
-        if self.batch_extend:
-            self.draw_fn(self.shader, self.batch_extend, self.color)
+        shaders.set_line_width(2)
+        shaders.blend_set_alpha()
+
+        self.shader.bind()
+        self.shader.uniform_float("color", self.color)
+        shaders.set_line_width_vk(self.shader)
+        self.batch.draw(self.shader)
+        # if self.batch_extend:
+        #     self.batch_extend.draw(self.shader)
+
+        shaders.set_line_width(1)
+        shaders.blend_set_none()
+
+    @classmethod
+    def init(cls, umesh: UMesh) -> 'DrawCallSeams2D | None':
+        data = mesh_extract.extract_seams_umesh(umesh)
+        if data:
+            return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": data}))
+        return None
+
+    if bpy.app.version >= (4, 5, 0):
+        @staticmethod
+        def get_color():
+            return *bpy.context.preferences.themes[0].view_3d.seam, 0.5
+    else:
+        @staticmethod
+        def get_color():
+            return *bpy.context.preferences.themes[0].view_3d.edge_seam, 0.5
+
+    @staticmethod
+    def is_enable():
+        try:
+            from .. import univ_pro
+            return univ_settings().overlay_2d_enable
+        except ImportError:
+            return False
+
+class DrawCallConstraints2D:
+    def __init__(self, batch_v: gpu.types.GPUBatch | None, batch_h: gpu.types.GPUBatch | None):
+        self.shader = shaders.POLYLINE_UNIFORM_COLOR
+        self.color_v = (0.1, 0.1, 0.8, 0.5)
+        self.color_h = (0.85, 1.0, 0.0, 0.5)
+
+        self.batch_v = batch_v
+        self.batch_h = batch_h
+
+    def __call__(self):
+        shaders.blend_set_alpha()
+        shaders.set_line_width(3)
+
+        self.shader.bind()
+        shaders.set_line_width_vk(self.shader, 3)
+
+        if self.batch_v:
+            self.shader.uniform_float("color", self.color_v)
+            self.batch_v.draw(self.shader)
+        if self.batch_h:
+            self.shader.uniform_float("color", self.color_h)
+            self.batch_h.draw(self.shader)
+
+        shaders.set_line_width(1)
+        shaders.blend_set_none()
+
+    @classmethod
+    def init(cls, umesh: UMesh) -> 'DrawCallConstraints2D | None':
+        constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
+        if not constraints_attr:
+            return None
+
+        v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
+        if not (v_coords or h_coords):
+            return None
+
+        v_batch = None
+        h_batch = None
+
+        if v_coords:
+            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": v_coords})
+        if h_coords:
+            h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": h_coords})
+
+        return cls(v_batch, h_batch)
+
+    @staticmethod
+    def is_enable():
+        try:
+            from .. import univ_pro
+            return univ_settings().overlay_2d_enable
+        except ImportError:
+            return False
+
+    @staticmethod
+    def extract_data(umesh: UMesh, attr):
+        """"""
+        v_coords = []
+        h_coords = []
+        v_coords_append = v_coords.append
+        h_coords_append = h_coords.append
+
+        uv = umesh.uv
+        if umesh.is_full_face_selected:
+            for e in umesh.bm.edges:
+                if edge_idx := e[attr]:
+                    for crn in getattr(e, 'link_loops', ()):
+                        bits = edge_idx & 3
+
+                        if bits == 2:  # vertical
+                            v_coords_append(crn[uv].uv)
+                            v_coords_append(crn.link_loop_next[uv].uv)
+                        elif bits == 3:  # horizontal
+                            h_coords_append(crn[uv].uv)
+                            h_coords_append(crn.link_loop_next[uv].uv)
+
+                        edge_idx >>= 2
+        else:
+            if umesh.sync:
+                for e in umesh.bm.edges:
+                    if edge_idx := e[attr]:
+                        for crn in getattr(e, 'link_loops', ()):
+                            if not crn.face.hide:
+                                bits = edge_idx & 3
+
+                                if bits == 2:  # vertical
+                                    v_coords_append(crn[uv].uv)
+                                    v_coords_append(crn.link_loop_next[uv].uv)
+                                elif bits == 3:  # horizontal
+                                    h_coords_append(crn[uv].uv)
+                                    h_coords_append(crn.link_loop_next[uv].uv)
+
+                                edge_idx >>= 2
+            else:
+                if umesh.is_full_face_deselected:
+                    return [], []
+                for e in umesh.bm.edges:
+                    if edge_idx := e[attr]:
+                        for crn in getattr(e, 'link_loops', ()):
+                            if crn.face.select:
+                                bits = edge_idx & 3
+
+                                if bits == 2:  # vertical
+                                    v_coords_append(crn[uv].uv)
+                                    v_coords_append(crn.link_loop_next[uv].uv)
+                                elif bits == 3:  # horizontal
+                                    h_coords_append(crn[uv].uv)
+                                    h_coords_append(crn.link_loop_next[uv].uv)
+
+                                edge_idx >>= 2
+        return v_coords, h_coords
 
 class DrawCall3D:
     def __init__(self, draw_fn, shader, color, batch, world_matrix):
@@ -451,10 +557,8 @@ def safe_remove_update_tracker():
 
 
 class Drawer2D:
-    draw_objects: dict[str | list[DrawCall2D]] = {}
-    drawers = []
-    shaders_with_color = []
-    mesh_extractors_with_batch = []
+    draw_objects: dict[str | list[DrawCallSeams2D]] = {}
+    drawers: list[type[DrawCallSeams2D]] = []
     dirt = True
     handler = None
     sync = True
@@ -462,19 +566,16 @@ class Drawer2D:
 
     @classmethod
     def update_drawer_data(cls):
-        drawers = []
-        shaders_with_color = []
-        mesh_extractors_with_batch = []
+        drawers: list[type[DrawCallSeams2D | DrawCallConstraints2D]] = []
+        if True:  # if constraints
+            drawers.append(DrawCallConstraints2D)
+
         if True:  # if seam
-            drawers.append(DrawerSeamsProcessing.draw_fn_2d)
-            shaders_with_color.append((DrawerSeamsProcessing.get_shader(), DrawerSeamsProcessing.get_color()))
-            mesh_extractors_with_batch.append((mesh_extract.extract_seams_umesh, DrawerSeamsProcessing.data_to_batch))
+            drawers.append(DrawCallSeams2D)
 
         cls.dirt = True
         cls.draw_objects.clear()
         cls.drawers = drawers
-        cls.shaders_with_color = shaders_with_color
-        cls.mesh_extractors_with_batch = mesh_extractors_with_batch
 
 
     @classmethod
@@ -506,10 +607,10 @@ class Drawer2D:
                 umesh = UMesh(bmesh.from_edit_mesh(obj.data), obj)
 
                 draw_calls_seq = []
-                for drawer, (shader, color), (extract, to_batch) in zip(cls.drawers, cls.shaders_with_color, cls.mesh_extractors_with_batch):
-                    data = extract(umesh)
-                    draw_call = DrawCall2D(drawer, shader, color, to_batch(data, shader))
-                    draw_calls_seq.append(draw_call)
+                for drawer in cls.drawers:
+                    draw_call = drawer.init(umesh)
+                    if draw_call:
+                        draw_calls_seq.append(draw_call)
 
                 draw_objects[obj_id] = draw_calls_seq
 
@@ -555,8 +656,6 @@ class Drawer2D:
         safe_remove_update_tracker()
 
         cls.draw_objects.clear()
-        cls.mesh_extractors_with_batch.clear()
-        cls.shaders_with_color.clear()
         cls.drawers.clear()
 
         cls.dirt = True
@@ -581,9 +680,6 @@ class Drawer2D:
 
     @classmethod
     def is_valid(cls):
-        assert len(cls.mesh_extractors_with_batch) == len(cls.shaders_with_color)
-        assert len(cls.mesh_extractors_with_batch) == len(cls.drawers)
-
         if cls.dirt:
             return
 

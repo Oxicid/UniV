@@ -84,11 +84,11 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
         # Flush System
         from .. import draw
-        if not draw.DrawerSeamsProcessing.is_enable():
+        if not draw.DrawCallSeams2D.is_enable():
             visible_umeshes.filter_by_visible_uv_faces()
             self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
             coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
-            draw.LinesDrawSimple.draw_register(coords, draw.DrawerSeamsProcessing.get_color())
+            draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
         return {'FINISHED'}
 
     def cut_uv_space(self):
@@ -141,9 +141,9 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 hit.umesh.update()
 
             from .. import draw
-            if not draw.DrawerSeamsProcessing.is_enable():
+            if not draw.DrawCallSeams2D.is_enable():
                 coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
-                draw.LinesDrawSimple.draw_register(coords, draw.get_seam_color())
+                draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
                 if coords:
                     bpy.context.area.tag_redraw()
             return {'FINISHED'} if had_seam else {'FINISHED'}
@@ -489,9 +489,9 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
         if self.bl_idname.startswith('UV'):
             # Flush System
             from .. import draw
-            if not draw.DrawerSeamsProcessing.is_enable():
+            if not draw.DrawCallSeams2D.is_enable():
                 coords = draw.mesh_extract.extract_seams_umeshes(umeshes)
-                draw.LinesDrawSimple.draw_register(coords, draw.DrawerSeamsProcessing.get_color())
+                draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
 
         umeshes.silent_update()
         return {'FINISHED'}

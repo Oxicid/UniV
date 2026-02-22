@@ -538,7 +538,7 @@ class Stitch:
                                 welded_append(crn[uv].uv)
                                 toggle = True
 
-        draw.LinesDrawSimple.draw_register(with_seam, draw.get_seam_color())
+        draw.LinesDrawSimple.draw_register(with_seam, draw.DrawCallSeams2D.get_color())
 
         welded_color = (0.1, 0.1, 1.0, 1.0)
         draw.DotLinesDrawSimple.draw_register(welded, welded_color)
