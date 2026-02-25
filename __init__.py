@@ -90,6 +90,7 @@ def load_register_types():
             # Transforms
             transform.UNIV_OT_Orient_VIEW3D,
             transform.UNIV_OT_Orient,
+            transform.UNIV_OT_Gravity_VIEW3D,
             transform.UNIV_OT_Gravity,
             transform.UNIV_OT_Align,
             transform.UNIV_OT_Align_pie,

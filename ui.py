@@ -227,6 +227,10 @@ class UNIV_PT_General(Panel):
             grid.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
             grid.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
 
+            grid.operator('uv.univ_gravity', icon_value=icons.gravity).axis = 'Z'
+            grid.operator('uv.univ_gravity', text='', icon_value=icons.x).axis = 'X'
+            grid.operator('uv.univ_gravity', text='', icon_value=icons.y).axis = 'Y'
+
             grid.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
             grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
             grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'

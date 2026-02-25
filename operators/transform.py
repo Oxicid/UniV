@@ -3559,7 +3559,7 @@ class UNIV_OT_Orient_VIEW3D(UNIV_OT_Orient):
 # The code was taken and modified from the TexTools addon:
 # https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
 class UNIV_OT_Gravity(Operator):
-    bl_idname = 'mesh.univ_gravity'
+    bl_idname = 'uv.univ_gravity'
     bl_label = 'Gravity'
     bl_description = "Align selected UV islands or faces to world / gravity directions"
     bl_options = {'REGISTER', 'UNDO'}
@@ -3589,9 +3589,12 @@ class UNIV_OT_Gravity(Operator):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
-        self.umeshes.set_sync(True)
 
         if self.is_edit_mode:
+            if not self.bl_idname.startswith('UV'):
+                self.umeshes.set_sync(True)
+                self.umeshes.sync_invalidate()
+
             self.world_orient(extended=True)
             if self.skip_count == len(self.umeshes):
                 self.world_orient(extended=False)
@@ -3631,6 +3634,7 @@ class UNIV_OT_Gravity(Operator):
             axis_mtx = Matrix.Rotation((-pi/2.0) + flip_angle, 3, (0,1,0))
 
         for umesh in self.umeshes:
+            get_face_select = utils.face_select_get_func(umesh)
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
             if self.is_edit_mode:
@@ -3656,7 +3660,7 @@ class UNIV_OT_Gravity(Operator):
                             self.count_flipped += 1
 
                     if extended:
-                        pre_calc_faces = (f for f in island if f.select)
+                        pre_calc_faces = (f for f in island if get_face_select(f))
                     else:
                         pre_calc_faces = island
 
@@ -3727,6 +3731,10 @@ class UNIV_OT_Gravity(Operator):
                     sum_angle += angle
 
         return sum_angle / n_edges
+
+
+class UNIV_OT_Gravity_VIEW3D(UNIV_OT_Gravity):
+    bl_idname = 'mesh.univ_gravity'
 
 
 class UNIV_OT_Pack(Operator):
