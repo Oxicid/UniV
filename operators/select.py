@@ -448,13 +448,13 @@ class UNIV_OT_Select_Border(Operator):
 
     border_mode: EnumProperty(name='Border', default='BORDER', items=(
         ('BORDER', 'Border', ''),
-        ('BORDER_BETWEEN', 'Border Between', ''),
+        ('BORDER_BETWEEN', 'Border Between Selected Islands', ''),
+        None,
         ('BORDER_EDGE_BY_ANGLE', 'Border Edge by Angle', ''),
         ('ALL_EDGE_BY_ANGLE', 'All Edge by Angle', ''),
     ))
 
     edge_dir: EnumProperty(name='Direction', default='HORIZONTAL', items=(
-        ('BOTH', 'Both', ''),
         ('HORIZONTAL', 'Horizontal', ''),
         ('VERTICAL', 'Vertical', ''),
     ))
@@ -463,31 +463,30 @@ class UNIV_OT_Select_Border(Operator):
     angle: FloatProperty(name='Angle', default=math.radians(5), min=0, max=math.radians(45.001), subtype='ANGLE')
 
     def draw(self, context):
+        layout = self.layout
         if self.border_mode in ('BORDER_EDGE_BY_ANGLE', 'ALL_EDGE_BY_ANGLE'):
-            row = self.layout.row(align=True)
-            row.prop(self, 'edge_dir', expand=True)
-            layout = self.layout
-            layout.prop(self, 'angle', slider=True)
             layout.prop(self, 'use_correct_aspect')
+            row = layout.row(align=True)
+            row.prop(self, 'edge_dir', expand=True)
+            layout.prop(self, 'angle', slider=True)
+            layout.separator()
 
-        col = self.layout.column(align=True)
+        col = layout.column(align=True)
         col.prop(self, 'border_mode', expand=True)
-        row = self.layout.row(align=True)
+        row = layout.row(align=True)
         row.prop(self, 'mode', expand=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.x_vec = Vector((1, 0))
         self.y_vec = Vector((0, 1))
-        self.angle_45 = math.pi / 4
-        self.angle_135 = math.pi * 0.75
         self.edge_orient = self.x_vec
         self.negative_ange = 0
         self.umeshes: UMeshes | None = None
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -607,15 +606,9 @@ class UNIV_OT_Select_Border(Operator):
         self.negative_ange = math.pi - self.angle
 
         if self.border_mode == 'BORDER_EDGE_BY_ANGLE':
-            if self.edge_dir == 'BOTH':
-                self.select_both_border()
-            else:
-                self.select_hv_border()
+            self.select_hv_border()
         else:
-            if self.edge_dir == 'BOTH':
-                self.select_both()
-            else:
-                self.select_hv()
+            self.select_hv()
 
         return self.umeshes.update()
 
@@ -665,88 +658,6 @@ class UNIV_OT_Select_Border(Operator):
             _y_angle <= _angle or _y_angle >= _neg_angle
         return inner
 
-    def select_both(self):
-        is_between_angle = self.is_between_angle_bidirect_fn(self.angle, self.negative_ange)
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            to_select = []
-            to_deselect = []
-
-            aspect_for_x = umesh.aspect
-            corners = utils.calc_visible_uv_corners_iter(umesh)
-            if self.mode == 'SELECT':
-                for crn in corners:
-                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                    vec.x *= aspect_for_x
-                    if is_between_angle(vec.angle(self.x_vec, 0),
-                                        vec.angle(self.y_vec, 0)):
-                        to_select.append(crn)
-                    else:
-                        to_deselect.append(crn)
-
-            elif self.mode == 'DESELECT':
-                for crn in corners:
-                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                    vec.x *= aspect_for_x
-                    if is_between_angle(vec.angle(self.x_vec, 0),
-                                        vec.angle(self.y_vec, 0)):
-                        to_deselect.append(crn)
-
-            else:  # 'ADDITION'
-                edge_select_get = utils.edge_select_get_func(umesh)
-                for crn in corners:
-                    if not edge_select_get(crn):
-                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                        vec.x *= aspect_for_x
-                        if is_between_angle(vec.angle(self.x_vec, 0),
-                                            vec.angle(self.y_vec, 0)):
-                            to_select.append(crn)
-
-            utils.select_edge_processing(umesh, to_deselect, to_select)
-
-    def select_both_border(self):
-        is_between_angle = self.is_between_angle_bidirect_fn(self.angle, self.negative_ange)
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            to_select = []
-            to_deselect = []
-
-            aspect_for_x = umesh.aspect
-            is_boundary = utils.is_boundary_func(umesh)
-            corners = utils.calc_visible_uv_corners_iter(umesh)
-            if self.mode == 'SELECT':
-                for crn in corners:
-                    if not is_boundary(crn):
-                        to_deselect.append(crn)
-                    else:
-                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                        vec.x *= aspect_for_x
-                        if is_between_angle(vec.angle(self.x_vec, 0),
-                                            vec.angle(self.y_vec, 0)):
-                            to_select.append(crn)
-                        else:
-                            to_deselect.append(crn)
-
-            elif self.mode == 'DESELECT':
-                for crn in corners:
-                    if is_boundary(crn):
-                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                        vec.x *= aspect_for_x
-                        if is_between_angle(vec.angle(self.x_vec, 0),
-                                            vec.angle(self.y_vec, 0)):
-                            to_deselect.append(crn)
-
-            else:  # 'ADDITION'
-                get_edge_select = utils.edge_select_get_func(umesh)
-                for crn in corners:
-                    if not get_edge_select(crn) and is_boundary(crn):
-                        vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                        vec.x *= aspect_for_x
-                        if is_between_angle(vec.angle(self.x_vec, 0),
-                                            vec.angle(self.y_vec, 0)):
-                            to_select.append(crn)
-
-            utils.select_edge_processing(umesh, to_deselect, to_select)
 
     @staticmethod
     def is_between_angle_fn(_angle, _neg_angle):
