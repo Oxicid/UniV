@@ -480,8 +480,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     use_auto_smooth: BoolProperty(name='Use Auto Smooth', default=True)
-    user_angle: FloatProperty(name='Smooth Angle', default=math.radians(
-        66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
+    user_angle: FloatProperty(name='Smooth Angle', subtype='ANGLE',
+                              default=math.radians(66.0), min=math.radians(5.0), max=math.pi)
 
     def draw(self, context):
         layout = self.layout
@@ -529,6 +529,9 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                 angle = min(umesh.smooth_angle, user_angle)
             else:
                 angle = user_angle
+
+            if any(m.type in ('BEVEL', 'SUBSURF', 'MULTIRES') for m in umesh.obj.modifiers if m.show_viewport):
+                angle = math.pi
 
             uv = umesh.uv
             for crn in utils.calc_visible_uv_corners(umesh):
