@@ -586,6 +586,7 @@ class UNIV_PT_PackSettings(Panel):
     bl_region_type = 'UI'
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
+    bl_ui_units_x = 12
 
     def draw(self, context):
         layout = self.layout
@@ -762,6 +763,7 @@ class UNIV_PT_CheckerTextures(Panel):
     bl_region_type = 'UI'
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
+    bl_ui_units_x = 12
 
     def draw(self, context):
         layout = self.layout
@@ -841,6 +843,7 @@ class UNIV_PT_TD_PresetsManager(Panel):
     bl_options = {'INSTANCED'}
     bl_region_type = 'UI'
     bl_category = 'UniV'
+    bl_ui_units_x = 12
 
     def draw(self, context):
         self.draw_ex(self.layout)
@@ -916,6 +919,7 @@ class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
     bl_region_type = 'UI'
     bl_options = {'INSTANCED'}
     bl_category = 'UniV'
+    bl_ui_units_x = 12
 
     @classmethod
     def poll(cls, context):
