@@ -3765,6 +3765,10 @@ class UNIV_OT_Pack(Operator):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack_op_type = '0'
+
     def execute(self, context):
         if univ_settings().use_uvpm:
             if hasattr(context.scene, 'uvpm4_props') or hasattr(context.scene, 'uvpm3_props'):
@@ -3776,8 +3780,8 @@ class UNIV_OT_Pack(Operator):
         else:
             return self.pack_native()
 
-    @staticmethod
-    def pack_uvpm():
+
+    def pack_uvpm(self):
         # TODO: Add Info about unselected and hidden faces
         # TODO: Use UniV orient (instead Pre-Rotation) and remove AXIS_ALIGNED method
         # TODO: Use UniV normalize
@@ -3785,11 +3789,29 @@ class UNIV_OT_Pack(Operator):
         # TODO: Add scale checker for packed meshes
 
         settings = univ_settings()
+        uvpm_addon_prefs = None
 
         if hasattr(bpy.context.scene, 'uvpm4_props'):
             uvpm_settings = bpy.context.scene.uvpm4_props
+            uvpm_package = 'bl_ext.user_default.uvpackmaster4'
         else:
             uvpm_settings = bpy.context.scene.uvpm3_props
+            uvpm_package = 'bl_ext.user_default.uvpackmaster3'
+
+        try:
+            uvpm_addon_prefs = bpy.context.preferences.addons[uvpm_package].preferences
+        except:  # noqa
+            import traceback
+            traceback.print_exc()
+            from ..preferences import debug
+            if debug():
+                self.report({'ERROR'}, 'Not found UVPackMaster addon preferences')
+
+
+        if uvpm_addon_prefs:
+            if getattr(uvpm_addon_prefs, 'dont_transform_pinned_uvs', False):
+                uvpm_addon_prefs.dont_transform_pinned_uvs = False
+
 
         if hasattr(uvpm_settings, 'default_main_props'):
             uvpm_settings = uvpm_settings.default_main_props
@@ -3822,11 +3844,12 @@ class UNIV_OT_Pack(Operator):
         if uvpm_settings.precision == 500:
             uvpm_settings.precision = 800
 
+
         if hasattr(bpy.context.scene, 'uvpm4_props'):
             pack = bpy.ops.uvpackmaster4.pack  # noqa
         else:
             pack = bpy.ops.uvpackmaster3.pack  # noqa
-        return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type='0')
+        return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type=self.pack_op_type)
 
     def pack_native(self):
         umeshes = UMeshes.calc(verify_uv=False)
@@ -3864,3 +3887,12 @@ class UNIV_OT_Pack(Operator):
         KEYUP = 0x0002  # Release  # noqa
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
         ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
+
+class UNIV_OT_PackOther(UNIV_OT_Pack):
+    bl_idname = 'uv.univ_pack_other'
+    bl_label = 'Other'
+    bl_description = "Pack to other selected islands"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pack_op_type = '1'

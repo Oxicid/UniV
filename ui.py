@@ -267,6 +267,8 @@ class UNIV_PT_General(Panel):
             row = col_align.row(align=True)
             row.scale_y = 1.3
             row.operator('uv.univ_pack', icon_value=icons.pack)
+            if pref.use_uvpm:
+                row.operator('uv.univ_pack_other')
             row.popover(panel='UNIV_PT_PackSettings', text='', icon_value=icons.settings_a)
 
 

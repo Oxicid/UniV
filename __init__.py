@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 63),
+    "version": (3, 9, 64),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -110,6 +110,7 @@ def load_register_types():
             transform.UNIV_OT_Shift,
             transform.UNIV_OT_Random_VIEW3D,
             transform.UNIV_OT_Random,
+            transform.UNIV_OT_PackOther,
             transform.UNIV_OT_Pack,
             # Texel
             texel.UNIV_OT_ResetScale_VIEW3D,
