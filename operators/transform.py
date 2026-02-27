@@ -431,7 +431,7 @@ class Align_by_Angle:
     angle: FloatProperty(name='Angle', default=to_rad(5), min=to_rad(
         2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
 
-    def align_edge_by_angle(self, x_axis):
+    def align_edge_by_angle(self, is_x_axis):
         umeshes: UMeshes = self.umeshes  # noqa
         if umeshes.is_edit_mode: # noqa
             selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_edges()
@@ -449,77 +449,9 @@ class Align_by_Angle:
 
         has_segments = False
         for umesh in umeshes:
-            uv = umesh.uv
-            edge_orient = Vector((not x_axis, x_axis))
-
-            angle = self.angle
-            negative_ange = math.pi - angle
-
-            if umesh.is_edit_bm:
-                islands = AdvIslands.calc_visible_with_mark_seam(umesh)
-            else:
-                islands = AdvIslands.calc_with_hidden_with_mark_seam(umesh)
-            islands.indexing()
-
-            is_boundary = utils.is_boundary_func(umesh, with_seam=False)
-            get_face_select = utils.face_select_get_func(umesh)
-            get_edge_select = utils.edge_select_get_func(umesh)
-
-            face_align = False
-            if not umesh.is_edit_bm:
-                face_align = True
-            elif umesh.elem_mode in ('FACE', 'ISLAND'):
-                face_align = True
-            elif not utils.USE_GENERIC_UV_SYNC:
-                if umesh.sync and umesh.total_face_sel:  # Preserve sync
-                    face_align = True
-            else:
-                if umesh.sync and not umesh.sync_valid and umesh.total_face_sel:
-                    face_align = True
-
-            for isl in islands:
-                isl.apply_aspect_ratio()
-                if selected_umeshes:
-                    def corners_iter():
-                        for crn_ in isl.corners_iter():
-                            if get_edge_select(crn_):
-                                yield crn_
-                            else:
-                                crn_.tag = False
-                    if umeshes.sync and face_align:
-                        def corners_iter():
-                            for crn_ in isl.corners_iter():
-                                if get_edge_select(crn_):
-                                    if get_face_select(crn_.face) or (not is_boundary(crn_) and get_face_select(crn_.link_loop_prev.face)):
-                                        yield crn_
-                                    else:
-                                        crn_.tag = False
-                                else:
-                                    crn_.tag = False
-                else:
-                    def corners_iter():
-                        return isl.corners_iter()
-
-                to_segmenting_corners = []
-                for crn in corners_iter():
-                    vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                    a = vec.angle(edge_orient, 0)
-
-                    if a <= angle or a >= negative_ange:
-                        to_segmenting_corners.append(crn)
-                        crn.tag = True
-                    else:
-                        crn.tag = False
-
-                has_segments |= bool(to_segmenting_corners)
-                segments = Segments.from_tagged_corners(to_segmenting_corners, umesh)
-                segments = segments.break_by_cardinal_dir()
-                segments.segments.sort(key=lambda seg: seg.length)
-                segments.segments.sort(key=lambda seg: seg.weight_angle, reverse=True)
-
-                new_segments = self.join_segments_by_angle(segments)
-                self.align_by_angle_ex(new_segments, x_axis)
-                isl.reset_aspect_ratio()
+            for segments in self.get_segments_by_angle(umesh, self.angle, is_x_axis, bool(selected_umeshes)):
+                self.align_by_angle_ex(segments, is_x_axis)
+                has_segments = True
 
         if not has_segments:
             self.report({'INFO'}, f'Not found edges with {math.degrees(self.angle):.1f} angle')  # noqa
@@ -531,6 +463,87 @@ class Align_by_Angle:
             umeshes.free()
             utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
+
+    @classmethod
+    def get_segments_by_angle(cls, umesh, angle, is_x_axis, has_selected_umeshes):
+        has_segments = False
+
+        uv = umesh.uv
+        edge_orient = Vector((not is_x_axis, is_x_axis))
+        negative_ange = math.pi - angle
+
+        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        get_face_select = utils.face_select_get_func(umesh)
+        get_edge_select = utils.edge_select_get_func(umesh)
+
+        face_align = False
+        if not umesh.is_edit_bm:
+            face_align = True
+        elif umesh.elem_mode in ('FACE', 'ISLAND'):
+            face_align = True
+        elif not utils.USE_GENERIC_UV_SYNC:
+            if umesh.sync and umesh.total_face_sel:  # Preserve sync
+                face_align = True
+        else:
+            if umesh.sync and not umesh.sync_valid and umesh.total_face_sel:
+                face_align = True
+
+
+        if umesh.is_edit_bm:
+            islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+        else:
+            islands = AdvIslands.calc_with_hidden_with_mark_seam(umesh)
+
+        islands.indexing()
+        for isl in islands:
+            isl.apply_aspect_ratio()
+
+
+            if has_selected_umeshes:
+                def corners_iter():
+                    for crn_ in isl.corners_iter():
+                        if get_edge_select(crn_):
+                            yield crn_
+                        else:
+                            crn_.tag = False
+
+                if umesh.sync and face_align:
+                    def corners_iter():
+                        for crn_ in isl.corners_iter():
+                            if get_edge_select(crn_):
+                                if get_face_select(crn_.face) or (
+                                        not is_boundary(crn_) and get_face_select(crn_.link_loop_prev.face)):
+                                    yield crn_
+                                else:
+                                    crn_.tag = False
+                            else:
+                                crn_.tag = False
+            else:
+                def corners_iter():
+                    return isl.corners_iter()
+
+
+            to_segmenting_corners = []
+            for crn in corners_iter():
+                vec = crn[uv].uv - crn.link_loop_next[uv].uv
+                a = vec.angle(edge_orient, 0)
+
+                if a <= angle or a >= negative_ange:
+                    to_segmenting_corners.append(crn)
+                    crn.tag = True
+                else:
+                    crn.tag = False
+
+            if to_segmenting_corners:
+                segments = Segments.from_tagged_corners(to_segmenting_corners, umesh)
+                segments = segments.break_by_cardinal_dir()
+                segments.segments.sort(key=lambda seg: seg.length)
+                segments.segments.sort(key=lambda seg: seg.weight_angle, reverse=True)
+
+                yield cls.join_segments_by_angle(segments)
+
+            isl.reset_aspect_ratio()
+        return has_segments
 
     @staticmethod
     def align_by_angle_ex(segments: Segments, x_axis=True):
@@ -585,7 +598,8 @@ class Align_by_Angle:
             if not all_equal:
                 segments.umesh.update_tag = True
 
-    def join_segments_by_angle(self, segments: Segments):  # noqa
+    @staticmethod
+    def join_segments_by_angle(segments: Segments):
         new_segments = []
         while segments:
             tar_seg: Segment = segments.segments.pop()
@@ -1095,7 +1109,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     if self.direction == 'CENTER':
                         return self.collect_islands()
                     elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                        return self.align_edge_by_angle(x_axis=self.direction == 'VERTICAL')
+                        return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL')
                     else:
                         self.move_ex(selected=bool(selected))
             case _:
