@@ -66,6 +66,7 @@ class icons:
     over = 0
     overlap = 0
     pack = 0
+    pack_others = 0
     pin = 0
     quadrify = 0
     random = 0
@@ -437,7 +438,7 @@ class IconsCreator:
         bpy.ops.object.select_all(action='DESELECT')
 
         for attr in dir(icons):
-            # if attr != 'symmetrize':
+            # if attr != 'pack_others':
             #     continue
             if not attr.endswith('_'):
                 if not isinstance(getattr(icons, attr), int):

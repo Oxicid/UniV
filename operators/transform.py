@@ -3890,8 +3890,8 @@ class UNIV_OT_Pack(Operator):
 
 class UNIV_OT_PackOther(UNIV_OT_Pack):
     bl_idname = 'uv.univ_pack_other'
-    bl_label = 'Other'
-    bl_description = "Pack to other selected islands"
+    bl_label = 'Others'
+    bl_description = "Pack selected islands into empty space, taking unselected islands into account"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
