@@ -221,6 +221,13 @@ class Stitch:
             trans.set_position(pt_a1, pt_b1)
             trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
 
+        # Select shared edges.
+        if bpy.context.scene.tool_settings.uv_sticky_select_mode != 'DISABLED':
+            set_select_edge = utils.edge_select_linked_set_func(trans_lg.umesh)
+            for crn in ref_lg:
+                set_select_edge(crn.link_loop_radial_prev, True)
+
+
     def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
         uv = ref_isl.umesh.uv
 
@@ -486,21 +493,6 @@ class Stitch:
             trans.move(pt_a1 - pt_b1)
             trans_lg.copy_coords_from_ref(ref_lg, self.update_seams)
 
-    def copy_pos(self, crn, uv):
-        if self.update_seams:
-            crn.edge.seam = False
-
-        co_a = crn[uv].uv
-        shared_a = utils.shared_crn(crn).link_loop_next
-        source_corners = utils.linked_crn_uv_by_face_index(shared_a, uv)
-        for _crn in source_corners:
-            _crn[uv].uv = co_a
-
-        co_b = crn.link_loop_next[uv].uv
-        shared_b = utils.shared_crn(crn)
-        source_corners = utils.linked_crn_uv_by_face_index(shared_b, uv)
-        for _crn in source_corners:
-            _crn[uv].uv = co_b
 
     def sort_by_dist_to_mouse_or_sel_edge_length(self, target_islands, umesh):
         if umesh.sync and self.mouse_position:
