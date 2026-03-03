@@ -140,27 +140,6 @@ def calc_max_length_uv_crn_with_dist(corners, uv):
     return max_length, v1.copy(), v2.copy()
 
 
-def copy_pos_to_target_with_select(crn: BMLoop, uv, idx):
-    """Weld and Selects a common edge"""
-    from .bm_walk import linked_crn_uv_by_island_index_unordered_included
-    next_crn_co = crn.link_loop_next[uv].uv
-    shared = crn.link_loop_radial_prev
-    shared[uv].select_edge = True
-
-    for _crn in linked_crn_uv_by_island_index_unordered_included(shared, uv, idx):
-        _crn_uv = _crn[uv]
-        _crn_uv.uv = next_crn_co
-        _crn_uv.select = True
-
-    crn_co = crn[uv].uv
-    shared_next = shared.link_loop_next
-
-    for _crn in linked_crn_uv_by_island_index_unordered_included(shared_next, uv, idx):
-        _crn_uv = _crn[uv]
-        _crn_uv.uv = crn_co
-        _crn_uv.select = True
-
-
 def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv: BMLayerItem):
     """For Weld OT"""
     coords_sum_a = Vector((0.0, 0.0))

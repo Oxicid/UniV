@@ -668,11 +668,12 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
     def weld(self):
         from ..utils import weld_crn_edge_by_idx
 
+        # Weld by index pair select edges
         islands_of_mesh = []
         for umesh in self.umeshes:
             uv = umesh.uv
             update_tag = False
-            if islands := Islands.calc_extended_any_edge_non_manifold(umesh):
+            if islands := AdvIslands.calc_extended_any_edge_non_manifold(umesh):
                 umesh.set_corners_tag(False)
                 islands.indexing()
 
@@ -685,12 +686,17 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
                             crn.tag = False
                             continue
 
-                        if shared.face.index != idx:  # island boundary skip
+                        # Skip non-inner boundary edges for stitch
+                        if shared.face.index != idx:
                             crn.tag = False
                             shared.tag = False
+                            # TODO: Count boundary edges for stitch operator, for avoid overhead
                             continue
 
-                        if not shared.tag:  # single select preserve system
+                        # Single select preserve system.
+                        if not shared.tag:
+                            # Contain inner edges for avoid overhead for single select preserve system.
+                            isl.sequence.append(crn)
                             continue
 
                         # CPU Bound
@@ -717,6 +723,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
 
                         crn.tag = False
                         shared.tag = False
+
             umesh.update_tag = update_tag
 
             if islands:
@@ -725,17 +732,43 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         if self.umeshes.update_tag:
             return
 
-        if not self.umeshes.sync:
+        # Weld unpair selected edges
+        if not self.umeshes.sync or any(u.sync_valid for u in self.umeshes):
+            from ..utils import linked_crn_uv_by_idx_unordered_included
+            from ..utils import is_pair
+
             for islands in islands_of_mesh:
+                umesh = islands.umesh
+                # There can be cases where one mesh has valid UVs and another does not, so we filter out such cases accordingly.
+                if umesh.sync:
+                    if not umesh.sync_valid:
+                        continue
+
                 update_tag = False
-                uv = islands.umesh.uv
-                for idx, isl in enumerate(islands):
-                    for crn in isl.iter_corners_by_tag():
-                        utils.copy_pos_to_target_with_select(crn, uv, idx)
-                        if crn.edge.seam:
-                            crn.edge.seam = False
+                uv = umesh.uv
+                edge_linked_select_set = utils.edge_select_linked_set_func(umesh)
+
+                for isl in islands:
+                    if single_selected_inner_edges := isl.sequence:
                         update_tag = True
-                islands.umesh.update_tag = update_tag
+                        for crn in single_selected_inner_edges:
+                            crn.edge.seam = False
+
+                            # Weld verts
+                            next_crn_co = crn.link_loop_next[uv].uv
+                            shared = crn.link_loop_radial_prev
+                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(shared, uv):
+                                shared_l_crn[uv].uv = next_crn_co
+
+                            crn_co = crn[uv].uv
+                            shared_next = shared.link_loop_next
+                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(shared_next, uv):
+                                shared_l_crn[uv].uv = crn_co
+
+                            # TODO: Check selection on flipped faces
+                            edge_linked_select_set(shared, True)
+
+                umesh.update_tag = update_tag
 
             if self.umeshes.update_tag:
                 return
