@@ -1377,9 +1377,9 @@ class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
         pie = layout.menu_pie()
 
         # Left
-        pie.operator("mesh.univ_weld", icon_value=icons.weld)
+        pie.operator("mesh.univ_relax", icon_value=icons.relax)
         # Right
-        pie.operator("mesh.univ_cut", icon_value=icons.cut)
+        pie.operator("mesh.univ_unwrap", icon_value=icons.unwrap)
 
         # Bottom
         split = pie.split()
@@ -1390,13 +1390,13 @@ class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
         # Upper
         pie.operator("mesh.univ_gravity", icon_value=icons.gravity)
         # Left Upper
-        pie.operator("mesh.univ_relax", icon_value=icons.relax)
-        # Right Upper
-        pie.operator("mesh.univ_unwrap", icon_value=icons.unwrap)
-        # Left Bottom
         pie.operator("mesh.univ_stack", icon_value=icons.stack)
-        # Right Bottom
+        # Right Upper
         pie.operator("mesh.univ_angle", icon_value=icons.border_by_angle)
+        # Left Bottom
+        pie.operator("mesh.univ_weld", icon_value=icons.weld)
+        # Right Bottom
+        pie.operator("mesh.univ_cut", icon_value=icons.cut)
 
 
 class IMAGE_MT_PIE_univ_favorites_edit(Menu):
@@ -1409,9 +1409,9 @@ class IMAGE_MT_PIE_univ_favorites_edit(Menu):
         pie = layout.menu_pie()
 
         # Left
-        pie.operator("uv.univ_weld", icon_value=icons.weld)
+        pie.operator("uv.univ_relax", icon_value=icons.relax)
         # Right
-        pie.operator("uv.univ_cut", icon_value=icons.cut)
+        pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)
 
         # Bottom
         split = pie.split()
@@ -1422,13 +1422,13 @@ class IMAGE_MT_PIE_univ_favorites_edit(Menu):
         # Upper
         pie.operator("uv.univ_orient", icon_value=icons.orient)
         # Left Upper
-        pie.operator("uv.univ_relax", icon_value=icons.relax)
+        pie.operator("uv.univ_quadrify", icon_value=icons.quadrify)
         # Right Upper
-        pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)
+        pie.operator("uv.univ_straight", icon_value=icons.straight)
         # Left Bottom
-        pie.operator("uv.univ_stack", icon_value=icons.stack)
+        pie.operator("uv.univ_weld", icon_value=icons.weld)
         # Right Bottom
-        pie.operator("uv.univ_pin", icon_value=icons.pin)
+        pie.operator("uv.univ_cut", icon_value=icons.cut)
 
 
 class VIEW3D_MT_PIE_univ_projection(Menu):
