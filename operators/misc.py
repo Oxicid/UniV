@@ -252,7 +252,7 @@ class UNIV_OT_LinearGradient(Operator):
     use_union_bbox: BoolProperty(name='Use Union Boundary Box')
     min_value: FloatProperty(name='Min', soft_min=0, soft_max=1, default=0)
     max_value: FloatProperty(name='Max', soft_min=0, soft_max=1, default=1)
-    threshold: FloatProperty(name='Threshold', soft_min=0, soft_max=1, default=0)
+    scale: FloatProperty(name='Scale', soft_min=0, soft_max=2, default=1)
     invert: BoolProperty(name='Invert', default=False)
     axis: EnumProperty(name='Axis', default='VERTICAL', items=utils.ENUM('HORIZONTAL', 'VERTICAL'))
     channel: EnumProperty(name='Channel', items=utils.ENUM(('RGB', 'RGB'), 'R', 'G', 'B', 'A'))
@@ -262,7 +262,7 @@ class UNIV_OT_LinearGradient(Operator):
         layout.prop(self, 'use_union_bbox')
         layout.prop(self, 'min_value', slider=True)
         layout.prop(self, 'max_value', slider=True)
-        layout.prop(self, 'threshold', slider=True)
+        layout.prop(self, 'scale', slider=True)
         layout.prop(self, 'invert')
 
         layout.row(align=True).prop(self, 'axis', expand=True)
@@ -282,6 +282,7 @@ class UNIV_OT_LinearGradient(Operator):
         else:
             calc_islands_type = utypes.AdvIslands.calc_with_hidden_with_mark_seam
 
+
         bb = utypes.BBox()
         for umesh in umeshes:
             islands = calc_islands_type(umesh)
@@ -297,12 +298,16 @@ class UNIV_OT_LinearGradient(Operator):
         else:
             set_channel_idx = 3
 
+        center = (self.min_value + self.max_value) / 2
+        output_min = (self.min_value - center) * self.scale + center
+        output_max = (self.max_value - center) * self.scale + center
         if self.invert:
-            output_min, output_max = self.max_value, self.min_value
-        else:
-            output_min, output_max = self.min_value, self.max_value
+            output_min, output_max = output_max, output_min
 
-        is_vertical = self.axis == 'VERTICAL'
+        x_or_y_component = 0
+        if is_vertical := (self.axis == 'VERTICAL'):
+            x_or_y_component = 1
+
         for umesh in umeshes:
             uv = umesh.uv
             islands: utypes.AdvIslands = umesh.sequence
@@ -313,23 +318,22 @@ class UNIV_OT_LinearGradient(Operator):
                     bb = isl.bbox
 
                 if is_vertical:
-                    x_or_y_component = 0
-                    input_min = bb.ymin + bb.ymin * self.threshold
-                    input_max = bb.ymax - bb.ymin * self.threshold
+                    input_min = bb.ymin
+                    input_max = bb.ymax
 
                 else:
-                    x_or_y_component = 1
-                    input_min = bb.xmin + bb.xmin * self.threshold
-                    input_max = bb.xmax - bb.xmin * self.threshold
+                    input_min = bb.xmin
+                    input_max = bb.xmax
 
                 if self.channel == 'RGB':
                     for crn in isl.corners_iter():
-                        val = clamp(utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max))
+                        val = utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max)
+                        val = clamp(val)
                         crn[color_layer] = Vector((val, val, val, 1.0))
                 else:
                     for crn in isl.corners_iter():
-                        val = clamp(utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max))
-                        crn[color_layer][set_channel_idx] = val
+                        val = utils.remap(crn[uv].uv[x_or_y_component], input_min, input_max, output_min, output_max)
+                        crn[color_layer][set_channel_idx] = clamp(val)
         umeshes.update()
         if not umeshes.is_edit_mode:
             umeshes.free()
