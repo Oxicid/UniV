@@ -276,11 +276,11 @@ def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
 
 
 def np_vec_dot(a, b):
-    try:
-        from numpy.core.umath_tests import inner1d  # noqa
-        return inner1d(a, b)  # x2 faster then einsum, but deprecated
-    except: # noqa
-        return np.einsum('ij,ij->i', a, b)
+    # try:
+    #     from numpy.core.umath_tests import inner1d  # noqa
+    #     return inner1d(a, b)  # x2 faster then einsum, but deprecated
+    # except: # noqa
+    return np.einsum('ij,ij->i', a, b)
 
 
 def np_vec_normalized(a, keepdims=True):

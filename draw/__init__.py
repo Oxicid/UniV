@@ -165,7 +165,7 @@ class DrawCallSeams2D:
             return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": data}))
         return None
 
-    if bpy.app.version >= (4, 5, 0):
+    if bpy.app.version >= (5, 0, 0):
         @staticmethod
         def get_color():
             return *bpy.context.preferences.themes[0].view_3d.seam, 0.5

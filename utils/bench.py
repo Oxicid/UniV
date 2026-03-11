@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import io
+import gc
 import time
 import pstats
 import cProfile
@@ -21,10 +22,12 @@ class timer:
         self._fix_args()
         if self.repeats != 1:
             raise ValueError('Context t manager not support repeats')
+        gc.disable()
         self._start = time.perf_counter()
 
     def __exit__(self, *exc_info):
         self._print_time_info()
+        gc.enable()
         self.reset()
 
     def __call__(self, func):
