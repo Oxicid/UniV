@@ -416,7 +416,9 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             if not has_full_selected_uv_faces:
                 if umesh.sync_valid:
                     for crn in verts_to_lock:
-                        crn.uv_select_vert = True
+                        if not crn.uv_select_vert:
+                            crn.uv_select_vert = True
+                            to_restore_selection.add(crn)
                         crn_uv = crn[uv]
                         if not crn_uv.pin_uv:
                             crn_uv.pin_uv = True
