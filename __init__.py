@@ -51,7 +51,7 @@ from . import preferences
 
 from bpy.app.timers import register as tm_register
 
-univ_pro: "type[bpy?] | None"
+# univ_pro: "type[bpy?] | None"
 try:
     from . import univ_pro
 except ImportError:
@@ -247,6 +247,7 @@ def load_register_types():
                 univ_pro.checker.UNIV_OT_Checker,
                 univ_pro.checker.UNIV_OT_CheckerSave,
                 univ_pro.checker.UNIV_OT_CheckerUpdate,
+                univ_pro.checker.UNIV_OT_CheckerShowFolder,
                 univ_pro.checker.UNIV_OT_CheckerGenerator,
                 # Trim
                 univ_pro.trim.UNIV_OT_TrimPresetsProcessing,

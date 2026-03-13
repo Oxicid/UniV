@@ -763,6 +763,7 @@ class UNIV_PT_CheckerSettings(Panel):
 
         from .univ_pro.checker import UNIV_OT_Checker
         UNIV_OT_Checker.draw_checker_layout(layout, True)
+        layout.operator('scene.univ_checker_show_folder', icon='FILE_FOLDER')
 
         # layout.operator('wm.univ_checker_generator')  # TODO: Improve
 
