@@ -203,18 +203,14 @@ class LinearSolver:
         # Solve
         if self.least_squares:
             rhs_vec = M.T @ b_vec
-            try:
-                # Solve (MtM) x = M^T b
-                x_compact = np.linalg.solve(A, rhs_vec)
-            except np.linalg.LinAlgError:
-                # fallback to least-squares solution if singular
-                x_compact, *_ = np.linalg.lstsq(A, rhs_vec , rcond=None)
+            # Solve (MtM) x = M^T b
+            x_compact = np.linalg.lstsq(A, rhs_vec , rcond=None)[0]
         else:
             try:
                 x_compact = np.linalg.solve(A, b_vec)
             except np.linalg.LinAlgError:
                 # fallback to least-squares solution if singular
-                x_compact, *_ = np.linalg.lstsq(A, b_vec, rcond=None)
+                x_compact = np.linalg.lstsq(A, b_vec, rcond=None)[0]
 
         # store into solver.x
         self.x[:] = x_compact
