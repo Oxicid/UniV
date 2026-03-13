@@ -203,6 +203,8 @@ copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
 if _is_360_pack := bpy.app.version >= (3, 6, 0):
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
+
+# noinspection PyTypeHints
 class UNIV_TrimPreset(bpy.types.PropertyGroup):
     name: StringProperty(name='Name', default='Trim')
     color: FloatVectorProperty(name='Color', default=(0.9, 0, 0), subtype="COLOR", size=3, min=0.0, max=1.0, update=_update_trim_system)
@@ -235,17 +237,18 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
                 return i
         return -1
 
+# noinspection PyTypeHints
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
     texel: FloatProperty(name='Texel', default=512, min=1, max=100_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
     size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
-
+# noinspection PyTypeHints
 class UNIV_UV_Layers(bpy.types.PropertyGroup):
     name: StringProperty(name='UVMap', update=_update_uv_layers_name)
     flag: IntProperty(name='Flag', default=0, min=0, max=3)
 
-
+# noinspection PyTypeHints
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -739,12 +742,6 @@ Some operators, can interact with trims:
             row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
 
             from .icons import icons
-
-            # TODO: Force load, needed?
-            try:
-                from . import univ_pro
-            except ImportError:
-                univ_pro = None
 
             if not univ_pro:
                 layout.label(

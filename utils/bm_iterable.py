@@ -91,7 +91,7 @@ else:
             return (f for f in umesh.bm.faces if all(crn[uv].select_edge for crn in f.loops) and f.select)
 
 
-def calc_selected_verts(umesh: 'utypes.UMesh') -> list[BMVert] | typing.Any:  # noqa
+def calc_selected_verts(umesh: 'utypes.UMesh') -> list[BMVert] | typing.Any:
     if umesh.is_full_vert_deselected:
         return []
     if umesh.is_full_vert_selected:
@@ -99,13 +99,19 @@ def calc_selected_verts(umesh: 'utypes.UMesh') -> list[BMVert] | typing.Any:  # 
     return [v for v in umesh.bm.verts if v.select]
 
 
-def calc_selected_edges(umesh: 'utypes.UMesh') -> list[BMEdge] | typing.Any:  # noqa
+def calc_selected_edges(umesh: 'utypes.UMesh') -> list[BMEdge] | typing.Any:
     if umesh.is_full_edge_deselected:
         return []
     if umesh.is_full_edge_selected:
         return umesh.bm.edges
     return [e for e in umesh.bm.edges if e.select]
 
+def calc_selected_edges_iter(umesh: 'utypes.UMesh') -> list[BMEdge] | typing.Any:
+    if umesh.is_full_edge_deselected:
+        return []
+    if umesh.is_full_edge_selected:
+        return umesh.bm.edges
+    return (e for e in umesh.bm.edges if e.select)
 
 def calc_visible_uv_faces_iter(umesh: 'utypes.UMesh') -> typing.Iterable[BMFace]:
     if umesh.is_full_face_selected:

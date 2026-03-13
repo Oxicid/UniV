@@ -395,6 +395,16 @@ def add_keymaps_ws():
         kmi = km.keymap_items.new('mesh.univ_select_similar', 'G', 'PRESS', shift=True)
         keys.append((km, kmi))
 
+        # Select loop
+        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
+        keys.append((km, kmi))
+
+        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
+        keys.append((km, kmi))
+
     workspace_duplicates(km)
 
     # Object Mode
@@ -716,6 +726,7 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                      'Delete User - Remove manually installed UniV keymaps\n' \
                      'Resolve Conflicts - Resolve all conflicts with UniV keymaps (except in cases where the UniV keymap is disabled)'
 
+    # noinspection PyTypeHints
     mode: bpy.props.EnumProperty(name='Mode', default='RESTORE',
                                  items=(
                                      ('RESTORE', 'Restore', ''),

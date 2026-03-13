@@ -40,6 +40,7 @@ from ..utypes import (
 from ..preferences import prefs, univ_settings
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Fit(Operator, utils.PaddingHelper):
     bl_idname = 'uv.univ_fit'
     bl_label = 'Fit'
@@ -130,9 +131,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
     def crop(self):
         offset = None
         if self.mode in ('TO_CURSOR', 'TO_CURSOR_INDIVIDUAL'):
-            if not (offset := utils.get_tile_from_cursor()):
-                self.report({'INFO'}, "Cursor not found")
-                return {'CANCELLED'}
+            offset = utils.get_tile_from_cursor()
 
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.update_tag = False
@@ -141,7 +140,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if not self.umeshes:
-                return self.umeshes.update()
+                return
 
             if selected_umeshes:
                 self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
@@ -149,7 +148,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
         else:
             if not self.umeshes:
-                return self.umeshes.update()
+                return
             self.umeshes.ensure()
             self.calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
 
@@ -262,7 +261,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if not self.umeshes:
-                return self.umeshes.update()
+                return
 
             if selected_umeshes:
                 self.calc_island_method = AdvIslands.calc_extended_with_mark_seam
@@ -270,7 +269,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 self.calc_island_method = AdvIslands.calc_visible_with_mark_seam
         else:
             if not self.umeshes:
-                return self.umeshes.update()
+                return
             selected_umeshes = []
             self.umeshes.ensure()
             self.calc_island_method = AdvIslands.calc_with_hidden_with_mark_seam
@@ -427,7 +426,7 @@ class UNIV_OT_FillToPixels(Operator):
 
 
 class Align_by_Angle:
-
+    # noinspection PyTypeHints
     angle: FloatProperty(name='Angle', default=to_rad(5), min=to_rad(
         2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
 
@@ -991,6 +990,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     bl_description = "Align verts, edges, faces, islands"
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
     direction: EnumProperty(name="Direction", default='UPPER', items=align_align_direction_items)
 
     # TODO: Add support Trim System: Move (Move by Trims)
@@ -1496,7 +1496,7 @@ align_event_info_ex = \
     "In Non-Edit Mode, operations proceed as in Island Mode.\n"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Align(UNIV_OT_Align_pie):
     bl_idname = 'uv.univ_align'
     bl_description = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
@@ -1566,13 +1566,14 @@ class UNIV_OT_Flip_VIEW3D(Operator):
                      "Alt - Flip by Y axis.\n\n" \
                      "Shift and Ctrl conflict between them."
 
+    # noinspection PyTypeHints
     mode: EnumProperty(name='Mode', default='DEFAULT', items=(
         ('DEFAULT', 'Default', ''),
         ('BY_CURSOR', 'By cursor', ''),
         ('INDIVIDUAL', 'Individual', ''),
         ('FLIPPED', 'Flipped', ''),
     ))
-
+    # noinspection PyTypeHints
     axis: EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
 
     def draw(self, context):
@@ -1693,7 +1694,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             umesh.update_tag = bool(islands)
 
         if not self.umeshes.update_tag:
-            return self.report({'INFO'}, 'Flipped islands not found')
+            self.report({'INFO'}, 'Flipped islands not found')
 
     @staticmethod
     def calc_visible_flipped_islands_with_mark_seam(umesh):
@@ -1757,7 +1758,7 @@ class UNIV_OT_Flip(UNIV_OT_Flip_VIEW3D):
     bl_idname = 'uv.univ_flip'
     bl_description = UNIV_OT_Flip_VIEW3D.bl_description + "\n\nHas [F] keymap"
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Rotate_VIEW3D(Operator):
     bl_idname = 'mesh.univ_rotate'
     bl_label = 'Rotate'
@@ -1906,7 +1907,7 @@ class UNIV_OT_Rotate(UNIV_OT_Rotate_VIEW3D):
     bl_idname = 'uv.univ_rotate'
     bl_description = UNIV_OT_Rotate_VIEW3D.bl_description + "\n\nHas [5, Alt+5, Shift+5] keymaps"
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     bl_idname = 'uv.univ_sort'
     bl_label = 'Sort'
@@ -2139,7 +2140,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         else:
             return self.axis == 'X'
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     bl_idname = 'uv.univ_distribute'
     bl_label = 'Distribute'
@@ -2348,7 +2349,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         else:
             return self.axis == 'X'
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Break(Operator, utils.PaddingHelper):
     bl_idname = 'uv.univ_break'
     bl_label = 'Break'
@@ -2447,7 +2448,7 @@ class UNIV_OT_Home(Operator):
                      "Removes attributes and modifiers from Shift operator, " \
                      "resets uv offset of Array, Mirror, UVWarp modifiers"
     bl_options = {'REGISTER', 'UNDO'}
-
+    # noinspection PyTypeHints
     to_cursor: BoolProperty(name='To Cursor', default=False)
 
     def invoke(self, context, event):
@@ -2609,7 +2610,7 @@ class UNIV_OT_Home(Operator):
 class UNIV_OT_Home_VIEW3D(UNIV_OT_Home):
     bl_idname = 'mesh.univ_home'
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Shift(Operator):
     bl_idname = "uv.univ_shift"
     bl_label = 'Shift'
@@ -2684,7 +2685,7 @@ class UNIV_OT_Shift(Operator):
         else:
             if changed_modifiers:
                 self.report({'INFO'}, f"Changed {changed_modifiers} modifiers")
-                return
+                return {'FINISHED'}
             else:
                 self.report({'WARNING'}, 'Islands not found')
                 return {'CANCELLED'}
@@ -2974,6 +2975,7 @@ class UNIV_OT_Shift_VIEW3D(UNIV_OT_Shift):
     bl_idname = "mesh.univ_shift"
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Random(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_random"
     bl_label = "Random"
@@ -2992,14 +2994,14 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     flip_strength: FloatVectorProperty(name='Flip', default=(0, 0), min=0, max=1, size=2, subtype='XYZ')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     rotation: FloatProperty(name='Rotation Range', default=0, min=0, soft_max=math.pi * 2, subtype='ANGLE',
-                            update=lambda self, _: setattr(self, 'rotation_steps', self.rotation) if self.rotation < self.rotation_steps else None)
+                            update=lambda self_, _: setattr(self_, 'rotation_steps', self_.rotation) if self_.rotation < self_.rotation_steps else None)
     rotation_steps: FloatProperty(name='Rotation Steps', default=0, min=0, max=math.pi, subtype='ANGLE',
-                                  update=lambda self, _: setattr(self, 'rotation', self.rotation_steps) if self.rotation < self.rotation_steps else None)
+                                  update=lambda self_, _: setattr(self_, 'rotation', self_.rotation_steps) if self_.rotation < self_.rotation_steps else None)
     scale_factor: FloatProperty(name="Scale Factor", default=0, min=0, soft_max=1, subtype='FACTOR')
     min_scale: FloatProperty(name='Min Scale', default=0.5, min=0, max=10, soft_min=0.1, soft_max=2,
-                             update=lambda self, _: setattr(self, 'max_scale', self.min_scale) if self.max_scale < self.min_scale else None)
+                             update=lambda self_, _: setattr(self_, 'max_scale', self_.min_scale) if self_.max_scale < self_.min_scale else None)
     max_scale: FloatProperty(name='Max Scale', default=2, min=0, max=10, soft_min=0.1, soft_max=2,
-                             update=lambda self, _: setattr(self, 'min_scale', self.max_scale) if self.max_scale < self.min_scale else None)
+                             update=lambda self_, _: setattr(self_, 'min_scale', self_.max_scale) if self_.max_scale < self_.min_scale else None)
     bool_bounds: BoolProperty(name="Within Image Bounds", default=False,
                               description="Keep the UV faces/islands within the 0-1 UV domain.", )
     rand_seed: IntProperty(name='Seed', default=0)
@@ -3279,7 +3281,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 class UNIV_OT_Random_VIEW3D(UNIV_OT_Random):
     bl_idname = "mesh.univ_random"
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     bl_idname = 'uv.univ_orient'
     bl_label = 'Orient'
@@ -3572,6 +3574,7 @@ class UNIV_OT_Orient_VIEW3D(UNIV_OT_Orient):
 
 # The code was taken and modified from the TexTools addon:
 # https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
+# noinspection PyTypeHints
 class UNIV_OT_Gravity(Operator):
     bl_idname = 'uv.univ_gravity'
     bl_label = 'Gravity'
@@ -3885,8 +3888,8 @@ class UNIV_OT_Pack(Operator):
         VK_RETURN = 0x0D  # Enter  # noqa
         KEYDOWN = 0x0000  # Press  # noqa
         KEYUP = 0x0002  # Release  # noqa
-        ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)
-        ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)
+        ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYDOWN, 0)  # noqa
+        ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYUP, 0)  # noqa
 
 class UNIV_OT_PackOther(UNIV_OT_Pack):
     bl_idname = 'uv.univ_pack_other'
