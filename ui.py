@@ -346,6 +346,14 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_cut', icon_value=icons.cut)
             row.operator('uv.univ_seam_border', icon_value=icons.border_seam)
 
+            if univ_pro:
+                row = col_align.row(align=True)
+                row.scale_y = 1.35
+                row.operator('uv.univ_constraint_by_angle', text='', icon='EVENT_A').vertical = False
+                row.operator('uv.univ_constraint', text='H-Constr', icon_value=icons.horizontal_c).vertical = False
+                row.operator('uv.univ_constraint_by_angle', text='', icon='EVENT_A').vertical = True
+                row.operator('uv.univ_constraint', text='V-Constr', icon_value=icons.vertical_b).vertical = True
+
             col_align.operator('uv.univ_pin', icon_value=icons.pin)
 
 

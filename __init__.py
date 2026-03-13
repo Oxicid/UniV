@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Advanced UV tools",
     "author": "Oxicid",
-    "version": (3, 9, 65),
+    "version": (4, 0, 0, 'alpha'),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -272,6 +272,9 @@ def load_register_types():
                 univ_pro.drag.UNIV_OT_Drag,
                 # Transfer
                 univ_pro.transfer.UNIV_OT_Transfer,
+                # Mark
+                univ_pro.mark.UNIV_OT_Constraint,
+                univ_pro.mark.UNIV_OT_ConstraintByAngle,
                 # Misc
                 univ_pro.rectify.UNIV_OT_Rectify,
                 univ_pro.projection.UNIV_OT_BoxProject,

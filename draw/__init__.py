@@ -273,8 +273,7 @@ class DrawCallConstraints2D:
                                 elif bits == 3:  # horizontal
                                     h_coords_append(crn[uv].uv)
                                     h_coords_append(crn.link_loop_next[uv].uv)
-
-                                edge_idx >>= 2
+                            edge_idx >>= 2
             else:
                 if umesh.is_full_face_deselected:
                     return [], []
@@ -290,8 +289,8 @@ class DrawCallConstraints2D:
                                 elif bits == 3:  # horizontal
                                     h_coords_append(crn[uv].uv)
                                     h_coords_append(crn.link_loop_next[uv].uv)
+                            edge_idx >>= 2
 
-                                edge_idx >>= 2
         return v_coords, h_coords
 
 class DrawCall3D:

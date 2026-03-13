@@ -1,12 +1,12 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
-
-import typing  # noqa
 
 import bpy
 import copy
 import bmesh
+import typing  # noqa
 
+import contextlib
 from collections import defaultdict
 from math import pi
 
@@ -602,6 +602,15 @@ class UMesh:
             self.uv = layers_uv.new('UVMap')
         else:
             self.uv = self.bm.loops.layers.uv.verify()
+
+    @contextlib.contextmanager
+    def temp_override_mode(self, mode: str = 'FACE'):
+        saved_mode = self.bm.select_mode
+        try:
+            self.bm.select_mode = {mode}
+            yield
+        finally:
+            self.bm.select_mode = saved_mode
 
     def __hash__(self):
         return hash(self.bm)

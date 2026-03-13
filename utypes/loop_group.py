@@ -771,6 +771,7 @@ class Segment:
                 lengths_seq.append(adv_crn.length)
         return lengths_seq
 
+    # TODO: Delete length
     @property
     def length(self):
         if isinstance(self._length_uv, utils.NoInit):

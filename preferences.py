@@ -776,7 +776,7 @@ Some operators, can interact with trims:
             layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gone too.",
                          icon_value=icons.loop_select)
             layout.separator(factor=0.35)
-            layout.label(text="Drag - this operator is similar to the QuickSnap operator, but has fundamental differences:",
+            layout.label(text="Drag [Alt + Drag LMB] - this operator is similar to the QuickSnap operator, but has fundamental differences:",
                          icon_value=icons.fill)
             layout.label(text="     1) It works only with islands")
             layout.label(text="     2) Moves only one island")

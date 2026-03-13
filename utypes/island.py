@@ -605,6 +605,22 @@ class FaceIsland:
             for face in self.faces:
                 face.select = False
 
+    def hide_for_unwrap(self):
+        if self.umesh.sync:
+            for face in self.faces:
+                face.hide_set(True)
+        else:
+            for face in self.faces:
+                face.select = False
+
+    def unhide_for_unwrap(self):
+        if self.umesh.sync:
+            for face in self.faces:
+                face.hide_set(False)
+        else:
+            for face in self.faces:
+                face.select = True
+
     def hide_second(self):
         if self.umesh.sync:
             fast_find_faces = set(self.faces)
@@ -777,6 +793,33 @@ class FaceIsland:
         for f in self:
             if flip_state != is_flipped_uv(f, uv):
                 return True
+        return False
+
+    def has_constraints_edge(self, selected=False):
+        constraints_attr = self.umesh.bm.edges.layers.int.get('univ_constraints')
+        if constraints_attr:
+            if selected:
+                get_edge_select = utils.edge_select_get_func(self.umesh)
+                # TODO: Check accidentally selected verts and edges (by mode)
+                # TODO: Check with linked edge
+                edges = (crn for f in self.faces for crn in f.loops if get_edge_select(crn))
+            else:
+                edges = (crn for f in self.faces for crn in f.loops)
+
+            for crn in edges:
+                if edge_bits := crn.edge[constraints_attr]:
+                    for i, crn_l in enumerate(crn.edge.link_loops):
+                        if crn == crn_l:
+                            if i == 16:
+                                break
+
+                            shift = i * 2
+                            bits = (edge_bits >> shift) & 3
+                            if bits == 2:  # vertical
+                                return True
+                            elif bits == 3:  # horizontal
+                                return True
+                            break
         return False
 
     def calc_islands_by_flip_with_mark_seam(self) -> 'tuple[Islands | AdvIslands, Islands | AdvIslands]':

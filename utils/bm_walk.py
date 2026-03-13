@@ -137,7 +137,7 @@ def linked_crn_to_vert_pair(crn: BMLoop, uv, sync: bool):
 
 
 def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
-    """Linked to arg corner by island index with arg corner (non-included)"""
+    """Linked to arg corner (non-included)"""
     is_invisible = is_invisible_func(sync)
     first_vert = crn.vert
 
@@ -175,6 +175,56 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
                             or pair_cw.edge.seam
                             or is_invisible(next_crn.face)
                             or not is_pair(bm_iter, pair_cw, uv)
+                        ):
+                    break
+                bm_iter = next_crn
+                linked_cw.append(next_crn)
+            linked.extend(linked_cw[::-1])
+            break
+        bm_iter = pair_ccw
+        linked.append(bm_iter)
+    # assert len(linked) == len(set(linked))
+    return linked
+
+def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop):
+    """Linked to arg corner with_seam without coord check(non-included)
+        NOTE: Need for unwrap in vert/edge mode for check
+        NOTE: Need actual mark seams for differencing islands by seams
+    """
+    first_vert = crn.vert
+
+    linked = []
+    bm_iter = crn
+    # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
+    iterated = False
+    while True:
+        prev_crn = bm_iter.link_loop_prev
+        pair_ccw = prev_crn.link_loop_radial_prev
+        if pair_ccw == crn and iterated:
+            break
+        iterated = True
+
+        # Finish CCW
+        if (pair_ccw in (prev_crn, crn) or
+                    (first_vert != pair_ccw.vert) or
+                    pair_ccw.edge.seam or
+                    pair_ccw.face.hide
+                ):
+            bm_iter = crn
+            linked_cw = []
+            while True:
+                pair_cw = bm_iter.link_loop_radial_prev
+                # Skip flipped and boundary
+                if pair_cw == bm_iter:
+                    break
+
+                next_crn = pair_cw.link_loop_next
+                if next_crn == crn:
+                    break
+
+                if ((first_vert != next_crn.vert)
+                            or pair_cw.edge.seam
+                            or pair_ccw.face.hide
                         ):
                     break
                 bm_iter = next_crn

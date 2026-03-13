@@ -4,6 +4,7 @@
 import math
 import heapq
 import typing
+import contextlib
 import numpy as np
 from bmesh.types import BMFace
 from mathutils import Vector, Matrix
@@ -58,6 +59,7 @@ class UnwrapOptions:
     unwrap_along: typing.Literal['UV', 'U', 'V'] = 'UV'
 
     blend: float = 1
+    constraints_factor: float = 100
     method: int = 0
     use_slim: bool = False
     use_abf: bool = False
@@ -66,6 +68,72 @@ class UnwrapOptions:
 
     # slim: ParamSlimOptions = None
     weight_group: str = ''
+
+def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
+                      unwrap_along: typing.Literal['UV', 'U', 'V'],
+                      use_abf=True,
+                      topology_from_uvs=True,
+                      blend_factor=1.0,
+                      fill_holes=True,
+                      constraints_factor=100.0
+                      ):
+    """NOTE: Need indexing for constraints for segments and tagging for pinning (False = Pin)"""
+
+    if constraints_factor < 100.0:
+        # Weight starts working with the smallest values, so remap the input values to smaller ones.
+        steps = [2 ** i for i in range(-10, 1)]
+
+        # Smooth step from 100 to 0.
+        t = constraints_factor / 100
+        pos = t * (len(steps) - 1)
+
+        i = int(pos)
+        f = pos - i
+
+        a = steps[i]
+        b = steps[min(i + 1, len(steps) - 1)]
+        # Interpolate steps.
+        constraints_factor = (a + (b - a) * f) * 100
+
+
+    options = UnwrapOptions
+    options.fill_holes = fill_holes
+    options.blend = blend_factor
+    options.constraints_factor = constraints_factor
+    options.use_abf = use_abf
+    options.unwrap_along = unwrap_along
+
+    options.topology_from_uvs = topology_from_uvs
+    options.topology_from_uvs_use_seams = True
+
+    if not any(isl.iter_corners_by_tag()):
+        return 0
+
+    handle = ParamHandle.construct_param_handle_by_tag(isl)
+    handle.uv_parametrizer_lscm_begin()
+    failed_solve = handle.uv_parametrizer_lscm_solve()
+    handle.uv_parametrizer_flush()
+    return failed_solve
+
+
+@contextlib.contextmanager
+def unwrap_time_report(report):
+    import time
+    t1 = time.perf_counter()
+    try:
+        yield
+    finally:
+        if (total := (time.perf_counter() - t1)) > 2:
+            first_line = f'UniV uses an inefficient Linear Solver ({total:.3} sec).'
+            import platform
+            if platform.system() == 'Windows':
+                from .. import fastapi
+                if not fastapi.FastAPI.lib:
+                    report({'WARNING'}, f"{first_line} Install the univ_fastapi.dll library to speed up the process.")
+            else:
+                report({'WARNING'},
+                       f"{first_line} Use a simpler mesh to avoid exponential growth in waiting time. "
+                       f"Plans to use a faster library for {platform.system()!r} are in the near future.")
 
 
 PVERT_PIN = 1
@@ -82,9 +150,9 @@ PEDGE_PIN = 4
 PEDGE_SELECT = 8
 PEDGE_DONE = 16
 PEDGE_FILLED = 32
-PEDGE_COLLAPSE = 64
-PEDGE_COLLAPSE_EDGE = 128
-PEDGE_COLLAPSE_PAIR = 256
+PEDGE_V_CONSTRAIN = 64
+PEDGE_H_CONSTRAIN = 128
+PEDGE_TAG = 256
 
 # for flipping faces
 PEDGE_VERTEX_FLAGS = PEDGE_PIN
@@ -682,9 +750,8 @@ class PChart:
         self.n_faces: int = 0
         self.n_boundaries: int = 0
 
-        self.collapsed_verts: ParametrizerIt[PVert] = ParametrizerIt()
-        self.collapsed_edges: ParametrizerIt[PEdge] = ParametrizerIt()
-        self.collapsed_faces: ParametrizerIt[PFace] = ParametrizerIt()
+        self.constr_h = []
+        self.constr_v = []
 
         self.area_uv: float = 0.0
         self.area_3d: float = 0.0
@@ -854,7 +921,8 @@ class PChart:
                 if not we or we == lastwe:
                     break
 
-    def lscm_begin(self):
+
+    def lscm_begin(self, constraints_segments):
 
         assert self.context is None
 
@@ -873,29 +941,40 @@ class PChart:
             if not self.abf_solve():
                 print("ABF solving failed: falling back to LSCM.")
 
+        res = None
+        if UnwrapOptions.unwrap_along == 'UV':
+            pin1: list[PVert | None] = [None]
+            pin2: list[PVert | None] = [None]
+
+            if len(pins) <= 1:
+                if constraints_segments:
+                    if res := self.extrema_verts_from_constr_segments(constraints_segments):
+                        self.pin1, self.pin2 = res
+                    else:
+                        print('UniV: Unwrap: Not found extrema pins from constraints.')
+
+                if not res:
+                    # No pins, let's find some ourselves.
+                    outer: PEdge = self.boundaries()
+
+                    # Outer can be null with non-finite coordinates.
+                    if not (outer and self.symmetry_pins(outer, pin1, pin2)):
+                        self.extrema_verts(pin1, pin2)
+
+
+                    self.pin1 = pin1[0]
+                    self.pin2 = pin2[0]
+
+            # from ..draw import lines
+            # lines.LinesDrawSimple.draw_register([self.pin1.edge.orig_uv, self.pin2.edge.orig_uv], (1,0,0,1))
+
         # ABF uses these indices for its internal references.
         # Set the indices afterward.
         for idx, v in enumerate(self.verts):
             v.id = idx
 
-
-        if UnwrapOptions.unwrap_along == 'UV':
-            if len(pins) <= 1:
-                # No pins, let's find some ourselves.
-
-                outer: PEdge = self.boundaries()
-
-                pin1: list[PVert | None] = [None]
-                pin2: list[PVert | None] = [None]
-                # Outer can be null with non-finite coordinates.
-                if not (outer and self.symmetry_pins(outer, pin1, pin2)):
-                    self.extrema_verts(pin1, pin2)
-
-
-                self.pin1 = pin1[0]
-                self.pin2 = pin2[0]
-
-        self.context = LinearSolver.new(2 * self.n_faces, 2 * self.n_verts, least_squares=True)
+        n_constr = len(self.constr_v) + len(self.constr_h)
+        self.context = LinearSolver.new(2 * self.n_faces + n_constr, 2 * self.n_verts, least_squares=True)
 
     def lscm_solve(self) -> bool:
         context: LinearSolver = self.context
@@ -904,10 +983,12 @@ class PChart:
         #     if v.flag & PVERT_PIN:
         #         v.load_pin_select_uvs() # Reload for Live Unwrap.
 
+        # Save origin
         if self.single_pin:
             # If only one pin, save location as origin.
             self.origin = self.single_pin.uv.copy()
-        #
+
+        # Lock extrema coords
         if self.pin1:
             pin1: PVert = self.pin1
             pin2: PVert = self.pin2
@@ -961,6 +1042,26 @@ class PChart:
             context.matrix_add_angles(row, a1, a2, a3, v1.id, v2.id, v3.id)
             row += 2
 
+        #########
+        w = UnwrapOptions.constraints_factor
+
+        for edge in self.constr_v:
+            v1 = edge.vert
+            v2 = edge.next.vert
+
+            context.matrix_add(row, 2 * v1.id, w)
+            context.matrix_add(row, 2 * v2.id, -w)
+            row += 1
+
+        for edge in self.constr_h:
+            v1 = edge.vert
+            v2 = edge.next.vert
+
+            context.matrix_add(row, 2 * v1.id+1, w)
+            context.matrix_add(row, 2 * v2.id+1, -w)
+            row += 1
+
+
         if context.solve():
             for v in self.verts:
                 v.uv[0] = context.variable_get(2 * v.id)
@@ -968,13 +1069,6 @@ class PChart:
             return True
         else:
             self.skip_flush = True
-            # print(f'{self.n_faces = }')
-            # print(f'{self.n_edges = }')
-            # print(f'{self.n_verts = }')
-            # print(f'{self.n_boundaries = }')
-            # for elem in self.verts:
-            #     print(elem.co)
-            #     print(elem.uv)
             # TODO: Debug this with EIG_linear_solver_print_matrix
             # for v in self.verts:
             #     v.uv.xy = (0.0, 0.0)
@@ -1298,6 +1392,122 @@ class PChart:
         pin2[0] = max_vert[dir_]
 
         self.pin_positions(pin1, pin2)
+
+    def extrema_verts_from_constr_segments(self, segments):
+        # pin1: list[PVert], pin2: list[PVert]
+        from ..utypes import Segment
+
+        seg: Segment
+        for seg in segments:
+            first_crn = seg[0].crn
+            if seg[0].invert:
+                print("UniV: Unwrap: Constraint: Inverted segment, UB.")
+            start_co = seg.start_co
+
+            end_co = seg.end_co
+            end_idx = -1
+            # TODO: Improve circular constraints, use true mark seam segments
+            if seg.is_circular:
+                end_idx = len(seg) // 2
+                if end_idx == 0:
+                    end_idx = -1
+
+            if seg[end_idx].invert:
+                second_crn = seg[end_idx].crn.link_loop_prev
+            else:
+                second_crn = seg[end_idx].crn.link_loop_next
+
+            if seg.is_circular:
+                end_co = second_crn[seg.umesh.uv].uv
+                first_crn = first_crn.link_loop_next
+                start_co = first_crn[seg.umesh.uv].uv
+
+            # TODO: Get pins from segment also
+            # Get first extrema pin
+            pin1 = None
+            index = first_crn.vert.index
+            for v in self.verts:
+                if v.id == index and v.edge.orig_uv == start_co:
+                    pin1 = v
+                    break
+
+            if not pin1:
+                for v in self.verts:
+                    if v.edge.orig_uv == start_co:
+                        pin1 = v
+                        break
+
+            # Get second extrema pin
+            pin2 = None
+            index = second_crn.vert.index
+            for v in self.verts:
+                if v.id == index and v.edge.orig_uv == end_co:
+                    pin2 = v
+                    break
+
+            # Small island (zero) scale case
+            if not pin2 or pin1 == pin2:
+                for v in self.verts:
+                    if v.edge.orig_uv == end_co and v != pin1:
+                        pin2 = v
+                        break
+
+            # if pin1 and pin2:
+                # from ..draw import lines
+                # lines.LinesDrawSimple.draw_register([pin1.uv.copy(), pin2.uv.copy()], (1,0,0,1))
+
+            if seg.value == 'U':
+                if not pin1 or not pin2 or (pin1 == pin2):
+                    print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
+
+                    e: PEdge = self.constr_h[0]
+                    pin1 = e.vert
+                    pin2 = e.next.vert
+
+                    pin1.uv[0] = 0.0
+                    pin1.uv[1] = 0.0
+                    pin2.uv[0] = 1.0
+                    pin2.uv[1] = 0.0
+                    # raise # TODO: Test
+                else:
+                    # TODO: Get y coord by weighted
+
+                    start = seg.start_co
+                    if start.x > seg.end_co.x:
+                        card_dir = Vector((-1, 0))
+                    else:
+                        card_dir = Vector((1, 0))
+
+                    end = start + (card_dir * max(seg.length_uv, 0.001))
+                    pin2.uv[0] = end.x
+                    pin2.uv[1] = end.y
+                return pin1, pin2
+            else:
+                if not pin1 or not pin2 or (pin1 == pin2):
+                    print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
+                    e: PEdge = self.constr_v[0]  # TODO: Get max edge length
+                    pin1 = e.vert
+                    pin2 = e.next.vert
+
+                    pin1.uv[0] = 0.0
+                    pin1.uv[1] = 0.0
+                    pin2.uv[0] = 0.0
+                    pin2.uv[1] = 1.0
+                    # raise # TODO: Test
+                else:
+                    # TODO: Get y coord by weighted
+                    start = seg.start_co
+                    if start.y > seg.end_co.y:
+                        card_dir = Vector((0, -1))
+                    else:
+                        card_dir = Vector((0, 1))
+
+                    end = start + (card_dir * max(seg.length_uv, 0.001))
+                    pin2.uv[0] = end.x
+                    pin2.uv[1] = end.y
+                return pin1, pin2
+
+
 
     def fill_boundaries(self, outer: PEdge):
         for e in self.edges:
@@ -1841,6 +2051,8 @@ class ParamHandleConstruct:
         self.charts: list[PChart] = []
         self.ncharts: int = 0
 
+        self.constraints_segments = []
+
         self.aspect_y = 1.0
         self.blend: float = 0.0
 
@@ -1861,6 +2073,9 @@ class ParamHandleConstruct:
             handle.construct_param_handle_face_add(ff, idx, umesh, get_vert_select)
 
         handle.construct_param_edge_set_seams(isl)
+        constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
+        if UnwrapOptions.topology_from_uvs and constraints_attr:
+            handle.constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
         handle.uv_parametrizer_construct_end()
 
         return handle
@@ -1882,7 +2097,13 @@ class ParamHandleConstruct:
             handle.construct_param_handle_face_add_by_tag(ff, idx, umesh)
 
         handle.construct_param_edge_set_seams(isl)
+        constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
+        if UnwrapOptions.topology_from_uvs and constraints_attr:
+            handle.constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
+
+
         handle.uv_parametrizer_construct_end()
+
 
         return handle
 
@@ -1958,24 +2179,85 @@ class ParamHandleConstruct:
             uv_co = crn[uv].uv
             uv_co_next = crn.link_loop_next[uv].uv
 
-            vkeys = [
-                self.uv_find_pin_index(crn.vert.index, uv_co),
-                self.uv_find_pin_index(crn.link_loop_next.vert.index, uv_co_next)
-            ]
 
             # Set the seam.
-            e: PEdge = self.edge_lookup(vkeys)
+            e: PEdge = self.edge_lookup(self.uv_find_pin_index(crn.vert.index, uv_co),
+                self.uv_find_pin_index(crn.link_loop_next.vert.index, uv_co_next))
             if e:
                 e.flag |= PEDGE_SEAM
 
+    def construct_param_edge_set_constraints(self, isl: 'utypes.AdvIsland', constraints_attr):
+        """Set constraints on UV Parametrizer based on options."""
+        uv = isl.umesh.uv
+        from ..utypes import Segments
+        v_corners = []
+        h_corners = []
+        h_p_corners = []
+
+        for crn in isl.corners_iter():
+            crn.tag = False
+            crn_e = crn.edge
+            edge_bits: int = crn_e[constraints_attr]
+
+            if edge_bits:
+                # Set the constraints.
+                e: PEdge = self.edge_lookup_exact(
+                    self.uv_find_pin_index(crn.vert.index, crn[uv].uv),
+                    self.uv_find_pin_index(crn.link_loop_next.vert.index, crn.link_loop_next[uv].uv)
+                )
+                if e:
+                    for i, crn_l in enumerate(crn_e.link_loops):
+                        if crn == crn_l:
+                            if i == 16:
+                                break
+
+                            shift = i * 2
+                            bits = (edge_bits >> shift) & 3
+                            if bits == 2:  # vertical
+                                e.flag |= PEDGE_V_CONSTRAIN
+                                v_corners.append(crn)
+                            elif bits == 3:  # horizontal
+                                e.flag |= PEDGE_H_CONSTRAIN
+                                h_p_corners.append(e)
+                                h_corners.append(crn)
+                            break
+                # else: raise
+
+        segments = []
+        if v_corners and UnwrapOptions.unwrap_along != 'V':
+            for crn in v_corners:
+                crn.tag = True
+
+            v_segments = Segments.from_tagged_corners(v_corners, isl.umesh)
+            for s in v_segments:
+                s.value = 'V'
+            segments.extend(v_segments)
+
+            for crn in v_corners:
+                crn.tag = False
+
+
+        if h_corners and UnwrapOptions.unwrap_along != 'U':
+            for crn in h_corners:
+                crn.tag = True
+
+            h_segments = Segments.from_tagged_corners(h_corners, isl.umesh)
+            for s in h_segments:
+                s.value = 'U'
+            segments.extend(h_segments)
+
+        segments.sort(key=lambda seg: seg.length_uv, reverse=True)
+        return segments
+
     def uv_parametrizer_construct_end(self):
         self.ncharts = self.connect_pairs()
+
         self.charts = self.construction_chart.split_charts(self.ncharts)
 
         # free
         self.construction_chart = None
         self.hash_verts = None
-        self.hash_edges = None
+        # self.hash_edges = None
         self.hash_faces = None
 
         j = 0
@@ -1998,6 +2280,20 @@ class ParamHandleConstruct:
                 v.load_pin_select_uvs()
 
             self.ncharts = j
+
+            if UnwrapOptions.topology_from_uvs:
+                con_v = []
+                con_h = []
+                for e in chart.edges:
+                    if e.flag & PEDGE_V_CONSTRAIN:
+                        con_v.append(e)
+                        e.flag &= ~PEDGE_V_CONSTRAIN
+
+                    elif e.flag & PEDGE_H_CONSTRAIN:
+                        con_h.append(e)
+                        e.flag &= ~PEDGE_H_CONSTRAIN
+                chart.constr_v = con_v
+                chart.constr_h = con_h
 
             self.state = ParamHandleConstruct.PHANDLE_STATE_CONSTRUCTED
 
@@ -2208,17 +2504,29 @@ class ParamHandleConstruct:
             return v
         return self.vert_add(key, co, weight, e)
 
-    def edge_lookup(self, vkeys: list[int | PHashKey | ParamKey]) -> PEdge | None:
-        key: PHashKey = PHASH_edge(vkeys[0], vkeys[1])  # noqa
+    def edge_lookup(self, vertex_key_a: int, vertex_key_b: int) -> PEdge | None:
+        """Searches for one of the pair of edges.
+        For seams, the order or which one from the pair is chosen does not matter in this case."""
+        key: PHashKey = PHASH_edge(vertex_key_a, vertex_key_b)
 
         e: PEdge | None = self.hash_edges.lookup(key)
 
         while e:
-            if (e.vert.key == vkeys[0]) and (e.next.vert.key == vkeys[1]):
+            if (e.vert.key == vertex_key_a) and (e.next.vert.key == vertex_key_b):
                 return e
-            if (e.vert.key == vkeys[1]) and (e.next.vert.key == vkeys[0]):
+            if (e.vert.key == vertex_key_b) and (e.next.vert.key == vertex_key_a):
                 return e
 
+            e = self.hash_edges.next(key, e)
+
+    def edge_lookup_exact(self, vertex_key_a: int, vertex_key_b: int):
+        """For constraints, the system exactly finds the required edges."""
+        key: PHashKey = PHASH_edge(vertex_key_a, vertex_key_b)
+        e: PEdge | None = self.hash_edges.lookup(key)
+
+        while e:
+            if (e.vert.key == vertex_key_a) and (e.next.vert.key == vertex_key_b):
+                return e
             e = self.hash_edges.next(key, e)
 
     def face_exists(self, vkeys: list[ParamKey], i1: int, i2: int, i3: int) -> bool:
@@ -2313,7 +2621,7 @@ class ParamHandleSolve(ParamHandleConstruct):
             for f in chart.faces:
                 f.backup_uvs()
 
-            chart.lscm_begin()
+            chart.lscm_begin(self.constraints_segments)
 
     def uv_parametrizer_lscm_solve(self):
 
