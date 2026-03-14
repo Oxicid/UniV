@@ -18,7 +18,7 @@ from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 from ..preferences import prefs, univ_settings
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
     bl_label = "Normal"
@@ -256,7 +256,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
 
         return eul.to_matrix().to_4x4()
 
-
+# noinspection PyTypeHints
 class UNIV_OT_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
     bl_label = "Box"
@@ -466,7 +466,7 @@ class ProjCameraInfo:
     def focal_length_to_fov(focal_length: float, sensor: float):
         return 2.0 * math.atan((sensor / 2.0) / focal_length)
 
-
+# noinspection PyTypeHints
 class UNIV_OT_ViewProject(bpy.types.Operator):
     bl_idname = "mesh.univ_view_project"
     bl_label = "View"
@@ -735,7 +735,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
             co *= scale
             co += diff
 
-
+# noinspection PyTypeHints
 class UNIV_OT_SmartProject(bpy.types.Operator):
     bl_idname = 'mesh.univ_smart_project'
     bl_label = 'Smart'

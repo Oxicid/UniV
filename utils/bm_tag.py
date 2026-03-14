@@ -16,6 +16,7 @@ def shared_crn(crn: BMLoop) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn:
         return shared
+    return None
 
 
 def is_flipped_3d(crn):

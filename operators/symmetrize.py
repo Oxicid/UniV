@@ -12,6 +12,8 @@ from .. import utils
 from .. import utypes
 from mathutils import Vector, kdtree
 
+
+# noinspection PyTypeHints
 class UNIV_OT_Symmetrize(bpy.types.Operator):
     bl_idname = "uv.univ_symmetrize"
     bl_label = "Symmetrize"

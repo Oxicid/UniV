@@ -552,6 +552,8 @@ class Stitch:
 LAST_WELD_BY_DISTANCE_TIME = 0.0
 LAST_WELD_BY_DISTANCE_COUNTERS = (0, 0)
 
+
+# noinspection PyTypeHints
 class UNIV_OT_Weld(bpy.types.Operator, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
@@ -1055,7 +1057,8 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         self.umeshes.verify_uv()
 
         if not self.umeshes and not umeshes_without_uv:
-            return self.umeshes.update(info='Not found edges for manipulate')
+            self.report({'WARNING'}, 'Not found edges for manipulate')
+            return
 
         if self.umeshes:
             if self.weld_by_distance_type == 'BY_ISLANDS':
@@ -1106,8 +1109,10 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         self.weld()
         self.clear_seams_from_selected_edges(umeshes_without_uv)
         self.umeshes.umeshes.extend(umeshes_without_uv.umeshes.copy())
+        return None
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
@@ -1284,7 +1289,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         if not self.umeshes:
-            return
+            return None
         if not selected_umeshes and self.mouse_pos_from_3d:
             if self.padding and (img_size := utils.get_active_image_size()):  # TODO: Get active image size from material id
                 if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
@@ -1308,3 +1313,4 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         self.stitch()
         self.clear_seams_from_selected_edges(without_uv)
         self.umeshes.umeshes.extend(without_uv.umeshes.copy())
+        return None

@@ -359,7 +359,7 @@ class ID_Runtime(StructBase):
 class ID(StructBase):
     next:                   c_void_p
     prev:                   c_void_p
-
+    # noinspection PyTypeHints
     newid: lambda: POINTER(ID)
     lib:                    c_void_p  # Library
     asset_data:             c_void_p  # AssetMetaData
@@ -377,6 +377,7 @@ class ID(StructBase):
 
     properties:             c_void_p  # IDProperty
     override_library:       c_void_p  # IDOverrideLibrary
+    # noinspection PyTypeHints
     orig_id: lambda: POINTER(ID)
     py_instance:            c_void_p
     library_weak_reference: c_void_p
@@ -427,12 +428,14 @@ class SpaceImage(StructBase):
     centy: c_float
 
 
+# noinspection PyTypeHints
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
     idname: c_char * 64  # noqa
 
 
+# noinspection PyTypeHints
 class PanelCategoryDyn(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
@@ -440,6 +443,7 @@ class PanelCategoryDyn(StructBase):
     rect: rcti
 
 
+# noinspection PyTypeHints
 # source/blender/makesdna/DNA_screen_types.h | rev 362
 class ARegion(StructBase):
     next: lambda: POINTER(ARegion)
@@ -567,7 +571,7 @@ class ReportList(StructBase):
     _pad4:          c_char * 4  # noqa
     reporttimer:    c_void_p  # wmTimer
 
-
+# noinspection PyTypeHints
 class UndoStep(StructBase):
     next: lambda: POINTER(UndoStep)
     prev: lambda: POINTER(UndoStep)
@@ -580,7 +584,7 @@ class UndoStep(StructBase):
     use_old_bmain_data: c_bool
     is_applied:         c_bool
 
-
+# noinspection PyTypeHints
 class UndoStack(StructBase):
     steps: ListBase(ListBase)
     step_active: POINTER(UndoStep)
@@ -590,6 +594,7 @@ class UndoStack(StructBase):
 
 # source/blender/makesdna/DNA_windowmanager_types.h | rev 362
 class wmWindowManager(StructBase):
+    # noinspection PyTypeHints
     ID: lambda: ID
 
     windrawable:                c_void_p
@@ -627,6 +632,7 @@ class wmWindowManager(StructBase):
     message_bus:                c_void_p  # wmMsgBus
 
 
+# noinspection PyTypeHints
 # source\blender\windowmanager\wm_event_system.h
 class wmEventHandler(StructBase):
     next: lambda: POINTER(wmEventHandler)
@@ -635,7 +641,7 @@ class wmEventHandler(StructBase):
     flag: c_char
     poll: c_void_p
 
-
+# noinspection PyTypeHints
 # source\blender\makesdna\DNA_windowmanager_types.h
 class wmWindow(StructBase):
     next: lambda: POINTER(wmWindow)
@@ -730,6 +736,7 @@ class wmWindow(StructBase):
 # source\blender\windowmanager\wm_event_system.h
 class wmEventHandler_Op(StructBase):
     class context(StructBase):  # Anonymous
+        # noinspection PyTypeHints
         win: lambda: POINTER(wmWindow)
         area: c_void_p  # ScrArea ptr
         region: c_void_p  # ARegion ptr
@@ -756,6 +763,7 @@ class PyBMesh(StructBase):
     ob_refcnt: c_long
     ob_type: c_void_p
     ob_size: c_long
+    # noinspection PyTypeHints
     bm: POINTER(CBMesh)
 
     @classmethod
@@ -815,11 +823,12 @@ class PyBMesh(StructBase):
         return cls.fields(bm).totloop
 
 class ImBufByteBuffer(StructBase):
+    # noinspection PyTypeHints
     data: POINTER(c_uint8)  # uint8_t
     ownership: c_int  # ImBufOwnership
     colorspace: c_void_p  # ColorSpace
 
-
+# noinspection PyTypeHints
 class ImBuf(StructBase):
     # Width and Height of our image buffer.
     x: c_int
@@ -849,6 +858,7 @@ class Py_ImBuf(StructBase):
     ob_refcnt: c_long
     ob_type: c_void_p
     ob_size: c_long
+    # noinspection PyTypeHints
     ibuf: POINTER(ImBuf)
 
     @classmethod

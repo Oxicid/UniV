@@ -18,7 +18,7 @@ from bmesh.types import BMFace, BMLoop
 USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
 if USE_GENERIC_UV_SYNC:
-    def face_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def face_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], None]:  # noqa
         if umesh.sync and not umesh.sync_valid:
             def select_set(f):
                 f.select = True
@@ -31,7 +31,7 @@ if USE_GENERIC_UV_SYNC:
                     crn.uv_select_edge = True
         return select_set
 else:
-    def face_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def face_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], None]:  # noqa
         def inner(uv, sync):
             if sync:
                 def select_set(f):
@@ -46,7 +46,7 @@ else:
         return inner(umesh.uv, umesh.sync)
 
 if USE_GENERIC_UV_SYNC:
-    def face_deselect_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def face_deselect_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], None]:  # noqa
         if umesh.sync:
             if not umesh.sync_valid:
                 def select_set(f: BMFace):
@@ -84,7 +84,7 @@ if USE_GENERIC_UV_SYNC:
                     crn.uv_select_edge = False
         return select_set
 else:
-    def face_deselect_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def face_deselect_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], None]:  # noqa
         def inner(uv, sync):
             if sync:
                 def select_set(f):
@@ -99,7 +99,7 @@ else:
         return inner(umesh.uv, umesh.sync)
 
 if USE_GENERIC_UV_SYNC:
-    def face_select_set_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace, bool], typing.NoReturn]:  # noqa
+    def face_select_set_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace, bool], None]:  # noqa
         if umesh.sync and not umesh.sync_valid:
             select_set = BMFace.select.__set__
         else:
@@ -118,7 +118,7 @@ if USE_GENERIC_UV_SYNC:
                         crn.uv_select_edge = state
         return select_set
 else:
-    def face_select_set_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace, bool], typing.NoReturn]:  # noqa
+    def face_select_set_func(umesh: 'types.UMesh') -> typing.Callable[[BMFace, bool], None]:  # noqa
         def inner(uv, sync):
             if sync:
                 select_set = BMFace.select.__set__
@@ -160,7 +160,7 @@ else:
         return catcher(umesh.uv)
 
 if USE_GENERIC_UV_SYNC:
-    def face_select_linked_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMFace], typing.NoReturn]:  # noqa
+    def face_select_linked_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMFace], None]:  # noqa
         def inner_catcher(uv, sync_invalid, face_is_invisible):
             if force or clamp_by_seams:
                 raise NotImplementedError()
@@ -192,8 +192,7 @@ if USE_GENERIC_UV_SYNC:
             return select_set
         return inner_catcher(umesh.uv, (umesh.sync and not umesh.sync_valid), face_invisible_get_func(umesh))
 else:
-    def face_select_linked_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[
-        [BMFace], typing.NoReturn]:  # noqa
+    def face_select_linked_func(umesh: 'utypes.UMesh', force=False, clamp_by_seams=False) -> typing.Callable[[BMFace], None]:  # noqa
         def inner(uv, sync):
             if force or clamp_by_seams:
                 raise NotImplementedError()
@@ -227,14 +226,14 @@ else:
 
         return inner(umesh.uv, umesh.sync)
 
-def face_visible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+def face_visible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
     if umesh.sync:
         return lambda f: not f.hide
     else:
         return BMFace.select.__get__
 
 
-def face_invisible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], typing.NoReturn]:
+def face_invisible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], bool]:
     if umesh.sync:
         return BMFace.hide.__get__
     else:
@@ -244,7 +243,7 @@ def face_invisible_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMFace], 
 if USE_GENERIC_UV_SYNC:
     # TODO: Add support clamp by seams (need for edge grow)
     def edge_select_linked_set_func(umesh: 'utypes.UMesh', force=False,
-                                    clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
+                                    clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], None]:
         # NOTE: UV_SELECT_FLUSH_MODE_NEEDED and UV_SELECT_SYNC_TO_MESH_NEEDED for deselect
         def inner(uv, sync, sync_invalid, face_is_invisible, is_edge_mode):
             if sync_invalid:
@@ -335,7 +334,7 @@ if USE_GENERIC_UV_SYNC:
         return inner(umesh.uv, umesh.sync, (umesh.sync and not umesh.sync_valid), face_invisible_get_func(umesh), umesh.elem_mode == 'EDGE')
 else:
     def edge_select_linked_set_func(umesh: 'utypes.UMesh', force=False,
-                                    clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], typing.NoReturn]:
+                                    clamp_by_seams=False) -> typing.Callable[[BMLoop, bool], None]:
         def inner(uv, sync):
             if sync:
                 def select_set(crn, state):
@@ -454,7 +453,7 @@ def edge_deselect_safe_3d_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop
     return deselect_edge
 
 if USE_GENERIC_UV_SYNC:
-    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], typing.NoReturn]:  # noqa
+    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], None]:  # noqa
         if umesh.sync and not umesh.sync_valid:
             def select_set(crn):
                 crn.vert.select = True
@@ -464,7 +463,7 @@ if USE_GENERIC_UV_SYNC:
                 crn.uv_select_vert = True
         return select_set
 else:
-    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], typing.NoReturn]:  # noqa
+    def vert_select_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], None]:  # noqa
         def catcher(uv, sync):
             if sync:
                 def select_set(crn):

@@ -96,6 +96,7 @@ class UNIV_OT_Pin(Operator):
         return res
 
 
+# noinspection PyTypeHints
 class UNIV_OT_RandomColor(Operator):
     bl_idname = 'uv.univ_random_color'
     bl_label = 'Random Color'
@@ -242,7 +243,7 @@ class UNIV_OT_RandomColor(Operator):
 
         return color_layer
 
-
+# noinspection PyTypeHints
 class UNIV_OT_LinearGradient(Operator):
     bl_idname = 'uv.univ_linear_gradient'
     bl_label = 'Linear Gradient'
@@ -346,7 +347,7 @@ class UNIV_OT_LinearGradient(Operator):
 class UNIV_OT_TD_PresetsProcessing(Operator):
     bl_idname = "scene.univ_td_presets_processing"
     bl_label = "Presets Processing"
-
+    # noinspection PyTypeHints
     operation_type: EnumProperty(default='ADD',
                                  options={'SKIP_SAVE'},
                                  items=(('ADD', 'Add', ''),
@@ -558,7 +559,7 @@ class UNIV_OT_Hide(Operator):
     bl_label = 'Hide'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = f"Hide selected or unselected UV"
-
+    # noinspection PyTypeHints
     unselected: BoolProperty(name='Unselected', default=False)
 
     @classmethod
@@ -1019,7 +1020,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
     bl_idname = 'uv.univ_layers_manager'
     bl_label = 'UV Maps'
     bl_options = {'REGISTER', 'UNDO'}
-
+    # noinspection PyTypeHints
     action: EnumProperty(default='ADD',
                                  options={'HIDDEN'},
                                  items=(('ADD', 'Add', ''),
@@ -1231,6 +1232,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
 
 class UNIV_OT_MoveUpDownBase(Operator):
     bl_options = {'REGISTER', 'UNDO'}
+    # noinspection PyTypeHints
     with_names: BoolProperty(default=False, options={'HIDDEN'})
 
     @classmethod
@@ -1364,7 +1366,7 @@ class UNIV_OT_Add(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = ("Add UV Layer \n"
                       "Alt+Click - Add missed UV layers.")
-
+    # noinspection PyTypeHints
     add_missed: BoolProperty(name='Add with Missed', default=False)
 
     @classmethod
@@ -1441,7 +1443,7 @@ class UNIV_OT_Remove(Operator):
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = ("Remove UV Layer \n"
                       "Alt+Click - Remove all UV layers.")
-
+    # noinspection PyTypeHints
     remove_all: BoolProperty(name='Remove All', default=False)
 
     @classmethod
@@ -1632,7 +1634,7 @@ class UNIV_OT_SetActiveRender(Operator):
     bl_idname = 'mesh.univ_active_render_set'
     bl_label = 'Remove'
     bl_options = {'REGISTER', 'UNDO'}
-
+    # noinspection PyTypeHints
     idx: IntProperty(name='Set Active', default=0, min=0, max=8, options={'HIDDEN'})
 
     @classmethod
@@ -1732,7 +1734,7 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
 
         return {'FINISHED'}
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Flatten(Operator):
     bl_idname = 'mesh.univ_flatten'
     bl_label = 'Flatten'

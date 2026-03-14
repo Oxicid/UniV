@@ -556,8 +556,8 @@ def safe_remove_update_tracker():
 
 
 class Drawer2D:
-    draw_objects: dict[str | list[DrawCallSeams2D]] = {}
-    drawers: list[type[DrawCallSeams2D]] = []
+    draw_objects: dict[str, list[DrawCallSeams2D | DrawCallConstraints2D]] = {}
+    drawers: list[type[DrawCallSeams2D | DrawCallConstraints2D]] = []
     dirt = True
     handler = None
     sync = True
@@ -565,7 +565,7 @@ class Drawer2D:
 
     @classmethod
     def update_drawer_data(cls):
-        drawers: list[type[DrawCallSeams2D | DrawCallConstraints2D]] = []
+        drawers = []
         if True:  # if constraints
             drawers.append(DrawCallConstraints2D)
 
@@ -701,7 +701,7 @@ class Drawer2D:
             cls.frozen = False
 
 class Drawer3D:
-    draw_objects: dict[str | list[DrawCall3D]] = {}
+    draw_objects: dict[str, list[DrawCall3D]] = {}
     drawers = []
     shaders_with_color = []
     mesh_extractors_with_batch = []

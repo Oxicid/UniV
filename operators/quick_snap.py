@@ -290,6 +290,8 @@ class QuickSnap_KDMeshes:
                 coords = self.kdmeshes.range_to_coords(res)
         return coords
 
+
+# noinspection PyTypeHints
 class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
     bl_label = "Quick Snap"

@@ -645,6 +645,7 @@ class UNIV_OT_IconsGenerator(bpy.types.Operator):
     bl_description = ("The Workspace Tool shader uses slightly different parameters, so colors may vary. "
                       "It's recommended to adjust them manually for best results.")
 
+    # noinspection PyTypeHints
     generate_only_ws_tool_icon: bpy.props.BoolProperty(name='Tool Icons', default=False)
 
     def execute(self, context):

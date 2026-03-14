@@ -39,7 +39,7 @@ class LinearSolver:
         self.state = 'VARIABLES_CONSTRUCT'
 
         # storage used during 'matrix construct' stage
-        self.M_triplets: list[(int, int, float)] = []   # list of (row, col, value)
+        self.M_triplets: list[tuple[int, int, float]] = []   # list of (row, col, value)
         self.b = None         # will be list of rhs vectors after ensure_matrix_construct
         self.x = None         # solution vectors after ensure_matrix_construct
 

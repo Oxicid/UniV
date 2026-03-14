@@ -21,12 +21,15 @@ def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
     if shared != crn and crn.face.index == shared.face.index:
         if crn.link_loop_next[uv].uv == shared[uv].uv and crn[uv].uv == shared.link_loop_next[uv].uv:
             return shared
+    return None
 
 
 def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn and crn.face.index == shared.face.index:
         return shared
+    return None
+
 
 def prev_disc(l: BMLoop) -> BMLoop:
     return l.link_loop_prev.link_loop_radial_prev
@@ -575,7 +578,7 @@ class ShortPath:
     def calc_path_uv_vert(isl: 'utypes.AdvIsland',
                           l_src: BMLoop,
                           l_dst: BMLoop,
-                          exclude_corners_group: 'list[types.LoopGroup] | tuple',
+                          exclude_corners_group: 'list[utypes.LoopGroup] | tuple',
                           prioritize_corners: set[BMLoop] | tuple = (),
                           bound_priority_factor=0.9) -> list[BMLoop]:
         import heapq

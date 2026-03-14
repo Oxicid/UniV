@@ -30,6 +30,7 @@ class RelaxData:
                 crn[uv].pin_uv = False
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
     bl_idname = "uv.univ_relax"
     bl_label = "Relax"
@@ -71,7 +72,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         # Legacy
         if not self.slim_support or self.legacy:
             self.umeshes.filter_by_selected_uv_by_context()
-            if self.umeshes.sync:  # noqa pycharm moment
+            if self.umeshes.sync:
                 if self.umeshes.elem_mode == 'FACE':
                     self.legacy_sync_relax_faces()
                 else:
@@ -350,6 +351,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         self.legacy_non_sync_or_sync_faces_relax_ex(relax_data)
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
     bl_idname = "mesh.univ_relax"
     bl_label = "Relax"

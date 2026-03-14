@@ -688,6 +688,7 @@ class BBox:
 
         if xmax >= xmin:
             return xmin, xmax
+        return None
 
     @property
     def aspect(self):

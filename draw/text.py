@@ -45,7 +45,7 @@ class TextDraw:
         if cls.handler is None:
             cls.max_draw_time = 1.5
             cls.target_area = 'UV'
-            return
+            return None
         counter = time() - cls.start_time
 
         if counter < cls.max_draw_time:
@@ -68,7 +68,7 @@ class TextDraw:
         cls.handler = None
         cls.max_draw_time = 1.5
         cls.target_area = 'UV'
-        return
+        return None
 
     @classmethod
     def draw_callback_px_uv_area(cls):

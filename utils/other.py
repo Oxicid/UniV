@@ -58,6 +58,7 @@ def get_active_image_size():
             image_width, image_height = space_data.image.size
             if image_height:
                 return image_width, image_height
+    return None
 
 
 def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):

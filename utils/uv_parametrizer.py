@@ -6,6 +6,7 @@ import heapq
 import typing
 import contextlib
 import numpy as np
+import numpy.typing as npt
 from bmesh.types import BMFace
 from mathutils import Vector, Matrix
 
@@ -1366,8 +1367,8 @@ class PChart:
         min_v: Vector = Vector((1e20, 1e20, 1e20))
         max_v: Vector = Vector((-1e20, -1e20, -1e20))
 
-        min_vert: list[PVert] = [None, None, None]
-        max_vert: list[PVert] = [None, None, None]
+        min_vert: list[PVert | None] = [None, None, None]
+        max_vert: list[PVert | None] = [None, None, None]
 
         for v in self.verts:
             for i in range(3):
@@ -1506,8 +1507,7 @@ class PChart:
                     pin2.uv[0] = end.x
                     pin2.uv[1] = end.y
                 return pin1, pin2
-
-
+        return None
 
     def fill_boundaries(self, outer: PEdge):
         for e in self.edges:
@@ -1642,16 +1642,16 @@ class PAbfSystem:
         # These are residual vectors for various types of constraints in a system of linear equations
 
         # bAlpha - residual according to the “angle difference” equation (α - β), i.e., how much the current angles deviate from the target angles.
-        self.bAlpha: np.ndarray | list[float] = []
+        self.bAlpha: npt.NDArray | list[float] = []
         # bTriangle - the residual according to the equations of the sum of angles in a triangle (should be π).
-        self.bTriangle: np.ndarray | list[float] = []
+        self.bTriangle: npt.NDArray | list[float] = []
         # bInterior - the residual according to the equations of the sum of angles around a vertex (should be 2π for interior angles, < 2π for boundary angles).
-        self.bInterior: list[float] = []
+        self.bInterior: npt.NDArray | list[float] = []
 
         # These λ are Lagrange coefficients that ensure the fulfillment of geometric constraints:
 
         # lambdaTriangle - multipliers for triangle angle sum constraints.
-        self.lambdaTriangle: list[float] = []
+        self.lambdaTriangle: npt.NDArray | list[float] = []
         # lambdaPlanar - multipliers for planarity constraints (that a triangle can be unfolded in 2D without self-intersection).
         self.lambdaPlanar: list[float] = []
         # lambdaLength - multipliers for edge length matching constraints (so that the sides match when triangles are joined).
@@ -1662,7 +1662,7 @@ class PAbfSystem:
         # J2dt - Jacobian (matrix of partial derivatives), with dimensions [n_angles][3], describes the relationship between angle changes and constraints.
         self.J2dt: list[Vector] = []
         # bstar - right-hand side for the reduced system (after eliminating dependencies).
-        self.bstar: list[float] = []
+        self.bstar: npt.NDArray | list[float] = []
         # dstar - result of solving the linear system (changes in variables α, λ, etc.).
         self.dstar: list[float] = []
         self.W: list[tuple[Vector, Vector, Vector]] = []
@@ -2254,12 +2254,6 @@ class ParamHandleConstruct:
 
         self.charts = self.construction_chart.split_charts(self.ncharts)
 
-        # free
-        self.construction_chart = None
-        self.hash_verts = None
-        # self.hash_edges = None
-        self.hash_faces = None
-
         j = 0
         for i in range(self.ncharts):
             chart: PChart = self.charts[i]
@@ -2518,6 +2512,7 @@ class ParamHandleConstruct:
                 return e
 
             e = self.hash_edges.next(key, e)
+        return None
 
     def edge_lookup_exact(self, vertex_key_a: int, vertex_key_b: int):
         """For constraints, the system exactly finds the required edges."""
@@ -2528,6 +2523,7 @@ class ParamHandleConstruct:
             if (e.vert.key == vertex_key_a) and (e.next.vert.key == vertex_key_b):
                 return e
             e = self.hash_edges.next(key, e)
+        return None
 
     def face_exists(self, vkeys: list[ParamKey], i1: int, i2: int, i3: int) -> bool:
         key: PHashKey = PHASH_edge(vkeys[i1], vkeys[i2])  # noqa
@@ -2614,7 +2610,7 @@ class ParamHandleConstruct:
 class ParamHandleSolve(ParamHandleConstruct):
 
     def uv_parametrizer_lscm_begin(self):
-        assert (self.state == self.PHANDLE_STATE_CONSTRUCTED);
+        assert (self.state == self.PHANDLE_STATE_CONSTRUCTED)
         self.state = self.PHANDLE_STATE_LSCM
 
         for chart in self.charts:

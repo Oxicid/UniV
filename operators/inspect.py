@@ -254,7 +254,7 @@ class UNIV_OT_Check_Flipped(Operator):
                       f'that may become flipped during triangulation.')
         return r_text
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Check_Over(Operator):
     bl_idname = 'uv.univ_check_over'
     bl_label = 'Over'
@@ -472,7 +472,7 @@ scaled islands from the calculation, focusing only on actual stretches"""
                     return False
         return True
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Check_Non_Splitted(Operator):
     bl_idname = 'uv.univ_check_non_splitted'
     bl_label = 'Non-Splitted'
@@ -602,7 +602,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             r_text = f'Found: {sum(counters)} non splitted edges. {r_text}'
         return r_text
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Check_Overlap(Operator):
     bl_idname = 'uv.univ_check_overlap'
     bl_label = 'Overlap'
@@ -685,7 +685,7 @@ class UNIV_OT_Check_Overlap(Operator):
 
         return count
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Check_Other(Operator):
     bl_idname = 'uv.univ_check_other'
     bl_label = 'Other'
@@ -918,7 +918,7 @@ class UNIV_OT_BatchInspectFlags(Operator):
     bl_idname = 'uv.univ_batch_inspect_flags'
     bl_label = 'Flags'
     bl_description = "Inspect Flags"
-
+    # noinspection PyTypeHints
     flag: IntProperty(name='Flag', default=0, min=0)
 
     def execute(self, context):
@@ -942,7 +942,7 @@ class UNIV_OT_BatchInspect(Operator):
     bl_label = 'Inspect'
     bl_description = "Batch Inspect by Enabled tags"
     bl_options = {'REGISTER', 'UNDO'}
-
+    # noinspection PyTypeHints
     inspect_all: BoolProperty(name='Inspect All', default=False)
 
     @classmethod

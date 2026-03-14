@@ -13,7 +13,7 @@ from bl_math import lerp
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
-from bmesh.types import BMFace
+from bmesh.types import BMLoop, BMFace
 from collections.abc import Callable
 
 from .. import utils
@@ -31,6 +31,7 @@ class UNIV_OT_SelectLinked(Operator):
     bl_description = "Select all UV vertices linked to the active UV map"
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
     deselect: bpy.props.BoolProperty(name='Deselect', default=False)
 
     @classmethod
@@ -72,7 +73,7 @@ class UNIV_OT_SelectLinked(Operator):
         umeshes.update(info=f'No found islands for {sel_opname}')
         return {'FINISHED'}
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Select_By_Cursor(Operator):
     bl_idname = "uv.univ_select_by_cursor"
     bl_label = "Cursor"
@@ -289,7 +290,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                 umesh.bm.uv_select_sync_to_mesh()
             umesh.update_tag = has_update
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Select_Square_Island(Operator):
     bl_idname = 'uv.univ_select_square_island'
     bl_label = 'Square'
@@ -433,7 +434,7 @@ class UNIV_OT_Select_Square_Island(Operator):
         percent = (width - height) / height
         return percent, math.isclose(percent, 0, abs_tol=self.threshold)
 
-
+# noinspection PyTypeHints
 class UNIV_OT_Select_Border(Operator):
     bl_idname = 'uv.univ_select_border'
     bl_label = 'Border'
@@ -714,6 +715,7 @@ class UNIV_OT_Select_Pick(Operator):
     bl_label = 'Pick Select'
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
     select: BoolProperty(name='Select', default=True)
 
     def __init__(self, *args, **kwargs):
@@ -790,14 +792,14 @@ class UNIV_OT_DeselectLinkedPick_VIEW3D(bpy.types.Macro):
     def poll(cls, context):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
-
+# noinspection PyTypeHints
 class UNIV_OT_SelectLinked_VIEW3D(Operator):
     bl_idname = 'mesh.univ_select_linked'
     bl_label = 'Select Linked'
     bl_options = {'REGISTER', 'UNDO'}
 
     select: BoolProperty(name='Select', default=True)
-    delimit: EnumProperty(name='Delimit', default=set(),  # noqa
+    delimit: EnumProperty(name='Delimit', default=set(),
                           items=(('NORMAL', 'Normal', ''),
                                  ('MATERIAL', 'Material', ''),
                                  ('SEAM', 'Seam', ''),
@@ -841,12 +843,10 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
                 calc_type = MeshIslands.calc_iter_non_manifold_ex
 
         for umesh in umeshes:
-            if self.delimit == 'UV' and not umesh.obj.data.uv_layers:
             calc_type_ = calc_type
             if 'UV' in self.delimit and not umesh.obj.data.uv_layers:
                 calc_type_ = MeshIslands.calc_with_markseam_non_manifold_iter_ex
-            else:
-                calc_type_ = calc_type
+
             Islands.tag_filter_visible(umesh)
             for isl in calc_type_(umesh):
                 if not utils.all_equal((f.select for f in isl)):
@@ -857,7 +857,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
                     umesh.sync_valid = False
         umeshes.update()
 
-
+# noinspection PyTypeHints
 # TODO: Grow after 0.3 (within 0.3-1.5 sec) sec and no effect repeat - without seam clamp
 class UNIV_OT_Select_Grow_Base(Operator):
     bl_label = 'Grow'
@@ -1636,6 +1636,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
         return {'FINISHED'}
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Select_Edge_Grow_Base(Operator):
     bl_label = 'Edge Grow'
     bl_options = {'REGISTER', 'UNDO'}
@@ -1804,7 +1805,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                             edge_select_set(crn, False)
                 umesh.update_tag = True
 
-    def grow_prev(self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped) -> 'BMLoop | None | False':
+    def grow_prev(self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped) -> 'BMLoop | None':
         prev_crn = crn.link_loop_prev
         shared = utils.shared_linked_crn_by_idx(crn, uv)
         cur_linked_corners = utils.linked_crn_uv_by_island_index_unordered(crn, uv, crn.face.index)
@@ -1858,9 +1859,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                             min_crn = prev_crn_
 
             return min_crn
-        return False
+        return None
 
-    def grow_next(self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped) -> 'BMLoop | None | False':
+    def grow_next(self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped) -> 'BMLoop | None':
         next_crn = crn.link_loop_next
         shared = utils.shared_linked_crn_by_idx(crn, uv)
         next_linked_corners = utils.linked_crn_uv_by_island_index_unordered(
@@ -1915,7 +1916,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                             angle = angle_
                             min_crn = prev_crn_
             return min_crn
-        return False
+        return None
 
     @staticmethod
     def is_clamped_by_selected_and_seams_func(umesh):
@@ -1941,6 +1942,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                         if (prev_crn := crn.link_loop_prev) != shared:
                             if get_edge_select(prev_crn):
                                 return True
+                return False
 
             return fn
         return catcher(utils.edge_select_get_func(umesh))
@@ -1949,6 +1951,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = 'mesh.univ_select_edge_grow'
 
+    # noinspection PyTypeHints
     max_angle: FloatProperty(name='Angle', default=math.radians(40), min=math.radians(1), soft_min=math.radians(5), max=math.radians(90), subtype='ANGLE',
                              description="Max select angle.")
 
@@ -2033,7 +2036,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                     umesh.bm.select_history.validate()
                     umesh.update_tag = True
 
-    def grow_prev(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> 'BMLoop | None | False':
+    def grow_prev(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> 'BMLoop | None':
         prev_crn = crn.link_loop_prev
         shared = utils.shared_linked_crn_to_edge_by_idx(crn)
         cur_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(crn)
@@ -2089,9 +2092,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                             min_crn = prev_crn_
 
             return min_crn
-        return False
+        return None
 
-    def grow_next(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> 'BMLoop | None | False':
+    def grow_next(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> 'BMLoop | None':
         next_crn = crn.link_loop_next
         shared = utils.shared_linked_crn_to_edge_by_idx(crn)
         next_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(next_crn)
@@ -2145,7 +2148,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                             angle = angle_
                             min_crn = prev_crn_
             return min_crn
-        return False
+        return None
 
     @staticmethod
     def is_clamped_by_selected_and_seams(linked_corners, shared, next_or_prev_crn, with_seam):
@@ -2171,8 +2174,10 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                     prev_crn_edge = prev_crn__.edge
                     if prev_crn_edge.seam or prev_crn_edge.select:
                         return True
+        return False
 
 
+# noinspection PyTypeHints
 class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
     bl_idname = "mesh.univ_select_texel_density"
     bl_label = 'Select by TD'
@@ -2355,10 +2360,7 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
             break
 
 
-
-        # umesh.update()
-
-
+# noinspection PyTypeHints
 class UNIV_OT_SelectByArea(Operator):
     bl_idname = "uv.univ_select_by_area"
     bl_label = 'Select by Area'
@@ -2384,9 +2386,9 @@ class UNIV_OT_SelectByArea(Operator):
 
     threshold: FloatProperty(name='Threshold', default=0.005, min=0, soft_min=0.005, max=0.5, subtype='FACTOR')
     lower_slider: FloatProperty(name='Low', default=0.1, min=0, max=0.9, subtype='PERCENTAGE',
-                                update=lambda self, _: setattr(self, 'higher_slider', self.lower_slider+0.05) if self.higher_slider-0.05 < self.lower_slider else None)
+                                update=lambda self_, _: setattr(self_, 'higher_slider', self_.lower_slider+0.05) if self_.higher_slider-0.05 < self_.lower_slider else None)
     higher_slider: FloatProperty(name='High', default=0.8, min=0.1, max=1, subtype='PERCENTAGE',
-                                 update=lambda self, _: setattr(self, 'lower_slider', self.higher_slider-0.05) if self.higher_slider-0.05 < self.lower_slider else None)
+                                 update=lambda self_, _: setattr(self_, 'lower_slider', self_.higher_slider-0.05) if self_.higher_slider-0.05 < self_.lower_slider else None)
 
     def draw(self, context):
         layout = self.layout
@@ -2523,6 +2525,7 @@ class UNIV_OT_SelectByArea(Operator):
         return {'FINISHED'}
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Stacked(Operator):
     bl_idname = "uv.univ_select_stacked"
     bl_label = 'Stacked'
@@ -2640,6 +2643,8 @@ class UNIV_OT_Stacked(Operator):
         umeshes.silent_update()
         return {'FINISHED'}
 
+
+# noinspection PyTypeHints
 class UNIV_OT_SelectByVertexCount_Base(Operator):
     bl_label = 'Select by Vertex Count'
     bl_description = "Select by Vertex Count"
@@ -2929,7 +2934,7 @@ class UNIV_OT_SelectMode(Operator):
     bl_label = 'Select Mode'
     bl_description = "Set Select Mode with sticky disabled in Face Mode"
     bl_options = {'REGISTER', 'UNDO'}
-
+    # noinspection PyTypeHints
     type: EnumProperty(name='Type', default='VERTEX', items=(
         ('VERTEX', 'Vertex', ''),
         ('EDGE', 'Edge', ''),
@@ -2940,9 +2945,9 @@ class UNIV_OT_SelectMode(Operator):
     @classmethod
     def poll(cls, context):
         if context.scene.tool_settings.use_uv_select_sync:
-            return bpy.ops.mesh.select_mode.poll()  # noqa
+            return bpy.ops.mesh.select_mode.poll()
         else:
-            return bpy.ops.uv.select_mode.poll()  # noqa
+            return bpy.ops.uv.select_mode.poll()
 
     def execute(self, context):
         if utils.USE_GENERIC_UV_SYNC:

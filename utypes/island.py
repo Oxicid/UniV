@@ -12,6 +12,7 @@ import mathutils
 import typing
 import itertools
 import numpy as np
+import numpy.typing as npt
 import collections
 from collections import defaultdict
 
@@ -155,8 +156,15 @@ class SaveTransform:
             return
         uv = self.island.umesh.uv
 
-        crn_co = self.target_crn[uv].uv if self.target_crn else Vector((0.0, 0.0))
-        crn_next_co = self.target_crn.link_loop_next[uv].uv if self.target_crn else Vector((0.0, 0.0))
+        # PyCharm moment...
+        target_crn = self.target_crn
+        if isinstance(self.target_crn, BMLoop):
+            crn_co = target_crn[uv].uv
+            crn_next_co = target_crn.link_loop_next[uv].uv
+        else:
+            crn_co = Vector((0.0, 0.0))
+            crn_next_co = Vector((0.0, 0.0))
+
 
         old_dir = self.old_coords[0] - self.old_coords[1]
         new_dir = crn_co - crn_next_co
@@ -219,8 +227,14 @@ class SaveTransform:
             return
         uv = self.island.umesh.uv
 
-        crn_co = self.target_crn[uv].uv if self.target_crn else Vector((0.0, 0.0))
-        crn_next_co = self.target_crn.link_loop_next[uv].uv if self.target_crn else Vector((0.0, 0.0))
+        # PyCharm moment...
+        target_crn = self.target_crn
+        if isinstance(self.target_crn, BMLoop):
+            crn_co = target_crn[uv].uv
+            crn_next_co = target_crn.link_loop_next[uv].uv
+        else:
+            crn_co = Vector((0.0, 0.0))
+            crn_next_co = Vector((0.0, 0.0))
 
         old_dir = self.old_coords[0] - self.old_coords[1]
         new_dir = crn_co - crn_next_co
@@ -500,6 +514,7 @@ class FaceIsland:
             for f in self:
                 for crn in f.loops:
                     crn[uv].pin_uv = state
+            return None
 
     if USE_GENERIC_UV_SYNC:
         def calc_selected_edge_corners_iter(self):
@@ -542,7 +557,7 @@ class FaceIsland:
                 return True
         return False
 
-    def calc_signed_area(self) -> bool:
+    def calc_signed_area(self) -> float:
         uv = self.umesh.uv
         signed_area = 0.0
         for f in self.faces:
@@ -850,10 +865,6 @@ class FaceIsland:
 
         return no_flipped_islands, flipped_islands
 
-    def clear(self):
-        self.faces = []
-        self.umesh = None
-
     def __iter__(self):
         return iter(self.faces)
 
@@ -876,7 +887,7 @@ class FaceIsland:
 class AdvIsland(FaceIsland):
     def __init__(self, faces: list[BMFace] | tuple | typing.Iterable[BMFace] = (), umesh: _umesh.UMesh | None = None):
         super().__init__(faces, umesh)
-        self.tris: list[tuple[BMLoop]] = []
+        self.tris: list[tuple[BMLoop, BMLoop, BMLoop]] = []
         self.flat_unique_uv_coords: list[Vector] = []
         self.flat_coords: list[Vector] | list[tuple[Vector, Vector, Vector]] = []  # rename to flat_uv_coords
         self.flat_3d_coords: list[Vector] | list[tuple[Vector, Vector, Vector]] = []
@@ -1377,7 +1388,7 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
         for face in umesh.bm.faces:
             if not face.tag:  # Skip unselected and appended faces
                 continue
-            face.tag = False  # Tag first element in island (don`t add again)
+            face.tag = False  # Tag first element in island (don't add again)
 
             parts_of_island = [face]  # Container collector of island elements
             temp = []  # Container for get elements from loop from parts_of_island
@@ -1408,7 +1419,7 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
         for face in umesh.bm.faces:
             if not face.tag:  # Skip unselected and appended faces
                 continue
-            face.tag = False  # Tag first element in island (don`t add again)
+            face.tag = False  # Tag first element in island (don't add again)
 
             parts_of_island = [face]  # Container collector of island elements
             temp = []  # Container for get elements from loop from parts_of_island
@@ -2024,8 +2035,8 @@ class UnionIslandsController:
 class UnionIslands(Islands):
     def __init__(self, islands: list[AdvIsland]):
         super().__init__([])
-        self.islands = islands
-        self.umesh = UnionIslandsController(islands)
+        self.islands: list[AdvIsland] = islands
+        self.umesh: UnionIslandsController = UnionIslandsController(islands)
         # self.flat_coords = []
         self.convex_coords = []
         self._bbox = None
@@ -2132,7 +2143,7 @@ class UnionIslands(Islands):
             class ExactOverlap:
                 def __init__(self, island):
                     self.island = island
-                    self.coords: np.array = np.array
+                    self.coords: npt.NDArray = np.array([])
 
                 def calc_coords(self):
                     uv = self.island.umesh.uv
@@ -2188,8 +2199,8 @@ class UnionIslands(Islands):
                         else:
                             # reduce by ngons
                             for isl__ in list_of_isl_by_area:
-                                ngons_sizes = collections.Counter(len(f.loops) for f in isl__)
-                                ngons_sizes = list(ngons_sizes.items())
+                                ngons_sizes: collections.Counter = collections.Counter(len(f.loops) for f in isl__)
+                                ngons_sizes: list[tuple[int, int] | float] = sorted(ngons_sizes.items(), key=lambda a: a[0])
                                 ngons_sizes.sort(key=lambda a: a[0])
                                 ngons_sizes.append(area)
                                 islands_by_ngons[tuple(ngons_sizes)].append(isl__)
@@ -2197,10 +2208,10 @@ class UnionIslands(Islands):
                 # reduce by ngons
                 for size, list_of_isl_by_size in islands_by_len_.items():
                     for isl__ in list_of_isl_by_size:
-                        ngons_sizes = collections.Counter(len(f.loops) for f in isl__)
-                        ngons_sizes = list(ngons_sizes.items())
-                        ngons_sizes.sort(key=lambda a: a[0])
-                        ngons_sizes.append(size)
+                        ngons_sizes: collections.Counter = collections.Counter(len(f.loops) for f in isl__)
+                        ngons_sizes: list[tuple[int, int] | int] = sorted(ngons_sizes.items(), key=lambda a: a[0])
+                        # PyCharm Moment...
+                        ngons_sizes.append(size)  # noqa
                         islands_by_ngons[tuple(ngons_sizes)].append(isl__)
 
             islands_by_ngons_ = islands_by_ngons.copy()
@@ -2288,7 +2299,7 @@ class AdvIslands(Islands):
         loop_triangles = self.umesh.bm.calc_loop_triangles()
         self.indexing(force=False)
 
-        islands_of_tris: list[list[tuple[BMLoop]]] = [[] for _ in range(len(self.islands))]
+        islands_of_tris: list[list[tuple[BMLoop, BMLoop, BMLoop]]] = [[] for _ in range(len(self.islands))]
         for tris in loop_triangles:
             face = tris[0].face
             if face.tag:

@@ -26,7 +26,8 @@ class FastAPI:
             return
 
         if platform.system() == 'Windows':
-            ctypes.windll.kernel32.FreeLibrary(ctypes.c_void_p(cls.lib._handle))
+            ctypes.windll.kernel32.FreeLibrary(  # noqa
+                ctypes.c_void_p(cls.lib._handle))
         cls.lib = None
 
     @classmethod

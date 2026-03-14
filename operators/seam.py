@@ -18,6 +18,7 @@ from ..utypes import UMeshes, AdvIslands
 from ..preferences import prefs, univ_settings
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Cut_VIEW2D(Operator):
     bl_idname = "uv.univ_cut"
     bl_label = "Cut"
@@ -149,6 +150,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             return {'FINISHED'} if had_seam else {'FINISHED'}
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
@@ -285,6 +287,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
         return {'CANCELLED'}
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Angle(Operator):
     bl_idname = "mesh.univ_angle"
     bl_label = "Angle"
@@ -388,6 +391,7 @@ class UNIV_OT_Angle(Operator):
         return {'FINISHED'}
 
 
+# noinspection PyTypeHints
 class UNIV_OT_SeamBorder_VIEW3D(Operator):
     bl_idname = "mesh.univ_seam_border"
     bl_label = "Border"

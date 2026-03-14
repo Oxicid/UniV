@@ -65,11 +65,6 @@ class MeshIsland:
         else:
             return any(v.select for f in self for v in f.verts)
 
-    def deselect(self, mode, force=False):
-        if force:
-            return self.__select_force(False)
-        self._select_ex(False, mode)
-
     def tag_selected_faces(self):
         for f in self:
             f.tag = f.select

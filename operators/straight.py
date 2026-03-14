@@ -30,6 +30,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
                       "or work in Face/Island mode to avoid such problems.")
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod

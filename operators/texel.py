@@ -35,6 +35,7 @@ from ..utypes import (
 from ..preferences import prefs, univ_settings
 
 
+# noinspection PyTypeHints
 class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
     bl_idname = "uv.univ_reset_scale"
     bl_label = 'Reset'
@@ -175,8 +176,8 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
                 cov = cov[mask]
                 w = weights[mask]
 
-            scale_cou = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
-            scale_cov = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
+            scale_cou: float = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
+            scale_cov: float = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
             scale_cross = 0.0
             if shear:
                 cou_n = cou / utils.np_vec_normalized(cou)
@@ -253,6 +254,7 @@ class UNIV_OT_ResetScale_VIEW3D(UNIV_OT_ResetScale):
     bl_idname = "mesh.univ_reset_scale"
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
     bl_idname = "mesh.univ_normalize"
     bl_label = 'Normalize'
@@ -387,8 +389,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 cov = cov[mask]
                 w = weights[mask]
 
-            scale_cou = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
-            scale_cov = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
+            scale_cou: float = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
+            scale_cov: float = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
             scale_cross = 0.0
             if self.shear:
                 cou_n = cou / utils.np_vec_normalized(cou)
@@ -438,6 +440,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
     def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
         if not self.xy_scale and len(islands) <= 1:
+
+            # TODO: Remove 'cancel_with_report'
             self.umeshes.cancel_with_report(
                 {'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
             return
@@ -508,8 +512,8 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
 
         areas = areas_uv if self.bl_idname.startswith('UV') else areas_3d
         median: float = np.median(areas)  # noqa
-        min_area = np.amin(areas)
-        max_area = np.amax(areas)
+        min_area: float = np.amin(areas)
+        max_area: float = np.amax(areas)
 
         center = (min_area + max_area) / 2
         if center > median:
@@ -693,7 +697,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                 self.report({'INFO'}, f'{unsel.capitalize()} islands not found, but {sel} was adjusted')
             else:
                 self.report({'WARNING'}, f'{unsel.capitalize()} islands not found')
-            return ret
+            return
 
         self.normalize(all_islands, tot_area_uv, tot_area_3d)
         self.umeshes.update(info=info_)
@@ -782,6 +786,7 @@ class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
     bl_idname = "uv.univ_adjust_td"
 
 
+# noinspection PyTypeHints
 class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     bl_idname = "mesh.univ_texel_density_set"
     bl_label = 'Set'
@@ -1018,7 +1023,7 @@ class UNIV_OT_TexelDensityGet(UNIV_OT_TexelDensityGet_VIEW3D):
     bl_idname = "uv.univ_texel_density_get"
 
 
-POLIIGON_PHYSICAL_SIZES: dict[int | tuple[float, float]] | dict[int | None] | None = None
+POLIIGON_PHYSICAL_SIZES: dict[int, tuple[float, float] | None] | None = None
 
 
 class UNIV_OT_TexelDensityFromTexture(Operator):
@@ -1094,6 +1099,7 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
             else:
                 x_size = y_size = utils.unit_conversion(float(g[0]), g[1], 'm')
             return x_size, y_size
+        return None
 
     @staticmethod
     def get_physical_size_quixel(image_path: Path):
@@ -1136,7 +1142,7 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
         match_poliigon_id = re.search(r'_(\d{4,})_', name)
         if not match_poliigon_id:
             self.report({'WARNING'}, 'Not found id from poliigon texture')
-            return
+            return None
 
         try:
             poliigon_id: int = int(match_poliigon_id.group(1))
@@ -1162,7 +1168,7 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
 
             if response.status_code == 404:
                 self.report({'WARNING'}, f'Not found url {url!r} for get texel density from poliigon metadata')
-                return
+                return None
 
             # Example: <p data-v-8f651ff6="">2.50 m  x 2.50 m</p>
             pattern = rf'>(\d+(?:\.\d+)?)\s*{utils.UNITS}\s*x\s*(\d+(?:\.\d+)?)\s*{utils.UNITS}<'

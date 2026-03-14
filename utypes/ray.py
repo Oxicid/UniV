@@ -262,25 +262,25 @@ class KDMeshes:
                 rmeshes.append(kdmesh)
         cls(rmeshes)
 
-    def find_range(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+    def find_range(self, co, r) -> typing.Iterator[list[tuple[Vector, int, float]]]:
         founded = []
         for kdmesh in self.kdmeshes:
             founded.append(kdmesh.find_range(co, r))
         return chain.from_iterable(founded)
 
-    def find_range_vert(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+    def find_range_vert(self, co, r) -> typing.Iterator[list[tuple[Vector, int, float]]]:
         founded = []
         for kdmesh in self.kdmeshes:
             founded.append(kdmesh.find_range_vert(co, r))
         return chain.from_iterable(founded)
 
-    def find_range_crn_center(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+    def find_range_crn_center(self, co, r) -> typing.Iterator[list[tuple[Vector, int, float]]]:
         founded = []
         for kdmesh in self.kdmeshes:
             founded.append(kdmesh.find_range_crn_center(co, r))
         return chain.from_iterable(founded)
 
-    def find_range_face_center(self, co, r) -> typing.Iterator[list[Vector, int, float]]:
+    def find_range_face_center(self, co, r) -> typing.Iterator[list[tuple[Vector, int, float]]]:
         founded = []
         for kdmesh in self.kdmeshes:
             founded.append(kdmesh.find_range_face_center(co, r))

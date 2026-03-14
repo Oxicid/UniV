@@ -8,6 +8,7 @@ if 'bpy' in locals():
 import bpy
 import typing
 import numpy as np
+import numpy.typing as npt
 
 from .. import utils
 from ..utils import linked_crn_to_vert_by_face_index
@@ -22,7 +23,7 @@ from bmesh.types import BMFace, BMLoop
 T = typing.TypeVar('T')
 
 
-def py_container_with_np_arrays_compare(a: deque[np.array], b: deque[np.array]):
+def py_container_with_np_arrays_compare(a: deque[npt.NDArray], b: deque[npt.NDArray]):
     return len(a) == len(b) and all(np.array_equal(a[i], b[i]) for i in range(len(a)))
 
 
@@ -31,7 +32,7 @@ class FacePattern:
         self.face: BMFace = f
         self.start_crn: BMLoop = start_crn
         self.ordered_corners: deque[BMLoop] = ordered_corners
-        self.shared_crn_face_sizes: np.array = np.zeros(shape=len(ordered_corners), dtype='uint16')
+        self.shared_crn_face_sizes: npt.NDArray[np.uint16] = np.zeros(shape=len(ordered_corners), dtype='uint16')
 
     @classmethod
     def calc_init(cls, f, start_crn):
@@ -69,15 +70,15 @@ class StackIsland:  # TODO: Split for source and target islands
         self.unique_faces: list[BMFace] = []
 
         self.face_start_pattern_crn: deque[BMLoop] = deque()
-        self.face_start_pattern: deque[np.array] = deque()
-        self.start_faces_patterns: list[list[deque[np.array], deque[BMLoop]]] = []
+        self.face_start_pattern: deque[npt.NDArray] = deque()
+        self.start_faces_patterns: list[list[deque[npt.NDArray] | deque[BMLoop]]] = []
 
         self.face_start_pattern_crn_backward: deque[BMLoop] = deque()
-        self.face_start_pattern_backward: deque[np.array] = deque()
-        self.start_faces_patterns_backward: list[list[deque[np.array], deque[BMLoop]]] = []
+        self.face_start_pattern_backward: deque[npt.NDArray] = deque()
+        self.start_faces_patterns_backward: list[list[deque[npt.NDArray] | deque[BMLoop]]] = []
 
         self.ngons_with_faces: defaultdict[int, list[BMFace]] = defaultdict(list)
-        self.np_ngons_with_faces: np.array = np.array([], dtype='int32')
+        self.np_ngons_with_faces: npt.NDArray[np.int32] = np.array([], dtype='int32')
 
     def preprocessing(self):
         self.ensure_ngons_with_faces()
@@ -251,6 +252,7 @@ class StackIsland:  # TODO: Split for source and target islands
                     break
             if not break_:
                 return source_island_walked
+        return None
 
     @staticmethod
     def pattern_to_str(pattern):
@@ -310,6 +312,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     bl_description = "Stack to selected"
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
     between_selected: bpy.props.BoolProperty(name='Between Selected', default=False)
 
     @classmethod

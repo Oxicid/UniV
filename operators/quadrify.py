@@ -25,6 +25,7 @@ from ..utils import linked_crn_uv_by_face_tag_unordered_included
 QUAD_SIZE = 4
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Quadrify(bpy.types.Operator):
     bl_idname = "uv.univ_quadrify"
     bl_label = "Quadrify"
@@ -457,7 +458,7 @@ def follow_active_uv(f_act, island: AdvIsland, edge_lengths):
         # all faces in this list must be tagged
         f.tag = False
         faces_a = [f]
-        faces_b = []
+        faces_b: list[BMFace] = []
 
         while faces_a:
             for f in faces_a:  # noqa

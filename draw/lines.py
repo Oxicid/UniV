@@ -45,7 +45,7 @@ class LinesDrawSimple:
     def uv_area_draw_timer(cls):
         if cls.handler is None:
             cls.max_draw_time = 1.5
-            return
+            return None
         counter = time() - cls.start_time
 
         if counter < cls.max_draw_time:
@@ -58,7 +58,7 @@ class LinesDrawSimple:
 
         cls.handler = None
         cls.max_draw_time = 1.5
-        return
+        return None
 
     @classmethod
     def draw_callback_px(cls):
@@ -107,7 +107,7 @@ class LinesDrawSimple3D:
     def univ_view3d_draw_timer(cls):
         if cls.handler is None:
             cls.max_draw_time = 1.5
-            return
+            return None
         counter = time() - cls.start_time
 
         if counter < cls.max_draw_time:
@@ -120,7 +120,7 @@ class LinesDrawSimple3D:
 
         cls.handler = None
         cls.max_draw_time = 1.5
-        return
+        return None
 
     @classmethod
     def draw_callback_px(cls):
@@ -179,7 +179,7 @@ class DotLinesDrawSimple:
     def uv_area_draw_timer(cls):
         if cls.handler is None:
             cls.max_draw_time = 1.5
-            return
+            return None
         counter = time() - cls.start_time
 
         if counter < cls.max_draw_time:
@@ -191,7 +191,7 @@ class DotLinesDrawSimple:
                 a.tag_redraw()
         cls.handler = None
         cls.max_draw_time = 1.5
-        return
+        return None
 
     @classmethod
     def draw_callback_px(cls):

@@ -27,6 +27,7 @@ MULTIPLAYER = 1
 UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
 
+# noinspection PyTypeHints
 class UNIV_OT_Unwrap(bpy.types.Operator):
     bl_idname = "uv.univ_unwrap"
     bl_label = "Unwrap"
@@ -839,6 +840,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                         pinned.append(crn_uv)
         return pinned
 
+# noinspection PyTypeHints
 class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
     bl_idname = "mesh.univ_unwrap"
     bl_label = "Unwrap"

@@ -33,6 +33,7 @@ Alt - swaps windows
 
 Has [Shift + T] keymap"""
 
+    # noinspection PyTypeHints
     mode: EnumProperty(name='Mode',
                        default='SPLIT',
                        items=(
@@ -623,7 +624,7 @@ class UNIV_OT_StretchUVToggle(Operator):
     bl_label = 'Stretch UV Toggle'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = "A single press toggles Stretch type on and off. Double press switches the Stretch type"
-
+    # noinspection PyTypeHints
     swap: BoolProperty(name='Swap', default=False)
 
     def execute(self, context):

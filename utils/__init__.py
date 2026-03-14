@@ -142,6 +142,7 @@ class Pip:
         return Pip()._cmd('install', '-U', module)
 
 
+# noinspection PyTypeHints
 class OverlapHelper:
     lock_overlap: bpy.props.BoolProperty(name='Lock Overlaps', default=False)
     lock_overlap_mode: bpy.props.EnumProperty(
@@ -163,6 +164,7 @@ class OverlapHelper:
 
 
 class PaddingHelper:
+    # noinspection PyTypeHints
     padding_multiplayer: bpy.props.FloatProperty(
         name='Padding Multiplayer', default=1, min=-32, soft_min=0, soft_max=4, max=32)
 
@@ -255,6 +257,7 @@ class ViewBoxSyncBlock:
                         break
                 else:
                     return True
+            return None
         else:
             for crn in island.corners_iter():
                 if not crn.edge.select:
@@ -267,7 +270,7 @@ class ViewBoxSyncBlock:
                 if crn.link_loop_next[uv].uv == pair[uv].uv or \
                     crn[uv].uv == pair.link_loop_next[uv].uv:
                     return True
-
+            return None
 
     def isect_island(self, island):
         """ NOTE: For the intersection check (isect) to work correctly,
@@ -324,6 +327,7 @@ class ViewBoxSyncBlock:
                         break
                 else:
                     return True
+
         else:
             for crn in lg:
                 if not crn.edge.select:
@@ -336,6 +340,7 @@ class ViewBoxSyncBlock:
                 if crn.link_loop_next[uv].uv == pair[uv].uv or \
                     crn[uv].uv == pair.link_loop_next[uv].uv:
                     return True
+        return False
 
     def isect_lg(self, lg):
         from ..utypes import BBox

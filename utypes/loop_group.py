@@ -805,7 +805,7 @@ class Segment:
             if not self.lengths_seq:
                 self.calc_lengths_uv()
             try:
-                self._weight_angle = np.average(self.angles_seq, weights=self.lengths_seq)
+                self._weight_angle = float(np.average(self.angles_seq, weights=self.lengths_seq))
             except ZeroDivisionError:
                 self._weight_angle = 0
 
