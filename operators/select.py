@@ -842,6 +842,8 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
 
         for umesh in umeshes:
             if self.delimit == 'UV' and not umesh.obj.data.uv_layers:
+            calc_type_ = calc_type
+            if 'UV' in self.delimit and not umesh.obj.data.uv_layers:
                 calc_type_ = MeshIslands.calc_with_markseam_non_manifold_iter_ex
             else:
                 calc_type_ = calc_type
