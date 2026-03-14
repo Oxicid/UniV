@@ -431,7 +431,7 @@ class UNIV_OT_TogglePivot(Operator):
                 else:
                     context.space_data.pivot_point = 'CENTER'
 
-            draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}')
+            draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}', 24)
 
         else:
             if PREV_PIVOT == '' or PREV_PIVOT == curr_pivot:
@@ -440,7 +440,7 @@ class UNIV_OT_TogglePivot(Operator):
                 else:
                     context.space_data.pivot_point = 'CENTER'
             else:
-                draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}')
+                draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}', 24)
                 context.space_data.pivot_point = PREV_PIVOT
 
         PREV_PIVOT = curr_pivot
@@ -659,7 +659,7 @@ class UNIV_OT_StretchUVToggle(Operator):
             if count_non_default_scale:
                 txt = [f'Warning: The scale hasn`t been applied to {count_non_default_scale} objects', txt]
             from .. import draw
-            draw.TextDraw.draw(txt)
+            draw.TextDraw.draw(txt, 32)
         else:
             STRETCH_SPACE_DATA = context.space_data
             bpy.app.timers.register(self.register_, first_interval=0.22)
@@ -701,7 +701,7 @@ class UNIV_OT_StretchUVToggle(Operator):
             txt = [f'Warning: The scale hasn`t been applied to {count_non_default_scale} objects', txt]
 
         from .. import draw
-        draw.TextDraw.draw(txt)
+        draw.TextDraw.draw(txt, 32)
 
         STRETCH_SPACE_DATA = None
         return None

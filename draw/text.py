@@ -24,10 +24,12 @@ class TextDraw:
     y_pad__with_text: list[tuple[int, str]] = []
     handler: None = None
     target_area: typing.Literal['UV', 'VIEW_3D'] = 'UV'
+    size: int = 16
 
     @classmethod
-    def draw(cls, text: str | list[str]):
+    def draw(cls, text: str | list[str], size=16):
         cls.start_time = time()
+        cls.size = size
         cls._text_precessing(text)
 
         if cls.target_area == 'UV':
@@ -88,7 +90,7 @@ class TextDraw:
 
         gpu.state.blend_set('ALPHA')
         font_id = 0
-        utils.blf_size(font_id, 16)
+        utils.blf_size(font_id, cls.size)
 
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         for y_pad, txt in cls.y_pad__with_text:
@@ -99,8 +101,11 @@ class TextDraw:
 
     @classmethod
     def _text_precessing(cls, text):
+        font_id = 0
+        utils.blf_size(font_id, cls.size)
+
         text = [text] if isinstance(text, str) else text
-        text_x_size, char_y_size = blf.dimensions(0, 'T')
+        text_x_size, char_y_size = blf.dimensions(font_id, 'T')
         pad_x = 40
         cls.width = max(len(line) for line in text) * text_x_size + pad_x
 

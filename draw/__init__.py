@@ -133,11 +133,10 @@ class DrawerNonSyncSelectProcessing:
             return False
 
 
-
 class DrawCallSeams2D:
     def __init__(self, batch: gpu.types.GPUBatch):
         self.shader = shaders.POLYLINE_UNIFORM_COLOR
-        self.color = self.get_color()
+        self.color = prefs().overlay_2d_uv_edge_seam_color
         self.batch = batch
         # To avoid iterating over all mesh elements again,
         # UniV operators can control Update by adding extended draw elements on top of existing draw elements.
@@ -165,14 +164,9 @@ class DrawCallSeams2D:
             return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": data}))
         return None
 
-    if bpy.app.version >= (5, 0, 0):
-        @staticmethod
-        def get_color():
-            return *bpy.context.preferences.themes[0].view_3d.seam, 0.5
-    else:
-        @staticmethod
-        def get_color():
-            return *bpy.context.preferences.themes[0].view_3d.edge_seam, 0.5
+    @staticmethod
+    def get_color():
+        return prefs().overlay_2d_uv_edge_seam_color
 
     @staticmethod
     def is_enable():
@@ -182,14 +176,15 @@ class DrawCallSeams2D:
         except ImportError:
             return False
 
-class DrawCallConstraints2D:
-    def __init__(self, batch_v: gpu.types.GPUBatch | None, batch_h: gpu.types.GPUBatch | None):
-        self.shader = shaders.POLYLINE_UNIFORM_COLOR
-        self.color_v = (0.1, 0.1, 0.8, 0.5)
-        self.color_h = (0.85, 1.0, 0.0, 0.5)
 
-        self.batch_v = batch_v
+class DrawCallConstraints2D:
+    def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None):
+        self.shader = shaders.POLYLINE_UNIFORM_COLOR
+        self.color_h = prefs().overlay_2d_uv_edge_h_constraints_color
+        self.color_v = prefs().overlay_2d_uv_edge_v_constraints_color
+
         self.batch_h = batch_h
+        self.batch_v = batch_v
 
     def __call__(self):
         shaders.blend_set_alpha()
@@ -198,12 +193,13 @@ class DrawCallConstraints2D:
         self.shader.bind()
         shaders.set_line_width_vk(self.shader, 3)
 
-        if self.batch_v:
-            self.shader.uniform_float("color", self.color_v)
-            self.batch_v.draw(self.shader)
         if self.batch_h:
             self.shader.uniform_float("color", self.color_h)
             self.batch_h.draw(self.shader)
+
+        if self.batch_v:
+            self.shader.uniform_float("color", self.color_v)
+            self.batch_v.draw(self.shader)
 
         shaders.set_line_width(1)
         shaders.blend_set_none()
@@ -215,18 +211,18 @@ class DrawCallConstraints2D:
             return None
 
         v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
-        if not (v_coords or h_coords):
+        if not (h_coords or v_coords):
             return None
 
-        v_batch = None
         h_batch = None
+        v_batch = None
 
-        if v_coords:
-            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": v_coords})
         if h_coords:
             h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": h_coords})
+        if v_coords:
+            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": v_coords})
 
-        return cls(v_batch, h_batch)
+        return cls(h_batch, v_batch)
 
     @staticmethod
     def is_enable():
@@ -292,6 +288,7 @@ class DrawCallConstraints2D:
                             edge_idx >>= 2
 
         return v_coords, h_coords
+
 
 class DrawCall3D:
     def __init__(self, draw_fn, shader, color, batch, world_matrix):

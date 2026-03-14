@@ -147,6 +147,7 @@ def _update_uv_layers_active_idx(self, context):
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
+
 checker_generated_types = [
     ('UV_GRID', 'Grid', ''),
     ('COLOR_GRID', 'Color Grid', ''),
@@ -302,6 +303,19 @@ Some operators, can interact with trims:
     overlay_2d_enable: BoolProperty(name='Overlay 2D', default=True, update=_update_drawer_2d_enable)
     overlay_3d_enable: BoolProperty(name='Overlay 3D', default=True, update=_update_drawer_3d_enable)
 
+    # Colors 2D
+    overlay_2d_uv_edge_h_constraints_color: FloatVectorProperty(name="H-Constr", default=(0.85, 1.0, 0.0, 0.25),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+    overlay_2d_uv_edge_v_constraints_color: FloatVectorProperty(name="V-Constr", default=(0.1, 0.1, 0.8, 0.35),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+
+    overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.1, 0.1, 0.5),
+        min=0.0, max=1.0, size=4, subtype='COLOR'
+    )
+
+    # Colors 3D
     overlay_3d_uv_vert_color: FloatVectorProperty(name="UV Select Vert", default=(1.0, 1.0, 1.0, 0.28),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
@@ -315,7 +329,7 @@ Some operators, can interact with trims:
         description="Shows faces through geometry. Vertices and edges are always visible in this mode, otherwise they are not visible.")
 
     # UV Layer
-    uv_layers_show: BoolProperty(name='Show UV Layers', default=True, update=_update_uv_layers_show)
+    uv_layers_show: BoolProperty(name='Show UV Layers in Panel', default=True, update=_update_uv_layers_show)
 
     uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0, options={'SKIP_SAVE'})
     uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0,
@@ -542,23 +556,21 @@ Some operators, can interact with trims:
                 layout.prop(self, 'use_fastapi')
             # TODO: Add link
 
-            layout.prop(self, 'use_csa_mods')
-            layout.separator()
+            # layout.separator(factor=0.5)
+            col = layout.column(align=True)
+            col.prop(self, 'use_texel', text='Use Texel in operators')
+            col.prop(self, 'use_csa_mods')
+            col.prop(self, 'split_toggle_uv_by_cursor')
+            # layout.separator(factor=0.5)
+            layout.prop(self, 'show_split_toggle_uv_button')
 
             layout.label(text='QuickSnap:')
             layout.prop(self, 'snap_points_default')
             layout.separator()
 
             layout.prop(self, 'max_pick_distance')
-            layout.prop(self, 'enable_uv_layers_sync_borders_seam')
 
         elif self.tab == 'UI':
-            layout.prop(self, 'show_view_3d_panel')
-            layout.prop(self, 'panel_3d_view_category')
-            row = layout.row()
-            row.prop(self, 'split_toggle_uv_by_cursor')
-            row.prop(self, 'show_split_toggle_uv_button')
-            layout.separator()
             box = layout.box()
             box.prop(self, 'color_mode')
 
@@ -600,10 +612,21 @@ Some operators, can interact with trims:
 
 
             box_row = box.row(align=True)
-            box_row.operator('wm.univ_icons_generator', text='Generate icons').generate_only_ws_tool_icon = False
+            box_row.operator('wm.univ_icons_generator', text='Generate').generate_only_ws_tool_icon = False
             box_row.operator('wm.univ_icons_generator',
-                               text='Generate only Workspace Tool icons').generate_only_ws_tool_icon = True
+                               text='Generate only Workspace Tool icon').generate_only_ws_tool_icon = True
 
+            # ========================================
+
+            split = layout.split(factor=0.5)
+            split.prop(self, 'show_view_3d_panel')
+            row = split.row(heading='3D Panel Category:')
+            row.prop(self, 'panel_3d_view_category', text='')
+
+            layout.prop(self, 'show_split_toggle_uv_button')
+
+            from . import ui
+            ui.UNIV_PT_GlobalSettings.draw_ui_settings(layout)
         elif self.tab == 'KEYMAPS':
             row = layout.row()
             row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'

@@ -41,6 +41,17 @@ else:
         row.label(text=_name)
         return layout
 
+if bpy.app.version >= (4, 1, 0):
+    def draw_panel_with_pref_checkbox(layout, pref_prop) -> bpy.types.UILayout:
+        pref = prefs()
+        header, panel = layout.panel("UniV_"+pref_prop, default_closed=True)
+        header.prop(pref, pref_prop)
+        return panel
+else:
+    def draw_panel_with_pref_checkbox(layout, pref_prop) -> bpy.types.UILayout:
+        layout.prop(prefs(), pref_prop)
+        return layout
+
 
 class UNIV_PT_General(Panel):
     bl_label = ''
@@ -538,55 +549,74 @@ class UNIV_PT_GlobalSettings(Panel):
     bl_region_type = 'UI'
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
+    bl_ui_units_x = 12
 
     def draw(self, context):
         self.draw_global_settings(self.layout)
 
     @staticmethod
     def draw_global_settings(layout):
-        indent_px = 16
-        indent = indent_px / bpy.context.region.width
+        UNIV_PT_GlobalSettings.draw_ui_settings(layout)
 
+        # layout.separator(factor=0.5)
         pref = prefs()
-        if univ_pro:
-            layout.prop(pref, 'overlay_2d_enable')
-            layout.prop(pref, 'overlay_3d_enable')
-            layout.prop(pref, 'overlay_3d_uv_vert_color')
-            layout.prop(pref, 'overlay_3d_uv_edge_color')
-            layout.prop(pref, 'overlay_3d_uv_face_color')
-            layout.prop(pref, 'overlay_toggle_xray')
-
-            layout.prop(pref, 'use_trims')
-            split = layout.split(factor=indent)
-            _ = split.column()
-            col = split.column()
-            col.active = pref.use_trims
-            col.prop(pref, 'trim_line_width')
-            col.prop(pref, 'trim_line_opacity')
-            col.prop(pref, 'trim_tris_opacity')
-
-            layout.separator()
-
         row = layout.row(align=True, heading='Global Size')
         row.prop(pref, 'size_x', text='')
         row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
         row.prop(pref, 'size_y', text='')
 
-        layout.prop(pref, 'use_texel', text='Use Texel in operators')
 
         layout.prop(pref, 'padding', slider=True)
-        layout.separator()
-        layout.prop(pref, 'uv_layers_show')
+        layout.prop(pref, 'use_texel', text='Use Texel in operators')
 
-
-        split = layout.split(factor=indent)
-        _ = split.column()
-        col = split.column()
-        col.active = pref.uv_layers_show
-        col.prop(pref, 'enable_uv_layers_sync_borders_seam')
 
         layout.prop(pref, 'use_csa_mods')
         layout.operator('wm.univ_show_addon_preferences', icon='TOOL_SETTINGS')
+
+    @staticmethod
+    def draw_ui_settings(layout):
+        indent_px = 16
+        indent = indent_px / bpy.context.region.width
+
+        pref = prefs()
+        if univ_pro:
+            if panel := draw_panel_with_pref_checkbox(layout, 'overlay_2d_enable'):
+                split = panel.split(factor=indent)
+                _ = split.column()
+                col = split.column()
+                col.active = pref.overlay_2d_enable
+
+                col.prop(pref, 'overlay_2d_uv_edge_seam_color')
+                col.prop(pref, 'overlay_2d_uv_edge_h_constraints_color')
+                col.prop(pref, 'overlay_2d_uv_edge_v_constraints_color')
+
+            if panel := draw_panel_with_pref_checkbox(layout, 'overlay_3d_enable'):
+                split = panel.split(factor=indent)
+                _ = split.column()
+                col = split.column()
+                col.active = pref.overlay_3d_enable
+
+                col.prop(pref, 'overlay_3d_uv_vert_color')
+                col.prop(pref, 'overlay_3d_uv_edge_color')
+                col.prop(pref, 'overlay_3d_uv_face_color')
+
+                col.prop(pref, 'overlay_toggle_xray')
+
+            if panel := draw_panel_with_pref_checkbox(layout, 'use_trims'):
+                split = panel.split(factor=indent)
+                _ = split.column()
+                col = split.column()
+                col.active = pref.use_trims
+                col.prop(pref, 'trim_line_width')
+                col.prop(pref, 'trim_line_opacity')
+                col.prop(pref, 'trim_tris_opacity')
+
+        if panel := draw_panel_with_pref_checkbox(layout, 'uv_layers_show'):
+            split = panel.split(factor=indent)
+            _ = split.column()
+            col = split.column()
+            col.active = pref.uv_layers_show
+            col.prop(pref, 'enable_uv_layers_sync_borders_seam')
 
 
 class UNIV_PT_PackSettings(Panel):
