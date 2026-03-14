@@ -30,6 +30,7 @@ class UMesh:
         self.elem_mode = utils.NoInit()
         self.uv: bmesh.types.BMLayerItem = bm.loops.layers.uv.verify() if verify_uv else None
         self.is_edit_bm: bool = is_edit_bm
+        # NOTE: Do not reset the tag after an update. Some operators check it after an update.
         self.update_tag: bool = True
         self.sync: bool = utils.sync()
         self._sync_invalidate: bool = False  # Need for 3D operators
@@ -628,7 +629,6 @@ class UMeshes:
         else:
             self.umeshes: list[UMesh] = umeshes
         self.report_obj = report
-        self._cancel: bool = False
         self.sync: bool = utils.sync()
         self._elem_mode: typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND'] = self._elem_mode_init()
         self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
@@ -639,19 +639,16 @@ class UMeshes:
             return
         self.report_obj(info_type, info)
 
-    def cancel_with_report(self, info_type: set[str] = {'INFO'}, info: str = "No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
-        self._cancel = True
-        self.report(info_type, info)
-        return {'CANCELLED'}
-
     def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
-        if self._cancel:
-            return {'CANCELLED'}
         if sum(umesh.update(force=force) for umesh in self.umeshes):
             return {'FINISHED'}
         if info:
             self.report(info_type, info)
         return {'CANCELLED'}
+
+    def silent_update(self):
+        for umesh in self:
+            umesh.update()
 
     @property
     def update_tag(self):
@@ -685,9 +682,7 @@ class UMeshes:
             umesh.elem_mode = mode
         return mode
 
-    def silent_update(self):
-        for umesh in self:
-            umesh.update()
+
 
     def ensure(self, face=True, edge=False, vert=False):
         for umesh in self.umeshes:
@@ -862,7 +857,10 @@ class UMeshes:
         self.umeshes = bmeshes
 
     @classmethod
-    def unselected_with_uv(cls):
+    def view_layer_context_unselected_with_uv(cls):
+        """Get unselected (not object.select_get()), visible meshes, with faces and with uv.
+            Need for AdjustScale in object mode.
+        """
         visible_objects = []
         if (area := bpy.context.area).type == 'VIEW_3D' and not area.spaces.active.local_view:
             for obj in bpy.context.view_layer.objects:
@@ -1145,10 +1143,6 @@ class UMeshes:
         missing = copy.copy(self)
         missing.umeshes = without_uv_map
         return missing
-
-    @property
-    def has_update_mesh(self):
-        return any(umesh.update_tag for umesh in self)
 
     def __iter__(self) -> typing.Iterator[UMesh]:
         return iter(self.umeshes)

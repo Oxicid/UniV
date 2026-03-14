@@ -333,14 +333,13 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 isl.value = self.individual_scale(isl)
 
         tot_area_uv, tot_area_3d = self.avg_by_frequencies(all_islands)
-        self.normalize(all_islands, tot_area_uv, tot_area_3d)
-
-        self.umeshes.update(info='All islands were normalized')
-
-        if not self.umeshes.is_edit_mode:
-            self.umeshes.free()
-            utils.update_area_by_type('VIEW_3D')
-
+        if self.normalize(all_islands, tot_area_uv, tot_area_3d):
+            self.umeshes.update(info='All islands were normalized')
+            if not self.umeshes.is_edit_mode:
+                self.umeshes.free()
+                utils.update_area_by_type('VIEW_3D')
+        else:
+            self.umeshes.silent_update()  # In normalize() has reports.
         return {'FINISHED'}
 
     def individual_scale(self, isl: AdvIsland, threshold=1e-8):
@@ -439,17 +438,24 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         return new_center
 
     def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
-        if not self.xy_scale and len(islands) <= 1:
-
-            # TODO: Remove 'cancel_with_report'
-            self.umeshes.cancel_with_report(
-                {'WARNING'}, info=f"Islands should be more than 1, given {len(islands)} islands")
-            return
-        if tot_area_3d == 0.0 or tot_area_uv == 0.0:
+        """ NOTE: The pivot stored in saved in 'AdvIsland.value' is taken into account when 'scale' is enabled."""
+        error = False
+        if (not self.xy_scale and not self.shear) and len(islands) <= 1:
+            error = True
+            self.report({'WARNING'}, f"Islands should be more than 1, given {len(islands)} islands")
+        elif tot_area_3d == 0.0 or tot_area_uv == 0.0:
+            error = True
             # Prevent divide by zero.
-            self.umeshes.cancel_with_report(
-                {'WARNING'}, info=f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
-            return
+            self.report({'WARNING'}, f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
+
+        if error:
+            # Apply transforms after xy_scale and shear.
+            if self.xy_scale or self.shear:
+                for isl in islands:
+                    old_pivot = isl.bbox.center
+                    new_pivot = isl.value
+                    isl.umesh.update_tag |= isl.set_position(old_pivot, new_pivot)
+            return False
 
         tot_fac = tot_area_3d / tot_area_uv
 
@@ -473,6 +479,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 if utils.vec_isclose(old_pivot, new_pivot) and math.isclose(scale, 1.0, abs_tol=0.00001):
                     continue
 
+                assert isl.flat_unique_uv_coords
                 for crn_co in isl.flat_unique_uv_coords:
                     crn_co *= scale
                     crn_co += diff
@@ -501,6 +508,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 isl.umesh.update_tag = True
 
             self.report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
+        return True
 
     def avg_by_frequencies(self, all_islands: list[AdvIsland]):
         areas_uv = np.empty(len(all_islands), dtype=float)
@@ -661,19 +669,17 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             adv_islands.calc_area_3d(umesh.value, areas_to_weight=True)  # umesh.value == obj scale
 
             for isl in adv_islands:
-                any_selected = AdvIslands.island_filter_is_any_face_selected(isl, umesh)
-                if any_selected:
-                    all_islands.append(isl)
-                else:
+                if isl.is_full_face_deselected():
                     tot_area_uv += isl.area_uv
                     tot_area_3d += isl.area_3d
+                else:
+                    all_islands.append(isl)
 
         for umesh in unselected_umeshes:
-            if not (faces := utils.calc_visible_uv_faces(umesh)):
-                continue
-            adv_islands = AdvIsland(faces, umesh)
-            tot_area_uv += adv_islands.calc_area_uv()
-            tot_area_3d += adv_islands.calc_area_3d(scale=umesh.value)
+            if faces := utils.calc_visible_uv_faces(umesh):
+                adv_islands = AdvIsland(faces, umesh)
+                tot_area_uv += adv_islands.calc_area_uv()
+                tot_area_3d += adv_islands.calc_area_3d(scale=umesh.value)
 
         if self.lock_overlap:
             threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None
@@ -688,19 +694,23 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         return {'FINISHED'}
 
     def normalize_and_show_adjust_result_info_edit(self, all_islands, tot_area_3d, tot_area_uv, sel='selected', unsel='unselected'):
-        info_ = 'All target islands were normalized'
+        info = 'All target islands were normalized'
         if isinstance(tot_area_uv, int):
-            ret = self.umeshes.update(info=info_)
-            if ret == {'FINISHED'}:
-                for isl in all_islands:
-                    isl.set_position(isl.value, isl.calc_bbox().center)
+            self.umeshes.update(info=info)
+            if self.umeshes.update_tag:
+                if self.xy_scale or self.shear:
+                    for isl in all_islands:
+                        first_pivot = isl.bbox.center
+                        current_pivot = isl.value
+                        isl.set_position(first_pivot, current_pivot)
                 self.report({'INFO'}, f'{unsel.capitalize()} islands not found, but {sel} was adjusted')
+        else:
+            if self.normalize(all_islands, tot_area_uv, tot_area_3d) or self.umeshes.update_tag:
+                self.umeshes.update(info=info)
             else:
-                self.report({'WARNING'}, f'{unsel.capitalize()} islands not found')
-            return
+                self.umeshes.silent_update()  # In normalize() has reports.
 
-        self.normalize(all_islands, tot_area_uv, tot_area_3d)
-        self.umeshes.update(info=info_)
+
 
     def adjust_object(self):
         all_islands: list[AdvIsland | UnionIslands] = []
@@ -717,7 +727,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
-        for umesh in (unselected_umeshes := UMeshes.unselected_with_uv()):
+        for umesh in (unselected_umeshes := UMeshes.view_layer_context_unselected_with_uv()):
             umesh.value = umesh.check_uniform_scale(report=self.report)
         unselected_umeshes.set_sync()
         unselected_umeshes.sync_invalidate()
@@ -752,34 +762,40 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                 isl.value = isl.bbox.center  # isl.value == pivot
                 isl.value = self.individual_scale(isl)
 
-        self.umeshes.report_obj = None
-        if isinstance(tot_area_uv, int):
-            if (ret := self.umeshes.update()) == {'FINISHED'}:
-                for isl in all_islands:
-                    isl.set_position(isl.value, isl.calc_bbox().center)
+
+        if not unselected_umeshes:
+            has_update = self.umeshes.update_tag
+            if has_update:
+                if self.xy_scale or self.shear:
+                    for isl in all_islands:
+                        if isl.umesh.update_tag:
+                            isl.set_position(isl.bbox.center, isl.value)
                 self.report({'INFO'}, f'Unselected objects not found, but selected was adjusted')
+                self.umeshes.silent_update()
             else:
                 self.report({'WARNING'}, f"Unselected objects not found")
 
             self.umeshes.free()
-            utils.update_area_by_type('VIEW_3D')
-            return ret
 
-        self.normalize(all_islands, tot_area_uv, tot_area_3d)
-        self.umeshes.report_obj = self.report
-
-        if self.umeshes.has_update_mesh:
-            if not unselected_umeshes:
-                self.umeshes.update(info=f'Unselected objects not found, but selected was adjusted')
-            else:
-                self.umeshes.update(info='All target islands were adjusted')
+            if has_update:
+                utils.update_area_by_type('VIEW_3D')
+            return {'FINISHED'}
         else:
-            self.report({'WARNING'}, f'Unselected objects not found.')
+            # Normalize tagged update_tag, so we use the latest tag
+            if self.normalize(all_islands, tot_area_uv, tot_area_3d):
+                if self.umeshes.update_tag:
+                    self.umeshes.update(info='All target islands were adjusted')
+                else:
+                    self.report({'WARNING'}, f'Unselected objects not found.')
+            else:
+                self.umeshes.silent_update()  # In normalize() has reports.
 
-        self.umeshes.free()
-        utils.update_area_by_type('VIEW_3D')
+            self.umeshes.free()
 
-        return {'FINISHED'}
+            if self.umeshes.update_tag:
+                utils.update_area_by_type('VIEW_3D')
+
+            return {'FINISHED'}
 
 
 class UNIV_OT_AdjustScale(UNIV_OT_AdjustScale_VIEW3D):
