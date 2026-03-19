@@ -34,6 +34,17 @@ version = bpy.app.version
 bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
 
 
+class PyObject_HEAD(Structure):
+    _fields_ = (("ob_refcnt", c_long),
+                ("ob_type", c_void_p)
+                )
+
+class PyObject_VAR_HEAD(Structure):
+    _fields_ = (("ob_refcnt", c_long),
+                ("ob_type", c_void_p),
+                ("ob_size", c_long)
+                )
+
 def info_(self):
     print('', '=' * 80, '\n', self)
     name_, size_ = 'Name', 'Size'
@@ -760,9 +771,11 @@ class CBMesh(StructBase):
 
 
 class PyBMesh(StructBase):
-    ob_refcnt: c_long
-    ob_type: c_void_p
-    ob_size: c_long
+    # Cleanup: use PyObject_HEAD for fixed-size types: https://projects.blender.org/blender/blender/pulls/155741
+    if version >= (5, 2, 0):
+        pyhead: PyObject_HEAD
+    else:
+        pyhead: PyObject_VAR_HEAD
     # noinspection PyTypeHints
     bm: POINTER(CBMesh)
 
@@ -855,9 +868,10 @@ class ImBuf(StructBase):
     byte_buffer: ImBufByteBuffer
 
 class Py_ImBuf(StructBase):
-    ob_refcnt: c_long
-    ob_type: c_void_p
-    ob_size: c_long
+    if version >= (5, 2, 0):
+        pyhead: PyObject_HEAD
+    else:
+        pyhead: PyObject_VAR_HEAD
     # noinspection PyTypeHints
     ibuf: POINTER(ImBuf)
 
