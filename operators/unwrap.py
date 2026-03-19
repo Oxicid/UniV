@@ -556,7 +556,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         failed_total = 0
         unique_number_for_multiply = 0
-        hidden_constraints_islands = []
+        hidden_constraints_islands: list[utypes.AdvIsland] = []
         all_transform_islands = []
         for umesh in reversed(self.umeshes):
             umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -614,15 +614,15 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
-
         if all_transform_islands:
             for hidden_isl in hidden_constraints_islands:
-                hidden_isl.hide_for_unwrap()
+                hidden_isl.sequence = hidden_isl.set_pins(with_pinned=True)
 
             bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
 
             for hidden_isl in hidden_constraints_islands:
-                hidden_isl.unhide_for_unwrap()
+                for crn_uv in hidden_isl.sequence:
+                    crn_uv.pin_uv = False
 
         for isl in all_transform_islands:
             unpinned, to_select = isl.island.sequence

@@ -64,7 +64,7 @@ class KDData:
 
 
 class KDMesh:
-    def __init__(self, umesh, islands=None, loop_groups=None):
+    def __init__(self, umesh, islands: Islands | AdvIslands | None = None, loop_groups=None):
         self.umesh: UMesh = umesh
         self.islands: Islands | AdvIslands | None = islands
         self.loop_groups: LoopGroups | None = loop_groups
@@ -757,7 +757,7 @@ class RayCast:
 
         if not (result and obj and obj.type == 'MESH'):  # TODO: Fix potential non-mesh overlap object
             # TODO: Add raycast, ignoring objects that are not in Edit Mode
-            return
+            return None
 
         eval_obj = obj.evaluated_get(deps)
         has_destructive_modifiers = len(obj.data.polygons) != len(eval_obj.data.polygons)
@@ -765,7 +765,7 @@ class RayCast:
             # Raycast, ignoring objects that are not in Edit Mode
             umesh, face_index = self.ray_cast_umeshes()
             if not umesh:
-                return
+                return None
         else:
             umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
         umesh.ensure()
@@ -781,3 +781,4 @@ class RayCast:
                     hit.umesh = umesh
                     hit.face = crn.face  # incref
                     return hit
+        return None

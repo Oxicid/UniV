@@ -2356,6 +2356,7 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
     bl_description = "Break"
     bl_options = {'REGISTER', 'UNDO'}
 
+    padding_multiplayer: FloatProperty(name='Padding Multiplayer', default=0.5, min=-32, soft_min=0, soft_max=4, max=32)
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     angle: FloatProperty(name='Smooth Angle', default=math.radians(
         66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
