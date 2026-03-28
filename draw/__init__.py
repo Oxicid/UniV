@@ -15,6 +15,7 @@ from gpu_extras.batch import batch_for_shader
 
 from . import shaders
 from . import mesh_extract
+from .. import fastapi
 from .text import TextDraw
 from ..utypes import UMesh
 from ..preferences import univ_settings, prefs
@@ -159,8 +160,11 @@ class DrawCallSeams2D:
 
     @classmethod
     def init(cls, umesh: UMesh) -> 'DrawCallSeams2D | None':
-        data = mesh_extract.extract_seams_umesh(umesh)
-        if data:
+        if fastapi.FastAPI.lib:
+            data = fastapi.ExtractData.extract_seams_data(umesh)
+        else:
+            data = mesh_extract.extract_seams_umesh(umesh)
+        if len(data):
             return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": data}))
         return None
 
@@ -210,16 +214,19 @@ class DrawCallConstraints2D:
         if not constraints_attr:
             return None
 
-        v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
-        if not (h_coords or v_coords):
+        if fastapi.FastAPI.lib:
+            v_coords, h_coords = fastapi.ExtractData.extract_constraints_data(umesh, constraints_attr)
+        else:
+            v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
+        if not (len(h_coords) or len(v_coords)):
             return None
 
         h_batch = None
         v_batch = None
 
-        if h_coords:
+        if len(h_coords):
             h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": h_coords})
-        if v_coords:
+        if len(v_coords):
             v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": v_coords})
 
         return cls(h_batch, v_batch)

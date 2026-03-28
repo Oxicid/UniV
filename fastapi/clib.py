@@ -1,15 +1,19 @@
 # SPDX-FileCopyrightText: 2025 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
+import numpy as np
 import platform
 import ctypes
+from .. import utypes
 from .. import utils
 from ctypes import (
     c_int,
+    c_float,
     c_double,
     c_void_p,
-    c_bool
+    c_bool,
+    POINTER,
+    byref
 )
 
 class FastAPI:
@@ -19,16 +23,37 @@ class FastAPI:
     def load(cls):
         cls.lib = utils.load_lib('univ_fastapi')
         cls.init_linear_solver()
+        cls.init_extract_data()
 
     @classmethod
     def close(cls):
         if cls.lib is None:
             return
 
-        if platform.system() == 'Windows':
-            ctypes.windll.kernel32.FreeLibrary(  # noqa
-                ctypes.c_void_p(cls.lib._handle))
-        cls.lib = None
+        handle = cls.lib._handle
+        cls.lib = None  # decref
+
+        match platform.system():
+            case 'Windows':
+                dll_close = ctypes.windll.kernel32.FreeLibrary  # noqa
+            case "Darwin":
+                stdlib = ctypes.CDLL("libc.dylib")
+                dll_close = stdlib.dlclose
+            case "Linux":
+                try:
+                    stdlib = ctypes.CDLL("")
+                except OSError:
+                    # Alpine Linux.
+                    stdlib = ctypes.CDLL("libc.so")
+                dll_close = stdlib.dlclose
+            case platform_:
+                raise NotImplementedError(f"Unknown platform: {platform_!r}.")
+
+        dll_close.argtypes = [ctypes.c_void_p]
+        dll_close(ctypes.c_void_p(handle))
+
+        import gc
+        gc.collect()  # clear for free lib
 
     @classmethod
     def init_linear_solver(cls):
@@ -70,6 +95,97 @@ class FastAPI:
         lib.solver_solve.argtypes = (c_void_p,)
         lib.solver_solve.restype = c_bool
 
+    @classmethod
+    def init_extract_data(cls):
+        from .. import btypes
+        lib = cls.lib
+
+        # void UniV_extract_data_constraints2d(
+        #     BMesh *bm,
+        #     const int uv_layer,
+        #     const int layer_index,
+        #     const int customdata_type,
+        #     const bool sync,
+        #     float *r_varray,
+        #     float *r_harray,
+        #     int *r_tot_v,
+        #     int *r_tot_h)
+        lib.UniV_extract_data_constraints2d.argtypes = (POINTER(btypes.CBMesh),
+                                                        c_int,
+                                                        c_int,
+                                                        c_int,
+                                                        c_bool,
+                                                        POINTER(c_float),
+                                                        POINTER(c_float),
+                                                        POINTER(c_int),
+                                                        POINTER(c_int)
+                                                        )
+        lib.UniV_extract_data_constraints2d.restype = None
+
+        # int UniV_extract_data_seams2d(
+        #     BMesh *bm,
+        #     const int uv_layer,
+        #     const bool sync,
+        #     float *r_array)
+
+        lib.UniV_extract_data_seams2d.argtypes = (POINTER(btypes.CBMesh),
+                                                        c_int,
+                                                        c_bool,
+                                                        POINTER(c_float)
+                                                        )
+        lib.UniV_extract_data_seams2d.restype = c_int
+
+
+class ExtractData:
+    @staticmethod
+    def extract_constraints_data(umesh: 'utypes.UMesh', attr):
+        from .. import btypes
+
+        py_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm)
+        total_corners = py_bm.bm.contents.totloop
+        py_uv: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv)
+        py_constr_layer: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(attr)
+
+        max_data_shape = (total_corners*2, 2)
+        varray = np.empty(max_data_shape, np.float32)
+        harray = np.empty(max_data_shape, np.float32)
+
+        tot_v_coords = c_int()
+        tot_h_coords = c_int()
+
+        FastAPI.lib.UniV_extract_data_constraints2d(
+            py_bm.bm,
+            py_uv.index,
+            py_constr_layer.index,
+            py_constr_layer.type,
+            umesh.sync,
+            varray.ctypes.data_as(POINTER(c_float)),
+            harray.ctypes.data_as(POINTER(c_float)),
+            byref(tot_v_coords),
+            byref(tot_h_coords)
+        )
+
+        return varray[:tot_v_coords.value], harray[:tot_h_coords.value]
+
+    @staticmethod
+    def extract_seams_data(umesh: 'utypes.UMesh'):
+        from .. import btypes
+
+        py_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm)
+        total_corners = py_bm.bm.contents.totloop
+        py_uv: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv)
+
+        max_data_shape = (total_corners*2, 2)
+        r_array = np.empty(max_data_shape, np.float32)
+
+        tot_coords = FastAPI.lib.UniV_extract_data_seams2d(
+            py_bm.bm,
+            py_uv.index,
+            umesh.sync,
+            r_array.ctypes.data_as(POINTER(c_float))
+        )
+
+        return r_array[:tot_coords]
 
 class LinearSolver:
     @classmethod
@@ -126,3 +242,109 @@ class LinearSolver:
             self.close()
         except Exception:  # noqa
             pass
+
+import unittest
+
+class TestExtractData(unittest.TestCase):
+    @staticmethod
+    def get_umesh_with_constraints_and_seams():
+        import bmesh
+        bm = bmesh.new()
+
+        v1 = bm.verts.new((0, 1, 0))
+        v2 = bm.verts.new((0, 0, 0))
+        v3 = bm.verts.new((1, 0, 0))
+        v4 = bm.verts.new((0, -1, 0))
+        v5 = bm.verts.new((-1, 0, 0))
+        v6 = bm.verts.new((0, 0, 1))
+        v7 = bm.verts.new((0, 1, 1))
+
+        bm.verts.index_update()
+
+        bm.edges.new((v6, v7))  # Wire Edge
+
+        f1 = bm.faces.new((v1, v2, v3))
+        f2 = bm.faces.new((v3, v2, v4))
+        f3 = bm.faces.new((v4, v2, v5))
+
+        f4 = bm.faces.new((v2, v4, v6))
+
+        uv = bm.loops.layers.uv.new()
+        bm.faces.ensure_lookup_table()
+
+        for crn, uv_co in zip(f1.loops, ((-1, 0), (0, 0), (0, 1))):
+            crn[uv].uv = uv_co
+
+        for crn, uv_co in zip(f2.loops, ((0, 1), (0, 0), (1, 0))):
+            crn[uv].uv = uv_co
+
+        for crn, uv_co in zip(f3.loops, ((1, 0), (0, 0), (0, -1))):
+            crn[uv].uv = uv_co
+
+        for crn, uv_co in zip(f4.loops, ((1, 0), (2, 0), (2, 1))):
+            crn[uv].uv = uv_co
+
+        V = '10'
+        H = '11'
+        ERR = '01'
+
+        atr = bm.edges.layers.int.new('univ_constraints')
+        f1.edges[0][atr] = int(H + V, 2)
+        f1.edges[1][atr] = int(H + H, 2)
+        f1.edges[2][atr] = int(ERR, 2)
+        f1.edges[1].seam = True
+
+        f2.edges[1][atr] = int(ERR + H + H, 2)
+        f2.edges[1].seam = True
+
+        f3.edges[1][atr] = int(ERR + V, 2)
+        f3.edges[1].seam = True
+
+        f4.edges[1][atr] = int(H + V + V, 2)
+        f4.edges[1].seam = True
+
+        wire_edge = next(e for e in bm.edges if e.is_wire)
+        wire_edge[atr] = int(H, 2)
+        wire_edge.seam = True
+
+        u = utypes.UMesh(bm, None, is_edit_bm=False)
+        u.sync = True
+
+        return u, atr
+
+    def test_extract_data_constraints(self):
+
+
+        umesh, attr = self.get_umesh_with_constraints_and_seams()
+        varray, harray = ExtractData.extract_constraints_data(umesh, attr)
+
+        self.assertEqual(len(varray), 6)
+        self.assertEqual(len(harray), 8)
+
+        expect_varray = [[-1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]
+        expect_harray = [[0,1],[0,0], [0,0],[0,1], [1,0],[2,0], [0,0],[1,0]]
+
+
+        self.assertEqual(varray.tolist(), expect_varray)
+        self.assertEqual(harray.tolist(), expect_harray)
+
+        umesh.free()
+
+    def test_extract_data_seams(self):
+        umesh, _ = self.get_umesh_with_constraints_and_seams()
+        data = ExtractData.extract_seams_data(umesh)
+
+        self.assertEqual(len(data), 14)
+
+        expect_data = [[0,1],[0,0], [0,0],[0,1], [1,0],[2,0], [0,0],[1,0], [1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]
+        self.assertEqual(data.tolist(), expect_data)
+
+        umesh.free()
+
+    @classmethod
+    def start(cls):
+        suite = unittest.TestLoader().loadTestsFromTestCase(cls)
+        runner = unittest.TextTestRunner(verbosity=2)
+        result = runner.run(suite)
+        result.wasSuccessful()
+        return result

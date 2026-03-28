@@ -111,6 +111,10 @@ class StructBase(Structure):
     def get_fields(cls, tar: bpy_struct_subclass):
         return cls.from_address(tar.as_pointer())
 
+    @classmethod
+    def get_fields_from_pyobj(cls, py_obj):
+        return cls.from_address(id(py_obj))
+
 
 class BArray(StructBase):
     _fields_ = (
@@ -743,22 +747,34 @@ class wmWindow(StructBase):
         runtime: c_void_p
         _pad3: c_void_p
 
+class context(StructBase):  # Anonymous
+    # noinspection PyTypeHints
+    win: lambda: POINTER(wmWindow)
+    area: c_void_p  # ScrArea ptr
+    region: c_void_p  # ARegion ptr
+    region_type: c_short
 
 # source\blender\windowmanager\wm_event_system.h
 class wmEventHandler_Op(StructBase):
-    class context(StructBase):  # Anonymous
-        # noinspection PyTypeHints
-        win: lambda: POINTER(wmWindow)
-        area: c_void_p  # ScrArea ptr
-        region: c_void_p  # ARegion ptr
-        region_type: c_short
-
     head: wmEventHandler
     op: c_void_p  # wmOperator
     is_file_select: c_bool
     context: context
 
-    del context
+# noinspection PyTypeHints
+class CustomData(StructBase):
+    layers: c_void_p
+
+    typemap: c_int * 53
+
+    totlayer: c_int
+    maxlayer: c_int
+
+    totsize: c_int
+
+    pool: c_void_p
+    external: c_void_p
+
 
 class CBMesh(StructBase):
     totvert: c_int
@@ -769,6 +785,48 @@ class CBMesh(StructBase):
     totedgesel: c_int
     totfacesel: c_int
 
+    elem_index_dirty: c_char
+
+    vpool: c_void_p
+    epool: c_void_p
+    lpool: c_void_p
+    fpool: c_void_p
+
+    vtable: c_void_p
+    etable: c_void_p
+    ftable: c_void_p
+
+    vtable_tot: c_int
+    etable_tot: c_int
+    ftable_tot: c_int
+
+    vtoolflagpool: c_void_p
+    etoolflagpool: c_void_p
+    ftoolflagpool: c_void_p
+
+    use_toolflags: c_bool
+
+    if version >= (5, 0, 0):
+        uv_select_sync_valid: c_bool
+
+    toolflag_index: c_int
+
+    vdata: CustomData
+    edata: CustomData
+    ldata: CustomData
+    pdata: CustomData
+
+
+class BPy_BMLayerItem(StructBase):
+    if version >= (5, 2, 0):
+        pyhead: PyObject_HEAD
+    else:
+        pyhead: PyObject_VAR_HEAD
+    # noinspection PyTypeHints
+    bm: POINTER(CBMesh)
+    htype: c_char
+    type: c_int  # customdata type - CD_XXX
+    index: c_int  # index of this layer type
 
 class PyBMesh(StructBase):
     # Cleanup: use PyObject_HEAD for fixed-size types: https://projects.blender.org/blender/blender/pulls/155741
@@ -778,6 +836,7 @@ class PyBMesh(StructBase):
         pyhead: PyObject_VAR_HEAD
     # noinspection PyTypeHints
     bm: POINTER(CBMesh)
+
 
     @classmethod
     def fields(cls, bm):

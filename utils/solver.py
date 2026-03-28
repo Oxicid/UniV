@@ -311,7 +311,6 @@ class TestSolver(unittest.TestCase):
 
     @classmethod
     def start(cls):
-        import unittest
         suite = unittest.TestLoader().loadTestsFromTestCase(cls)
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)

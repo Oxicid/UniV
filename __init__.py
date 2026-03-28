@@ -382,13 +382,14 @@ def register():
     try:
         fastapi.clib.FastAPI.load()
     except:  # noqa
-        pass
-        # print('UniV: Cannot load fastapi')
+        if univ_pro:
+            print('UniV: Cannot load fastapi.')
+            traceback.print_exc()
 
     try:
         icons.icons.register_icons_()
     except:  # noqa
-        print('UniV: Icons not loaded')
+        print('UniV: Icons not loaded.')
         traceback.print_exc()
 
     try:
