@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.10)
 project(univ_fastapi)
 
 set(CMAKE_CXX_STANDARD 17)
+
 # set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 set(BLENDER_ROOT ${CMAKE_SOURCE_DIR}/..)
 set(BLENLIB ${BLENDER_ROOT}/source/blender/blenlib)
 set(BMESH_DIR ${BLENDER_ROOT}/source/blender/bmesh)
@@ -23,21 +25,15 @@ add_library(univ_fastapi SHARED
 	
 	${BLENDER_ROOT}/extern/fmtlib/src/format.cc
 	${BLENDER_ROOT}/extern/wcwidth/wcwidth.c
-	# C:\Users\user\Desktop\BSource\blender\source\blender\blenkernel\intern\mesh_tessellate.cc
 	
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_core.cc
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_query.cc
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_query_uv.cc
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_iterators.cc
-	# ${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_mods.cc
-	# ${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_operators.cc
-	# ${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_construct.cc
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_marking.cc
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_polygon.cc
 	
 	${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_structure.cc
-	# ${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_opdefines.cc
-	# ${BLENDER_ROOT}/source/blender/bmesh/intern/bmesh_interp.cc
 	${BLENDER_ROOT}/source/blender/bmesh/tools/bmesh_beautify.cc
 	
     ${BLENDER_ROOT}/intern/eigen/intern/linear_solver.cc
@@ -92,14 +88,7 @@ add_library(univ_fastapi SHARED
 	${BLENDER_ROOT}/source/blender/blenlib/intern/task_scheduler.cc
 	
 	${BLENDER_ROOT}/source/blender/blenlib/intern/BLI_kdopbvh.cc
-	
-	# ${BLENDER_ROOT}/intern/guardedalloc/intern/mallocn_lockfree_impl.cc
-	# ${BLENDER_ROOT}/source/blender/blenlib/intern/math_vector.cc
-    # ${BLENDER_ROOT}/source/blender/blenlib/intern/math_vec.cc
-	# ${BLENDER_ROOT}/source/blender/blenlib/intern/memory_utils.cc 
-	# ${BLENDER_ROOT}/source/blender/blenlib/intern/math_vec_interp.cc
-	# ${BLENDER_ROOT}/source/blender/blenlib/intern/math_interp.cc
-	# ${BLENDER_ROOT}/source/blender/blenlib/intern/math_base_safe_inline.cc
+
 )
 
 target_include_directories(univ_fastapi PRIVATE
@@ -126,12 +115,19 @@ target_include_directories(univ_fastapi PRIVATE
 	${BLENDER_ROOT}/extern/wcwidth
     ${BLENDER_ROOT}/extern/wcwidth/include
 	
-	 ${BLENDER_ROOT}/intern/utfconv
+	${BLENDER_ROOT}/intern/utfconv
 	 
 )
 
-target_link_libraries(univ_fastapi PRIVATE 
-	${BLENDER_ROOT}/lib/windows_x64/pthreads/lib/pthreadVC3.lib)
+set(EXTRA_LIBS "")
+
+if(WIN32)
+    list(APPEND EXTRA_LIBS
+        ${BLENDER_ROOT}/lib/windows_x64/pthreads/lib/pthreadVC3.lib
+    )
+endif()
+
+target_link_libraries(univ_fastapi PRIVATE ${EXTRA_LIBS})
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} /arch:SSE2 /fp:precise")
