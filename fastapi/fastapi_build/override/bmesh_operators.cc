@@ -7,7 +7,7 @@
 
 #define BMO_OP_MAX_SLOTS 21
 
-
+namespace blender {
 int BMO_slot_buffer_len(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name) {return 0;}
 
 void *BMO_iter_new(BMOIter *iter,
@@ -16,3 +16,5 @@ void *BMO_iter_new(BMOIter *iter,
                    const char restrictmask) {return nullptr;}
 				   
 void *BMO_iter_step(BMOIter *iter) {return nullptr;}
+
+}  // namespace blender

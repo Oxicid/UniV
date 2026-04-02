@@ -5,7 +5,8 @@
 #include "bmesh.hh"
 #include "intern/bmesh_private.hh"
 
-
+namespace blender {
+	
 int BMO_slot_buffer_len(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name);
 
 void *BMO_iter_new(BMOIter *iter,
@@ -14,3 +15,5 @@ void *BMO_iter_new(BMOIter *iter,
                    const char restrictmask);
 				   
 void *BMO_iter_step(BMOIter *iter);
+
+}  // namespace blender

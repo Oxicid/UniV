@@ -1061,3 +1061,15 @@ class UNIV_OT_BatchInspect(Operator):
             umeshes.silent_update()
             return context.window_manager.invoke_popup(self, width=420)
         return {'FINISHED'}
+
+# noinspection PyTypeHints
+class UNIV_OT_Check_Lib(Operator):
+    bl_idname = 'wm.univ_check_lib'
+    bl_label = 'Test Lib'
+    bl_description = "Test shared library (fast api)."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        from .. import fastapi
+        res = fastapi.TestExtractData.start()
+        return {'FINISHED'}

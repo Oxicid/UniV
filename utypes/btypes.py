@@ -24,7 +24,7 @@ from ctypes import (
     sizeof,
     c_size_t,
     c_bool,
-    # addressof
+    addressof
 )
 
 from . import bbox
@@ -49,16 +49,20 @@ def info_(self):
     print('', '=' * 80, '\n', self)
     name_, size_ = 'Name', 'Size'
     print(f"{name_: <17}{size_: ^11}Offset   Value")
-    ofs = 0
+
+    typ = type(self)
     total_size = 0
     for name, *dtype in self._fields_:
         value = getattr(self, name)
         size = sizeof(*dtype)
         total_size += size
-        print(f"{name[:20]: <20}{size: <6}{ofs: < 6}   {value}")
-        ofs += size
+
+        print(f"{name[:20]: <20}{size: <6}{getattr(typ, name).offset: < 6}   {value}")
 
     print('\n', f'{total_size=}', '\n', '=' * 80)
+
+def format_to_cpp_pointer(pointer) -> str:
+    return hex(addressof(pointer)).upper()[2:].zfill(16)
 
 
 class StructBase(Structure):
@@ -761,9 +765,29 @@ class wmEventHandler_Op(StructBase):
     is_file_select: c_bool
     context: context
 
+
+# noinspection PyTypeHints
+class CustomDataLayer(StructBase):
+    type: c_int
+    offset: c_int
+    flag: c_int
+    active: c_int
+    active_rnd: c_int
+    if version <= (5, 0, 2):
+        active_clone: c_int
+        active_mask: c_int
+
+    uid: c_int
+    name: c_char * 68
+    _pad1: c_char * 4
+    data: c_void_p
+
+    sharing_info: c_void_p
+
+
 # noinspection PyTypeHints
 class CustomData(StructBase):
-    layers: c_void_p
+    layers: lambda: POINTER(CustomDataLayer)
 
     typemap: c_int * 53
 

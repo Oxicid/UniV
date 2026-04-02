@@ -4,29 +4,36 @@
 
 #pragma once
 
-#include <stdio.h>
-
+/**##################
+   Min solver requirements **/
 #include "eigen_capi.h"
 #include "BLI_math_vector.h"
+/* ################## */
+
+
+#include <stdio.h>
+#include <iostream>
 #include "BLI_compiler_attrs.h"
-#include "BLI_math_inline.h"
+
 #include "BLI_utildefines.h"
-#include "BLI_compiler_attrs.h"
-#include "BLI_math_inline.h"
 
 
 #include "BLI_alloca.h"
 #include "BLI_linklist.h"
 #include "BLI_math_base.hh"
+#include "BLI_math_inline.h"
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
-#include "BLI_math_vector.h"
 #include "BLI_memarena.h"
 #include "BLI_polyfill_2d.h"
 #include "BLI_polyfill_2d_beautify.h"
 
 #include "bmesh.hh"
 
+using namespace blender;
+
+/* This counter should only be changed when new features are added or critical changes are made. */
+#define FASTAPI_VERSION 3
 
 # define VERTICAL_CONSTR 2
 # define HORIZONTAL_CONSTR 3
@@ -50,29 +57,34 @@ static inline bool BMesh_is_full_face_deselected(BMesh *bm){
         return bm->totfacesel == 0;
 }
 
-static inline void write_uv_line(float **ptr, BMLoop *l, const BMUVOffsets offsets)
+
+static inline void write_uv_line(float **ptr, BMLoop *l, const int offsets)
 {
-    float *dst = *ptr;
+  float *dst = *ptr;
 
-    float *uv = BM_ELEM_CD_GET_FLOAT_P(l, offsets.uv);
-    dst[0] = uv[0];
-    dst[1] = uv[1];
+  float *uv = BM_ELEM_CD_GET_FLOAT_P(l, offsets);
+  dst[0] = uv[0];
+  dst[1] = uv[1];
 
-    uv = BM_ELEM_CD_GET_FLOAT_P(l->next, offsets.uv);
-    dst[2] = uv[0];
-    dst[3] = uv[1];
+  uv = BM_ELEM_CD_GET_FLOAT_P(l->next, offsets);
+  dst[2] = uv[0];
+  dst[3] = uv[1];
 
-    *ptr += 4;
+  *ptr += 4;
 }
 
 
 extern "C" {
+DLL_EXPORT int version()
+{
+  return FASTAPI_VERSION;
+}
+
 
 DLL_EXPORT void UniV_extract_data_constraints2d(
     BMesh *bm,
-    const int uv_layer,
-    const int layer_index,
-    const int customdata_type,
+    const int uv_offset,
+    const int constr_offset,
     const bool sync,
     float *r_varray,
     float *r_harray,
@@ -86,7 +98,11 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
     float *hptr = r_harray;
 
     const CustomData *data = &bm->edata;
-    const BMUVOffsets offsets = BM_uv_map_offsets_from_layer(bm, uv_layer);
+
+    if (uv_offset == -1) {
+      std::cout << "UniV: FastAPI: UniV_extract_data_constraints2d: Can't get uv layer index\n";
+      return;
+    }
 
     BMEdge *e;
     BMLoop *l;
@@ -110,10 +126,7 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
 
     BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 
-        void *value = CustomData_bmesh_get_n(
-            data, e->head.data,
-            eCustomDataType(customdata_type),
-            layer_index);
+        void *value = POINTER_OFFSET(e->head.data, constr_offset);
 
         int edge_idx = *(int *)value;
 
@@ -131,11 +144,11 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
             int bits = edge_idx & 3;
 
             if (bits == VERTICAL_CONSTR) {
-                write_uv_line(&vptr, l, offsets);
+              write_uv_line(&vptr, l, uv_offset);
                 total_vlines++;
             }
             else if (bits == HORIZONTAL_CONSTR) {
-                write_uv_line(&hptr, l, offsets);
+              write_uv_line(&hptr, l, uv_offset);
                 total_hlines++;
             }
 
@@ -149,7 +162,7 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
 
 DLL_EXPORT int UniV_extract_data_seams2d(
     BMesh *bm,
-    const int uv_layer,
+    const int uv_offset,
     const bool sync,
     float *r_array)
 {
@@ -157,7 +170,10 @@ DLL_EXPORT int UniV_extract_data_seams2d(
 
     float *arrptr = r_array;
 
-    const BMUVOffsets offsets = BM_uv_map_offsets_from_layer(bm, uv_layer);
+    if (uv_offset == -1) {
+      std::cout << "UniV: FastAPI: UniV_extract_data_seams2d: Can't get uv layer index\n";
+      return 0;
+    }
 
     BMEdge *e;
     BMLoop *l;
@@ -190,7 +206,7 @@ DLL_EXPORT int UniV_extract_data_seams2d(
 					continue;
 					}
 
-				write_uv_line(&arrptr, l, offsets);
+				write_uv_line(&arrptr, l, uv_offset);
 				total_lines++;
 			}
 		}
@@ -198,22 +214,22 @@ DLL_EXPORT int UniV_extract_data_seams2d(
 	return total_lines * 2;
 }
 
-DLL_EXPORT void UniV_calc_tessellation_for_face_impl(std::array<BMLoop *, 3> *looptris,
-                                                      BMFace *efa,
-                                                      MemArena **pf_arena_p,
-                                                      const bool face_normal)
-
-{
-	UniV_calc_tessellation_for_face_impl(looptris, efa, pf_arena_p, false);
-
-}
-
-DLL_EXPORT void UniV_polyfill_calc(const float (*coords)[2],
-                       unsigned int coords_num,
-                       int coords_sign,
-                       unsigned int (*r_tris)[3]) {
-    BLI_polyfill_calc(coords, coords_num, 1, r_tris);
-}
+//DLL_EXPORT void UniV_calc_tessellation_for_face_impl(std::array<BMLoop *, 3> *looptris,
+//                                                      BMFace *efa,
+//                                                      MemArena **pf_arena_p,
+//                                                      const bool face_normal)
+//
+//{
+//	UniV_calc_tessellation_for_face_impl(looptris, efa, pf_arena_p, false);
+//
+//}
+//
+//DLL_EXPORT void UniV_polyfill_calc(const float (*coords)[2],
+//                       unsigned int coords_num,
+//                       int coords_sign,
+//                       unsigned int (*r_tris)[3]) {
+//    BLI_polyfill_calc(coords, coords_num, 1, r_tris);
+//}
 
 
 DLL_EXPORT LinearSolver* solver_create(int num_rows, int num_variables, bool least_squares)

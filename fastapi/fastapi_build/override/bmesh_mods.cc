@@ -17,5 +17,9 @@
 #include "bmesh.hh"
 #include "intern/bmesh_private.hh"
 
+namespace blender {
+
 BMEdge *BM_edge_rotate(BMesh *bm, BMEdge *e, bool ccw, short check_flag) {return nullptr;}
 bool BM_edge_rotate_check(BMEdge *e) {return false;}
+
+}  // namespace blender

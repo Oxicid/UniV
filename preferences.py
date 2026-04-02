@@ -553,7 +553,9 @@ Some operators, can interact with trims:
 
             import platform
             if platform.system() == 'Windows':
-                layout.prop(self, 'use_fastapi')
+                row = layout.row()
+                row.prop(self, 'use_fastapi')
+                row.operator('wm.univ_check_lib')
             # TODO: Add link
 
             # layout.separator(factor=0.5)

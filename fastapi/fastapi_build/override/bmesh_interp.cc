@@ -7,6 +7,8 @@
 #include "bmesh_interp.hh"
 #include "bmesh.hh"
 
+namespace blender {
+	
 void BM_loop_interp_multires_ex(BMesh * /*bm*/,
                                 BMLoop *l_dst,
                                 const BMFace *f_src,
@@ -22,4 +24,4 @@ void BM_face_interp_multires_ex(BMesh *bm,
                                 const float f_src_center[3],
                                 int cd_loop_mdisp_offset) {}
 								
-								
+}  // namespace blender

@@ -18,10 +18,18 @@ from ctypes import (
 
 class FastAPI:
     lib: ctypes.CDLL | None = None
-
+    _expected_fastapi_min_version = 3
     @classmethod
     def load(cls):
         cls.lib = utils.load_lib('univ_fastapi')
+        if hasattr(cls.lib, 'version'):  # TODO: Delete after 3 month
+            if cls.lib.version() < cls._expected_fastapi_min_version:
+                cls.close()
+                print(f"UniV: FastAPI: Expected minimal version {cls._expected_fastapi_min_version}, given: {cls.lib.version()!r}.")
+                return
+        else:
+            cls.close()
+            return
         cls.init_linear_solver()
         cls.init_extract_data()
 
@@ -31,7 +39,7 @@ class FastAPI:
             return
 
         handle = cls.lib._handle
-        cls.lib = None  # decref
+        cls.lib.UniV_extract_data_constraints2d = None  # decref
 
         match platform.system():
             case 'Windows':
@@ -50,8 +58,9 @@ class FastAPI:
                 raise NotImplementedError(f"Unknown platform: {platform_!r}.")
 
         dll_close.argtypes = [ctypes.c_void_p]
-        dll_close(ctypes.c_void_p(handle))
-
+        res_lib_close = dll_close(ctypes.c_void_p(handle))
+        if not res_lib_close:
+            print("UniV: FastAPI: Cant unload shared library.")
         import gc
         gc.collect()  # clear for free lib
 
@@ -102,16 +111,14 @@ class FastAPI:
 
         # void UniV_extract_data_constraints2d(
         #     BMesh *bm,
-        #     const int uv_layer,
-        #     const int layer_index,
-        #     const int customdata_type,
+        #     const int uv_offset,
+        #     const int constr_offset,
         #     const bool sync,
         #     float *r_varray,
         #     float *r_harray,
         #     int *r_tot_v,
         #     int *r_tot_h)
         lib.UniV_extract_data_constraints2d.argtypes = (POINTER(btypes.CBMesh),
-                                                        c_int,
                                                         c_int,
                                                         c_int,
                                                         c_bool,
@@ -141,12 +148,12 @@ class ExtractData:
     def extract_constraints_data(umesh: 'utypes.UMesh', attr):
         from .. import btypes
 
-        py_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm)
-        total_corners = py_bm.bm.contents.totloop
-        py_uv: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv)
-        py_constr_layer: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(attr)
+        c_bm: btypes.CBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
-        max_data_shape = (total_corners*2, 2)
+        uv_offset = ExtractData.get_uv_offset(umesh)
+        constr_offset = ExtractData.get_constr_offset(umesh, attr)
+
+        max_data_shape = (c_bm.contents.totloop*2, 2)
         varray = np.empty(max_data_shape, np.float32)
         harray = np.empty(max_data_shape, np.float32)
 
@@ -154,38 +161,77 @@ class ExtractData:
         tot_h_coords = c_int()
 
         FastAPI.lib.UniV_extract_data_constraints2d(
-            py_bm.bm,
-            py_uv.index,
-            py_constr_layer.index,
-            py_constr_layer.type,
+            c_bm,
+            uv_offset,
+            constr_offset,
             umesh.sync,
             varray.ctypes.data_as(POINTER(c_float)),
             harray.ctypes.data_as(POINTER(c_float)),
             byref(tot_v_coords),
             byref(tot_h_coords)
         )
-
         return varray[:tot_v_coords.value], harray[:tot_h_coords.value]
 
     @staticmethod
     def extract_seams_data(umesh: 'utypes.UMesh'):
         from .. import btypes
 
-        py_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm)
-        total_corners = py_bm.bm.contents.totloop
-        py_uv: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv)
+        c_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
+        total_corners = c_bm.contents.totloop
+        uv_offset = ExtractData.get_uv_offset(umesh)
 
         max_data_shape = (total_corners*2, 2)
         r_array = np.empty(max_data_shape, np.float32)
 
         tot_coords = FastAPI.lib.UniV_extract_data_seams2d(
-            py_bm.bm,
-            py_uv.index,
+            c_bm,
+            uv_offset,
             umesh.sync,
             r_array.ctypes.data_as(POINTER(c_float))
         )
 
         return r_array[:tot_coords]
+
+    @staticmethod
+    def get_uv_offset(umesh):
+        from .. import btypes
+        CD_PROP_FLOAT2 = 49
+        n = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv).index
+        assert(n >= 0)
+
+        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.ldata
+
+        i = custom_data.typemap[CD_PROP_FLOAT2]
+        if i != -1:
+          # If the value of n goes past the block of layers of the correct type, return -1. */
+            if (i + n) < custom_data.totlayer:
+                layer = custom_data.layers[i + n]
+                if layer.type == CD_PROP_FLOAT2:
+                    return layer.offset
+        raise
+        return -1
+
+    @staticmethod
+    def get_constr_offset(umesh, attr):
+        from .. import btypes
+        py_constr_layer: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(attr)
+
+        n = py_constr_layer.index
+        typ = py_constr_layer.type
+
+        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.edata
+
+        assert(n >= 0)
+
+        layer_index = custom_data.typemap[typ]
+        assert layer_index != -1
+
+        layer: btypes.CustomDataLayer = custom_data.layers[layer_index + n]
+        assert layer.type == typ
+        return layer.offset
+
+
+
 
 class LinearSolver:
     @classmethod

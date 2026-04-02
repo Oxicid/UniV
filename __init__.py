@@ -82,6 +82,7 @@ def load_register_types():
             inspect.UNIV_OT_Check_Overlap,
             inspect.UNIV_OT_Check_Over,
             inspect.UNIV_OT_Check_Other,
+            inspect.UNIV_OT_Check_Lib,
             # Stitch and Weld
             stitch_and_weld.UNIV_OT_Weld_VIEW3D,
             stitch_and_weld.UNIV_OT_Weld,

@@ -5,11 +5,15 @@
 
 #pragma once
 
+// #include "DNA_customdata_types.h"
+
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata.hh"
 #include "BLI_string_ref.hh"
 #include "bmesh.hh"
+
+namespace blender {
 
 
 const CustomData_MeshMasks CD_MASK_BAREMESH = {
@@ -81,14 +85,14 @@ static void CustomData_bmesh_set_default_n(CustomData *data, void **block, const
 }
 
 
-CustomData CustomData_shallow_copy_remove_non_bmesh_attributes(const CustomData *src,
-                                                               const eCustomDataMask mask)
-{
+// CustomData CustomData_shallow_copy_remove_non_bmesh_attributes(const CustomData *src,
+                                                               // const eCustomDataMask mask)
+// {
 
-  CustomData dst;
+  // CustomData dst;
 
-  return dst;
-}
+  // return dst;
+// }
 
 void CustomData_init_layout_from(const CustomData *source,
                                  CustomData *dest,
@@ -304,3 +308,5 @@ const char *CustomData_get_layer_name(const CustomData *data,
                                       const int n) {return 0;}
 									  
 bool CustomData_free_layer(CustomData *data, const eCustomDataType type, const int index) {return false;}
+
+} // namespace blender

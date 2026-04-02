@@ -17,3 +17,5 @@ cmake --build . -j$(nproc)
 
 cd ..
 echo "[Done]"
+
+read -p "Press Enter for continue..."

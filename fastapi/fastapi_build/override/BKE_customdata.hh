@@ -4,16 +4,22 @@
 
 #pragma once
 
+// #include "BLI_generic_virtual_array.hh"
 #include "BLI_sys_types.h"
 #include "BLI_vector.hh"
 #include "BLI_string_ref.hh"
 
 #include "DNA_customdata_types.h"
 
+namespace blender {
+
 struct BMesh;
 struct BMFace;
+struct CustomData;
+struct CustomData_MeshMasks;
+// struct eCustomDataMask;
+// struct eCustomDataType;
 
-// using namespace blender;
 using cd_interp = void (*)(const void **sources, const float *weights, int count, void *dest);
 using cd_copy = void (*)(const void *source, void *dest, int count);
 using cd_set_default_value = void (*)(void *data, int count);
@@ -75,18 +81,18 @@ struct BMCustomDataCopyMap {
     cd_free fn;
     int dst_offset;
   };
-  blender::Vector<TrivialCopy> trivial_copies;
-  blender::Vector<Copy> copies;
-  blender::Vector<TrivialDefault> trivial_defaults;
-  blender::Vector<Default> defaults;
-  blender::Vector<Free> free;
+  Vector<TrivialCopy> trivial_copies;
+  Vector<Copy> copies;
+  Vector<TrivialDefault> trivial_defaults;
+  Vector<Default> defaults;
+  Vector<Free> free;
 };
 
 
 
 
-CustomData CustomData_shallow_copy_remove_non_bmesh_attributes(const CustomData *src,
-                                                               eCustomDataMask mask);
+// CustomData CustomData_shallow_copy_remove_non_bmesh_attributes(const CustomData *src,
+                                                               // eCustomDataMask mask);
 
 void CustomData_init_layout_from(const CustomData *source,
                                  CustomData *dest,
@@ -109,7 +115,7 @@ void *CustomData_add_layer_named(CustomData *data,
                                  const eCustomDataType type,
                                  const eCDAllocType alloctype,
                                  const int totelem,
-                                 const blender::StringRef name);
+                                 const StringRef name);
 
 bool CustomData_merge_layout(const CustomData *source,
                              CustomData *dest,
@@ -131,13 +137,13 @@ void *CustomData_bmesh_get_n(const CustomData *data,
 							 
 int CustomData_get_offset_named(const CustomData *data,
                                 eCustomDataType type,
-                                blender::StringRef name);
+                                StringRef name);
 
 int CustomData_get_active_layer(const CustomData *data, eCustomDataType type);
 
 int CustomData_get_named_layer_index(const CustomData *data,
                                      const eCustomDataType type,
-                                     const blender::StringRef name);
+                                     const StringRef name);
 
 void CustomData_reset(CustomData *data);
 void CustomData_free(CustomData *data);
@@ -181,12 +187,6 @@ void CustomData_copy_elements(const eCustomDataType type,
 
 int CustomData_sizeof(const eCustomDataType type);
 
-// void CustomData_bmesh_interp_n(CustomData *data,
-                               // const void **src_blocks_ofs,
-                               // const float *weights,
-                               // int count,
-                               // void *dst_block_ofs,
-                               // int n);
 int CustomData_number_of_layers(const CustomData *data, const eCustomDataType type);
 
 bool CustomData_free_layer_active(CustomData *data, const eCustomDataType type);
@@ -197,7 +197,7 @@ void CustomData_bmesh_set_n(
 void CustomData_bmesh_interp(
     CustomData *data, const void **src_blocks, const float *weights, int count, void *dst_block);
 	
-bool CustomData_free_layer_named(CustomData *data, const blender::StringRef name);
+bool CustomData_free_layer_named(CustomData *data, const StringRef name);
 void *CustomData_add_layer(CustomData *data,
                            const eCustomDataType type,
                            eCDAllocType alloctype,
@@ -208,3 +208,5 @@ const char *CustomData_get_layer_name(const CustomData *data,
                                       const int n);
 									  
 bool CustomData_free_layer(CustomData *data, const eCustomDataType type, const int index);
+
+} // namespace blender

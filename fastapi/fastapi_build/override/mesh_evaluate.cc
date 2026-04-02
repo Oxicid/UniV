@@ -30,5 +30,7 @@ using blender::OffsetIndices;
 using blender::Span;
 using blender::VArray;
 
-
+namespace blender {
+	
 void BKE_mesh_mdisp_flip(MDisps *md, const bool use_loop_mdisp_flip) {}
+}

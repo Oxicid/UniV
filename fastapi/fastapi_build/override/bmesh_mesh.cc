@@ -7,6 +7,7 @@
 #include "bmesh.hh"
 
 
-
+namespace blender {
 void BM_mesh_elem_toolflags_ensure(BMesh *bm) {}
 void BM_mesh_elem_toolflags_clear(BMesh *bm) {}
+} // namespace blender

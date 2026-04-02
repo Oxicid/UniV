@@ -24,6 +24,9 @@
 #include "intern/bmesh_private.hh"
 #include "bmesh_class.hh"
 
+
+namespace blender {
+	
 bool BM_verts_from_edges(BMVert **vert_arr, BMEdge **edge_arr, int len) {return false;}
 
 bool BM_edges_from_verts(BMEdge **edge_arr, BMVert **vert_arr, const int len)  {return false;}
@@ -66,3 +69,4 @@ BMFace *BM_face_create_ngon(BMesh *bm,
 	
 // void BM_face_kill(BMesh *bm, BMFace *f) {}
 
+}  // namespace blender
