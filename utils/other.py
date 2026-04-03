@@ -235,6 +235,7 @@ def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
 
 
 def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so', 'dylib'] | None=None):
+    lib_prefix = ''
     if lib_ext is None:
         import platform
         system = platform.system()
@@ -244,6 +245,7 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
             lib_ext = "dylib"
         else:
             lib_ext = "so"
+            lib_prefix = 'lib'
 
     from pathlib import Path
     if root_path is None:
@@ -263,7 +265,7 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
     assert univ_dir is not None, f"No directory starting with 'univ' found in {root_path!r}"
 
     # recursive search lib
-    lib_filename = f"{lib_name}.{lib_ext}"
+    lib_filename = f"{lib_prefix}{lib_name}.{lib_ext}"
     candidates = list(univ_dir.rglob(lib_filename))
 
     lib = None

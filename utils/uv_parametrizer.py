@@ -127,10 +127,10 @@ def unwrap_time_report(report):
         if (total := (time.perf_counter() - t1)) > 2:
             first_line = f'UniV uses an inefficient Linear Solver ({total:.3} sec).'
             import platform
-            if platform.system() == 'Windows':
+            if platform.system() in ('Windows', 'Linux'):
                 from .. import fastapi
                 if not fastapi.FastAPI.lib:
-                    report({'WARNING'}, f"{first_line} Install the univ_fastapi.dll library to speed up the process.")
+                    report({'WARNING'}, f"{first_line} Install the 'univ_fastapi' library to speed up the process.")
             else:
                 report({'WARNING'},
                        f"{first_line} Use a simpler mesh to avoid exponential growth in waiting time. "

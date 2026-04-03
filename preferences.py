@@ -552,7 +552,7 @@ Some operators, can interact with trims:
             layout.prop(self, 'mode')
 
             import platform
-            if platform.system() == 'Windows':
+            if platform.system() in ('Windows', 'Linux'):
                 row = layout.row()
                 row.prop(self, 'use_fastapi')
                 row.operator('wm.univ_check_lib')

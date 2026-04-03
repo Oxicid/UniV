@@ -380,12 +380,14 @@ def register():
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
-    try:
-        fastapi.clib.FastAPI.load()
-    except:  # noqa
-        if univ_pro:
-            print('UniV: Cannot load fastapi.')
-            traceback.print_exc()
+    import platform
+    if platform.system() in ('Windows', 'Linux'):
+        try:
+            fastapi.clib.FastAPI.load()
+        except:  # noqa
+            if univ_pro:
+                print('UniV: Cannot load fastapi.')
+                traceback.print_exc()
 
     try:
         icons.icons.register_icons_()
