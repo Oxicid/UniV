@@ -39,28 +39,35 @@ class FastAPI:
             return
 
         handle = cls.lib._handle
-        cls.lib.UniV_extract_data_constraints2d = None  # decref
+        cls.lib = None  # decref
 
+        success = False
         match platform.system():
             case 'Windows':
                 dll_close = ctypes.windll.kernel32.FreeLibrary  # noqa
+                success = dll_close(ctypes.c_void_p(handle)) != 0
+
             case "Darwin":
                 stdlib = ctypes.CDLL("libc.dylib")
                 dll_close = stdlib.dlclose
+                success = dll_close(ctypes.c_void_p(handle)) == 0
             case "Linux":
                 try:
                     stdlib = ctypes.CDLL("")
                 except OSError:
-                    # Alpine Linux.
                     stdlib = ctypes.CDLL("libc.so")
+
                 dll_close = stdlib.dlclose
+                dll_close.argtypes = [ctypes.c_void_p]
+
+                success = dll_close(ctypes.c_void_p(handle)) == 0
             case platform_:
                 raise NotImplementedError(f"Unknown platform: {platform_!r}.")
 
-        dll_close.argtypes = [ctypes.c_void_p]
-        res_lib_close = dll_close(ctypes.c_void_p(handle))
-        if not res_lib_close:
-            print("UniV: FastAPI: Cant unload shared library.")
+
+
+        if not success:
+            print("UniV: FastAPI: Can't unload shared library.")
         import gc
         gc.collect()  # clear for free lib
 
