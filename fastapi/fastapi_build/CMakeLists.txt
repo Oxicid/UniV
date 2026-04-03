@@ -104,19 +104,22 @@ add_library(univ_fastapi SHARED
 	${BLENLIB}/intern/BLI_kdopbvh.cc
 )
 
+set(INCLUDE_DIRS "")
+if(WIN32)
+    list(APPEND INCLUDE_DIRS ${BLENDER_ROOT}/lib/windows_x64/pthreads/include)
+endif()
 
 target_include_directories(univ_fastapi PRIVATE
 	${BMESH_DIR}
+	${INCLUDE_DIRS}
 	${CMAKE_SOURCE_DIR}/override
 	
-	# Min solver requironments
+	# Min solver requirements
 	${LIB_BY_OS_FOLDER}/eigen/include/eigen3
 	${BLENDER_ROOT}/intern/eigen
-	
-	
 	${BLENLIB}
+	##########
 	
-	${BLENDER_ROOT}/lib/windows_x64/pthreads/include
 	
 	${BLENDER_ROOT}/source/blender/blenkernel
 	
@@ -130,20 +133,18 @@ target_include_directories(univ_fastapi PRIVATE
     ${BLENDER_ROOT}/extern/wcwidth/include
 )
 
+
 set(EXTRA_LIBS "")
 
 if(WIN32)
-    list(APPEND EXTRA_LIBS
-        ${BLENDER_ROOT}/lib/windows_x64/pthreads/lib/pthreadVC3.lib
-    )
-	
+    list(APPEND EXTRA_LIBS ${BLENDER_ROOT}/lib/windows_x64/pthreads/lib/pthreadVC3.lib)
+    list(APPEND EXTRA_LIBS ${LIB_BY_OS_FOLDER}/fmt/lib/fmt.lib)
 endif()
-
 
 target_link_libraries(univ_fastapi PRIVATE 
 	${EXTRA_LIBS}
-	${LIB_BY_OS_FOLDER}/fmt/lib/fmt.lib
 	)
+
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} /arch:SSE2 /fp:precise")
@@ -163,16 +164,26 @@ endif()
 add_definitions(-DWITH_CLOG_PTHREADS)
 remove_definitions(-DWITH_OPENCOLORIO)
 
-target_compile_options(univ_fastapi PRIVATE /utf-8)
+
+if(MSVC)
+	target_compile_options(univ_fastapi PRIVATE /utf-8)
+	
+	add_definitions("/wd4005")
+	add_definitions("/wd4018")
+	add_definitions("/wd4305")
+	add_definitions("/wd4309")
+	add_definitions("/wd4200")
+	add_definitions("/wd4244")
+	add_definitions("/wd4267")
+	add_definitions("/wd4717")
+	add_definitions("/wd4838")
+	add_definitions("/wd4996")
+else()
+	target_compile_options(univ_fastapi PRIVATE -w)
+	target_compile_options(univ_fastapi PRIVATE -Wno-macro-redefined)
+endif()
 
 
-add_definitions("/wd4005")
-add_definitions("/wd4018")
-add_definitions("/wd4305")
-add_definitions("/wd4309")
-add_definitions("/wd4200")
-add_definitions("/wd4244")
-add_definitions("/wd4267")
-add_definitions("/wd4717")
-add_definitions("/wd4838")
-add_definitions("/wd4996")
+if(UNIX)
+	target_compile_definitions(univ_fastapi PRIVATE HAVE_MALLOC_STATS_H)
+endif()
