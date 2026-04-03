@@ -139,6 +139,8 @@ set(EXTRA_LIBS "")
 if(WIN32)
     list(APPEND EXTRA_LIBS ${BLENDER_ROOT}/lib/windows_x64/pthreads/lib/pthreadVC3.lib)
     list(APPEND EXTRA_LIBS ${LIB_BY_OS_FOLDER}/fmt/lib/fmt.lib)
+else()
+    list(APPEND EXTRA_LIBS ${LIB_BY_OS_FOLDER}/fmt/lib/libfmt.a)
 endif()
 
 target_link_libraries(univ_fastapi PRIVATE 
