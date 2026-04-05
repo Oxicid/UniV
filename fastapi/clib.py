@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import bpy
 import numpy as np
 import platform
 import ctypes
@@ -157,7 +158,7 @@ class ExtractData:
 
         c_bm: btypes.CBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
-        uv_offset = ExtractData.get_uv_offset(umesh)
+        uv_offset = ExtractData.get_uv_offset(umesh.uv)
         constr_offset = ExtractData.get_constr_offset(umesh, attr)
 
         max_data_shape = (c_bm.contents.totloop*2, 2)
@@ -185,7 +186,7 @@ class ExtractData:
 
         c_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
         total_corners = c_bm.contents.totloop
-        uv_offset = ExtractData.get_uv_offset(umesh)
+        uv_offset = ExtractData.get_uv_offset(umesh.uv)
 
         max_data_shape = (total_corners*2, 2)
         r_array = np.empty(max_data_shape, np.float32)
@@ -199,24 +200,40 @@ class ExtractData:
 
         return r_array[:tot_coords]
 
-    @staticmethod
-    def get_uv_offset(umesh):
-        from .. import btypes
-        CD_PROP_FLOAT2 = 49
-        n = btypes.BPy_BMLayerItem.get_fields_from_pyobj(umesh.uv).index
-        assert(n >= 0)
+    if bpy.app.version >= (3, 5, 0):
+        @staticmethod
+        def get_uv_offset(uv):
+            from .. import btypes
+            CD_PROP_FLOAT2 = 49
+            py_btype_uv_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
+            n = py_btype_uv_layer.index
+            assert (n >= 0)
 
-        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.ldata
+            custom_data: btypes.CustomData = py_btype_uv_layer.bm.contents.ldata
+            i = custom_data.typemap[CD_PROP_FLOAT2]
 
-        i = custom_data.typemap[CD_PROP_FLOAT2]
-        if i != -1:
-          # If the value of n goes past the block of layers of the correct type, return -1. */
-            if (i + n) < custom_data.totlayer:
-                layer = custom_data.layers[i + n]
-                if layer.type == CD_PROP_FLOAT2:
-                    return layer.offset
-        raise
-        return -1
+            if i != -1:
+                # If the value of n goes past the block of layers of the correct type, return -1.
+                if (i + n) < custom_data.totlayer:
+                    layer = custom_data.layers[i + n]
+                    if layer.type == CD_PROP_FLOAT2:
+                        return layer.offset
+            raise
+            return -1
+    else:
+        # CustomData_get_offset
+        # https://projects.blender.org/blender/blender/src/commit/bcfdb14560e77891d674c2701a5071a7c07baba3/source/blender/blenkernel/intern/customdata.cc
+        @staticmethod
+        def get_uv_offset(uv):
+            from .. import btypes
+            py_constr_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
+
+            n = py_constr_layer.index
+            assert (n >= 0)  # noqa
+
+            custom_data: btypes.CustomData = py_constr_layer.bm.contents.ldata
+            return custom_data.get_offset(py_constr_layer.type)
+
 
     @staticmethod
     def get_constr_offset(umesh, attr):

@@ -149,10 +149,46 @@ target_link_libraries(univ_fastapi PRIVATE
 
 
 if(MSVC)
-    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} /arch:SSE2 /fp:precise")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:AVX /fp:fast")
+    target_compile_options(univ_fastapi PRIVATE
+        /O2        # max optimization
+        /Oi        # intrinsic functions
+        /Ot        # optimization for speed (not size)
+        /GL        # LTO (Whole Program Optimization)
+        /arch:AVX  # AVX support (SSE2, AVX, AVX2)
+        /fp:fast   # fast float
+        /Gy        # functions into separate sections (for the linker)
+        /Gw        # data into separate sections
+        /GF        # Eliminate Duplicate Strings
+        /GR        #
+        /MP        # Multiprocessing compilation
+
+    )
+
+    target_link_options(univ_fastapi PRIVATE
+        /LTCG      # linker optimization (must be used with /GL)
+        /OPT:REF   # remove unused code
+        /OPT:ICF   # function deduplication
+    )
+
+    # set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:AVX /fp:fast")
 else()
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -mavx -ffast-math")
+    target_compile_options(univ_fastapi PRIVATE
+        -O3                    # max optimization
+        -flto
+        -mavx                  # AVX support (SSE2, mavx, mavx2)
+        -ffast-math
+        -ffunction-sections
+        -fdata-sections
+        -fmerge-all-constants
+    )
+
+    target_link_options(univ_fastapi PRIVATE
+        -flto
+        -Wl,--gc-sections
+        -Wl,--icf=all
+    )
+
+    # set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -mavx -ffast-math")
 endif()
 
 
@@ -170,16 +206,16 @@ remove_definitions(-DWITH_OPENCOLORIO)
 if(MSVC)
 	target_compile_options(univ_fastapi PRIVATE /utf-8)
 	
-	add_definitions("/wd4005")
-	add_definitions("/wd4018")
-	add_definitions("/wd4305")
-	add_definitions("/wd4309")
-	add_definitions("/wd4200")
-	add_definitions("/wd4244")
-	add_definitions("/wd4267")
-	add_definitions("/wd4717")
-	add_definitions("/wd4838")
-	add_definitions("/wd4996")
+	target_compile_options(univ_fastapi PRIVATE /wd4005)
+	target_compile_options(univ_fastapi PRIVATE /wd4018)
+	target_compile_options(univ_fastapi PRIVATE /wd4305)
+	target_compile_options(univ_fastapi PRIVATE /wd4309)
+	target_compile_options(univ_fastapi PRIVATE /wd4200)
+	target_compile_options(univ_fastapi PRIVATE /wd4244)
+	target_compile_options(univ_fastapi PRIVATE /wd4267)
+	target_compile_options(univ_fastapi PRIVATE /wd4717)
+	target_compile_options(univ_fastapi PRIVATE /wd4838)
+	target_compile_options(univ_fastapi PRIVATE /wd4996)
 else()
 	target_compile_options(univ_fastapi PRIVATE -w)
 	target_compile_options(univ_fastapi PRIVATE -Wno-macro-redefined)

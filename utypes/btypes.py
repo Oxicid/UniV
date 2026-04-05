@@ -773,13 +773,17 @@ class CustomDataLayer(StructBase):
     flag: c_int
     active: c_int
     active_rnd: c_int
-    if version <= (5, 0, 2):
+
+    if version < (5, 1, 0):
         active_clone: c_int
         active_mask: c_int
 
     uid: c_int
-    name: c_char * 68
-    _pad1: c_char * 4
+    if version >= (3, 5, 0):
+        name: c_char * 68
+        _pad1: c_char * 4
+    else:
+        name: c_char * 64
     data: c_void_p
 
     sharing_info: c_void_p
@@ -789,7 +793,14 @@ class CustomDataLayer(StructBase):
 class CustomData(StructBase):
     layers: lambda: POINTER(CustomDataLayer)
 
-    typemap: c_int * 53
+    if version >= (3, 4, 0):
+        typemap: c_int * 53
+    else:
+        if version >= (3, 2, 0):
+            typemap: c_int * 52
+        else:
+            typemap: c_int * 50
+        _pad1: c_char * 4
 
     totlayer: c_int
     maxlayer: c_int
@@ -798,6 +809,14 @@ class CustomData(StructBase):
 
     pool: c_void_p
     external: c_void_p
+
+    def get_offset(self, typ):
+        return self.layers[self.get_active_layer_index(typ)].offset
+
+    def get_active_layer_index(self, typ):
+        layer_index = self.typemap[typ]
+        assert layer_index != -1
+        return layer_index + self.layers[layer_index].active
 
 
 class CBMesh(StructBase):
