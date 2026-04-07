@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "BLI_utildefines.h"
-
 #include "BKE_customdata.hh"
 
 namespace blender {

@@ -2,7 +2,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include "intern/bmesh_operator_api.hh"
+#include "bmesh_class.hh"
 
 namespace blender {
 void BM_mesh_elem_toolflags_ensure(BMesh *bm);

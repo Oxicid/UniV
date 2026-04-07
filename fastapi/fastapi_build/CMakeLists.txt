@@ -40,7 +40,7 @@ add_library(univ_fastapi SHARED
 	${BLENDER_ROOT}/intern/eigen/intern/linear_solver.cc
 	${BLENDER_ROOT}/source/blender/blenlib/intern/math_base_inline.cc
 	###################
-
+	
 
 	${BLENDER_ROOT}/intern/eigen/intern/eigenvalues.cc
 	${BLENDER_ROOT}/intern/eigen/intern/svd.cc
@@ -53,8 +53,8 @@ add_library(univ_fastapi SHARED
 	
 	${BLENDER_ROOT}/intern/guardedalloc/intern/mallocn_guarded_impl.cc
 	${BLENDER_ROOT}/intern/guardedalloc/intern/memory_usage.cc
+	
 	${BLENDER_ROOT}/intern/utfconv/utfconv.cc
-
 	${BLENDER_ROOT}/extern/wcwidth/wcwidth.c
 	
 	${BMESH_DIR}/intern/bmesh_core.cc
@@ -82,26 +82,20 @@ add_library(univ_fastapi SHARED
 	${BLENLIB}/intern/BLI_memarena.cc
 	${BLENLIB}/intern/BLI_heap.cc
 	${BLENLIB}/intern/BLI_mempool.cc
-	${BLENLIB}/intern/BLI_heap_simple.cc
-	${BLENLIB}/intern/stack.cc
 	
 	
 	${BLENLIB}/intern/BLI_linklist.cc
 	${BLENLIB}/intern/BLI_ghash.cc
 	${BLENLIB}/intern/BLI_ghash_utils.cc
 	${BLENLIB}/intern/hash_mm2a.cc
-	${BLENLIB}/intern/sort_utils.cc
 	${BLENLIB}/intern/listbase.cc
-	${BLENLIB}/intern/string.cc
-	
-	${BLENLIB}/intern/threads.cc
+
 	${BLENLIB}/intern/time.cc
+	${BLENLIB}/intern/threads.cc
 	${BLENLIB}/intern/task_pool.cc
 	${BLENLIB}/intern/task_range.cc
 	${BLENLIB}/intern/task_scheduler.cc
 	${BLENLIB}/intern/task_iterator.cc
-	
-	${BLENLIB}/intern/BLI_kdopbvh.cc
 )
 
 set(INCLUDE_DIRS "")

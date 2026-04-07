@@ -10,9 +10,6 @@
  */
 
 
-#include "BKE_customdata.hh"
-#include "DNA_mesh_types.h"
-
 #include "bmesh.hh"
 
 
