@@ -7,8 +7,6 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_customdata.hh"
-#include "BLI_string_ref.hh"
-#include "bmesh.hh"
 
 namespace blender {
 

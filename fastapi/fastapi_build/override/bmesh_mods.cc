@@ -9,13 +9,8 @@
  * the topology of existing mesh data. (split, join, flip etc).
  */
 
-#include "BLI_math_vector.h"
-#include "BLI_vector.hh"
-
-#include "BKE_customdata.hh"
 
 #include "bmesh.hh"
-#include "intern/bmesh_private.hh"
 
 namespace blender {
 

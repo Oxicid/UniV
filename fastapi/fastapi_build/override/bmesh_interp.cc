@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "bmesh_interp.hh"
-#include "bmesh.hh"
+#include "bmesh_class.hh"
 
 namespace blender {
 	

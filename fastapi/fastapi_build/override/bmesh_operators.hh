@@ -2,7 +2,6 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include "bmesh.hh"
 #include "intern/bmesh_private.hh"
 
 namespace blender {

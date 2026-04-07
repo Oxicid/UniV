@@ -9,20 +9,11 @@
  * BM construction functions.
  */
 
-#include "MEM_guardedalloc.h"
-
-#include "BLI_alloca.h"
-#include "BLI_listbase.h"
-#include "BLI_math_vector.h"
-#include "BLI_sort_utils.h"
 
 #include "BKE_customdata.hh"
-
 #include "DNA_mesh_types.h"
 
 #include "bmesh.hh"
-#include "intern/bmesh_private.hh"
-#include "bmesh_class.hh"
 
 
 namespace blender {
