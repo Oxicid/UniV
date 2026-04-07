@@ -28,27 +28,17 @@
 namespace blender {
 	
 bool BM_verts_from_edges(BMVert **vert_arr, BMEdge **edge_arr, int len) {return false;}
-
 bool BM_edges_from_verts(BMEdge **edge_arr, BMVert **vert_arr, const int len)  {return false;}
 
 void BM_edges_from_verts_ensure(BMesh *bm, BMEdge **edge_arr, BMVert **vert_arr, const int len) {}
-
-void BM_elem_attrs_copy(BMesh *bm, const BMCustomDataCopyMap &map, const BMVert *src, BMVert *dst) {}
-
-void BM_elem_attrs_copy(BMesh *bm, const BMCustomDataCopyMap &map, const BMEdge *src, BMEdge *dst) {}
-
 void BM_elem_attrs_copy(BMesh *bm, const BMCustomDataCopyMap &map, const BMFace *src, BMFace *dst) {}
 
 void BM_elem_attrs_copy(BMesh *bm, const BMCustomDataCopyMap &map, const BMLoop *src, BMLoop *dst) {}
 
 void BM_elem_attrs_copy(BMesh *bm, const BMVert *src, BMVert *dst) {}
-
 void BM_elem_attrs_copy(BMesh *bm, const BMEdge *src, BMEdge *dst) {}
-
 void BM_elem_attrs_copy(BMesh *bm, const BMFace *src, BMFace *dst) {}
-
 void BM_elem_attrs_copy(BMesh *bm, const BMLoop *src, BMLoop *dst) {}
-
 void BM_elem_select_copy(BMesh *bm_dst, void *ele_dst_v, const void *ele_src_v) {}
 
 BMFace *BM_face_create_ngon(BMesh *bm,
@@ -59,14 +49,5 @@ BMFace *BM_face_create_ngon(BMesh *bm,
                             const BMFace *f_example,
                             const eBMCreateFlag create_flag)
 							{return nullptr;}
-// BMFace *BM_face_create_verts(BMesh *bm,
-                             // BMVert **vert_arr,
-                             // const int len,
-                             // const BMFace *f_example,
-                             // const eBMCreateFlag create_flag,
-                             // const bool create_edges)
-	// {return nullptr;}
-	
-// void BM_face_kill(BMesh *bm, BMFace *f) {}
 
 }  // namespace blender

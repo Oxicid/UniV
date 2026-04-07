@@ -2,8 +2,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#pragma once
+
 #include "BKE_attribute.h"
 #include "BLI_string_ref.hh"
+#include "BKE_customdata.hh"
 
 #include <fmt/format.h>
 

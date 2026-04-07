@@ -1069,7 +1069,30 @@ class UNIV_OT_Check_Lib(Operator):
     bl_description = "Test shared library (fast api)."
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(cls, context):
+        from .. import fastapi
+        return bool(fastapi.FastAPI.lib)
+
     def execute(self, context):
         from .. import fastapi
+        success = True
+        errors_count = 0
+
+
         res = fastapi.TestExtractData.start()
+        if not res.wasSuccessful():
+            success = False
+        errors_count += len(res.errors)
+
+
+        res = utils.TestSolver.start()
+        if not res.wasSuccessful():
+            success = False
+        errors_count += len(res.errors)
+
+        if success:
+            self.report({'INFO'}, 'Success.')
+        else:
+            self.report({'ERROR'}, f'Failure {errors_count!r} tests.')
         return {'FINISHED'}

@@ -185,7 +185,6 @@ else()
     target_link_options(univ_fastapi PRIVATE
         -flto
         -Wl,--gc-sections
-        -Wl,--icf=all
     )
 
     # set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -mavx -ffast-math")

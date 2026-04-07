@@ -249,7 +249,7 @@ class TestSolver(unittest.TestCase):
         def fill_solver():
             # system:  2*x0 + 3*x1 = 5
             #            x0 -  x1 = 1
-            solver.matrix_add(0, 0, 2)
+            solver.matrix_add(10, 0, 2)
             solver.matrix_add(0, 1, 3)
             solver.matrix_add(1, 0, 1)
             solver.matrix_add(1, 1, -1)
@@ -315,3 +315,4 @@ class TestSolver(unittest.TestCase):
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)
         result.wasSuccessful()
+        return result

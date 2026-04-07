@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #pragma once
+
 #include "BLI_string_ref.hh"
-#include "DNA_customdata_types.h"
-#include "BKE_customdata.hh"
+
 
 // using namespace blender;
 

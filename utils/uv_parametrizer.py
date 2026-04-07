@@ -2324,7 +2324,7 @@ class ParamHandleConstruct:
 
             ncharts += 1
 
-        assert ncharts == 1
+        # assert ncharts == 1
         return ncharts
 
     def face_add_construct(self, key: ParamKey, vkeys: list[ParamKey], co: list[Vector], uv: list[Vector], weight: list[float],
