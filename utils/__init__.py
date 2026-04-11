@@ -196,6 +196,12 @@ class PaddingHelper:
                 self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
                                          'which will result in incorrect padding.')
 
+    @staticmethod
+    def get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal):
+        if is_horizontal:
+            return max(1.0, 1.0 / aspect)
+        else:
+            return max(1.0, aspect)
 
 class ViewBoxSyncBlock:
     def __init__(self, bbox):

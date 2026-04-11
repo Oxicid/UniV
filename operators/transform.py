@@ -2150,13 +2150,6 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         else:
             return self.axis == 'X'
 
-    @staticmethod
-    def get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal):
-        if is_horizontal:
-            return max(1.0, 1.0 / aspect)
-        else:
-            return max(1.0, aspect)
-
 
 # noinspection PyTypeHints
 class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
@@ -2173,12 +2166,14 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     space: EnumProperty(name='Space', default='ALIGN', items=(('ALIGN', 'Align', ''), ('SPACE', 'Space', '')),
                         description='Distribution of islands at equal distances')
     to_cursor: BoolProperty(name='To Cursor', default=False)
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     def draw(self, context):
         self.layout.row().prop(self, 'space', expand=True)
         self.draw_overlap()
         self.layout.prop(self, 'to_cursor')
         self.layout.row().prop(self, 'axis', expand=True)
+        self.layout.row().prop(self, 'use_correct_aspect')
         self.draw_padding()
 
     def invoke(self, context, event):
@@ -2193,11 +2188,16 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.umeshes: UMeshes | None = None
         self.cursor_loc: Vector | None = None
         self.islands_calc_type = None
+        self.aspect: float = 1.0
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
         self.calc_padding()
         self.report_padding()
+
+        self.aspect = 1.0
+        if self.use_correct_aspect:
+            self.aspect = utils.get_aspect_ratio()
 
         self.cursor_loc = None
         if self.to_cursor:
@@ -2225,13 +2225,12 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         else:
             all_islands, general_bbox = self.distribute_preprocessing()
 
-        if len(all_islands) < 2:
+        if len(all_islands) <= 1:
             if len(all_islands) == 1:
                 self.report({'INFO'}, "The number of islands must be greater than one")
-                if not self.umeshes.is_edit_mode:
-                    self.umeshes.free()
-                return {'FINISHED'}
-            self.umeshes.update()
+            else:
+                self.umeshes.update()
+
             if not self.umeshes.is_edit_mode:
                 self.umeshes.free()
             return {'FINISHED'}
@@ -2257,6 +2256,8 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def distribute_ex(self, all_islands, general_bbox):
         cursor_offset = 0
         if self.is_horizontal(all_islands):
+            pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=True)
+
             all_islands.sort(key=lambda a: a.bbox.xmin)
             if self.cursor_loc is None:
                 margin = general_bbox.min.x
@@ -2266,10 +2267,13 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
 
             for isl in all_islands:
                 width = isl.bbox.width
-                isl.umesh.update_tag |= isl.set_position(
-                    Vector((margin, isl.bbox.ymin - cursor_offset)), _from=isl.bbox.min)
-                margin += self.padding + width
+                delta = Vector((margin, isl.bbox.ymin - cursor_offset))
+                isl.umesh.update_tag |= isl.set_position(delta, _from=isl.bbox.min)
+
+                margin += self.padding * pad_mul + width
         else:
+            pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=False)
+
             all_islands.sort(key=lambda a: a.bbox.ymin)
             if self.cursor_loc is None:
                 margin = general_bbox.min.y
@@ -2279,16 +2283,19 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
 
             for isl in all_islands:
                 height = isl.bbox.height
-                isl.umesh.update_tag |= isl.set_position(
-                    Vector((isl.bbox.xmin - cursor_offset, margin)), _from=isl.bbox.min)
-                margin += self.padding + height
+                delta = Vector((isl.bbox.xmin - cursor_offset, margin))
+                isl.umesh.update_tag |= isl.set_position(delta, _from=isl.bbox.min)
+
+                margin += self.padding * pad_mul + height
 
     def distribute_space(self, all_islands, general_bbox):
         cursor_offset = 0
         if self.is_horizontal(all_islands):
+            pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=True)
+
             all_islands.sort(key=lambda a: a.bbox.xmin)
 
-            general_bbox.xmax += self.padding * (len(all_islands) - 1)
+            general_bbox.xmax += self.padding * pad_mul * (len(all_islands) - 1)
             start_pos = general_bbox.xmin + all_islands[0].bbox.half_width
             end_pos = general_bbox.xmax - all_islands[-1].bbox.half_width
             if start_pos == end_pos:
@@ -2305,8 +2312,10 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 pos = Vector((space_point, isl.bbox.center_y - cursor_offset))
                 isl.umesh.update_tag |= isl.set_position(pos, _from=isl.bbox.center)
         else:
+            pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=False)
+
             all_islands.sort(key=lambda a: a.bbox.ymin)
-            general_bbox.ymax += self.padding * (len(all_islands) - 1)
+            general_bbox.ymax += self.padding * pad_mul * (len(all_islands) - 1)
             start_pos = general_bbox.ymin + all_islands[0].bbox.half_height
             end_pos = general_bbox.ymax - all_islands[-1].bbox.half_height
             if start_pos == end_pos:
@@ -2378,11 +2387,13 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
     angle: FloatProperty(name='Smooth Angle', default=math.radians(
         66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
 
     def draw(self, context):
         self.layout.prop(self, 'angle', slider=True)
         row = self.layout.row()
         row.prop(self, 'axis', expand=True)
+        self.layout.prop(self, 'use_correct_aspect')
         self.draw_padding()
 
     def __init__(self, *args, **kwargs):
@@ -2390,11 +2401,16 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
         self.umeshes: UMeshes | None = None
         self.islands_calc_type = None
         self.report_info =  'Not found islands'
+        self.aspect = 1.0
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
         self.calc_padding()
         self.report_padding()
+
+        self.aspect = 1.0
+        if self.use_correct_aspect:
+            self.aspect = utils.get_aspect_ratio()
 
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -2435,25 +2451,28 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
                     continue
 
                 if self.is_horizontal(isl.bbox):
+                    pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=True)
                     sub_islands.sort(key=lambda a: a.bbox.xmin)
                     margin = isl.bbox.min.x
 
                     for sub_isl in sub_islands:
                         bb = sub_isl.bbox
                         umesh.update_tag |= sub_isl.set_position(Vector((margin, bb.ymin)), _from=bb.min)
-                        margin += self.padding + bb.width
+                        margin += self.padding * pad_mul + bb.width
                 else:
+                    pad_mul = self.get_padding_multiplayer_from_aspect_by_axis(self.aspect, is_horizontal=False)
                     sub_islands.sort(key=lambda a: a.bbox.ymin)
                     margin = isl.bbox.min.y
 
                     for sub_isl in sub_islands:
                         bb = sub_isl.bbox
                         umesh.update_tag |= sub_isl.set_position(Vector((bb.xmin, margin)), _from=bb.min)
-                        margin += self.padding + bb.height
+                        margin += self.padding * pad_mul + bb.height
 
     def is_horizontal(self, bbox):
+        # TODO: Get axis by break boundary corner edges direction (orthogonal)
         if self.axis == 'AUTO':
-            return bbox.width > bbox.height
+            return bbox.width * self.aspect > bbox.height
         else:
             return self.axis == 'X'
 
