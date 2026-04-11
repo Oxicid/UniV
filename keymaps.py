@@ -340,13 +340,28 @@ def add_keymaps_ws():
     # Edit Mode
     km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
 
+    ## Rotate
+    kmi = km.keymap_items.new('mesh.univ_rotate', 'FIVE', 'PRESS')
+    kmi.properties.rot_dir = 'CW'
+    kmi.properties.mode = 'DEFAULT'
+    keys_ws.append((km, kmi))
+
+    # Default. CW. Individual.
+    kmi = km.keymap_items.new('mesh.univ_rotate', 'FIVE', 'PRESS', shift=True)
+    kmi.properties.rot_dir = 'CW'
+    kmi.properties.mode = 'INDIVIDUAL'
+    keys_ws.append((km, kmi))
+
+    # kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
+    # keys_ws.append((km, kmi))
+
     kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_PIE_univ_favorites_edit"
-    keys.append((km, kmi))
+    keys_ws.append((km, kmi))
 
     kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
     keys_ws.append((km, kmi))

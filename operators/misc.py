@@ -1723,11 +1723,11 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
 
         info = ''
         if conflicts_counter:
-            info += f"Resolver {conflicts_counter} uv names conflicts. "
+            info += f"Resolved {conflicts_counter!r} uv names conflicts. "
         if removed_extra_channels_counter:
-            info += f"Removed {removed_extra_channels_counter} extra channels in total."
+            info += f"Removed {removed_extra_channels_counter!r} extra channels in total."
         if added_uvs_counter:
-            info += f"Added {added_uvs_counter} channels in total."
+            info += f"Added {added_uvs_counter!r} channels in total."
 
         if info:
             self.report({'WARNING'}, info)

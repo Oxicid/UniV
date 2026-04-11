@@ -86,9 +86,9 @@ class UNIV_OT_Straight(bpy.types.Operator):
                             continue
 
                         pair_face = crn.link_loop_radial_prev.face
-                        selected_len = sum((get_face_select(crn.face), (get_face_select(pair_face) and pair_face.index == idx)))
+                        has_two_selected_faces = get_face_select(crn.face) and get_face_select(pair_face) and pair_face.index == idx
 
-                        if selected_len == 2:
+                        if has_two_selected_faces:
                             crn.tag = False
                         else:
                             crn.tag = True
