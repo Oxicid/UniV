@@ -2024,8 +2024,7 @@ class UnionIslandsController:
 
     @property
     def aspect(self):
-        import numpy
-        return numpy.mean([isl.umesh.aspect for isl in self._islands])
+        return float(np.mean([isl.umesh.aspect for isl in self._islands]))
 
     @property
     def sync(self):

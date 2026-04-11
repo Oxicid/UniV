@@ -1924,6 +1924,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     reverse: BoolProperty(name='Reverse', default=True)
     to_cursor: BoolProperty(name='To Cursor', default=False)
     orient: BoolProperty(name='Orient', default=False)
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     subgroup_type: EnumProperty(name='Subgroup Type', default='NONE', items=(
         ('NONE', 'None', ''),
         ('AREA', 'Area', ''),
@@ -1937,6 +1938,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         layout.prop(self, 'reverse')
         layout.prop(self, 'to_cursor')
         layout.prop(self, 'orient')
+        layout.prop(self, 'use_correct_aspect')
         if self.subgroup_type == 'NONE':
             self.draw_overlap()
         self.draw_padding()
@@ -1962,6 +1964,8 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
 
     def execute(self, context):
         self.umeshes = UMeshes(report=self.report)
+        if self.use_correct_aspect:
+            self.umeshes.calc_aspect_ratio(from_mesh=False)
         self.calc_padding()
         self.report_padding()
 
@@ -2011,10 +2015,10 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             if self.orient:
                 isl_coords = union_island.calc_convex_points()
                 general_bbox.union(union_island.bbox)
-                angle = utils.calc_min_align_angle(isl_coords)
+                angle = utils.calc_min_align_angle(isl_coords, aspect=union_island.umesh.aspect)
 
                 if not math.isclose(angle, 0, abs_tol=0.0001):
-                    union_island.rotate_simple(angle)
+                    union_island.rotate_simple(angle, union_island.umesh.aspect)
                     union_island.calc_bbox()
             else:
                 bb = union_island.bbox
@@ -2033,9 +2037,9 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
                         general_bbox.union(island.bbox)
-                        angle = utils.calc_min_align_angle(isl_coords)
+                        angle = utils.calc_min_align_angle(isl_coords, umesh.aspect)
                         if not math.isclose(angle, 0, abs_tol=0.0001):
-                            island.rotate_simple(angle)
+                            island.rotate_simple(angle, umesh.aspect)
                             island.calc_bbox()
                 else:
                     for island in adv_islands:
@@ -2101,23 +2105,29 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         islands.sort(key=lambda x: x.bbox.max_length, reverse=self.reverse)
         if is_horizontal:
             for island in islands:
+                aspect = island.umesh.aspect
+                pad_mult_by_aspect = self.get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal)
+
                 width = island.bbox.width
-                if self.orient and island.bbox.height < width:
-                    width = island.bbox.height
-                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
+                if self.orient and island.bbox.height < (width*aspect):
+                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center, aspect=aspect)
                     island.calc_bbox()
+                    width = island.bbox.width
                 island.umesh.update_tag |= island.set_position(margin, _from=island.bbox.min)
-                margin.x += self.padding + width
+                margin.x += self.padding * pad_mult_by_aspect + width
             margin.x += self.sub_padding
         else:
             for island in islands:
+                aspect = island.umesh.aspect
+                pad_mult_by_aspect = self.get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal)
+
                 height = island.bbox.height
-                if self.orient and island.bbox.width < height:
-                    height = island.bbox.width
-                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center)
-                    island.calc_bbox()  # TODO: Optimize this
+                if self.orient and (island.bbox.width*island.umesh.aspect) < height:
+                    island.umesh.update_tag |= island.rotate(pi * 0.5, island.bbox.center, aspect=aspect)
+                    island.calc_bbox()
+                    height = island.bbox.height
                 island.umesh.update_tag |= island.set_position(margin, _from=island.bbox.min)
-                margin.y += self.padding + height
+                margin.y += self.padding * pad_mult_by_aspect + height
             margin.y += self.sub_padding
 
     def is_horizontal(self, bbox, islands):
@@ -2139,6 +2149,14 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
                 return total_width < total_height
         else:
             return self.axis == 'X'
+
+    @staticmethod
+    def get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal):
+        if is_horizontal:
+            return max(1.0, 1.0 / aspect)
+        else:
+            return max(1.0, aspect)
+
 
 # noinspection PyTypeHints
 class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
