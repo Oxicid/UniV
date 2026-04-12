@@ -23,10 +23,6 @@ from bmesh.types import BMFace, BMLoop
 T = typing.TypeVar('T')
 
 
-def py_container_with_np_arrays_compare(a: deque[npt.NDArray], b: deque[npt.NDArray]):
-    return len(a) == len(b) and all(np.array_equal(a[i], b[i]) for i in range(len(a)))
-
-
 class FacePattern:
     def __init__(self, f, start_crn, ordered_corners):
         self.face: BMFace = f
@@ -152,7 +148,7 @@ class StackIsland:  # TODO: Split for source and target islands
         init_face: BMFace = self.unique_faces[idx]
         face_idx = init_face.index
 
-        face_start_pattern: deque[np.ndarray] = deque()  # [shared face size, linked face size]
+        face_start_pattern: deque[list[int]] = deque()  # [shared face size, linked face size]
         face_start_pattern_crn: deque[BMLoop] = deque(init_face.loops)
 
         unique_dist_idx = self.get_unique_start_crn_idx(face_start_pattern_crn)
@@ -169,7 +165,8 @@ class StackIsland:  # TODO: Split for source and target islands
                 shared_face_size = len(shared_crn.face.loops)
 
             linked_crn_face_size.sort()
-            face_start_pattern.append(np.array((shared_face_size, *linked_crn_face_size), dtype='uint16'))
+            linked_crn_face_size.insert(0, shared_face_size)
+            face_start_pattern.append(linked_crn_face_size)
 
         return [face_start_pattern, face_start_pattern_crn]
 
@@ -188,7 +185,7 @@ class StackIsland:  # TODO: Split for source and target islands
 
         for _ in range(len(other.face_start_pattern) - 1):
 
-            if py_container_with_np_arrays_compare(self.face_start_pattern, other.face_start_pattern):
+            if self.face_start_pattern == other.face_start_pattern:
                 yield other.face_start_pattern_crn
 
             other.face_start_pattern.rotate(1)
@@ -199,7 +196,7 @@ class StackIsland:  # TODO: Split for source and target islands
 
         for face_start_pattern, face_start_pattern_crn in other.start_faces_patterns:
             for _ in range(len(face_start_pattern) - 1):
-                if py_container_with_np_arrays_compare(self.face_start_pattern, face_start_pattern):
+                if self.face_start_pattern == face_start_pattern:
                     yield face_start_pattern_crn
 
                 face_start_pattern.rotate(1)
@@ -285,10 +282,14 @@ class StackIsland:  # TODO: Split for source and target islands
                     if not shared_face.tag:
                         continue
 
+                    # Three and more linked faces case when mesh island calc (maybe in uv also).
+                    if shared_face.index != init_idx:
+                        continue
+
                     f[crn_idx] = len(shared_face.loops)
                     temp.append(FacePattern.calc(shared_face, shared_crn))
                     shared_face.tag = False
-                    assert shared_face.index == init_idx
+
 
             self.walked_island_from_init_face.append(parts_of_island)
             parts_of_island = temp

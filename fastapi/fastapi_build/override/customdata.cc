@@ -22,7 +22,7 @@ bool CustomData_data_equals(const eCustomDataType type, const void *data1, const
 
 void CustomData_bmesh_copy_block(CustomData &data, void *src_block, void **dst_block) {}
 
-void *CustomData_bmesh_get(const CustomData *data, void *block, const eCustomDataType type) {nullptr;}
+void *CustomData_bmesh_get(const CustomData *data, void *block, const eCustomDataType type) {return nullptr;}
 
 void CustomData_bmesh_set_default(CustomData *data, void **block) {}
 

@@ -439,10 +439,17 @@ Some operators, can interact with trims:
                        ),
                        default='EXTENDED')
 
-    use_fastapi: bpy.props.BoolProperty(default=True,
-                                         name="Use FastAPI (for unwrap along axis)",
-                                         description="Use fast library", update=_update_fastapi
-                                         )
+    use_fastapi: BoolProperty(
+        default=True,
+        name="Use FastAPI",
+        update=_update_fastapi,
+        description="The FastAPI library is written in a low-level programming language and is typically 50–100 times faster.\n"
+        "It is well-suited for draw systems, as well as for UV parameterization in solvers and other CPU-bound functions.\n\n"
+        "After enabling the library, it is strongly recommended to test it to avoid crashes.\n"
+        "The library uses low-level access to data, whose structures may change.\n"
+        "It is also not recommended to enable FastAPI for alpha or beta versions.\n\n"
+        "For the library to work, place univ_fastapi.dll / libuniv_fastapi.so in the add-on folder"
+        )
 
     use_csa_mods: bpy.props.BoolProperty(default=True,
                                          name="Use Modifier Keys",
@@ -565,6 +572,7 @@ Some operators, can interact with trims:
             if platform.system() in ('Windows', 'Linux'):
                 row = layout.row()
                 row.prop(self, 'use_fastapi')
+                row.operator("wm.url_open", text="Open Download Link...").url = r"https://github.com/Oxicid/UniV/releases"
                 row.operator('wm.univ_check_lib')
             # TODO: Add link
 
