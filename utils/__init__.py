@@ -860,30 +860,34 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
 
 def get_trim_bboxes():
     from .. import preferences
-    trim: preferences.UNIV_TrimPreset
-    return [trim.to_bbox() for trim in preferences.prefs().trims_presets if trim.visible]
+    trim_slot = preferences.prefs().get_active_trim_slot()
+    return [trim.to_bbox() for trim in trim_slot.trims_preset if trim.visible]
 
 
 def has_visible_trim_bboxes():
     from .. import preferences
-
-    for trim in preferences.prefs().trims_presets:
-        if trim.visible:
-            return True
-    return False
+    pref = preferences.prefs()
+    if not pref.trims_presets_slots:
+        return False
+    return any(trim.visible for trim in pref.get_active_trim_slot().trims_preset)
 
 def has_visible_active_trim(report=None):
     from .. import preferences
     pref = preferences.prefs()
 
-    trim_presets = pref.trims_presets
-    if not trim_presets:
+    if not pref.trims_presets_slots:
+        return False
+
+    trim_slot = pref.get_active_trim_slot()
+
+    trim_preset = trim_slot.trims_preset
+    if not trim_preset:
         if report:
             report({'WARNING'}, 'Trims preset is empty')
         return False
 
-    if len(trim_presets) >= (idx := pref.active_trim_index)+1:
-        if trim_presets[idx].visible:
+    if len(trim_preset) >= (idx := trim_slot.active_trim_index)+1:
+        if trim_preset[idx].visible:
             return True
         if report:
             report({'WARNING'}, 'Active trim is invisible')
@@ -895,8 +899,8 @@ def has_visible_active_trim(report=None):
 
 def get_active_trim():
     from .. import preferences
-    pref = preferences.prefs()
-    trim: preferences.UNIV_TrimPreset = pref.trims_presets[pref.active_trim_index]
+    slot = preferences.prefs().get_active_trim_slot()
+    trim: preferences.UNIV_TrimPreset = slot.trims_preset[slot.active_trim_index]
     return trim
 
 def is_pro_version_support():

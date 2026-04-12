@@ -334,39 +334,43 @@ class TrimDrawer:
 
         boxes_tris = []
         boxes_tris_color = []
-        active = prefs().active_trim_index
+        pref = prefs()
 
-        line_opacity = prefs().trim_line_opacity
-        tris_opacity = prefs().trim_tris_opacity
+        if pref.trims_presets_slots:
+            slot = pref.get_active_trim_slot()
+            active_trim = slot.active_trim_index
 
-        from .. import utils
-        aspect = utils.get_aspect_ratio()
-        aspect_x = min(1.0, 1.0 / aspect)
-        aspect_y = min(1.0, aspect)
+            line_opacity = pref.trim_line_opacity
+            tris_opacity = pref.trim_tris_opacity
 
-        for idx, trim in enumerate(prefs().trims_presets):
-            if trim.visible:
-                bb = trim.to_bbox()
-                boxes_lines.extend(bb.draw_data_lines())
-                boxes_tris.extend(bb.draw_data_tris())
+            from .. import utils
+            aspect = utils.get_aspect_ratio()
+            aspect_x = min(1.0, 1.0 / aspect)
+            aspect_y = min(1.0, aspect)
 
-                if idx == active:
-                    center = bb.center
-                    cursor_size = trim.get_cursor_size()
+            for idx, trim in enumerate(slot.trims_preset):
+                if trim.visible:
+                    bb = trim.to_bbox()
+                    boxes_lines.extend(bb.draw_data_lines())
+                    boxes_tris.extend(bb.draw_data_tris())
 
-                    off_x = cursor_size * aspect_x
-                    off_y = cursor_size * aspect_y
+                    if idx == active_trim:
+                        center = bb.center
+                        cursor_size = trim.get_cursor_size()
 
-                    boxes_lines.append(center - Vector((off_x, 0)))
-                    boxes_lines.append(center + Vector((off_x, 0)))
-                    boxes_lines.append(center - Vector((0, off_y)))
-                    boxes_lines.append(center + Vector((0, off_y)))
+                        off_x = cursor_size * aspect_x
+                        off_y = cursor_size * aspect_y
 
-                    boxes_lines_colors.extend([[*trim.color, line_opacity+0.3]] * 12)
-                    boxes_tris_color.extend([[*trim.color, tris_opacity+0.15]] * 6)
-                else:
-                    boxes_lines_colors.extend([[*trim.color, line_opacity]] * 8)
-                    boxes_tris_color.extend([[*trim.color, tris_opacity]] * 6)
+                        boxes_lines.append(center - Vector((off_x, 0)))
+                        boxes_lines.append(center + Vector((off_x, 0)))
+                        boxes_lines.append(center - Vector((0, off_y)))
+                        boxes_lines.append(center + Vector((0, off_y)))
+
+                        boxes_lines_colors.extend([[*trim.color, line_opacity+0.3]] * 12)
+                        boxes_tris_color.extend([[*trim.color, tris_opacity+0.15]] * 6)
+                    else:
+                        boxes_lines_colors.extend([[*trim.color, line_opacity]] * 8)
+                        boxes_tris_color.extend([[*trim.color, tris_opacity]] * 6)
 
         if cls.line_shader is None:
             cls.tris_shader, cls.line_shader = cls.get_shader()

@@ -233,10 +233,20 @@ class UNIV_TrimPreset(bpy.types.PropertyGroup):
         return min(min_size / 3, 0.01)
 
     def get_index(self):
-        for i, t in enumerate(prefs().trims_presets):
+        for i, t in enumerate(prefs().get_active_trim_slot().trims_preset):
             if t == self:
                 return i
         return -1
+
+
+# noinspection PyTypeHints
+class UNIV_TrimPresetsSlot(bpy.types.PropertyGroup):
+    name: StringProperty(name='Name', default='Trim Preset')
+    active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
+    trims_preset: CollectionProperty(name="Trims Preset", type=UNIV_TrimPreset)
+    # material_association: StringProperty(name='Material Association', default='')
+    # texture_association: StringProperty(name='Texture Association', default='')
+
 
 # noinspection PyTypeHints
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
@@ -292,8 +302,8 @@ Some operators, can interact with trims:
 
     TODO: Hotspot in the near future"""
                             )
-    trims_presets: CollectionProperty(name="Trims Presets", type=UNIV_TrimPreset)
-    active_trim_index: IntProperty(min=0, max=200, update=_update_trim_system)
+    trims_presets_slots: CollectionProperty(name="Trims Presets Slots", type=UNIV_TrimPresetsSlot)
+    active_trim_slot_index: IntProperty(min=0, max=64, update=_update_trim_system)
 
     trim_line_width: FloatProperty(name='Line Width', default=1.5, min=0.5, soft_min=1, soft_max=2, max=4, update=_update_trim_system)
     trim_line_opacity: FloatProperty(name='Line Opacity', default=0.5, min=0.0, max=1, update=_update_trim_system)
@@ -829,6 +839,18 @@ Some operators, can interact with trims:
                 box_split = box.split(align=True, factor=0.5)
                 box_split.label(text=' ', icon='ERROR' if user_kmi.active else 'BLANK1')
                 rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box_split, 0)
+
+    def get_active_trim_slot(self) -> "UNIV_TrimPresetsSlot":
+        try:
+            return self.trims_presets_slots[self.active_trim_slot_index]
+        except:  # noqa
+            # Index Error case, get last preset.
+            if self.trims_presets_slots:
+                return self.trims_presets_slots[-1]
+            else:
+                # Empty collection case, avoid None, for avoid checks.
+                print("UniV: Trims: Auto added active trim index")  # TODO: Disable this
+                return self.trims_presets_slots.add()
 
 
 class UNIV_OT_ShowAddonPreferences(bpy.types.Operator):

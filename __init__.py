@@ -67,6 +67,7 @@ def load_register_types():
         classes.extend([
             preferences.UNIV_UV_Layers,
             preferences.UNIV_TrimPreset,
+            preferences.UNIV_TrimPresetsSlot,
             preferences.UNIV_TexelPreset,
             preferences.UNIV_AddonPreferences,
             preferences.UNIV_OT_ShowAddonPreferences,
@@ -240,6 +241,7 @@ def load_register_types():
             classes.extend((
                 # UI
                 ui.UNIV_UL_TrimPresetsManager,
+                ui.UNIV_UL_TrimSlotsManager,
                 ui.UNIV_PT_TrimManager,
                 ui.UNIV_PT_CheckerSettings,
                 ui.UNIV_PT_CheckerTextures,
@@ -252,6 +254,7 @@ def load_register_types():
                 univ_pro.checker.UNIV_OT_CheckerGenerator,
                 # Trim
                 univ_pro.trim.UNIV_OT_TrimPresetsProcessing,
+                univ_pro.trim.UNIV_OT_TrimSlotsProcessing,
                 univ_pro.trim.UNIV_OT_TrimLoadFromSVG,
                 univ_pro.trim.UNIV_OT_TrimSaveToSVG,
                 univ_pro.trim.UNIV_OT_TrimSaveToImage,

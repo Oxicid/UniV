@@ -164,16 +164,19 @@ class UNIV_PT_General(Panel):
         row = panel.row()
         col = row.column()
 
+        slots = settings.trims_presets_slots
         col.scale_x = 0.5
-        col.template_list(
-            listtype_name="UNIV_UL_TrimPresetsManager",
-            list_id="",
-            dataptr=settings,  # noqa
-            propname="trims_presets",
-            active_dataptr=settings,  # noqa
-            active_propname="active_trim_index",
-            rows=4
-        )
+        if slots:
+            slot = settings.get_active_trim_slot()
+            col.template_list(
+                listtype_name="UNIV_UL_TrimPresetsManager",
+                list_id="",
+                dataptr=slot,  # noqa
+                propname="trims_preset",
+                active_dataptr=slot,  # noqa
+                active_propname="active_trim_index",
+                rows=4
+            )
 
         col = row.column(align=True)
         col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
@@ -187,23 +190,6 @@ class UNIV_PT_General(Panel):
         col.separator(factor=0.25)
         col.popover(panel='UNIV_PT_trim_manager', text='', icon_value=icons.settings_a)
 
-
-        td_idx = univ_settings().active_trim_index
-        if td_idx < 0:
-            return
-
-        trims_presets = univ_settings().trims_presets
-        if len(trims_presets) >= td_idx + 1:
-            preset = trims_presets[td_idx]
-
-            row = panel.row(align=True)
-            col = row.column(align=True)
-            col.prop(preset, 'x')
-            col.prop(preset, 'y')
-
-            col = row.column(align=True)
-            col.prop(preset, 'width')
-            col.prop(preset, 'height')
 
     def draw_header(self, context):
         layout = self.layout
@@ -845,6 +831,10 @@ class UNIV_UL_TrimPresetsManager(bpy.types.UIList):
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'visible', text='')
 
+class UNIV_UL_TrimSlotsManager(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+        layout.prop(item, 'name', text='', emboss=False)
+        # row.prop(item, 'visible', text='')
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
@@ -977,9 +967,76 @@ class UNIV_PT_TrimManager(Panel):
     bl_options = {'INSTANCED'}
     bl_region_type = 'UI'
     bl_category = 'UniV'
+    bl_ui_units_x = 12
 
     def draw(self, context):
+        pref = prefs()
+
+        # Draw Slots
+        row = self.layout.row()
+        col = row.column()
+
+        col.scale_x = 0.5
+        col.template_list(
+            listtype_name="UNIV_UL_TrimSlotsManager",
+            list_id="",
+            dataptr=pref,  # noqa
+            propname="trims_presets_slots",
+            active_dataptr=pref,  # noqa
+            active_propname="active_trim_slot_index",
+            rows=4
+        )
+
+        col = row.column(align=True)
+        col.operator('scene.univ_trim_slots_processing', icon='ADD', text='').operation_type = 'ADD'
+        col.operator('scene.univ_trim_slots_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
+        col.operator('scene.univ_trim_slots_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
+
+
+        # Draw Trims
+        row = self.layout.row()
+        col = row.column()
+
+        slots = pref.trims_presets_slots
+        col.scale_x = 0.5
+        if slots:
+            slot = pref.get_active_trim_slot()
+            col.template_list(
+                listtype_name="UNIV_UL_TrimPresetsManager",
+                list_id="",
+                dataptr=slot,  # noqa
+                propname="trims_preset",
+                active_dataptr=slot,  # noqa
+                active_propname="active_trim_index",
+                rows=8
+            )
+
+            col = row.column(align=True)
+            col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
+            col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
+            col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
+
+
+            slot = pref.get_active_trim_slot()
+            trim_idx = slot.active_trim_index
+            trims_presets = slot.trims_preset
+
+            if trim_idx + 1 <= len(trims_presets):
+                preset = trims_presets[trim_idx]
+
+                row = self.layout.row(align=True)
+                col = row.column(align=True)
+                col.prop(preset, 'x')
+                col.prop(preset, 'y')
+
+                col = row.column(align=True)
+                col.prop(preset, 'width')
+                col.prop(preset, 'height')
+
+
+
         col = self.layout.column(align=True)
+        col.separator()
         col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
         col.separator(factor=0.25)
         col.operator('scene.univ_trim_load_from_svg', icon='MOD_MULTIRES')
