@@ -1038,12 +1038,9 @@ class UNIV_PT_TrimManager(Panel):
         col = self.layout.column(align=True)
         col.separator()
         col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
-        col.separator(factor=0.25)
-        col.operator('scene.univ_trim_load_from_svg', icon='MOD_MULTIRES')
-        col.operator('scene.univ_trim_save_to_svg', icon='FILE_TICK')
-        col.separator(factor=0.25)
-        col.operator('scene.univ_trim_load_from_image', icon='SEQ_SPLITVIEW')
-        col.operator('scene.univ_trim_save_to_image', icon='FILE_TICK')
+        row = col.row(align=True)
+        row.operator('scene.univ_trim_preset_load', icon='MOD_MULTIRES')
+        row.operator('scene.univ_trim_preset_save', icon='FILE_TICK')
 
 
 class UNIV_PT_TD_LayersManager(Panel):

@@ -255,10 +255,8 @@ def load_register_types():
                 # Trim
                 univ_pro.trim.UNIV_OT_TrimPresetsProcessing,
                 univ_pro.trim.UNIV_OT_TrimSlotsProcessing,
-                univ_pro.trim.UNIV_OT_TrimLoadFromSVG,
-                univ_pro.trim.UNIV_OT_TrimSaveToSVG,
-                univ_pro.trim.UNIV_OT_TrimSaveToImage,
-                univ_pro.trim.UNIV_OT_TrimLoadFromImage,
+                univ_pro.trim.UNIV_OT_TrimPresetLoad,
+                univ_pro.trim.UNIV_OT_TrimPresetSave,
                 univ_pro.trim.UNIV_OT_TrimFromMesh,
                 univ_pro.trim.UNIV_OT_TrimEditor,
                 # Stack
