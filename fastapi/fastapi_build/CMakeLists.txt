@@ -177,7 +177,7 @@ else()
     )
 
     target_link_options(univ_fastapi PRIVATE
-        -flto
+        -flto=auto
         -Wl,--gc-sections
     )
 

@@ -911,8 +911,9 @@ class UNIV_OT_SetCursor2D(Operator):
     def set_active_trim(mouse_pos):
         idx = -1
         min_dist = float('inf')
-        if prefs().use_trims:
-            for i, trim in enumerate(preferences.prefs().trims_presets):
+        if prefs().use_trims and prefs().trims_presets_slots:
+            slot = prefs().get_active_trim_slot()
+            for i, trim in enumerate(slot.trims_preset):
                 if not trim.visible:
                     continue
                 bb = BBox(trim.x, trim.x + trim.width, trim.y, trim.y + trim.height)
@@ -925,7 +926,7 @@ class UNIV_OT_SetCursor2D(Operator):
                             idx = i
 
             if idx != -1:
-                prefs().active_trim_index = idx
+                slot.active_trim_index = idx
 
 
 class UNIV_OT_Focus(Operator):

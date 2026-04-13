@@ -6,6 +6,7 @@
 
 #include "BLI_sys_types.h"
 #include "BLI_vector.hh"
+#include "BLI_string_ref.hh"
 
 #include "DNA_customdata_types.h"
 
@@ -32,6 +33,7 @@ struct BMCustomDataCopyMap {};
 
 void CustomData_bmesh_free_block(CustomData *data, void **block);
 int CustomData_get_offset(const CustomData *data, const eCustomDataType type);
+int CustomData_get_offset_named(const CustomData *data, const eCustomDataType type, const StringRef name);
 int CustomData_get_layer_index_n(const CustomData *data, const eCustomDataType type, const int n);
 int CustomData_get_active_layer(const CustomData *data, const eCustomDataType type);
 bool CustomData_data_equals(const eCustomDataType type, const void *data1, const void *data2);
