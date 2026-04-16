@@ -764,6 +764,7 @@ class UNIV_OT_Check_Other(Operator):
         selected_objects = utils.calc_any_unique_obj()
 
         # Check unapplied scale
+        # TODO: Add select button in messenger
         counter = 0
         error_id = 'Unapplied Scales'
         error_description = ''

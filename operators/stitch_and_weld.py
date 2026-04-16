@@ -97,9 +97,9 @@ class Stitch:
                         balanced_target_islands.append(trans_isl)
 
                     if self.padding:
-                        self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg)
+                        self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
                     else:
-                        self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg)
+                        self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
                     umesh.update_tag = True
 
                 while True:
@@ -119,9 +119,9 @@ class Stitch:
                                 if self.padding:
                                     # NOTE: ref_isl is not the island from which ref_lg(lg) is derived
                                     # TODO: Check to pass balance_isl
-                                    self.reorient_to_target_with_padding(ref_isl, trans_isl, lg, trans_lg)
+                                    self.reorient_to_target_with_padding(ref_isl, trans_isl, lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
                                 else:
-                                    self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg)
+                                    self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
 
                     balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
                     balanced_target_islands.extend(stack)
@@ -134,16 +134,18 @@ class Stitch:
             self.report({'WARNING'}, f'Found {self.flipped_3d_count} loops with 3D flipped faces. '  # noqa
                                      f'For correct result need recalculate normals')
 
-    def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
+    def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
         uv = ref_isl.umesh.uv
 
-        is_flipped_3d = trans_lg.is_flipped_3d
-        self.flipped_3d_count += is_flipped_3d
-        if is_flipped_3d:
-            if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+        is_flipped_3d = False
+        if correct_flip:
+            is_flipped_3d = trans_lg.is_flipped_3d
+            self.flipped_3d_count += is_flipped_3d
+            if is_flipped_3d:
+                if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                    trans.scale_simple(Vector((1, -1)))
+            elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
                 trans.scale_simple(Vector((1, -1)))
-        elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
-            trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
             bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
@@ -228,18 +230,27 @@ class Stitch:
                 set_select_edge(crn.link_loop_radial_prev, True)
 
 
-    def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
+    def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
         uv = ref_isl.umesh.uv
 
-        is_flipped_3d = trans_lg.is_flipped_3d
-        if trans_lg.is_flipped_3d:
-            if (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) == (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
-                # trans_is_flipped ^= 1
-                trans.scale_simple(Vector((1, -1)))
+        ref_is_flipped = False
+        trans_is_flipped = False
+        is_flipped_3d = False
 
-        elif (ref_is_flipped := (ref_lg.calc_signed_face_area() < 0)) != (trans_is_flipped := (trans_lg.calc_signed_face_area() < 0)):  # noqa
-            # trans_is_flipped ^= 1
-            trans.scale_simple(Vector((1, -1)))
+        if correct_flip:
+            is_flipped_3d = trans_lg.is_flipped_3d
+            if trans_lg.is_flipped_3d:
+                ref_is_flipped = ref_lg.calc_signed_face_area() < 0
+                trans_is_flipped = trans_lg.calc_signed_face_area() < 0
+                if ref_is_flipped == trans_is_flipped:
+                    # trans_is_flipped ^= 1
+                    trans.scale_simple(Vector((1, -1)))
+            else:
+                ref_is_flipped = ref_lg.calc_signed_face_area() < 0
+                trans_is_flipped = trans_lg.calc_signed_face_area() < 0
+                if ref_is_flipped != trans_is_flipped:
+                    # trans_is_flipped ^= 1
+                    trans.scale_simple(Vector((1, -1)))
 
         if ref_lg.is_cyclic:
             bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
@@ -447,13 +458,15 @@ class Stitch:
                         continue
                     crn.tag = is_bound(crn)
 
-    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup):
-        is_flipped = trans_lg.is_flipped_3d
-        if is_flipped:
-            if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
+
+        if correct_flip:
+            is_flipped = trans_lg.is_flipped_3d
+            if is_flipped:
+                if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                    trans.scale_simple(Vector((1, -1)))
+            elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
                 trans.scale_simple(Vector((1, -1)))
-        elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
-            trans.scale_simple(Vector((1, -1)))
 
         pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
         pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
@@ -1127,6 +1140,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
     between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
     update_seams: BoolProperty(name='Update Seams', default=True)
     use_aspect: BoolProperty(name='Correct Aspect', default=True)
+    correct_flip: BoolProperty(name='Correct Flip', default=True)
     padding_multiplayer: bpy.props.FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=0,
                                                  soft_max=4, max=32)
 
@@ -1139,6 +1153,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
         layout.prop(self, "between")
         layout.prop(self, "update_seams")
         layout.prop(self, "use_aspect")
+        layout.prop(self, "correct_flip")
         if not self.between:
             self.draw_padding()
 
@@ -1235,7 +1250,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
 
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg)
+            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=self.correct_flip)
             hit.umesh.update()
 
 
