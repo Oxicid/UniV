@@ -9,6 +9,7 @@
 import os
 import gpu
 import bpy
+import traceback
 import numpy as np
 from mathutils import Vector, Matrix, Color
 from pathlib import Path
@@ -125,7 +126,10 @@ class icons:
                 _ = icon.icon_pixels[0]  # Need to force load icons, bugreport?
                 setattr(cls, attr, icon.icon_id)
 
-        # Updating icons for workspaces
+        # Register category icons
+        cls.update_general_panels_icon_()
+
+        # Register icons for workspaces
         from pathlib import Path
         from .. import ui
 
@@ -161,10 +165,30 @@ class icons:
         except KeyError:
             from ..preferences import debug
             if debug():
-                import traceback
+                print("UniV: Can't unregister icons.")
                 traceback.print_exc()
 
         cls.reset_icon_value_()
+
+    @classmethod
+    def update_general_panels_icon_(cls):
+        if bpy.app.version >= (5, 2, 0):
+            # Set icons to general panel.
+            try:
+                from .. import classes
+                # For the property to apply to the panel, it must be applied to all panels in use.
+                all_panels = [c for c in classes if issubclass(c, bpy.types.Panel)]
+                if not len(all_panels):
+                    print(f'UniV: Panels: N-Panel not found to set icon in compact mode.')
+                else:
+                    for panel in all_panels:
+                        if "bl_rna" in panel.__dict__:
+                            bpy.utils.unregister_class(panel)
+                        panel.bl_icon_value = cls.unwrap
+                        bpy.utils.register_class(panel)
+            except:  # noqa
+                print("UniV: Can't set icons to compact panel.")
+                traceback.print_exc()
 
 
 class PreviousData:

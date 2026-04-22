@@ -593,7 +593,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -1146,7 +1146,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout

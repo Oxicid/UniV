@@ -363,6 +363,14 @@ def register():
             print(f'UniV: Failed to register a class {c.__name__}')
             traceback.print_exc()
 
+    # Icons register.
+    try:
+        icons.icons.register_icons_()  # NOTE: Need registered AddonPreferences.
+    except:  # noqa
+        print('UniV: Icons not loaded.')
+        traceback.print_exc()
+
+
     # WARNING: When modules are reloaded, classes are overwritten and have no registration.
     # To avoid this, it is necessary to use initially registered classes.
     # Perhaps it does not allow to reload operators in a normal way.
@@ -389,12 +397,6 @@ def register():
             if univ_pro:
                 print('UniV: Cannot load fastapi.')
                 traceback.print_exc()
-
-    try:
-        icons.icons.register_icons_()
-    except:  # noqa
-        print('UniV: Icons not loaded.')
-        traceback.print_exc()
 
     try:
         keymaps.add_keymaps()

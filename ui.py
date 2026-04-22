@@ -1228,7 +1228,8 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         # Bottom
         split = pie.split()
         col = split.column(align=True)
-        col.separator(factor=18)
+        col.separator(factor=20)
+        col.scale_x = 0.8
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
