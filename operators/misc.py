@@ -19,7 +19,7 @@ from .. import utypes
 from ..utypes import UMeshes, BBox, BBox3D
 from .. import preferences
 from ..preferences import prefs, univ_settings
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 
 class UNIV_OT_Pin(Operator):
@@ -1263,6 +1263,7 @@ class UNIV_OT_MoveUpDownBase(Operator):
             self._swap_uv_bm(obj, idx, other_idx, with_names)
         else:
             self._swap_uv_mesh(obj, idx, other_idx, with_names)
+        return True
 
     @staticmethod
     def _swap_uv_bm(obj, idx, other_idx, with_names, change_active_idx=True):
@@ -1956,6 +1957,7 @@ class UNIV_OT_Flatten(Operator):
             self.create_gn_flatter_modifier(node_group)
             utils.update_area_by_type('VIEW_3D')
             return True
+        return False
 
     def create_gn_flatter_modifier(self, node_group):
         axis = {'z': 2, 'y': 3, 'x': 4}
@@ -2405,3 +2407,238 @@ class UNIV_OT_FlattenCleanup(Operator):
                 if umesh.obj.data.shape_keys.key_blocks.get('uv'):
                     return True
         return False
+
+
+class UNIV_OT_SmartScaleApply(Operator):
+    bl_idname = "mesh.univ_smart_scale_apply"
+    bl_label = "Smart Scale Apply"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Apply scale and invert normals. Fixes modifier and worked with instances"
+
+
+    def execute(self, context):
+        UNIFORM_SCALE = Vector((1.0, 1.0, 1.0))
+        FLIP_PATTERN = [[1, 1, -1], [1, -1, 1], [-1, 1, 1], [-1, -1, -1]]
+
+        count = 0
+        selected_object_with_instances = utils.get_selected_object_with_instances()
+        if not selected_object_with_instances:
+            self.report({'WARNING'}, 'Not found selected meshes')
+            return {'CANCELLED'}
+
+        for ob, instances in selected_object_with_instances:
+            if ob.scale == UNIFORM_SCALE:
+                continue
+
+            if not self.valid_obj(ob):
+                self.report({'WARNING'}, f"Object {ob.name} has zero scale component {ob.scale!r} and was skipped.")
+                continue
+
+            count += 1
+            me = ob.data
+            scale = ob.scale.copy()
+            pattern = [1 if (i > 0) else -1 for i in scale]
+            flip = pattern in FLIP_PATTERN
+
+            distance_scaler = min(ob.scale, key=lambda x: abs(1 - x))
+            for mod in ob.modifiers:
+                self.modifier_compensation(mod, scale, distance_scaler, scale)
+
+
+            # TODO: Check with autosmoth
+            mirror_split_normals = []
+            if me.has_custom_normals and getattr(me, 'use_auto_smooth', False):
+                if hasattr(me, 'calc_normals_split'):
+                    me.calc_normals_split()
+
+                    if flip:
+                        mirror_split_normals = [me.loops[i].normal * Vector(pattern)
+                                                for iter_poly in me.polygons
+                                                for i in [iter_poly.loop_indices[0]] +
+                                                [*reversed(iter_poly.loop_indices[1:])]]
+                    else:
+                        mirror_split_normals = [me.loops[i].normal * Vector(pattern)
+                                                for iter_poly in me.polygons
+                                                for i in iter_poly.loop_indices]
+
+            scale_mtx = Matrix.Diagonal(scale).to_4x4()
+            me.transform(scale_mtx)
+
+            if flip:
+                me.flip_normals()
+
+            if mirror_split_normals:
+                if me.has_custom_normals and getattr(me, 'use_auto_smooth', False):
+                    me.normals_split_custom_set(mirror_split_normals)
+
+            ob.scale = UNIFORM_SCALE
+
+            for inst in instances:
+                try:
+                    compensation = [inst.scale[i] / scale[i] for i in range(3)]
+
+                    # TODO: Use distance_scaler by modifier
+                    distance_scaler = min([abs(x / i) for x, i in zip(inst.scale, compensation)])
+
+                    for mod in inst.modifiers:
+                        self.modifier_compensation(mod, scale, distance_scaler, inst.scale.copy())
+                    inst.scale = Vector(compensation)
+                except ZeroDivisionError:
+                    self.report({'WARNING'}, f"Object {inst.name!r} has zero scale: {inst.scale!r}, and was reset.")
+                    inst.scale = UNIFORM_SCALE
+
+        if count:
+            self.report({'INFO'}, f"Fixed scales for {count!r} selected objects")
+        else:
+            self.report({'INFO'}, f"All selected objects has uniform scale")
+
+        from .inspect import INSPECT_INFO
+        if info_list := INSPECT_INFO.get('Other'):
+            for i, (check_type, _) in enumerate(info_list):
+                if check_type == 'Unapplied Scales':
+                    del info_list[i]
+                    break
+
+
+        return {'FINISHED'}
+
+    @staticmethod
+    def valid_obj(obj):
+        return (obj.type == 'MESH') and (0 not in obj.scale)
+
+    @staticmethod
+    def modifier_compensation(mod, tar_scale, var, cur_scale):
+        match mod.type:
+            case 'ARRAY':
+                if mod.use_constant_offset:
+                    mod.constant_offset_displace *= tar_scale
+                mod.merge_threshold *= var
+                if mod.use_relative_offset:
+                    rel_sign = Vector([1 if i > 0 else -1 for i in tar_scale])
+                    mod.relative_offset_displace *= rel_sign
+            case 'NODES':
+                if 'Array' not in mod.name:
+                    return
+
+                shape_type_sk = "Socket_2"
+                offset_method_type_sk = "Socket_14"
+
+                array_offset_sk = 'Socket_21'
+                transform_reference_sk = 'Socket_25'
+                array_translation_sk = 'Socket_8'
+                array_rotation_sk = 'Socket_9'
+
+                curve_count_method_distance_sk = 'Socket_33'
+                curve_distance_sk = 'Socket_34'
+
+                merge_sk = 'Socket_31'
+                distance_sk = 'Socket_32'
+
+                circle_central_axis_sk = 'Socket_11'
+                circle_radius_sk = 'Socket_6'
+
+                if shape_type_sk not in mod:
+                    return
+                if offset_method_type_sk not in mod:
+                    return
+
+                match mod[shape_type_sk]:
+                    case 0:  # Line
+                        match mod[offset_method_type_sk]:
+                            case 2: # Relative
+                                rel_sign = Vector([1 if i > 0 else -1 for i in tar_scale])
+                                mod[array_offset_sk][:] = Vector(mod[array_offset_sk]) * rel_sign  # Rescale offset.
+                            case 0: # Offset
+                                mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                            case 1: # Endpoint
+                                mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                            case offset_method:
+                                print(f"UniV: Smart Scale Apply: Unknow shape type {offset_method!r}")
+                                return
+
+                        # TODO: Add rotation fix for other types
+                        import math
+                        import mathutils
+
+                        rot = mathutils.Euler(mod[array_rotation_sk])
+                        scale_mat = Matrix.Diagonal(cur_scale).to_3x3()
+
+                        # Adjust the rotation using the scale.
+                        fixed_mat = scale_mat @ rot.to_matrix() @ scale_mat.inverted_safe()
+
+                        rot = fixed_mat.to_euler()
+                        # Round to avoid float point error and remove sign
+                        for i, v in enumerate(rot):
+                            if math.isclose(v, 0, abs_tol=1e-7):
+                                rot[i] = 0
+
+                        mod[array_rotation_sk][:] = rot
+
+                    case 1:  # Circle
+                        # TODO: Implement radius by axis
+                        match mod[circle_central_axis_sk]:
+                            case 0:  # X
+                                pass
+                            case 1:  # Y
+                                pass
+                            case 2:  # Z
+                                pass
+
+                        mod[circle_radius_sk] *= abs(var)
+                    case 2:  # Curve
+                        is_curve_distance_type = mod[curve_count_method_distance_sk] == 1
+                        if is_curve_distance_type:
+                            mod[curve_distance_sk] *= abs(var)
+                    case 3:  # Transform
+                        is_inputs = mod[transform_reference_sk] == 0
+                        if is_inputs:
+                            mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                    case shape_type:
+                        print(f"UniV: Smart Scale Apply: Unknow shape type {shape_type!r}")
+
+                # Correct distance.
+                if merge_sk in mod:
+                    if mod[merge_sk]:
+                        if distance_sk in mod:
+                            mod[distance_sk] *= abs(var)
+                        else:
+                            print(f"UniV: Smart Scale Apply: Can't found distance merge socket")
+                else:
+                    print(f"UniV: Smart Scale Apply: Can't found merge socket")
+
+            case 'BEVEL':
+                mod.width *= var
+            case 'SOLIDIFY':
+                mod.thickness *= var
+            case 'BOOLEAN':
+                mod.double_threshold *= var
+            case 'MIRROR':
+                mod.merge_threshold *= var
+
+                for i in range(3):
+                    if mod.use_axis[i] and tar_scale[i] < 0:
+                        mod.use_bisect_flip_axis[i] ^= 1
+            case 'SCREW':
+                mod.screw_offset *= getattr(tar_scale, mod.axis.lower())
+                mod.merge_threshold *= var
+            case 'WIREFRAME':
+                mod.thickness *= var
+            case 'CAST':
+                mod.radius *= var
+            case 'HOOK':
+                mod.falloff_radius *= var
+            case 'SHRINKWRAP':
+                mod.offset *= var
+            case 'WARP':
+                mod.falloff_radius *= var
+            case 'WELD':
+                mod.merge_threshold *= var
+            case 'DISPLACE':
+                if mod.direction in ('X', 'Y'):
+                    mod.strength *= getattr(tar_scale, mod.direction.lower())
+                else:
+                    mod.strength *= tar_scale.z
+
+
+def draw_smart_scale_menu(self, _context):
+    self.layout.operator("mesh.univ_smart_scale_apply")

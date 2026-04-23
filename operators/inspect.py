@@ -721,6 +721,9 @@ class UNIV_OT_Check_Other(Operator):
                 for line in wrapped_lines:
                     box.label(text=line)
 
+                if check_type == 'Unapplied Scales':
+                    box.operator("mesh.univ_smart_scale_apply")
+
     def execute(self, context):
         global INSPECT_INFO
         INSPECT_INFO.clear()
@@ -971,6 +974,9 @@ class UNIV_OT_BatchInspect(Operator):
                 wrapped_lines = textwrap.wrap(check_type + ': ' + info, width=72)
                 for line in wrapped_lines:
                     box.label(text=line)
+
+                if check_type == 'Unapplied Scales':
+                    box.operator("mesh.univ_smart_scale_apply")
 
     def invoke(self, context, event):
         if event.value == 'PRESS':

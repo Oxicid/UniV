@@ -232,6 +232,7 @@ def load_register_types():
             misc.UNIV_OT_MoveDown,
             misc.UNIV_OT_CopyToLayer,
             misc.UNIV_OT_SetActiveRender,
+            misc.UNIV_OT_SmartScaleApply,
             # Mesh
             misc.UNIV_OT_Flatten,
             misc.UNIV_OT_FlattenCleanup,
@@ -389,6 +390,8 @@ def register():
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_split_btn)
 
+    bpy.types.VIEW3D_MT_object_apply.prepend(misc.draw_smart_scale_menu)
+
     import platform
     if platform.system() in ('Windows', 'Linux'):
         try:
@@ -449,6 +452,8 @@ def unregister():
     bpy.types.VIEW3D_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
+    bpy.types.VIEW3D_MT_object_apply.remove(misc.draw_smart_scale_menu)
+
     texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
 
     toggle.ToggleHandlers.unregister_handler()

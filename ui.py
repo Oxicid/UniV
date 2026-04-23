@@ -380,6 +380,8 @@ class UNIV_PT_General(Panel):
                     col.operator('uv.univ_fill_to_pixels')
                     col.operator('uv.univ_random_color')
                     col.operator('uv.univ_linear_gradient')
+                    col.separator(factor=0.35)
+                    col.operator('mesh.univ_smart_scale_apply')
 
         # UV Maps
         if pref.uv_layers_show:

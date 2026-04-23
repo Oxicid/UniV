@@ -858,6 +858,44 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
     return objects
 
 
+def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bpy.types.Object]]]:
+    """ Get unique selected meshes with/without uv and get selected/visible/hidden instances (non-included) """
+
+    objects = []
+    if bpy.context.mode == 'EDIT_MESH':
+        for obj in bpy.context.objects_in_mode_unique_data:
+            objects.append(obj)
+    else:
+        from collections import defaultdict
+
+        selected = bpy.context.selected_objects[:]
+        if active := bpy.context.active_object:
+            selected.insert(0, active)  # Set active to first
+
+        data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+        for obj in selected:
+            if obj.type == 'MESH':
+                data_and_objects[obj.data].append(obj)
+
+        for data, objs in data_and_objects.items():
+            objects.append(objs[0])
+
+    ret = []
+    for tar_obj in objects:
+        instances = []
+        for inst_obj in bpy.data.objects:
+            if inst_obj.type != 'MESH':
+                continue
+
+            if tar_obj.data != inst_obj.data or tar_obj == inst_obj:
+                continue
+            instances.append(inst_obj)
+
+        ret.append((tar_obj, instances))
+
+    return ret
+
+
 def get_trim_bboxes():
     from .. import preferences
     trim_slot = preferences.prefs().get_active_trim_slot()
