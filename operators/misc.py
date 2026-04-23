@@ -2426,6 +2426,11 @@ class UNIV_OT_SmartScaleApply(Operator):
             self.report({'WARNING'}, 'Not found selected meshes')
             return {'CANCELLED'}
 
+        prev_mode = bpy.context.mode
+        if prev_mode == 'EDIT_MESH':
+            if bpy.ops.object.mode_set.poll():
+                bpy.ops.object.mode_set(mode='OBJECT')
+
         for ob, instances in selected_object_with_instances:
             if ob.scale == UNIFORM_SCALE:
                 continue
@@ -2498,6 +2503,10 @@ class UNIV_OT_SmartScaleApply(Operator):
                 if check_type == 'Unapplied Scales':
                     del info_list[i]
                     break
+
+        if prev_mode == 'EDIT_MESH':
+            if bpy.ops.object.mode_set.poll():
+                bpy.ops.object.mode_set(mode='EDIT')
 
 
         return {'FINISHED'}
@@ -2616,7 +2625,7 @@ class UNIV_OT_SmartScaleApply(Operator):
                 mod.merge_threshold *= var
 
                 for i in range(3):
-                    if mod.use_axis[i] and tar_scale[i] < 0:
+                    if mod.use_axis[i] and mod.use_bisect_axis[i] and tar_scale[i] < 0:
                         mod.use_bisect_flip_axis[i] ^= 1
             case 'SCREW':
                 mod.screw_offset *= getattr(tar_scale, mod.axis.lower())
