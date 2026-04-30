@@ -2616,32 +2616,32 @@ class UNIV_OT_SmartScaleApply(Operator):
                     print(f"UniV: Smart Scale Apply: Can't found merge socket")
 
             case 'BEVEL':
-                mod.width *= var
+                mod.width *= abs(var)
             case 'SOLIDIFY':
                 mod.thickness *= var
             case 'BOOLEAN':
-                mod.double_threshold *= var
+                mod.double_threshold *= abs(var)
             case 'MIRROR':
-                mod.merge_threshold *= var
+                mod.merge_threshold *= abs(var)
 
                 for i in range(3):
                     if mod.use_axis[i] and mod.use_bisect_axis[i] and tar_scale[i] < 0:
                         mod.use_bisect_flip_axis[i] ^= 1
             case 'SCREW':
                 mod.screw_offset *= getattr(tar_scale, mod.axis.lower())
-                mod.merge_threshold *= var
+                mod.merge_threshold *= abs(var)
             case 'WIREFRAME':
-                mod.thickness *= var
+                mod.thickness *= abs(var)
             case 'CAST':
-                mod.radius *= var
+                mod.radius *= abs(var)
             case 'HOOK':
-                mod.falloff_radius *= var
+                mod.falloff_radius *= abs(var)
             case 'SHRINKWRAP':
-                mod.offset *= var
+                mod.offset *= abs(var)
             case 'WARP':
-                mod.falloff_radius *= var
+                mod.falloff_radius *= abs(var)
             case 'WELD':
-                mod.merge_threshold *= var
+                mod.merge_threshold *= abs(var)
             case 'DISPLACE':
                 if mod.direction in ('X', 'Y'):
                     mod.strength *= getattr(tar_scale, mod.direction.lower())

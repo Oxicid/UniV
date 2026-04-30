@@ -215,6 +215,9 @@ def add_keymaps():
     kmi.properties.name = "IMAGE_MT_PIE_univ_texel"
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new('uv.univ_home', 'G', 'PRESS', alt=True)
+    keys.append((km, kmi))
+
     # Relax
     kmi = km.keymap_items.new('uv.univ_relax', 'R', 'PRESS', alt=True)
     keys.append((km, kmi))
