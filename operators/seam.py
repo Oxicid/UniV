@@ -328,19 +328,18 @@ class UNIV_OT_Angle(Operator):
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = UMeshes(report=self.report)
+        umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+        if not umeshes:
+            return umeshes.update()
 
         # clamp angle
         if self.obj_smooth:
-            max_angle_from_obj_smooth = max(umesh.smooth_angle for umesh in self.umeshes)
+            max_angle_from_obj_smooth = max(umesh.smooth_angle for umesh in umeshes)
             self.angle = bl_math.clamp(self.angle, 0.0, max_angle_from_obj_smooth)
 
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             umesh.check_uniform_scale(self.report)
             if self.selected and umesh.is_full_face_deselected:
                 umesh.update_tag = False
@@ -387,7 +386,7 @@ class UNIV_OT_Angle(Operator):
                     elif not self.addition:
                         crn_edge.seam = False
 
-        self.umeshes.update()
+        umeshes.update(info='Not found selected faces')
         return {'FINISHED'}
 
 
