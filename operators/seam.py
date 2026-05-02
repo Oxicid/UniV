@@ -37,7 +37,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         self.layout.prop(univ_settings(), 'use_texel')
@@ -170,7 +170,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -307,7 +307,7 @@ class UNIV_OT_Angle(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -410,7 +410,7 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout

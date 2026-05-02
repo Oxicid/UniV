@@ -96,7 +96,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -316,7 +316,7 @@ class UNIV_OT_Select_Square_Island(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -726,7 +726,7 @@ class UNIV_OT_Select_Pick(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         self.umeshes = UMeshes()
@@ -780,7 +780,7 @@ class UNIV_OT_SelectLinkedPick_VIEW3D(bpy.types.Macro):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
 
 class UNIV_OT_DeselectLinkedPick_VIEW3D(bpy.types.Macro):
@@ -790,7 +790,7 @@ class UNIV_OT_DeselectLinkedPick_VIEW3D(bpy.types.Macro):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
 # noinspection PyTypeHints
 class UNIV_OT_SelectLinked_VIEW3D(Operator):
@@ -810,7 +810,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         self.layout.prop(self, 'select')
@@ -875,7 +875,7 @@ class UNIV_OT_Select_Grow_Base(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1661,7 +1661,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -2420,7 +2420,7 @@ class UNIV_OT_SelectByArea(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()

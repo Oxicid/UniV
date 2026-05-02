@@ -82,7 +82,7 @@ class UNIV_OT_Check_Zero(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()
@@ -163,7 +163,7 @@ class UNIV_OT_Check_Flipped(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()
@@ -280,7 +280,7 @@ scaled islands from the calculation, focusing only on actual stretches"""
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()
@@ -490,7 +490,7 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def execute(self, context):
         umeshes = UMeshes()
@@ -616,7 +616,7 @@ class UNIV_OT_Check_Overlap(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -951,7 +951,7 @@ class UNIV_OT_BatchInspect(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         layout = self.layout

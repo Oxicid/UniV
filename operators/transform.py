@@ -3804,7 +3804,7 @@ class UNIV_OT_Pack(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
