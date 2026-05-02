@@ -34,6 +34,7 @@ class icons:
     arrow_top = 0
     arrow_top_left = 0
     arrow_top_right = 0
+    align_border_verts = 0
     border = 0
     border_by_angle = 0
     border_seam = 0

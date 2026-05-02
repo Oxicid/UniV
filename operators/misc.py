@@ -2651,3 +2651,118 @@ class UNIV_OT_SmartScaleApply(Operator):
 
 def draw_smart_scale_menu(self, _context):
     self.layout.operator("mesh.univ_smart_scale_apply")
+
+# noinspection PyTypeHints
+class UNIV_OT_AlignBorderVerts(Operator):
+    bl_idname = "uv.univ_align_border_verts"
+    bl_label = "Align Border Verts"
+    bl_description = "Align selected shared border vertices coords by orthogonal edge axis"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    flip_order: BoolProperty(name='Flip Order', default=False, description="From Left->Right, Bottom->Upper to Right->Left, Upper->Bottom.")
+    is_orthogonal_axis: BoolProperty(name='Orthogonal Axis', default=True)
+    use_aspect: BoolProperty(name='Correct Aspect', default=True)
+
+    def execute(self, context):
+        if bpy.context.mode != 'EDIT_MESH':
+            self.report({'WARNING'}, "Edit mode is required.")
+            return {'CANCELLED'}
+
+        umeshes = UMeshes()
+        if not umeshes:
+            return umeshes.update()
+
+        umeshes.filter_by_selected_uv_edges()
+        if not umeshes:
+            self.report({'WARNING'}, 'Selected uv edges not found')
+            return {"CANCELLED"}
+
+        def is_vertical(vec):
+            return abs(vec.y) > abs(vec.x)
+
+        aspect = 1.0
+        if self.use_aspect:
+            aspect = utils.get_aspect_ratio()
+        aspect_vec = Vector((1 / aspect, 1))
+
+        utils.get_aspect_ratio()
+        for umesh in umeshes:
+            is_boundary_with_pair = utils.is_boundary_func(umesh, with_seam=False)
+            selected_contiguous_edges = []
+            for crn in utils.calc_selected_uv_edge_iter(umesh):
+                 if crn.edge.is_contiguous and is_boundary_with_pair(crn):
+                     crn.tag = False
+                     selected_contiguous_edges.append(crn)
+
+            umesh.set_corners_tag(False)
+
+
+            umesh.update_tag = bool(selected_contiguous_edges)
+            if not umesh.update_tag:
+                continue
+
+            islands = utypes.AdvIslands.calc_visible(umesh)
+            islands.indexing()
+            for crn in selected_contiguous_edges:
+                crn.tag = True
+
+            segments = utypes.Segments.from_tagged_corners(selected_contiguous_edges, umesh)
+
+            v = []
+            h = []
+            for seg in segments:
+                center = (seg.start_co - seg.end_co)
+
+                if is_vertical(center * aspect_vec):
+                    seg.value = center.x
+                    v.append(seg)
+                else:
+                    seg.value = center.y
+                    h.append(seg)
+
+
+            v.sort(key = lambda s: s.value, reverse=True)
+            h.sort(key = lambda s: s.value, reverse=True)
+
+            if not self.is_orthogonal_axis:
+                v, h = h, v
+
+            v = [adv_crn.crn.link_loop_prev if adv_crn.invert else adv_crn.crn for seg in v for adv_crn in seg]
+            h = [adv_crn.crn.link_loop_prev if adv_crn.invert else adv_crn.crn for seg in h for adv_crn in seg]
+            if self.flip_order:
+                v = [crn.link_loop_radial_prev for crn in v]
+                h = [crn.link_loop_radial_prev for crn in h]
+
+
+            uv = umesh.uv
+            for crn in h:
+                linked_corners_a = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn, uv)]
+                linked_corners_b = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn.link_loop_next, uv)]
+
+                shared_crn = crn.link_loop_radial_prev
+                x = shared_crn[uv].uv.x
+                for l_crn in linked_corners_b:
+                    l_crn[uv].uv.x = x
+
+                shared_crn_next = shared_crn.link_loop_next
+                x = shared_crn_next[uv].uv.x
+                for l_crn in linked_corners_a:
+                    l_crn[uv].uv.x = x
+
+            for crn in v:
+                linked_corners_a = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn, uv)]
+                linked_corners_b = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn.link_loop_next, uv)]
+
+                shared_crn = crn.link_loop_radial_prev
+                y = shared_crn[uv].uv.y
+                for l_crn in linked_corners_b:
+                    l_crn[uv].uv.y = y
+
+                shared_crn_next = shared_crn.link_loop_next
+                y = shared_crn_next[uv].uv.y
+                for l_crn in linked_corners_a:
+                    l_crn[uv].uv.y = y
+
+
+        umeshes.update(info='Not found border contiguous selected uv edges.')
+        return {'FINISHED'}

@@ -233,6 +233,7 @@ def load_register_types():
             misc.UNIV_OT_CopyToLayer,
             misc.UNIV_OT_SetActiveRender,
             misc.UNIV_OT_SmartScaleApply,
+            misc.UNIV_OT_AlignBorderVerts,
             # Mesh
             misc.UNIV_OT_Flatten,
             misc.UNIV_OT_FlattenCleanup,

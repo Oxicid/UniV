@@ -299,6 +299,7 @@ def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
 
 
 def linked_crn_uv_unordered_included(first: BMLoop, uv: BMLayerItem):
+    # TODO: Rename to with hidden
     first_co = first[uv].uv
     linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
     return linked

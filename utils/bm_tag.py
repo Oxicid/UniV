@@ -160,6 +160,7 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_c
 
 
 def is_visible_func(sync: bool):
+    # TODO: Rename to is_visible_face
     if sync:
         return lambda f: not f.hide
     else:

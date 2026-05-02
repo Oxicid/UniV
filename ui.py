@@ -271,6 +271,7 @@ class UNIV_PT_General(Panel):
 
         # Misc
         if panel := draw_panel(layout, 'Misc'):
+            # TODO: Move Rectify, Unwrap, Relax, Straighten, Quadrify to Unfold
             col_align = panel.column(align=True)
             if univ_pro:
                 col_align.operator('uv.univ_rectify', icon_value=icons.rectify)
@@ -377,6 +378,8 @@ class UNIV_PT_General(Panel):
                 header.label(text='Specific')
                 if sub_panel:
                     col = sub_panel.column(align=True)
+                    col.operator('uv.univ_align_border_verts', icon_value=icons.align_border_verts)
+                    col.separator(factor=0.35)
                     col.operator('uv.univ_fill_to_pixels')
                     col.operator('uv.univ_random_color')
                     col.operator('uv.univ_linear_gradient')

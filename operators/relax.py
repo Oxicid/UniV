@@ -124,7 +124,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             if self.umeshes.elem_mode == 'VERT':
                 selected_elem = utils.calc_selected_verts(umesh)
             else:
-                selected_elem = utils.calc_selected_edges(umesh)
+                selected_elem = utils.calc_selected_3d_edges(umesh)
 
             uv = umesh.uv
             islands = AdvIslands.calc_visible(umesh)
