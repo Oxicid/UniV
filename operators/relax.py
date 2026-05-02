@@ -57,6 +57,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         self.layout.prop(self, 'use_correct_aspect')
 
         self.layout.prop(univ_settings(), 'use_texel')
+        self.layout.prop(self, 'fill_holes')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -194,7 +195,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
     def legacy_sync_verts_or_edges_relax_ex(self, relax_data: list[RelaxData]):
         # Relax
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
+        bpy.ops.uv.minimize_stretch(fill_holes=self.fill_holes, iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
@@ -203,7 +204,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv_co = crn[uv].uv
                     crn_uv_co[:] = co.lerp(crn_uv_co, self.border_blend)
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
+        bpy.ops.uv.minimize_stretch(fill_holes=self.fill_holes, iterations=self.iterations*5)
 
         for rd in relax_data:
             for isl in rd.save_transform_islands:  # TODO: Weld half selected islands
@@ -285,7 +286,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
     def legacy_non_sync_or_sync_faces_relax_ex(self, relax_data: list[RelaxData]):
         # Relax
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
+        bpy.ops.uv.minimize_stretch(fill_holes=self.fill_holes, iterations=self.iterations*5)
         if any(rd.coords_before for rd in relax_data):
             bpy.ops.uv.unwrap(method='CONFORMAL')
             # Blend Borders
@@ -294,7 +295,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 for co, crn in zip(rd.coords_before, rd.border_corners):
                     crn_uv = crn[uv]
                     crn_uv.uv = co.lerp(crn_uv.uv, self.border_blend)
-        bpy.ops.uv.minimize_stretch(iterations=self.iterations*5)
+        bpy.ops.uv.minimize_stretch(fill_holes=self.fill_holes, iterations=self.iterations*5)
 
 
         for rd in relax_data:
@@ -367,6 +368,7 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
         self.layout.prop(self, 'iterations', slider=True)
 
         self.layout.prop(univ_settings(), 'use_texel')
+        self.layout.prop(self, 'fill_holes')
         self.layout.prop(self, 'use_correct_aspect')
 
     def execute(self, context):

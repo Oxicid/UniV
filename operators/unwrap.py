@@ -40,6 +40,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                                           ('CONFORMAL', 'Conformal', ''),
                                           ('MINIMUM_STRETCH', 'Organic', '')))
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
+    fill_holes: bpy.props.BoolProperty(name='Fill Holes', default=True)
     mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Self Borders', default=True,
                                     description='Marking seams where there are split edges within the same island.')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
@@ -51,6 +52,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
     def draw(self, context):
         self.layout.prop(univ_settings(), 'use_texel')
+        self.layout.prop(self, 'fill_holes')
 
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'mark_seam_inner_island')
@@ -301,6 +303,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
+                                                                            fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constraints_weight * 100)
                     to_lock_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
@@ -465,7 +468,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for to_lock_isl in to_lock_constraints_islands:
                 to_lock_isl.sequence = self.lock_island_from_unwrap_and_get_pins_sync(to_lock_isl)
 
-            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
             for to_lock_isl in to_lock_constraints_islands:
                 for crn_uv in to_lock_isl.sequence:
@@ -597,6 +600,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
+                                                                            fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constraints_weight * 100)
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
@@ -618,7 +622,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for hidden_isl in hidden_constraints_islands:
                 hidden_isl.sequence = hidden_isl.set_pins(with_pinned=True)
 
-            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
             for hidden_isl in hidden_constraints_islands:
                 for crn_uv in hidden_isl.sequence:
@@ -705,6 +709,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
+                                                                            fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constraints_weight * 100)
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
@@ -761,7 +766,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             for hidden_isl in hidden_constraints_islands:
                 hidden_isl.hide_for_unwrap()
 
-            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
             for hidden_isl in hidden_constraints_islands:
                 hidden_isl.unhide_for_unwrap()
@@ -854,6 +859,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                                           ('CONFORMAL', 'Conformal', ''),
                                           ('MINIMUM_STRETCH', 'Organic', '')))
 
+    fill_holes: bpy.props.BoolProperty(name='Fill Holes', default=True)
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -862,6 +868,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
     def draw(self, context):
         self.layout.prop(univ_settings(), 'use_texel')
+        self.layout.prop(self, 'fill_holes')
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
@@ -943,7 +950,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                 isl.apply_aspect_ratio()
             save_t = utypes.SaveTransform(adv_subislands, flip_if_needed=True)
 
-            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
             adv_island = mesh_island.to_adv_island()
             save_t.island = adv_island
@@ -964,7 +971,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             adv_island = mesh_island.to_adv_island()
             adv_island.select = True
 
-            bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
             umesh.verify_uv()
             unique_number_for_multiply = hash(mesh_island[0])  # multiplayer
