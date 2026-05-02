@@ -524,13 +524,10 @@ def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: i
     return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
 
 
-def linked_crn_to_vert_by_face_index(crn):
+def linked_crn_to_vert_by_idx_without_co_check_unordered(crn):
     """Linked to vertex by face index without arg corner"""
     idx = crn.face.index
-    linked = deque(l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx)
-    linked.rotate(-linked.index(crn))
-    linked.popleft()
-    return linked
+    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx]
 
 
 def linked_crn_to_vert_by_island_index_unordered(crn):

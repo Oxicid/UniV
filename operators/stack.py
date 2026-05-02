@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 
 from .. import utils
-from ..utils import linked_crn_to_vert_by_face_index
+from ..utils import linked_crn_to_vert_by_idx_without_co_check_unordered
 from .. import utypes
 from ..utypes import UMeshes, AdvIsland, AdvIslands
 from collections import deque, defaultdict
@@ -24,79 +24,91 @@ T = typing.TypeVar('T')
 
 
 class FacePattern:
-    def __init__(self, f, start_crn, ordered_corners):
+    def __init__(self, f: BMFace, start_crn: BMLoop, ordered_corners):
         self.face: BMFace = f
         self.start_crn: BMLoop = start_crn
-        self.ordered_corners: deque[BMLoop] = ordered_corners
-        self.shared_crn_face_sizes: npt.NDArray[np.uint16] = np.zeros(shape=len(ordered_corners), dtype='uint16')
+        self.ordered_corners: deque[BMLoop] = ordered_corners  # Face ordered corners by start corner (included and not included)
+        # TODO: Add more comments about this
+        self.ordered_corners_pair_crn_face_sides: npt.NDArray[np.uint16] = np.zeros(shape=len(ordered_corners), dtype='uint16')
 
     @classmethod
     def calc_init(cls, f, start_crn):
         return cls(f, start_crn, deque(f.loops))
 
     @classmethod
-    def calc(cls, f, start_crn):
+    def calc_fw(cls, f: BMFace, start_crn: BMLoop):
         linked = deque(f.loops)
         linked.rotate(-linked.index(start_crn))
         linked.popleft()
         return cls(f, start_crn, linked)
 
     @classmethod
-    def calc_backward(cls, f, start_crn):
+    def calc_bw(cls, f, start_crn):
         linked = deque(reversed(f.loops))
         linked.rotate(-linked.index(start_crn))
         linked.popleft()
         return cls(f, start_crn, linked)
 
     def __str__(self):
-        return f"FacePattern: shared crn face size = {self.shared_crn_face_sizes}"
+        return f"FacePattern: shared crn face size = {self.ordered_corners_pair_crn_face_sides}"
 
     def __iter__(self) -> typing.Iterator[BMLoop]:
         return iter(self.ordered_corners)
 
     def __setitem__(self, key: int, value: int):
-        self.shared_crn_face_sizes[key] = value
+        self.ordered_corners_pair_crn_face_sides[key] = value
 
 
-class StackIsland:  # TODO: Split for source and target islands
+class StackIsland:  # TODO: Split for target and target islands
     def __init__(self, island):
         self.island: AdvIsland = island
         self.walked_island_from_init_face: list[list[FacePattern]] = []
 
         self.unique_faces: list[BMFace] = []
 
-        self.face_start_pattern_crn: deque[BMLoop] = deque()
-        self.face_start_pattern: deque[npt.NDArray] = deque()
-        self.start_faces_patterns: list[list[deque[npt.NDArray] | deque[BMLoop]]] = []
+        # Forward patterns.
+        self.face_start_pattern_fw: deque[list[int]] = deque()  # Linked sorted face sides count.
+        self.face_start_pattern_crn_fw: deque[BMLoop] = deque()  # Ordered by unique corner - corners.
+        self.start_faces_patterns_fw: list[list[deque[list[int]] | deque[BMLoop]]] = []  # Lazy computed patterns (taken by `calc_unique_faces`)
 
-        self.face_start_pattern_crn_backward: deque[BMLoop] = deque()
-        self.face_start_pattern_backward: deque[npt.NDArray] = deque()
-        self.start_faces_patterns_backward: list[list[deque[npt.NDArray] | deque[BMLoop]]] = []
+        # Backward patterns.
+        self.face_start_pattern_bw: deque[list[int]] = deque()
+        self.face_start_pattern_crn_bw: deque[BMLoop] = deque()
+        self.start_faces_patterns_bw: list[list[deque[list[int]] | deque[BMLoop]]] = []
 
-        self.ngons_with_faces: defaultdict[int, list[BMFace]] = defaultdict(list)
+        self.poligon_sides_with_faces: defaultdict[int, list[BMFace]] = defaultdict(list)
+
+        # Used for quantity stack groups.
         self.np_ngons_with_faces: npt.NDArray[np.int32] = np.array([], dtype='int32')
 
     def preprocessing(self):
-        self.ensure_ngons_with_faces()
+        self.ensure_polygon_sides_with_faces()
+        # Get more unique faces for start walking, for minimize iterations
         self.calc_unique_faces()
+        # Get the largest face
         self.unique_faces.sort(key=lambda face: face.calc_area(), reverse=True)
+        # Need for grouping by same polygons sizes
         self.ngons_to_np()
-        self.face_start_pattern, self.face_start_pattern_crn = self.calc_linked_corners_pattern(0)
+        # Get first pattern for walking. Once the first pattern passes, the other patterns are processed immediately.
+        self.face_start_pattern_fw, self.face_start_pattern_crn_fw = self.calc_linked_corners_pattern(idx=0)
 
-    def ensure_ngons_with_faces(self):
+    def ensure_polygon_sides_with_faces(self):
         for f in self.island:
-            self.ngons_with_faces[len(f.loops)].append(f)
+            self.poligon_sides_with_faces[len(f.loops)].append(f)
 
     def calc_unique_faces(self) -> list[BMFace]:
-        assert self.ngons_with_faces
+        assert self.poligon_sides_with_faces
 
         min_sequence: tuple[int | list[BMFace]] | tuple = ()
-        for ngons_size, faces in self.ngons_with_faces.items():
+        for ngons_size, faces in self.poligon_sides_with_faces.items():
             if not min_sequence:
+                # Set first unique faces
                 min_sequence = ngons_size, faces
 
+            # Set by min faces length
             elif len(faces) < len(min_sequence[1]):
                 min_sequence = ngons_size, faces
+            # Set by more poligon sides, if faces size equal
             elif len(faces) == len(min_sequence[1]) and ngons_size > min_sequence[0]:
                 min_sequence = ngons_size, faces
 
@@ -104,8 +116,8 @@ class StackIsland:  # TODO: Split for source and target islands
         return self.unique_faces
 
     def ngons_to_np(self):
-        np_ngons_with_faces = np.empty(shape=(len(self.ngons_with_faces), 2), dtype='int32')
-        for idx, (f_size, faces) in enumerate(self.ngons_with_faces.items()):
+        np_ngons_with_faces = np.empty(shape=(len(self.poligon_sides_with_faces), 2), dtype='int32')
+        for idx, (f_size, faces) in enumerate(self.poligon_sides_with_faces.items()):
             np_ngons_with_faces[idx][0] = f_size
             np_ngons_with_faces[idx][1] = len(faces)
 
@@ -144,7 +156,7 @@ class StackIsland:  # TODO: Split for source and target islands
         unique_dist_idx = np.argmax(mean_dist)
         return unique_dist_idx
 
-    def calc_linked_corners_pattern(self, idx) -> list[deque[np.ndarray] | deque[BMLoop]]:
+    def calc_linked_corners_pattern(self, idx) -> list[deque[list[int]] | deque[BMLoop]]:
         init_face: BMFace = self.unique_faces[idx]
         face_idx = init_face.index
 
@@ -154,101 +166,118 @@ class StackIsland:  # TODO: Split for source and target islands
         unique_dist_idx = self.get_unique_start_crn_idx(face_start_pattern_crn)
         face_start_pattern_crn.rotate(-unique_dist_idx)
 
-        for idx__, crn in enumerate(face_start_pattern_crn):
-            linked_crn_face_size = []
-            for crn_ in linked_crn_to_vert_by_face_index(crn):
-                linked_crn_face_size.append(len(crn_.face.loops))
+        for crn in face_start_pattern_crn:
+            # TODO: Implement radial linked corners by index, with missing not equal index faces, without reset searching.
+            linked_crn_faces_sides = [len(l_crn.face.loops) for l_crn in linked_crn_to_vert_by_idx_without_co_check_unordered(crn)]
 
             shared_face_size = 0
             shared_crn = crn.link_loop_radial_prev
             if shared_crn != crn and shared_crn.face.index == face_idx:
                 shared_face_size = len(shared_crn.face.loops)
 
-            linked_crn_face_size.sort()
-            linked_crn_face_size.insert(0, shared_face_size)
-            face_start_pattern.append(linked_crn_face_size)
+            linked_crn_faces_sides.sort()
+            linked_crn_faces_sides.insert(0, shared_face_size)
+            face_start_pattern.append(linked_crn_faces_sides)
 
         return [face_start_pattern, face_start_pattern_crn]
 
-    def calc_all_linked_corners_pattern(self):
-        start_faces_patterns: list[list[deque[np.ndarray] | deque[BMLoop]]] = []
+    def calc_all_linked_corners_pattern_fw(self):
+        start_faces_patterns_fw: list[list[deque[list[int]] | deque[BMLoop]]] = []
         for idx, sequ in enumerate(self.unique_faces):
-            # continue
+            # Skip first (unique) calculated pattern
             if not idx:
                 continue
-            start_faces_patterns.append(self.calc_linked_corners_pattern(idx))
-        self.start_faces_patterns = start_faces_patterns
+            start_faces_patterns_fw.append(self.calc_linked_corners_pattern(idx))
+        self.start_faces_patterns_fw = start_faces_patterns_fw
 
-    def compared_matching_first_pattern(self, other: 'typing.Self'):
-        if len(self.face_start_pattern) != len(other.face_start_pattern):
+    def compared_matching_first_pattern(self, other: 'StackIsland'):
+        if len(self.face_start_pattern_fw) != len(other.face_start_pattern_fw):
             return
 
-        for _ in range(len(other.face_start_pattern) - 1):
+        # Rotate the start patterns based on their correspondence via linked face sides.
+        for _ in range(len(other.face_start_pattern_fw) - 1):
+            if self.face_start_pattern_fw == other.face_start_pattern_fw:
+                yield other.face_start_pattern_crn_fw
+            other.face_start_pattern_fw.rotate(1)
+            other.face_start_pattern_crn_fw.rotate(1)
 
-            if self.face_start_pattern == other.face_start_pattern:
-                yield other.face_start_pattern_crn
 
-            other.face_start_pattern.rotate(1)
-            other.face_start_pattern_crn.rotate(1)
+        # Rotate other patterns
+        if not other.start_faces_patterns_fw:
+            other.calc_all_linked_corners_pattern_fw()
 
-        if not other.start_faces_patterns:
-            other.calc_all_linked_corners_pattern()
-
-        for face_start_pattern, face_start_pattern_crn in other.start_faces_patterns:
+        for face_start_pattern, face_start_pattern_crn in other.start_faces_patterns_fw:
             for _ in range(len(face_start_pattern) - 1):
-                if self.face_start_pattern == face_start_pattern:
+                if self.face_start_pattern_fw == face_start_pattern:
                     yield face_start_pattern_crn
 
                 face_start_pattern.rotate(1)
                 face_start_pattern_crn.rotate(1)
 
-    def calc_source_stack_island(self, source: 'typing.Self'):
-        for source_pattern in self.compared_matching_first_pattern(source):
-            source_island_walked: list[list[FacePattern]] = []
-            source.island.set_tag(True)  # TODO: Tagging source_island_walked
 
-            start_crn_ = source_pattern[0]
-            init_face_pattern = FacePattern(start_crn_.face, start_crn_, source_pattern)
-            parts_of_island: list[FacePattern] = [init_face_pattern]  # Container collector of island elements
+    def calc_transfer_stack_island_fw(self, transfer: 'StackIsland'):
+        for transfer_pattern in self.compared_matching_first_pattern(transfer):  # Iterate across all unique faces
+            # Container collector of island transfer patterns by generation step
+            transfer_island_walked: list[list[FacePattern]] = []
+            transfer.island.set_tag(True)  # TODO: Tagging transfer_island_walked
+
+            start_crn = transfer_pattern[0]
+            init_face_pattern = FacePattern(start_crn.face, start_crn, transfer_pattern)
             init_face_pattern.face.tag = False
 
             face_idx = init_face_pattern.face.index
 
-            temp = []  # Container for get elements from loop from parts_of_island
-            break_ = False
+            current_transfer_faces: list[FacePattern] = [init_face_pattern]
+            next_transfer_faces = []
 
-            for generation_of_shared_face in self.walked_island_from_init_face:
-                for target_face__, source_face__ in zip(generation_of_shared_face, parts_of_island):
-                    if len(target_face__.ordered_corners) != len(source_face__.ordered_corners):
-                        break_ = True
+            failed = False
+            for generation_step_of_shared_face in self.walked_island_from_init_face:
+                for target_face, transfer_face in zip(generation_step_of_shared_face, current_transfer_faces):
+                    if len(target_face.ordered_corners) != len(transfer_face.ordered_corners):
+                        failed = True
                         break
 
-                    for target_face_size, source_crn in zip(
-                            target_face__.shared_crn_face_sizes, source_face__.ordered_corners):
-                        if target_face_size == 0:
-                            continue
-
-                        if (shared_crn := source_crn.link_loop_radial_prev) == source_crn:
-                            break_ = True
-                            break
-
+                    for tar_face_sides, transfer_crn in zip(target_face.ordered_corners_pair_crn_face_sides, transfer_face.ordered_corners):
+                        shared_crn = transfer_crn.link_loop_radial_prev
                         shared_crn_face = shared_crn.face
-                        if target_face_size != len(shared_crn_face.loops) or (not shared_crn_face.tag) or (shared_crn_face.index != face_idx):
-                            break_ = True
+
+                        # Skip boundary edges.
+                        if tar_face_sides == 0:
+                            if shared_crn == transfer_crn or (not shared_crn_face.tag) or (shared_crn_face.index != face_idx):
+                                continue
+                            else:
+                                # Transfer corner has valid pair corner, stop the walking.
+                                failed = True
+                                break
+
+                        # Expect pair crn, break.
+                        if shared_crn == transfer_crn:
+                            failed = True
                             break
 
+                        if tar_face_sides != len(shared_crn_face.loops):
+                            failed = True
+                            break
+
+                        # Just to be safe, we check the tag along with the index, since the tag may be corrupted on non-manifold edges.
+                        if (not shared_crn_face.tag) or shared_crn_face.index != face_idx:
+                            failed = True
+                            break
+
+                        # TODO: Restore tags after failed from contained faces.
                         shared_crn_face.tag = False
-                        temp.append(FacePattern.calc(shared_crn_face, shared_crn))
-                    if break_:
+                        next_transfer_faces.append(FacePattern.calc_fw(shared_crn_face, shared_crn))
+                    if failed:
                         break
 
-                source_island_walked.append(parts_of_island)
-                parts_of_island = temp
-                temp = []
-                if break_:
+                transfer_island_walked.append(current_transfer_faces)
+                current_transfer_faces = next_transfer_faces
+                next_transfer_faces = []
+                if failed:
+                    # NOTE: Only one failing pattern is stopped, while iteration continues over all unique faces.
                     break
-            if not break_:
-                return source_island_walked
+            if not failed:
+                return transfer_island_walked
         return None
 
     @staticmethod
@@ -258,14 +287,14 @@ class StackIsland:  # TODO: Split for source and target islands
             text += f'{idx}: {list(p)}, '
         return text
 
-    def calc_walked_reference_island(self):
+    def calc_walked_reference_island_fw_and_for_bw(self):
         """Create an island that saves a sequence of found faces and its shared corner"""
         self.island.set_tag(True)
 
         init_face = self.unique_faces[0]
         # For the future be careful, maybe face_start_pattern_crn should be copied
         # Container collector of island elements
-        parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn[0], self.face_start_pattern_crn)]
+        parts_of_island = [FacePattern(init_face, self.face_start_pattern_crn_fw[0], self.face_start_pattern_crn_fw)]
         init_face.tag = False
 
         init_idx = init_face.index
@@ -287,7 +316,7 @@ class StackIsland:  # TODO: Split for source and target islands
                         continue
 
                     f[crn_idx] = len(shared_face.loops)
-                    temp.append(FacePattern.calc(shared_face, shared_crn))
+                    temp.append(FacePattern.calc_fw(shared_face, shared_crn))
                     shared_face.tag = False
 
 
@@ -310,7 +339,7 @@ class StackIsland:  # TODO: Split for source and target islands
 class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     bl_idname = "mesh.univ_stack"
     bl_label = "Stack"
-    bl_description = "Stack to selected"
+    bl_description = "Topology stack islands to selected."
     bl_options = {'REGISTER', 'UNDO'}
 
     # noinspection PyTypeHints
@@ -318,7 +347,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
+        return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
         self.layout.prop(self, 'between_selected', toggle=1)
@@ -330,7 +359,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.umeshes: UMeshes | None = None
         self.targets: list[StackIsland] = []
-        self.source: list[StackIsland] = []
+        self.transfer: list[StackIsland] = []
         self.counter: int = 0
         self.calc_selected: Callable = AdvIslands.calc_selected
         self.calc_non_selected: Callable = AdvIslands.calc_non_selected
@@ -345,7 +374,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         if self.between_selected:
             self.stack_selected_between()
         else:
-            self.stack_target_source()
+            self.stack_transfer_to_target()
         if self.counter:
             self.report({'INFO'}, f'Found {self.counter} islands for stacking')
 
@@ -361,15 +390,17 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                     target.island.tag = False
                     if not any(i.island.tag for i in sort_stack_islands):
                         break
-                    target.calc_walked_reference_island()
-                    for source in sort_stack_islands:
-                        if source.island.tag:
-                            if res := target.calc_source_stack_island(source):
-                                target.transfer_co_to(res, source.island.umesh.uv)
-                                source.island.umesh.update_tag = True
-                                source.island.tag = False
+                    target.calc_walked_reference_island_fw_and_for_bw()
+                    for transfer in sort_stack_islands:
+                        if transfer.island.tag:
+                            if res := target.calc_transfer_stack_island_fw(transfer):
+                                target.transfer_co_to(res, transfer.island.umesh.uv)
+
+                                transfer.island.mark_seam()
+                                transfer.island.umesh.update_tag = True
+                                transfer.island.tag = False
                                 self.counter += 1
-                            source.island.set_tag(False)  # TODO: Check when else
+                            transfer.island.set_tag(False)  # TODO: Check when else
 
         self.umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
@@ -399,26 +430,27 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             return []
         return sort_stack_islands_groups
 
-    # Target Source
-    def stack_target_source(self):
+    def stack_transfer_to_target(self):
         self.targets: list[StackIsland] = []
-        self.source: list[StackIsland] = []
+        self.transfer: list[StackIsland] = []
 
-        sort_stack_islands = self.islands_preprocessing_reference_and_source()
+        sorted_target_islands_with_transfer = self.islands_preprocessing_target_and_transfer()
 
-        for stack_target, stacks_source in sort_stack_islands:
-            for stacks_source_isl in stacks_source:
-                if stacks_source_isl.island.tag:
-                    if res := stack_target.calc_source_stack_island(stacks_source_isl):
-                        stack_target.transfer_co_to(res, stacks_source_isl.island.umesh.uv)
-                        stacks_source_isl.island.umesh.update_tag = True
-                        stacks_source_isl.island.tag = False
+        for target, stacks_transfer in sorted_target_islands_with_transfer:
+            for transfer in stacks_transfer:
+                if transfer.island.tag:
+                    if res := target.calc_transfer_stack_island_fw(transfer):
+                        target.transfer_co_to(res, transfer.island.umesh.uv)
+
+                        transfer.island.mark_seam()
+                        transfer.island.umesh.update_tag = True
+                        transfer.island.tag = False
                         self.counter += 1
-                    stacks_source_isl.island.set_tag(False)
+                    transfer.island.set_tag(False)
 
         self.umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
-    def islands_preprocessing_reference_and_source(self, stack_type=StackIsland):
+    def islands_preprocessing_target_and_transfer(self, stack_type=StackIsland):
         for umesh in reversed(self.umeshes):
             # TODO: With expanded selection, you can calculate islands via calc_visible
             #  and add them to selected and non_selected. This does not work with calc_selected.
@@ -445,33 +477,33 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             for sel_isl in selected:
                 stack_isl = stack_type(sel_isl)
                 stack_isl.preprocessing()
-                stack_isl.calc_walked_reference_island()
+                stack_isl.calc_walked_reference_island_fw_and_for_bw()
                 self.targets.append(stack_isl)
 
             for non_sel_isl in non_selected:
                 stack_isl = stack_type(non_sel_isl)
                 stack_isl.preprocessing()
-                self.source.append(stack_isl)
+                self.transfer.append(stack_isl)
 
         if not self.targets:
             self.report({'WARNING'}, 'Not found target islands')
             return []
 
-        if not self.source:
-            self.report({'WARNING'}, 'Not found source islands')
+        if not self.transfer:
+            self.report({'WARNING'}, 'Not found transfer islands')
             return []
 
-        if not (sort_stack_islands := self.sort_stack_islands_target_source()):
+        if not (sort_stack_islands := self.sort_stack_islands_target_with_transfer()):
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
         return sort_stack_islands
 
-    def sort_stack_islands_target_source(self):
+    def sort_stack_islands_target_with_transfer(self):
         sorted_groups: list[tuple[StackIsland, list[StackIsland]]] = []
         for tar in self.targets:
             group: list[StackIsland] = []
-            for source_isl in self.source:
-                if tar == source_isl:
-                    group.append(source_isl)
+            for transfer_isl in self.transfer:
+                if tar == transfer_isl:
+                    group.append(transfer_isl)
             if group:
                 sorted_groups.append((tar, group))
         return sorted_groups
