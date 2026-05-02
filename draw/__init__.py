@@ -128,7 +128,7 @@ class DrawerNonSyncSelectProcessing:
     @staticmethod
     def is_enable():
         try:
-            from .. import univ_pro
+            from ..univ_pro import version
             return univ_settings().overlay_3d_enable
         except ImportError:
             return False
@@ -175,7 +175,7 @@ class DrawCallSeams2D:
     @staticmethod
     def is_enable():
         try:
-            from .. import univ_pro
+            from ..univ_pro import version
             return univ_settings().overlay_2d_enable
         except ImportError:
             return False

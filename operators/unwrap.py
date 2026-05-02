@@ -157,7 +157,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             islands.indexing()
             isl.mark_seam_by_index(additional=True)
 
-        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
         save_t.inplace(flip_if_needed=False)
         save_t.apply_saved_coords(self.blend_factor, flip_if_needed=True)
@@ -1017,7 +1017,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                     unique_number += self.unwrap_selected_faces_preprocess(umesh)
 
         UNIV_OT_Unwrap.multiply_relax(unique_number % (1 << 62), unwrap_kwargs)
-        bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False, **unwrap_kwargs)
+        bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
         for umesh in meshes_with_uvs:
             self.unwrap_selected_faces_postprocess(umesh)

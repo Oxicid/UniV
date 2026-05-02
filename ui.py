@@ -1304,7 +1304,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
             if bpy.app.version >= (5, 1, 0):
-                pie.operator("mesh.loop_multi_select", text='Loop')
+                pie.operator("mesh.select_edge_loop_multi", text='Loop')
             else:
                 pie.operator("mesh.loop_multi_select", text='Loop').ring = False
         # Right Bottom

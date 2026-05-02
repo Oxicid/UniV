@@ -40,6 +40,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         return context.mode == 'EDIT_MESH' and (obj := context.active_object) and obj.type == 'MESH'  # noqa # pylint:disable=used-before-assignment
 
     def draw(self, context):
+        self.layout.prop(univ_settings(), 'use_texel')
         self.layout.prop(self, 'addition')
         self.layout.prop(self, 'use_correct_aspect')
         self.layout.column(align=True).prop(self, 'unwrap', expand=True)
