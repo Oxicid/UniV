@@ -379,8 +379,8 @@ class UNIV_PT_General(Panel):
                 if sub_panel:
                     col = sub_panel.column(align=True)
                     col.operator('uv.univ_align_border_verts', icon_value=icons.align_border_verts)
+                    col.operator('uv.univ_snap_to_pixels', icon='FORCE_TEXTURE')
                     col.separator(factor=0.35)
-                    col.operator('uv.univ_fill_to_pixels', icon='FORCE_TEXTURE')
                     col.operator('uv.univ_random_color')
                     col.operator('uv.univ_linear_gradient')
                     col.separator(factor=0.35)

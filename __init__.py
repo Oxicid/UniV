@@ -98,7 +98,7 @@ def load_register_types():
             transform.UNIV_OT_Align_pie,
             transform.UNIV_OT_Fill,
             transform.UNIV_OT_Fit,
-            transform.UNIV_OT_FillToPixels,
+            transform.UNIV_OT_SnapToPixels,
             transform.UNIV_OT_Flip,
             transform.UNIV_OT_Flip_VIEW3D,
             transform.UNIV_OT_Rotate,

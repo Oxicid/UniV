@@ -362,9 +362,9 @@ class UNIV_OT_Fill(UNIV_OT_Fit):
     bl_options = {'REGISTER', 'UNDO'}
 
 
-class UNIV_OT_FillToPixels(Operator):
-    bl_idname = 'uv.univ_fill_to_pixels'
-    bl_label = 'Fill to Pixels'
+class UNIV_OT_SnapToPixels(Operator):
+    bl_idname = 'uv.univ_snap_to_pixels'
+    bl_label = 'Snap to Pixels'
     bl_description = 'Snap island by boundary box to pixels'
     bl_options = {'REGISTER', 'UNDO'}
 
