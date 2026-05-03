@@ -316,6 +316,76 @@ else:
             return [crn for f in umesh.bm.faces for crn in f.loops if crn[uv].select_edge]
         return [crn for f in umesh.bm.faces if f.select for crn in f.loops if crn[uv].select_edge]
 
+if USE_GENERIC_UV_SYNC:
+    def calc_selected_uv_edges_from_linked_selected_face(umesh: 'utypes.UMesh') -> list[BMLoop]:
+        """Similar to calc_selected_uv_edges, but for invalid sync mode it excludes edges that are not linked to selected faces."""
+        if umesh.is_full_face_deselected:
+            return []
+
+        if umesh.sync:
+            if not umesh.sync_valid:
+                if umesh.is_full_edge_selected:
+                    return [crn for f in umesh.bm.faces for crn in f.loops]
+
+                # Select isolated
+                from .bm_tag import is_pair
+                uv = umesh.uv
+                selected_corners = []
+                for f in umesh.bm.faces:
+
+                    if f.select:
+                        selected_corners.extend(f.loops)
+                    elif not f.hide:
+                        for crn in f.loops:
+                            if crn.edge.select:
+                                pair_crn = crn.link_loop_radial_prev
+                                if pair_crn.face.select:
+                                    if not pair_crn.edge.seam:
+                                        if is_pair(crn, pair_crn, uv):
+                                            selected_corners.append(crn)
+                return selected_corners
+            else:
+                if umesh.is_full_face_selected:
+                    return [crn for f in umesh.bm.faces for crn in f.loops if crn.uv_select_edge]
+                return [crn for f in umesh.bm.faces if not f.hide for crn in f.loops if crn.uv_select_edge]
+
+        if umesh.is_full_face_deselected:
+            return []
+        if umesh.is_full_face_selected:
+            return [crn for f in umesh.bm.faces for crn in f.loops if crn.uv_select_edge]
+        return [crn for f in umesh.bm.faces if f.select for crn in f.loops if crn.uv_select_edge]
+else:
+    def calc_selected_uv_edges_from_linked_selected_face(umesh: 'utypes.UMesh') -> list[BMLoop]:
+        if umesh.sync:
+            if umesh.is_full_edge_deselected:
+                return []
+            if umesh.is_full_face_selected:
+                return [crn for f in umesh.bm.faces for crn in f.loops]
+
+            # Select isolated
+            from .bm_tag import is_pair
+            uv = umesh.uv
+            selected_corners = []
+            for f in umesh.bm.faces:
+                if f.select:
+                    selected_corners.extend(f.loops)
+                elif not f.hide:
+                    for crn in f.loops:
+                        if crn.edge.select:
+                            pair_crn = crn.link_loop_radial_prev
+                            if pair_crn.face.select:
+                                if not pair_crn.edge.seam:
+                                    if is_pair(crn, pair_crn, uv):
+                                        selected_corners.append(crn)
+            return selected_corners
+
+        if umesh.is_full_face_deselected:
+            return []
+        uv = umesh.uv
+        if umesh.is_full_face_selected:
+            return [crn for f in umesh.bm.faces for crn in f.loops if crn[uv].select_edge]
+        return [crn for f in umesh.bm.faces if f.select for crn in f.loops if crn[uv].select_edge]
+
 def calc_visible_uv_corners(umesh: 'utypes.UMesh') -> list[BMLoop]:
     if umesh.sync:
         if umesh.is_full_face_selected:
