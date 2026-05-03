@@ -8,7 +8,6 @@ if 'bpy' in locals():
 import bpy  # noqa
 
 from bmesh.types import BMesh, BMLoop, BMLayerItem
-from collections import deque
 from itertools import chain
 
 from .. import utypes

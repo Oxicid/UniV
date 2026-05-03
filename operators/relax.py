@@ -94,7 +94,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 unwrap.MULTIPLAYER = 1
                 unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
-            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
             if not self.umeshes:
                 return self.umeshes.update()
@@ -394,7 +394,7 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
             self.report({'WARNING'}, 'Relax is not supported in Blender versions below 4.3')
             return {'CANCELLED'}
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
         if not self.umeshes:
             return self.umeshes.update()

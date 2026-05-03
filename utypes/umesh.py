@@ -234,6 +234,7 @@ class UMesh:
             return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
 
     if USE_GENERIC_UV_SYNC:
+        # TODO: Fix Select OT. Selected verts in edge mode without selected edges (fix that)
         def has_selected_uv_verts(self) -> bool:
             if self.sync:
                 if not self.total_vert_sel:
@@ -1042,6 +1043,8 @@ class UMeshes:
                 self.umeshes.remove(umesh)
 
     def filtered_by_selected_and_visible_uv_verts(self) -> tuple['UMeshes', 'UMeshes']:
+        """NOTE: Do not use this in edge mode (and face ???), as there may be cases where 'flush_select' is not called,
+        resulting in invisible selected vertices even when all edges are deselected. """
         selected = []
         visible = []
         for umesh in self:

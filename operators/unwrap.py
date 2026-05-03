@@ -903,7 +903,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
         if not self.umeshes:
             return self.umeshes.update()

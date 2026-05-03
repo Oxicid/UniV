@@ -41,7 +41,7 @@ class UNIV_OT_Pin(Operator):
         self.umeshes.update_tag = False
 
         if context.mode == 'EDIT_MESH':
-            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
             self.umeshes = selected if selected else visible
 
             if selected:
@@ -595,7 +595,7 @@ class UNIV_OT_Hide(Operator):
                 utils.update_area_by_type('VIEW_3D')
             self.umeshes.sync = False
 
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         if not self.umeshes:
@@ -2450,7 +2450,7 @@ class UNIV_OT_SmartScaleApply(Operator):
                 self.modifier_compensation(mod, scale, distance_scaler, scale)
 
 
-            # TODO: Check with autosmoth
+            # TODO: Check with auto smooth
             mirror_split_normals = []
             if me.has_custom_normals and getattr(me, 'use_auto_smooth', False):
                 if hasattr(me, 'calc_normals_split'):

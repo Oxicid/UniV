@@ -627,7 +627,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
             umesh.aspect = utils.get_aspect_ratio() if self.use_aspect else 1.0
 
         if self.use_by_distance:
-            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if not self.umeshes:
@@ -1063,7 +1063,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         return {'FINISHED'}
 
     def weld_by_distance_from_3d(self):
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_verts()
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         umeshes_without_uv = self.umeshes.filtered_by_uv_exist()

@@ -2331,7 +2331,7 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
 
         # from .. import univ_pro
         umesh = self.umeshes[0]
-        uv = umesh.uv
+        # uv = umesh.uv
 
         islands = AdvIslands.calc_visible_with_mark_seam(umesh)
         islands.indexing()
@@ -3077,6 +3077,7 @@ class UNIV_OT_SelectMode(Operator):
                 if initial_mode != 'VERT' or initial_use_island_select:
                     if initial_mode == 'EDGE':
                         for umesh in umeshes:
+                            # TODO: Replace with has_selected_uv_edges?
                             if not umesh.has_selected_uv_verts():
                                 if umesh.sync_valid:
                                     umesh.sync_valid = False
