@@ -651,8 +651,12 @@ class Align_by_Angle:
                             grow_from_end.append(seg)
                             continue
 
-            Align_by_Angle.join_segments_by_optimal_angle(
-                grow_from_end, grow_from_start, new_segments, segments, tar_seg)
+            try:
+                Align_by_Angle.join_segments_by_optimal_angle(
+                    grow_from_end, grow_from_start, new_segments, segments, tar_seg)
+            except ConnectionError:  # TODO: Fix this
+                print('UniV: Align by Angle: Zero edges found.')
+                continue
 
         return Segments(new_segments, segments.umesh)
 
@@ -705,7 +709,8 @@ class Align_by_Angle:
                 tar_seg.tag = True
                 is_joined = True
 
-        assert not tar_seg.is_circular
+        if tar_seg.is_circular:
+            raise ConnectionError
 
         if grow_from_start:
             tar_vec = tar_seg[0].vec
@@ -959,8 +964,8 @@ def draw(self, context):
     is_pro = utils.is_pro_version_support()
     is_trim = is_pro and pref.use_trims
 
-    if self.is_island_mode and not is_trim:
-        if self.mode == 'INDIVIDUAL_OR_MOVE':
+    if not is_trim:
+        if self.mode == 'MOVE_ANGLE_COLLECT':
             if self.direction == 'CENTER':
                 self.layout.label(text='Collect')
                 self.draw_overlap()
@@ -973,7 +978,7 @@ def draw(self, context):
     self.layout.prop(self, 'direction')
 
     if not is_trim:
-        if context.mode == 'EDIT_MESH':
+        if context.mode == 'EDIT_MESH' and self.mode != 'MOVE_ANGLE_COLLECT':
             row = self.layout.row(align=True)
             row.prop(pref, 'align_island_mode', expand=True)
 
@@ -1000,8 +1005,8 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         is_pro = utils.is_pro_version_support()
         is_trim = is_pro and pref.use_trims
 
-        if self.is_island_mode and not is_trim:
-            if self.mode == 'INDIVIDUAL_OR_MOVE':
+        if not is_trim:
+            if self.mode == 'MOVE_ANGLE_COLLECT':
                 if self.direction == 'CENTER':
                     self.layout.label(text='Collect')
                     self.draw_overlap()
@@ -1014,7 +1019,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         self.layout.prop(self, 'direction')
 
         if not is_trim:
-            if context.mode == 'EDIT_MESH':
+            if context.mode == 'EDIT_MESH' and self.mode != 'MOVE_ANGLE_COLLECT':
                 row = self.layout.row(align=True)
                 row.prop(pref, 'align_island_mode', expand=True)
 
@@ -1091,27 +1096,53 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
                 self.move_to_cursor_union_ex(cursor_loc, selected=bool(selected))
 
-            case 'INDIVIDUAL_OR_MOVE':
+            case 'MOVE_ANGLE_COLLECT':
+                # NOTE: Collect and Align by Axis processes errors and updates meshes.
+                # To avoid repeated updates and duplicate reports, the result is returned immediately from the function.
+                if self.direction == 'CENTER':
+                    return self.collect_islands()
+                elif self.direction in ('HORIZONTAL', 'VERTICAL'):
+                    return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL')
+                else:
+                    if self.umeshes.is_edit_mode:
+                        selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+                        self.umeshes = selected if selected else visible
+                        self.move_islands_ex(selected=bool(selected))
+                    else:
+                        move_value = Vector(self.get_move_value(self.direction))
+                        for umesh in self.umeshes:
+                            uv = umesh.uv
+                            for f in umesh.bm.faces:
+                                for crn in f.loops:
+                                    crn[uv].uv += move_value
+                            umesh.update_tag = True
+
+            case 'INDIVIDUAL':
+                selected = []
                 if self.umeshes.is_edit_mode:
                     if self.is_island_mode:
                         selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
                     else:
                         selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
                     self.umeshes = selected if selected else visible
-                else:
-                    selected = []
 
-                if selected and not self.is_island_mode:
+                if selected:
                     self.individual_scale_zero()
                 else:
-                    # NOTE: Collect and Align by Axis processes errors and updates meshes.
-                    # To avoid repeated updates and duplicate reports, the result is returned immediately from the function.
-                    if self.direction == 'CENTER':
-                        return self.collect_islands()
-                    elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                        return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL')
+                    if self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:
+                        self.align_ex(selected=bool(selected))
                     else:
-                        self.move_ex(selected=bool(selected))
+                        move_value = Vector(self.get_move_value(self.direction))
+                        for umesh in self.umeshes:
+                            uv = umesh.uv
+                            if self.umeshes.is_edit_mode:
+                                for crn in utils.calc_visible_uv_corners(umesh):
+                                    crn[uv].uv += move_value
+                            else:
+                                for f in umesh.bm.faces:
+                                    for crn in f.loops:
+                                        crn[uv].uv += move_value
+                            umesh.update_tag = True
             case _:
                 raise NotImplementedError(self.mode)
 
@@ -1318,34 +1349,26 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         self.align_corners(all_groups, general_bbox)
         view_box_sync_block.draw_if_blocked()
 
-    def move_ex(self, selected=True):
+    def move_islands_ex(self, selected=True):
         assert self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}
+
         move_value = Vector(self.get_move_value(self.direction))
+        view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
 
-        if self.is_island_mode:
-            view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
+        for umesh in self.umeshes:
+            view_box_sync_block.skip_from_param(umesh, selected)
+            if umesh.is_edit_bm:
+                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+            else:
+                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+            view_box_sync_block.filter_by_isect_islands(islands)
 
-            for umesh in self.umeshes:
-                view_box_sync_block.skip_from_param(umesh, selected)
-                if umesh.is_edit_bm:
-                    islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
-                else:
-                    islands = Islands.calc_with_hidden_with_mark_seam(umesh)
-                view_box_sync_block.filter_by_isect_islands(islands)
+            umesh.update_tag = bool(islands)
 
-                umesh.update_tag = bool(islands)
+            for isl in islands:
+                isl.move(move_value)
+        view_box_sync_block.draw_if_blocked()
 
-                for island in islands:
-                    island.move(move_value)
-            view_box_sync_block.draw_if_blocked()
-        else:
-            assert self.umeshes.is_edit_mode
-            for umesh in self.umeshes:
-                if corners := utils.calc_visible_uv_corners_iter(umesh):
-                    uv = umesh.uv
-                    for corner in corners:
-                        corner[uv].uv += move_value
-                umesh.update_tag = bool(corners)
 
     def individual_scale_zero(self):
         assert self.umeshes.is_edit_mode
@@ -1486,13 +1509,14 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
 
 align_event_info_ex = \
-    "Default - Align faces/verts\n" \
-    "Shift - Arrows and H/V align vertices or edges individually in Vertex/Edge mode.\n" \
-    "\t\t\tIn Island mode, they move entire islands.\n" \
-    "\t\t\tCenter button collects islands in Island mode.\n" \
-    "\t\t\tH/V buttons - align edges by angle in Island mode.\n" \
-    "Ctrl - Align to cursor\n" \
-    "Ctrl+Shift+Alt - Align to cursor union\n" \
+    "Default - Align verts/islands\n" \
+    "Shift - Move | Align by Angle | Collect verts/islands.\n" \
+    "\t\t\tArrows buttons move verts/islands.\n" \
+    "\t\t\tCenter button collects islands.\n" \
+    "\t\t\tH/V buttons - align edges by angle.\n" \
+    "Ctrl - Align to cursor.\n" \
+    "Alt - Individual align.\n" \
+    "Ctrl+Shift+Alt - Align to cursor union.\n\n" \
     "In Non-Edit Mode, operations proceed as in Island Mode.\n"
 # "Ctrl+Shift+LMB = Collision move (Not Implement)\n"
 
@@ -1503,9 +1527,10 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
 
     mode: EnumProperty(name="Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', ''),
-        ('INDIVIDUAL_OR_MOVE', 'Individual | Move | Angle | Collect', ''),
+        ('MOVE_ANGLE_COLLECT', 'Move | Align by Angle | Collect', ''),
         ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
         ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
+        ('INDIVIDUAL', 'Individual', ''),
         # ('MOVE_COLLISION', 'Collision move', '')
     ))
 
@@ -1522,7 +1547,9 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
             case True, True, True:
                 prefs().align_mode = 'ALIGN_TO_CURSOR_UNION'
             case False, True, False:
-                prefs().align_mode = 'INDIVIDUAL_OR_MOVE'
+                prefs().align_mode = 'MOVE_ANGLE_COLLECT'
+            case False, False, True:
+                prefs().align_mode = 'INDIVIDUAL'
             case _:
                 self.report({'INFO'}, f"Event: {utils.event_to_string(event)} not implement. \n\n"
                             f"See all variations:\n\n{align_event_info_ex}")

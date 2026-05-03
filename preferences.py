@@ -393,11 +393,12 @@ Some operators, can interact with trims:
 
     align_mode: EnumProperty(name="Align Mode", default='ALIGN', items=(
         ('ALIGN', 'Align', 'Align', 'EMPTY_SINGLE_ARROW', 0),
-        ('INDIVIDUAL_OR_MOVE', 'Individual | Move | Angle | Collect', 'Individual Align. Move in Island Mode. '
+        ('MOVE_ANGLE_COLLECT', 'Move | Align by Angle | Collect', 'Move in Island Mode. '
                                                     'Collect in Island mode when press Center. '
-                                                    'HV applies align by edge angle in Island mode', 'PIVOT_INDIVIDUAL', 1),
+                                                    'HV applies align by edge angle in Island mode', 'ARROW_LEFTRIGHT', 1),
         ('ALIGN_TO_CURSOR', 'Align to cursor', 'Align to cursor', 'PIVOT_CURSOR', 2),
-        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', 'Align to cursor union', 'EVENT_U', 3)
+        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', 'Align to cursor union', 'EVENT_U', 3),
+        ('INDIVIDUAL', 'Individual', 'Individual Align', 'PIVOT_INDIVIDUAL', 4)
     ))
 
     align_island_mode: EnumProperty(name="Island Mode", default='FOLLOW', items=(

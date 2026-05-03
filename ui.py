@@ -380,7 +380,7 @@ class UNIV_PT_General(Panel):
                     col = sub_panel.column(align=True)
                     col.operator('uv.univ_align_border_verts', icon_value=icons.align_border_verts)
                     col.separator(factor=0.35)
-                    col.operator('uv.univ_fill_to_pixels')
+                    col.operator('uv.univ_fill_to_pixels', icon='FORCE_TEXTURE')
                     col.operator('uv.univ_random_color')
                     col.operator('uv.univ_linear_gradient')
                     col.separator(factor=0.35)
@@ -1124,7 +1124,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 class IMAGE_MT_PIE_univ_align(Menu):
     bl_label = 'UniV Pie'
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
 
@@ -1141,8 +1141,7 @@ class IMAGE_MT_PIE_univ_align(Menu):
         row = col.row(align=True)
         row.alignment = 'CENTER'
         row.prop(univ_settings(), 'align_island_mode', expand=True, icon_only=True)
-        # TODO: Uncomment this after add keymap for Non-Edit mode in UV Editor
-        # row.active = _context.mode == 'EDIT_MESH'
+        row.active = context.mode == 'EDIT_MESH' and univ_settings().align_mode != 'MOVE_ANGLE_COLLECT'
 
         col.separator(factor=0.2)
         row = col.row(align=True)
