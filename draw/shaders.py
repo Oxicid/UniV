@@ -10,16 +10,26 @@ import gpu
 
 VK_ENABLED = False
 
-UNIFORM_COLOR = None
+# Deprecated: ('2D_FLAT_COLOR', '2D_IMAGE', '2D_SMOOTH_COLOR', '2D_UNIFORM_COLOR', '3D_FLAT_COLOR',
+# '3D_IMAGE', '3D_SMOOTH_COLOR', '3D_UNIFORM_COLOR', '3D_POLYLINE_FLAT_COLOR', '3D_POLYLINE_SMOOTH_COLOR', '3D_POLYLINE_UNIFORM_COLOR')
+
+UNIFORM_COLOR_2D = None
 UNIFORM_COLOR_3D = None
+
+SMOOTH_COLOR_2D = None
+SMOOTH_COLOR_3D = None
+
+POLYLINE_FLAT_COLOR_2D = None
+POLYLINE_FLAT_COLOR_3D = None
+
 
 # The color doesn't go into the shader, so it's hardcoded as a constant that gets updated when the color changes.
 FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT = None
 
-POLYLINE_UNIFORM_COLOR = None  # Edge Shader with width support
-POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
+POLYLINE_UNIFORM_COLOR_2D = None  # Edge Shader with width support
+POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE (used for 3.4 and less version)
 
-POINT_UNIFORM_COLOR = None  # Edge Shader with width support
+POINT_UNIFORM_COLOR_2D = None  # Edge Shader with width support
 POINT_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
 
 set_line_width = lambda width: None
@@ -29,54 +39,84 @@ set_point_size = gpu.state.point_size_set
 blend_set_alpha = lambda : gpu.state.blend_set('ALPHA')
 blend_set_none = lambda : gpu.state.blend_set('NONE')
 
+depth_test_set_less = lambda : gpu.state.depth_test_set('LESS')
+depth_test_set_none = lambda : gpu.state.depth_test_set('NONE')
+
+
+
 class Shaders:
 
     @classmethod
     def init_shaders(cls):
         cls.init_functions()
 
-        global POLYLINE_UNIFORM_COLOR
+        # ----------
+
+        global SMOOTH_COLOR_2D
+        global SMOOTH_COLOR_3D
+
+        if bpy.app.version >= (3, 5, 0):
+            SMOOTH_COLOR_2D = SMOOTH_COLOR_3D = gpu.shader.from_builtin('SMOOTH_COLOR')
+        else:
+            SMOOTH_COLOR_2D = gpu.shader.from_builtin('2D_SMOOTH_COLOR')
+            SMOOTH_COLOR_3D = gpu.shader.from_builtin('3D_SMOOTH_COLOR')
+
+        # ----------
+
+        global POLYLINE_FLAT_COLOR_2D
+        global POLYLINE_FLAT_COLOR_3D
+
+        if bpy.app.version >= (3, 5, 0):
+            POLYLINE_FLAT_COLOR_2D = POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
+        else:
+            POLYLINE_FLAT_COLOR_2D = gpu.shader.from_builtin('2D_FLAT_COLOR')
+            POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin('3D_POLYLINE_FLAT_COLOR')
+
+        # ---------- gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
+
+        global POLYLINE_UNIFORM_COLOR_2D
         if VK_ENABLED:
-            POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+            POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
         else:
             if bpy.app.version >= (3, 5, 0):
-                POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('UNIFORM_COLOR')
+                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('UNIFORM_COLOR')
             else:
-                POLYLINE_UNIFORM_COLOR = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
-
+                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
 
         global POLYLINE_UNIFORM_COLOR_3D
-        POLYLINE_UNIFORM_COLOR_3D = POLYLINE_UNIFORM_COLOR
-        if bpy.app.version < (3, 5, 0):
+        if bpy.app.version >= (3, 5, 0):
+            POLYLINE_UNIFORM_COLOR_3D = POLYLINE_UNIFORM_COLOR_2D
+        else:
             POLYLINE_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
 
+        # ----------
 
-        global POINT_UNIFORM_COLOR
+        global POINT_UNIFORM_COLOR_2D
         if VK_ENABLED:
-            POINT_UNIFORM_COLOR = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+            POINT_UNIFORM_COLOR_2D = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
         else:
-            POINT_UNIFORM_COLOR = gpu.shader.from_builtin(
+            POINT_UNIFORM_COLOR_2D = gpu.shader.from_builtin(
                 '2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
 
-
         global POINT_UNIFORM_COLOR_3D
-        POINT_UNIFORM_COLOR_3D = POINT_UNIFORM_COLOR
-        if bpy.app.version < (3, 5, 0):
+        if bpy.app.version >= (3, 5, 0):
+            POINT_UNIFORM_COLOR_3D = POINT_UNIFORM_COLOR_2D
+        else:
             POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
 
+        # ----------
 
-        global UNIFORM_COLOR
+        global UNIFORM_COLOR_2D
         if bpy.app.version >= (3, 5, 0):
-            UNIFORM_COLOR = gpu.shader.from_builtin('UNIFORM_COLOR')
+            UNIFORM_COLOR_2D = gpu.shader.from_builtin('UNIFORM_COLOR')
         else:
-            UNIFORM_COLOR = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
-
+            UNIFORM_COLOR_2D = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
 
         global UNIFORM_COLOR_3D
-        UNIFORM_COLOR_3D = UNIFORM_COLOR
-        if bpy.app.version < (3, 5, 0):
+        if bpy.app.version >= (3, 5, 0):
+            UNIFORM_COLOR_3D = UNIFORM_COLOR_2D
+        else:
             POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
-
 
     @classmethod
     def init_functions(cls):
@@ -99,6 +139,9 @@ class Shaders:
             global blend_set_alpha
             global blend_set_none
 
+            global depth_test_set_less
+            global depth_test_set_none
+
             if bpy.app.version >= (3, 5, 0):
                 set_line_width = gpu.state.line_width_set
             else:
@@ -106,8 +149,12 @@ class Shaders:
                 set_line_width = bgl.glLineWidth
                 set_point_size = bgl.glPointSize
 
-                blend_set_alpha = lambda: bgl.glEnable(bgl.GL_ALPHA)
+                blend_set_alpha = lambda: bgl.glEnable(bgl.GL_BLEND)
                 blend_set_none = lambda: bgl.glDisable(bgl.GL_BLEND)
+
+                depth_test_set_less = lambda: bgl.glEnable(bgl.GL_DEPTH_TEST); bgl.glEnable(bgl.GL_LINE_SMOOTH)
+                depth_test_set_none = lambda: bgl.glDisable(bgl.GL_LINE_SMOOTH); bgl.glDisable(bgl.GL_DEPTH_TEST)
+
 
         cls.init_flat_shading_uniform_color()
 

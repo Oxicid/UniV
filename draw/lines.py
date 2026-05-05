@@ -31,7 +31,7 @@ class LinesDrawSimple:
         cls.start_time = time()
         cls.color = color
 
-        cls.shader = shaders.POLYLINE_UNIFORM_COLOR
+        cls.shader = shaders.POLYLINE_UNIFORM_COLOR_2D
         cls.batch = batch_for_shader(cls.shader, 'LINES', {"pos": data})
 
         sima = bpy.types.SpaceImageEditor

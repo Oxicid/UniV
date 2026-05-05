@@ -544,6 +544,7 @@ class IconsCreator:
 
     @classmethod
     def draw_image(cls, coords, colors, icon_size_x, icon_size_y, scale_mul=1.0):
+        from .. import draw
         from gpu_extras.batch import batch_for_shader
 
         gpu.state.blend_set('ALPHA')
@@ -552,7 +553,7 @@ class IconsCreator:
             gpu.matrix.load_matrix(mtx)
             gpu.matrix.load_projection_matrix(Matrix.Identity(4))
 
-            shader = gpu.shader.from_builtin('FLAT_COLOR')
+            shader = draw.shaders.POLYLINE_FLAT_COLOR_2D
             batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
             batch.draw(shader)
 
@@ -599,8 +600,9 @@ class IconsCreator:
 
     @classmethod
     def draw_background_colors(cls, coords, colors):
+        from .. import draw
         from gpu_extras.batch import batch_for_shader
-        shader = gpu.shader.from_builtin('FLAT_COLOR')
+        shader = draw.shaders.POLYLINE_FLAT_COLOR_2D
         batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
         batch.draw(shader)
 

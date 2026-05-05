@@ -1042,7 +1042,11 @@ class UNIV_PT_TrimManager(Panel):
 
         col = self.layout.column(align=True)
         col.separator()
-        col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
+        if bpy.app.version <= (4, 0, 0):
+            # TODO: Get exact icon version
+            col.operator('uv.univ_trim_from_mesh')
+        else:
+            col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
         row = col.row(align=True)
         row.operator('scene.univ_trim_preset_load', icon='MOD_MULTIRES')
         row.operator('scene.univ_trim_preset_save', icon='FILE_TICK')
@@ -1369,6 +1373,7 @@ class IMAGE_MT_PIE_univ_transform(Menu):
 
 class IMAGE_MT_PIE_univ_texel(Menu):
     bl_label = 'UniV Pie'
+    bl_ui_units_x = 8
 
     def draw(self, _context):
         layout = self.layout
@@ -1385,7 +1390,8 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         # Bottom
         split = pie.split()
         col = split.column()
-        col.separator(factor=18)
+        col.scale_x = 0.8
+        col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
         row.prop(settings, 'texel_density')
@@ -1434,7 +1440,8 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         # Bottom
         split = pie.split()
         col = split.column()
-        col.separator(factor=18)
+        col.scale_x = 0.8
+        col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
         row.prop(settings, 'texel_density')

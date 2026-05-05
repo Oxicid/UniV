@@ -314,14 +314,14 @@ Some operators, can interact with trims:
     overlay_3d_enable: BoolProperty(name='Overlay 3D', default=True, update=_update_drawer_3d_enable)
 
     # Colors 2D
-    overlay_2d_uv_edge_h_constraints_color: FloatVectorProperty(name="H-Constr", default=(0.85, 1.0, 0.0, 0.25),
+    overlay_2d_uv_edge_h_constraints_color: FloatVectorProperty(name="H-Constr", default=(0.85, 1.0, 0.0, 0.15),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
     overlay_2d_uv_edge_v_constraints_color: FloatVectorProperty(name="V-Constr", default=(0.1, 0.1, 0.8, 0.35),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
 
-    overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.1, 0.1, 0.5),
+    overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.0, 0.0, 0.25),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
 

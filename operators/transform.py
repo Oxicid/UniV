@@ -817,6 +817,10 @@ class Collect(utils.OverlapHelper):
             view_box_sync_block.draw_if_blocked()
             self.report({'WARNING'}, 'Islands not found')  # noqa
             return {'FINISHED'}
+        elif len(all_islands) == 1:
+            self.report({'WARNING'}, 'Expect two and more islands, given one.')  # noqa
+            return {'FINISHED'}
+
 
         if self.lock_overlap:
             threshold = self.threshold if self.lock_overlap_mode == 'EXACT' else None

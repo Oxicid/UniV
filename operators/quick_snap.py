@@ -341,7 +341,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             return {'CANCELLED'}
         self.view = context.region.view2d
         self.sync = utils.sync()
-        self.shader = shaders.POINT_UNIFORM_COLOR
+        self.shader = shaders.POINT_UNIFORM_COLOR_3D
 
         self.refresh_draw_points()
         self.register_draw()
@@ -760,6 +760,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.shader.uniform_float("color", (1, 1, 0, 0.5))
         self.batch.draw(self.shader)
 
+        self.nearest_point[0] = self.nearest_point[0].to_3d()
         batch_nearest = batch_for_shader(self.shader, 'POINTS', {"pos": self.nearest_point})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)

@@ -136,7 +136,7 @@ class DrawerNonSyncSelectProcessing:
 
 class DrawCallSeams2D:
     def __init__(self, batch: gpu.types.GPUBatch):
-        self.shader = shaders.POLYLINE_UNIFORM_COLOR
+        self.shader = shaders.POLYLINE_UNIFORM_COLOR_2D
         self.color = prefs().overlay_2d_uv_edge_seam_color
         self.batch = batch
         # To avoid iterating over all mesh elements again,
@@ -145,17 +145,19 @@ class DrawCallSeams2D:
         # self.batch_extend = None
 
     def __call__(self):
-        shaders.set_line_width(2)
         shaders.blend_set_alpha()
+        shaders.depth_test_set_less()
+        shaders.set_line_width(4)
 
         self.shader.bind()
         self.shader.uniform_float("color", self.color)
-        shaders.set_line_width_vk(self.shader)
+        shaders.set_line_width_vk(self.shader, 4.0)
         self.batch.draw(self.shader)
         # if self.batch_extend:
         #     self.batch_extend.draw(self.shader)
 
         shaders.set_line_width(1)
+        shaders.depth_test_set_none()
         shaders.blend_set_none()
 
     @classmethod
@@ -165,7 +167,7 @@ class DrawCallSeams2D:
         else:
             data = mesh_extract.extract_seams_umesh(umesh)
         if len(data):
-            return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": data}))
+            return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": data}))
         return None
 
     @staticmethod
@@ -183,7 +185,7 @@ class DrawCallSeams2D:
 
 class DrawCallConstraints2D:
     def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None):
-        self.shader = shaders.POLYLINE_UNIFORM_COLOR
+        self.shader = shaders.POLYLINE_UNIFORM_COLOR_2D
         self.color_h = prefs().overlay_2d_uv_edge_h_constraints_color
         self.color_v = prefs().overlay_2d_uv_edge_v_constraints_color
 
@@ -192,10 +194,11 @@ class DrawCallConstraints2D:
 
     def __call__(self):
         shaders.blend_set_alpha()
-        shaders.set_line_width(3)
+        shaders.depth_test_set_less()
+        shaders.set_line_width(2)
 
         self.shader.bind()
-        shaders.set_line_width_vk(self.shader, 3)
+        shaders.set_line_width_vk(self.shader, 2)
 
         if self.batch_h:
             self.shader.uniform_float("color", self.color_h)
@@ -206,6 +209,7 @@ class DrawCallConstraints2D:
             self.batch_v.draw(self.shader)
 
         shaders.set_line_width(1)
+        shaders.depth_test_set_none()
         shaders.blend_set_none()
 
     @classmethod
@@ -225,9 +229,9 @@ class DrawCallConstraints2D:
         v_batch = None
 
         if len(h_coords):
-            h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": h_coords})
+            h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": h_coords})
         if len(v_coords):
-            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR, 'LINES', {"pos": v_coords})
+            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": v_coords})
 
         return cls(h_batch, v_batch)
 
@@ -379,8 +383,7 @@ class TrimDrawer:
 
     @staticmethod
     def get_shader():
-        # TODO: Standardize
-        return gpu.shader.from_builtin('SMOOTH_COLOR'), gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
+        return shaders.SMOOTH_COLOR_2D, shaders.POLYLINE_FLAT_COLOR_2D
 
     @staticmethod
     def is_enable():
@@ -393,19 +396,19 @@ class TrimDrawer:
     @staticmethod
     def univ_drawer_2d_callback():
         if bpy.context.area.ui_type == 'UV':
-            # shaders.set_line_width(line_width)
+            line_width = prefs().trim_line_width
+
             shaders.blend_set_alpha()
+            shaders.set_line_width(line_width)
+
             TrimDrawer.line_shader.bind()
 
-            # shaders.set_line_width_vk(TrimDrawer.shader, line_width)
-            try:
-                TrimDrawer.line_shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
-                TrimDrawer.line_shader.uniform_float("lineWidth", prefs().trim_line_width)
-            except: pass  # noqa
+            shaders.set_line_width_vk(TrimDrawer.line_shader, line_width)
+
             TrimDrawer.batch_lines.draw(TrimDrawer.line_shader)
             TrimDrawer.batch_tris.draw(TrimDrawer.tris_shader)
 
-            # shaders.set_line_width(1)
+            shaders.set_line_width(1)
             shaders.blend_set_none()
 
     @classmethod

@@ -1439,10 +1439,10 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
             return {'CANCELLED'}
 
         from gpu_extras.batch import batch_for_shader
-        batch = batch_for_shader(shaders.UNIFORM_COLOR, 'TRIS', {"pos": coords})
+        batch = batch_for_shader(shaders.UNIFORM_COLOR_2D, 'TRIS', {"pos": coords})
         umeshes.free()
 
-        self.draw_coverage(tiles, shaders.UNIFORM_COLOR, batch)
+        self.draw_coverage(tiles, shaders.UNIFORM_COLOR_2D, batch)
 
         return {'FINISHED'}
 

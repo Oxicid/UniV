@@ -132,7 +132,7 @@ def set_select_mode_uv(mode: T_uv_select_modes):
 
 
 def blf_size(font_id, font_size):
-    if bpy.app.version > (3, 3):
+    if bpy.app.version >= (3, 4):
         blf.size(font_id, font_size)
     else:
         blf.size(font_id, font_size, 72)
