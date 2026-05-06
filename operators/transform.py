@@ -3054,17 +3054,16 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
     between: BoolProperty(name='Shaffle', default=False)
     bound_between: EnumProperty(name='Bound Shaffle', default='OFF', items=(
         ('OFF', 'Off', ''), ('CROP', 'Crop', ''), ('CLAMP', 'Clamp', '')))
-    round_mode: EnumProperty(name='Round Mode', default='OFF', items=(
-        ('OFF', 'Off', ''), ('INT', 'Int', ''), ('STEPS', 'Steps', '')))
-    steps: FloatVectorProperty(name='Steps', description="Incorrectly works with Within Image Bounds",
-                               default=(0, 0), min=0, max=10, soft_min=0, soft_max=1, size=2, subtype='XYZ')
+    steps: IntVectorProperty(name='Steps', default=(0, 0), min=0, max=1024, soft_max=10, size=2, subtype='XYZ',
+                             description='Rounds the movement step: Rounded Movement = 1 / Steps')
+
     strength: FloatVectorProperty(name='Strength', default=(1, 1), min=-10, max=10,
                                   soft_min=0, soft_max=1, size=2, subtype='XYZ')
     flip_strength: FloatVectorProperty(name='Flip', default=(0, 0), min=0, max=1, size=2, subtype='XYZ')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
     rotation: FloatProperty(name='Rotation Range', default=0, min=0, soft_max=math.pi * 2, subtype='ANGLE',
                             update=lambda self_, _: setattr(self_, 'rotation_steps', self_.rotation) if self_.rotation < self_.rotation_steps else None)
-    rotation_steps: FloatProperty(name='Rotation Steps', default=0, min=0, max=math.pi, subtype='ANGLE',
+    rotation_steps: FloatProperty(name='Rotation Steps', default=0, min=0, max=math.pi, soft_max=math.pi/2, subtype='ANGLE',
                                   update=lambda self_, _: setattr(self_, 'rotation', self_.rotation_steps) if self_.rotation < self_.rotation_steps else None)
     scale_factor: FloatProperty(name="Scale Factor", default=0, min=0, soft_max=1, subtype='FACTOR')
     min_scale: FloatProperty(name='Min Scale', default=0.5, min=0, max=10, soft_min=0.1, soft_max=2,
@@ -3080,32 +3079,36 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
         layout.prop(self, 'rand_seed')
 
         if not self.between:
-            layout.prop(self, 'round_mode', slider=True)
-            if self.round_mode == 'STEPS':
-                layout.prop(self, 'steps', slider=True)
             layout.prop(self, 'strength', slider=True)
         layout.prop(self, 'flip_strength', slider=True)
 
+        if not self.between:
+            layout.prop(self, 'steps', slider=True)
+
         if self.bound_between != 'CROP':
+            layout.label(text='Scale:')
             layout.prop(self, 'scale_factor', slider=True)
             if self.scale_factor != 0:
                 layout.prop(self, 'min_scale', slider=True)
                 layout.prop(self, 'max_scale', slider=True)
 
+        layout.label(text='Rotation:')
         layout.prop(self, 'rotation', slider=True)
         if self.rotation != 0:
             layout.prop(self, 'rotation_steps', slider=True)
-            layout.prop(self, 'use_correct_aspect', toggle=1)  # TODO: Implement for crop and clamp
+            layout.separator()
+            layout.prop(self, 'use_correct_aspect')  # TODO: Implement for crop and clamp
+        else:
+            layout.separator()
 
         if not self.between:
             layout.prop(self, 'bool_bounds')
 
-        layout = self.layout.row()
         if self.between:
-            layout.prop(self, 'bound_between', expand=True)
-        layout = self.layout.row()
-        self.draw_overlap()
-        layout.prop(self, 'between', toggle=1)
+            self.layout.row().prop(self, 'bound_between', expand=True)
+        layout.prop(self, 'between')
+
+        self.draw_overlap(False)
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -3247,14 +3250,10 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
 
             randmove = Vector((rand_move_x, rand_move_y)) * move
 
-            if self.round_mode == 'INT':
-                randmove = Vector([round(i) for i in randmove])
-            elif self.round_mode == 'STEPS':
-                # TODO bool_bounds for steps
-                if self.steps.x > 1e-05:
-                    randmove.x = utils.round_threshold(randmove.x, self.steps.x)
-                if self.steps.y > 1e-05:
-                    randmove.y = utils.round_threshold(randmove.y, self.steps.y)
+            if self.steps[0]:
+                randmove.x = utils.round_threshold(randmove.x, 1 / self.steps[0])
+            if self.steps[1]:
+                randmove.y = utils.round_threshold(randmove.y, 1 / self.steps[1])
 
             if not self.bool_bounds:
                 island.move(randmove)
@@ -3320,10 +3319,7 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
             if self.bound_between == 'OFF':
                 continue
 
-            if self.lock_overlap:
-                bb = island.calc_bbox(force=True)
-            else:
-                bb = island.calc_bbox()
+            bb = island.calc_bbox()
 
             if protege.min_length < 2e-07 or bb.min_length < 2e-07:
                 self.non_valid_counter += 1
