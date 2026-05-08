@@ -122,15 +122,13 @@ class FastAPI:
         #     const int uv_offset,
         #     const int constr_offset,
         #     const bool sync,
-        #     float *r_varray,
-        #     float *r_harray,
+        #     float *arr,
         #     int *r_tot_v,
         #     int *r_tot_h)
         lib.UniV_extract_data_constraints2d.argtypes = (POINTER(btypes.CBMesh),
                                                         c_int,
                                                         c_int,
                                                         c_bool,
-                                                        POINTER(c_float),
                                                         POINTER(c_float),
                                                         POINTER(c_int),
                                                         POINTER(c_int)
@@ -162,8 +160,7 @@ class ExtractData:
         constr_offset = ExtractData.get_constr_offset(umesh, attr)
 
         max_data_shape = (c_bm.contents.totloop*2, 2)
-        varray = np.empty(max_data_shape, np.float32)
-        harray = np.empty(max_data_shape, np.float32)
+        arr = np.empty(max_data_shape, np.float32)
 
         tot_v_coords = c_int()
         tot_h_coords = c_int()
@@ -173,12 +170,11 @@ class ExtractData:
             uv_offset,
             constr_offset,
             umesh.sync,
-            varray.ctypes.data_as(POINTER(c_float)),
-            harray.ctypes.data_as(POINTER(c_float)),
+            arr.ctypes.data_as(POINTER(c_float)),
             byref(tot_v_coords),
             byref(tot_h_coords)
         )
-        return varray[:tot_v_coords.value], harray[:tot_h_coords.value]
+        return arr[:tot_v_coords.value], arr[-tot_h_coords.value:] if tot_h_coords else []
 
     @staticmethod
     def extract_seams_data(umesh: 'utypes.UMesh'):
@@ -392,8 +388,7 @@ class TestExtractData(unittest.TestCase):
         self.assertEqual(len(harray), 8)
 
         expect_varray = [[-1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]
-        expect_harray = [[0,1],[0,0], [0,0],[0,1], [1,0],[2,0], [0,0],[1,0]]
-
+        expect_harray = [[0,0],[1,0], [1,0],[2,0], [0,0],[0,1], [0,1],[0,0]]
 
         self.assertEqual(varray.tolist(), expect_varray)
         self.assertEqual(harray.tolist(), expect_harray)

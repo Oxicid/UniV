@@ -58,19 +58,15 @@ static inline bool BMesh_is_full_face_deselected(BMesh *bm){
 }
 
 
-static inline void write_uv_line(float **ptr, BMLoop *l, const int offsets)
+static inline void write_uv_line(float *arr, BMLoop *l, const int offsets)
 {
-  float *dst = *ptr;
-
   float *uv = BM_ELEM_CD_GET_FLOAT_P(l, offsets);
-  dst[0] = uv[0];
-  dst[1] = uv[1];
+  arr[0] = uv[0];
+  arr[1] = uv[1];
 
   uv = BM_ELEM_CD_GET_FLOAT_P(l->next, offsets);
-  dst[2] = uv[0];
-  dst[3] = uv[1];
-
-  *ptr += 4;
+  arr[2] = uv[0];
+  arr[3] = uv[1];
 }
 
 
@@ -86,18 +82,15 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
     const int uv_offset,
     const int constr_offset,
     const bool sync,
-    float *r_varray,
-    float *r_harray,
+    float *r_array,
     int *r_tot_v,
     int *r_tot_h)
 {
     int total_vlines = 0;
     int total_hlines = 0;
 
-    float *vptr = r_varray;
-    float *hptr = r_harray;
-
-    const CustomData *data = &bm->edata;
+    float *vptr = r_array;
+    float *hptr = r_array + (bm->totloop * 4);
 
     if (uv_offset == -1) {
       std::cout << "UniV: FastAPI: UniV_extract_data_constraints2d: Can't get uv layer index\n";
@@ -144,11 +137,13 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
             int bits = edge_idx & 3;
 
             if (bits == VERTICAL_CONSTR) {
-              write_uv_line(&vptr, l, uv_offset);
+                write_uv_line(vptr, l, uv_offset);
+                vptr += 4;
                 total_vlines++;
             }
             else if (bits == HORIZONTAL_CONSTR) {
-              write_uv_line(&hptr, l, uv_offset);
+                hptr -= 4;
+                write_uv_line(hptr, l, uv_offset);
                 total_hlines++;
             }
 
@@ -206,7 +201,8 @@ DLL_EXPORT int UniV_extract_data_seams2d(
 					continue;
 					}
 
-				write_uv_line(&arrptr, l, uv_offset);
+				write_uv_line(arrptr, l, uv_offset);
+                arrptr += 4;
 				total_lines++;
 			}
 		}
