@@ -575,9 +575,11 @@ def select_edge_processing(umesh, to_deselect, to_select):
         set_edge_select = edge_select_linked_set_func(umesh)
         for crn in to_deselect:
             set_edge_select(crn, False)
+        if to_deselect:
+            umesh.bm.select_flush(False)
+
         for crn in to_select:
             set_edge_select(crn, True)
-        umesh.bm.select_flush(True)
 
 if USE_GENERIC_UV_SYNC:
     def has_any_vert_select_func(umesh: 'utypes.UMesh'):
