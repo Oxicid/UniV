@@ -1486,10 +1486,10 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
             tiles_with_value.sort(key=lambda tup: tup[0][1], reverse=True)
             tiles_with_value.sort(key=lambda tup: tup[0][0], reverse=True)
             text = []
-            for t, v in tiles_with_value:
-                first = f"{t[0]}, {t[1]}"
+            for tile_number, coverage in tiles_with_value:
+                first = f"{tile_number[0]}, {tile_number[1]}"
                 first += (6 - len(first)) * '  '
-                text.append(f"{first} = {v: .5f}")
+                text.append(f"{first} = {coverage: .5f}")
 
             from .. import draw
             if not self.bl_idname.startswith('UV'):

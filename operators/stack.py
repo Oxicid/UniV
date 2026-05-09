@@ -350,10 +350,28 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
-        self.layout.prop(self, 'between_selected', toggle=1)
+        self.layout.prop(self, 'between_selected', toggle=True)
 
-    # def invoke(self, context, event):
-    #     return self.execute(context)
+    def invoke(self, context, event):
+        if not self.between_selected:
+            operators = context.window_manager.operators
+            if operators and operators[-1].bl_idname.endswith('_OT_univ_select_similar'):
+                self.between_selected = True
+
+                from .. import draw
+                if not self.bl_idname.startswith('UV'):
+                    draw.TextDraw.target_area = 'VIEW_3D'
+
+                draw.TextDraw.draw(["Auto-switch to 'Between Selected'", "after 'Select Similar'.", "", "", "", "", ""])
+                draw.TextDraw.max_draw_time = 4
+                bpy.context.area.tag_redraw()
+
+
+        # if event.value == 'PRESS':
+        #     return self.execute(context)
+        #
+
+        return self.execute(context)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
