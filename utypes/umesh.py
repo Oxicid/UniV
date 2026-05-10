@@ -1042,6 +1042,25 @@ class UMeshes:
             if not umesh.has_visible_uv_faces():
                 self.umeshes.remove(umesh)
 
+    def filtered_by_selected_and_visible_3d_edges(self) -> tuple['UMeshes', 'UMeshes']:
+        selected = []
+        visible = []
+        for umesh in self:
+            if umesh.total_edge_sel:
+                selected.append(umesh)
+            else:
+                visible.append(umesh)
+        if not selected:
+            for umesh2 in reversed(visible):
+                if not any(not e.hide for e in umesh2.bm.edges):
+                    visible.remove(umesh2)
+
+        u1 = copy.copy(self)
+        u2 = copy.copy(self)
+        u1.umeshes = selected
+        u2.umeshes = visible
+        return u1, u2
+
     def filtered_by_selected_and_visible_uv_verts(self) -> tuple['UMeshes', 'UMeshes']:
         """NOTE: Do not use this in edge mode (and face ???), as there may be cases where 'flush_select' is not called,
         resulting in invisible selected vertices even when all edges are deselected. """

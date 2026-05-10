@@ -220,6 +220,8 @@ def load_register_types():
             misc.UNIV_OT_RandomColor,
             misc.UNIV_OT_LinearGradient,
             misc.UNIV_OT_Pin,
+            misc.UNIV_OT_Mark_VIEW2D,
+            misc.UNIV_OT_Mark_VIEW3D,
             misc.UNIV_OT_Hide,
             misc.UNIV_OT_Focus,
             misc.UNIV_OT_SetCursor2D,

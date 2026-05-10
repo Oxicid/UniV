@@ -271,6 +271,10 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
+    invert_toggle_logic: BoolProperty(name='Invert Toggle Logic', default=False,
+        description="When the selected elements contain both marked/unmarked or pinned/unpinned elements, "
+                    "enabling this option will set the boolean value to False.")
+
     # Checker Texture
     checker_toggle: EnumProperty(name='Toggle', default='TOGGLE', items=ENUM('TOGGLE', 'OVERWRITE'),
                                            description='Off/On checker modifier')

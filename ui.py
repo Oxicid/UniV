@@ -352,7 +352,9 @@ class UNIV_PT_General(Panel):
                 row.operator('uv.univ_constraint_by_angle', text='', icon='EVENT_A').vertical = True
                 row.operator('uv.univ_constraint', text='V-Constr', icon_value=icons.vertical_b).vertical = True
 
-            col_align.operator('uv.univ_pin', icon_value=icons.pin)
+            row = col_align.row(align=True)
+            row.operator('uv.univ_mark')
+            row.operator('uv.univ_pin', icon_value=icons.pin)
 
 
         # Other
@@ -498,7 +500,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_cut', icon_value=icons.cut)
             row.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
 
-            col_align.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_mark')
+            row.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
 
         if panel := draw_panel(layout, 'Project'):

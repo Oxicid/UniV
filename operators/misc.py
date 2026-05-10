@@ -96,6 +96,145 @@ class UNIV_OT_Pin(Operator):
         return res
 
 
+
+class UNIV_OT_Mark_VIEW2D(Operator):
+    bl_idname = 'uv.univ_mark'
+    bl_label = 'Mark'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Set/Clear mark seam"
+
+    def draw(self, context):
+        self.layout.prop(prefs(), 'invert_toggle_logic')
+
+    def execute(self, context):
+        umeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
+
+        if context.mode == 'EDIT_MESH':
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
+            umeshes = selected if selected else visible
+
+            for umesh in umeshes:
+                if selected:
+                    umesh.sequence = utils.calc_selected_uv_edge(umesh)
+                else:
+                    umesh.sequence = utils.calc_visible_uv_corners(umesh)
+        else:
+            for umesh in umeshes:
+                umesh.sequence = [crn for f in umesh.bm.faces for crn in f.loops]
+                umesh.update_tag = bool(umesh.sequence)
+
+
+        if not prefs().invert_toggle_logic:
+            all_marked = all(all(crn.edge.seam for crn in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_marked:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = False
+                else:
+                    # Extend mark seam.
+                    if all(crn.edge.seam for crn in umesh.sequence):  # Skip full marked.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = True
+        else:
+            all_unmarked = all(all(not crn.edge.seam for crn in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_unmarked:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = True
+                else:
+                    # Unset mark seam.
+                    if all(not crn.edge.seam for crn in umesh.sequence):  # Skip full unmarked.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = False
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+
+        return res
+
+
+class UNIV_OT_Mark_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_mark'
+    bl_label = 'Mark'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Set/Clear mark seam"
+
+    def draw(self, context):
+        self.layout.prop(prefs(), 'invert_toggle_logic')
+
+    def execute(self, context):
+        umeshes = UMeshes.calc_all_objects(verify_uv=False)
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
+        umeshes.update_tag = False
+
+
+        if context.mode == 'EDIT_MESH':
+            selected, visible = umeshes.filtered_by_selected_and_visible_3d_edges()
+            umeshes = selected if selected else visible
+
+            for umesh in umeshes:
+                if selected:
+                    umesh.sequence = [e for e in umesh.bm.edges if e.select]
+                else:
+                    umesh.sequence = [e for e in umesh.bm.edges if not e.hide]
+        else:
+            for umesh in umeshes:
+                umesh.sequence = umesh.bm.edges
+                umesh.update_tag = bool(umesh.sequence)
+
+
+        if not prefs().invert_toggle_logic:
+            all_marked = all(all(e.seam for e in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_marked:
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = False
+                else:
+                    # Extend mark seam.
+                    if all(e.seam for e in umesh.sequence):  # Skip full marked.
+                        continue
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = True
+        else:
+            all_unmarked = all(all(not e.seam for e in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_unmarked:
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = True
+                else:
+                    # Unset mark seam.
+                    if all(not e.seam for e in umesh.sequence):  # Skip full unmarked.
+                        continue
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = False
+
+        if not umeshes.update_tag:
+            self.report({'WARNING'}, "Edges not found.")
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+
+        return res
+
+
 # noinspection PyTypeHints
 class UNIV_OT_RandomColor(Operator):
     bl_idname = 'uv.univ_random_color'
