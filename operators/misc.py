@@ -26,26 +26,22 @@ class UNIV_OT_Pin(Operator):
     bl_idname = 'uv.univ_pin'
     bl_label = 'Pin'
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = f"Set/clear selected UV vertices as anchored between multiple unwrap operations\n" \
-        f"With sync mode disabled, Edge mode switches to Vertex since the pins are not visible in edge mode\n\n" \
+    bl_description = f"Set/Clear selected UV vertices as anchored between multiple unwrap operations\n\n" \
         f"This button is used to free the 'P' button for the Pack operator"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
-
+    def draw(self, context):
+        self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
         from .transform import UNIV_OT_Align_pie
-        self.umeshes = UMeshes(report=self.report)
-        self.umeshes.update_tag = False
+        umeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
 
         if context.mode == 'EDIT_MESH':
-            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
-            self.umeshes = selected if selected else visible
-
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
+            umeshes = selected if selected else visible
             if selected:
-                for umesh in self.umeshes:
+                for umesh in umeshes:
                     if umesh.elem_mode == 'VERT':
                         umesh.sequence = utils.calc_selected_uv_vert(umesh)
                     elif umesh.elem_mode == 'EDGE':
@@ -54,44 +50,59 @@ class UNIV_OT_Pin(Operator):
                     else:
                         corners = (crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
                         umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_vert(umesh, corners)
-
-                    umesh.update_tag = bool(umesh.sequence)
             else:
-                for umesh in self.umeshes:
+                for umesh in umeshes:
                     umesh.sequence = utils.calc_visible_uv_corners(umesh)
-                    umesh.update_tag = bool(umesh.sequence)
         else:
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 umesh.sequence = [crn for f in umesh.bm.faces for crn in f.loops]
-                umesh.update_tag = bool(umesh.sequence)
-
-        all_pinned = True
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            corners = umesh.sequence
-            if not all(crn[uv].pin_uv for crn in corners):
-                all_pinned = False
-                break
 
 
-        for umesh in self.umeshes:
-            uv = umesh.uv
-            corners = umesh.sequence
+        if not prefs().invert_toggle_logic:
+            all_pinned = True
+            for umesh in umeshes:
+                uv = umesh.uv
+                if not all(crn[uv].pin_uv for crn in umesh.sequence):
+                    all_pinned = False
+                    break
 
-            if all_pinned:
-                if any(crn[uv].pin_uv for crn in corners):
+            for umesh in umeshes:
+                uv = umesh.uv
+                if all_pinned:
                     umesh.update_tag = True
-                    for crn in corners:
+                    for crn in umesh.sequence:
                         crn[uv].pin_uv = False
-            else:
-                if not all(crn[uv].pin_uv for crn in corners):
+                else:
+                    if all(crn[uv].pin_uv for crn in umesh.sequence):  # Skip full pinned.
+                        continue
                     umesh.update_tag = True
-                    for crn in corners:
+                    for crn in umesh.sequence:
                         crn[uv].pin_uv = True
+        else:
+            all_unpinned = True
+            for umesh in umeshes:
+                uv = umesh.uv
+                if any(crn[uv].pin_uv for crn in umesh.sequence):
+                    all_unpinned = False
+                    break
 
-        res = self.umeshes.update()
-        if not self.umeshes.is_edit_mode:
-            self.umeshes.free()
+            for umesh in umeshes:
+                uv = umesh.uv
+                if all_unpinned:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = True
+                else:
+                    if all(not crn[uv].pin_uv for crn in umesh.sequence):  # Skip full unpinned.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = False
+
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
 
         return res
 
@@ -113,7 +124,6 @@ class UNIV_OT_Mark_VIEW2D(Operator):
         if context.mode == 'EDIT_MESH':
             selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
             umeshes = selected if selected else visible
-
             for umesh in umeshes:
                 if selected:
                     umesh.sequence = utils.calc_selected_uv_edge(umesh)
@@ -156,6 +166,7 @@ class UNIV_OT_Mark_VIEW2D(Operator):
                     for crn in umesh.sequence:
                         crn.edge.seam = False
 
+
         res = umeshes.update()
         if not umeshes.is_edit_mode:
             umeshes.free()
@@ -182,7 +193,6 @@ class UNIV_OT_Mark_VIEW3D(Operator):
         if context.mode == 'EDIT_MESH':
             selected, visible = umeshes.filtered_by_selected_and_visible_3d_edges()
             umeshes = selected if selected else visible
-
             for umesh in umeshes:
                 if selected:
                     umesh.sequence = [e for e in umesh.bm.edges if e.select]
@@ -224,6 +234,7 @@ class UNIV_OT_Mark_VIEW3D(Operator):
                     umesh.update_tag = True
                     for e in umesh.sequence:
                         e.seam = False
+
 
         if not umeshes.update_tag:
             self.report({'WARNING'}, "Edges not found.")
