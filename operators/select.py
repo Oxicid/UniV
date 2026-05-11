@@ -49,7 +49,12 @@ class UNIV_OT_SelectLinked(Operator):
         umeshes.fix_context()
         umeshes.update_tag = False
 
-        select_state = not self.deselect
+        for umesh in umeshes:
+            umesh.sequence = Islands.calc_partial_selected_by_context(umesh)
+        if not any(u.sequence for u in umeshes):
+            self.report({'INFO'}, "Not found partial selected islands.")
+            return {'CANCELLED'}
+
         need_sync_validation_check = False
         if umeshes.sync:
             if utils.USE_GENERIC_UV_SYNC:
@@ -58,18 +63,18 @@ class UNIV_OT_SelectLinked(Operator):
                 umeshes.elem_mode = 'FACE'
 
         for umesh in umeshes:
-            if islands := Islands.calc_partial_selected_by_context(umesh):
+            if islands := umesh.sequence:
                 if need_sync_validation_check:
                     umesh.sync_from_mesh_if_needed()
 
                 for isl in islands:
-                    isl.select = select_state
+                    isl.select = not self.deselect
 
                 if need_sync_validation_check and self.deselect:
                     umesh.bm.uv_select_sync_to_mesh()
                 umesh.update_tag = True
 
-        sel_opname = 'select' if select_state else 'deselect'
+        sel_opname = 'deselect' if self.deselect else 'select'
         umeshes.update(info=f'No found islands for {sel_opname}')
         return {'FINISHED'}
 
