@@ -657,17 +657,21 @@ class TexturePatterns:
 
         bound_line.draw_vline(0, thickness=thickness)
         bound_line.draw_hline(0, thickness=thickness)
+        TexturePatterns.draw_pluses(bound_line, step=max_size, size=64*thickness//2, thickness=thickness*2, center=False)
 
         medium_lines = UMask(*size)
         cls.draw_lines(medium_lines, step=256, exclude_first=True)
+
+        if max_size >= 1024:
+            TexturePatterns.draw_pluses(medium_lines, step=512, size=32*thickness//4, thickness=thickness*2, center=False)
 
         small_lines = UMask(*size)
         if draw_small_lines:
             cls.draw_lines(small_lines, step=32, exclude_first=True)
 
+
         if max_size >= 2048:
             cls.draw_lines(bound_line, step=1024, thickness=3, exclude_first=True)
-
         if max_size >= 4096*2:
             cls.draw_lines(bound_line, step=4096, thickness=5, exclude_first=True)
 
