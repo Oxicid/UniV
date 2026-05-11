@@ -409,39 +409,52 @@ class UNIV_OT_TogglePivot(Operator):
 
         draw_time = 1.8
         draw.TextDraw.max_draw_time = draw_time
-        readable_text = {'INDIVIDUAL_ORIGINS': 'Individual',
-                         'CENTER': 'Boundary Box',
-                         'MEDIAN': 'Median',
-                         'CURSOR': 'Cursor'}
 
-        if (curr_time - PREV_PIVOT_TIME) <= draw_time:
-            if PREV_PIVOT == 'CENTER' and curr_pivot == 'INDIVIDUAL_ORIGINS':
-                context.space_data.pivot_point = 'CURSOR'
-            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == 'CENTER':
-                context.space_data.pivot_point = 'CURSOR'
-            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == 'MEDIAN':
-                context.space_data.pivot_point = 'CURSOR'
-            elif PREV_PIVOT == 'CENTER' and curr_pivot == 'MEDIAN':
-                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
-            elif PREV_PIVOT == 'MEDIAN' and curr_pivot == 'CENTER':
-                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
-            else:
-                if curr_pivot == 'CENTER':
-                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
-                else:
-                    context.space_data.pivot_point = 'CENTER'
-
-            draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}', 24)
-
+        if bpy.app.version >= (5, 1, 0):
+            MEDIAN_POINT = 'MEDIAN_POINT'
+            BBOX = 'BOUNDING_BOX_CENTER'
         else:
+            MEDIAN_POINT = 'MEDIAN'
+            BBOX = 'CENTER'
+
+        readable_text = {'INDIVIDUAL_ORIGINS': 'Individual',
+                         'CURSOR': 'Cursor',
+                         BBOX: 'Boundary Box',
+                         MEDIAN_POINT: 'Median'
+                         }
+
+        if (curr_time - PREV_PIVOT_TIME) > draw_time:
             if PREV_PIVOT == '' or PREV_PIVOT == curr_pivot:
-                if curr_pivot == 'CENTER':
+                if curr_pivot == BBOX:
                     context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
                 else:
-                    context.space_data.pivot_point = 'CENTER'
+                    context.space_data.pivot_point = BBOX
             else:
                 draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}', 24)
                 context.space_data.pivot_point = PREV_PIVOT
+
+        else:
+            # Get third pivot.
+            if PREV_PIVOT == BBOX and curr_pivot == 'INDIVIDUAL_ORIGINS':
+                context.space_data.pivot_point = 'CURSOR'
+            elif PREV_PIVOT == BBOX and curr_pivot == MEDIAN_POINT:
+                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+
+            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == BBOX:
+                context.space_data.pivot_point = 'CURSOR'
+            elif PREV_PIVOT == 'INDIVIDUAL_ORIGINS' and curr_pivot == MEDIAN_POINT:
+                context.space_data.pivot_point = 'CURSOR'
+
+            elif PREV_PIVOT == MEDIAN_POINT and curr_pivot == BBOX:
+                context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+            else:
+                if curr_pivot == BBOX:
+                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+                else:
+                    context.space_data.pivot_point = BBOX
+
+
+            draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}', 24)
 
         PREV_PIVOT = curr_pivot
         PREV_PIVOT_TIME = curr_time

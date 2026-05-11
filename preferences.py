@@ -810,7 +810,7 @@ Some operators, can interact with trims:
             layout.label(text="More Checker Textures like: Gravity, Atlux, Simple.", icon_value=icons.checker)
             layout.label(text="Real-time seam display.", icon_value=icons.cut)
             layout.label(text="Real-time display of selected geometry in non-sync mode.", icon_value=icons.arrow)
-            layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gone too.",
+            layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gon too.",
                          icon_value=icons.rectify)
             layout.separator(factor=0.35)
             layout.label(text="Transfer - interactively transfers a UV layer from one object to another.",
@@ -818,7 +818,7 @@ Some operators, can interact with trims:
             layout.separator(factor=0.35)
             layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
             layout.separator(factor=0.35)
-            layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gone too.",
+            layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gon too.",
                          icon_value=icons.loop_select)
             layout.separator(factor=0.35)
             layout.label(text="Drag [Alt + Drag LMB] - this operator is similar to the QuickSnap operator, but has fundamental differences:",

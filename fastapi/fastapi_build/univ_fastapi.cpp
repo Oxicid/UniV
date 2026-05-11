@@ -33,7 +33,7 @@
 using namespace blender;
 
 /* This counter should only be changed when new features are added or critical changes are made. */
-#define FASTAPI_VERSION 3
+#define FASTAPI_VERSION 4
 
 # define VERTICAL_CONSTR 2
 # define HORIZONTAL_CONSTR 3

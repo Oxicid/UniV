@@ -19,7 +19,7 @@ from ctypes import (
 
 class FastAPI:
     lib: ctypes.CDLL | None = None
-    _expected_fastapi_min_version = 3
+    _expected_fastapi_min_version = 4
     @classmethod
     def load(cls):
         cls.lib = utils.load_lib('univ_fastapi')

@@ -2660,10 +2660,10 @@ class UNIV_OT_SelectByVertexCount_Base(Operator):
         ('ADDITION', 'Addition', ''),
         ('DESELECT', 'Deselect', ''),
     ))
-    polygone_type: EnumProperty(name='Polygone Type', default='TRIS', items=(
+    polygon_type: EnumProperty(name='Polygone Type', default='TRIS', items=(
         ('TRIS', 'Tris', ''),
         ('QUAD', 'Quad', ''),
-        ('NGONE', 'N-Gone', ''),
+        ('NGON', 'N-Gon', ''),
     ))
     use_face_target_size: BoolProperty(name='Use target face size', default=False)
     face_target_size: IntProperty(name='Face Size', min=3, soft_max=32, default=4)
@@ -2674,7 +2674,7 @@ class UNIV_OT_SelectByVertexCount_Base(Operator):
         layout.row(align=True).prop(self, 'mode', expand=True)
         row = layout.row(align=True)
         row.active = not self.use_face_target_size
-        row.prop(self, 'polygone_type', expand=True)
+        row.prop(self, 'polygon_type', expand=True)
 
         row = layout.row(align=True)
         row.prop(self, "use_face_target_size", text="")
@@ -2724,9 +2724,9 @@ class UNIV_OT_SelectByVertexCount_Base(Operator):
                             f"No {elem_name} found to additional select - they may have been selected initially")
 
     def get_is_target_face_func(self):
-        if self.polygone_type == 'TRIS':
+        if self.polygon_type == 'TRIS':
             is_target_polygon = lambda f_: len(f_.loops) == 3
-        elif self.polygone_type == 'QUAD':
+        elif self.polygon_type == 'QUAD':
             is_target_polygon = lambda f_: len(f_.loops) == 4
         else:
             is_target_polygon = lambda f_: len(f_.loops) >= 5

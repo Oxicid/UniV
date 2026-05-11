@@ -1110,9 +1110,9 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('uv.univ_select_by_vertex_count', text='Tris').polygone_type = 'TRIS'
-        row.operator('uv.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
-        row.operator('uv.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
+        row.operator('uv.univ_select_by_vertex_count', text='Tris').polygon_type = 'TRIS'
+        row.operator('uv.univ_select_by_vertex_count', text='Quad').polygon_type = 'QUAD'
+        row.operator('uv.univ_select_by_vertex_count', text='N-Gon').polygon_type = 'NGON'
 
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
@@ -1293,9 +1293,9 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('mesh.univ_select_by_vertex_count', text='Tris').polygone_type = 'TRIS'
-        row.operator('mesh.univ_select_by_vertex_count', text='Quad').polygone_type = 'QUAD'
-        row.operator('mesh.univ_select_by_vertex_count', text='N-Gone').polygone_type = 'NGONE'
+        row.operator('mesh.univ_select_by_vertex_count', text='Tris').polygon_type = 'TRIS'
+        row.operator('mesh.univ_select_by_vertex_count', text='Quad').polygon_type = 'QUAD'
+        row.operator('mesh.univ_select_by_vertex_count', text='N-Gon').polygon_type = 'NGON'
 
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
