@@ -2120,7 +2120,10 @@ class UNIV_OT_Flatten(Operator):
         return False
 
     def create_gn_flatter_modifier(self, node_group):
-        axis = {'z': 2, 'y': 3, 'x': 4}
+        if bpy.app.version >= (5, 2, 0):
+            axis = {'z': 'Bottom', 'y': 'Front', 'x': 'Side'}
+        else:
+            axis = {'z': 2, 'y': 3, 'x': 4}
         for umesh in self.umeshes:
             has_checker_modifier = False
 
@@ -2132,22 +2135,24 @@ class UNIV_OT_Flatten(Operator):
                     if m.node_group != node_group:
                         m.node_group = node_group
 
-                    m['Socket_2'] = umesh.uv.name
-                    m['Socket_3'] = axis[self.axis]
-                    m['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                    m['Socket_5'] = self.weld_distance
-                    m['Socket_6'] = self.mix_factor
+                    gn_mod = utils.GN(m)
+                    gn_mod['Socket_2'] = umesh.uv.name
+                    gn_mod['Socket_3'] = axis[self.axis]
+                    gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
+                    gn_mod['Socket_5'] = self.weld_distance
+                    gn_mod['Socket_6'] = self.mix_factor
                     umesh.obj.update_tag()
                     break
 
             if not has_checker_modifier:
                 m = umesh.obj.modifiers.new(name='UniV Flatten', type='NODES')
                 m.node_group = node_group
-                m['Socket_2'] = umesh.uv.name
-                m['Socket_3'] = axis[self.axis]
-                m['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                m['Socket_5'] = self.weld_distance
-                m['Socket_6'] = self.mix_factor
+                gn_mod = utils.GN(m)
+                gn_mod['Socket_2'] = umesh.uv.name
+                gn_mod['Socket_3'] = axis[self.axis]
+                gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
+                gn_mod['Socket_5'] = self.weld_distance
+                gn_mod['Socket_6'] = self.mix_factor
 
     def get_flatten_node_group(self):
         """Get exist flatten node group"""
@@ -2210,7 +2215,6 @@ class UNIV_OT_Flatten(Operator):
         aspect_ratio_socket.default_value = (1.0, 1.0, 0.0)
         aspect_ratio_socket.min_value = 0.01
         aspect_ratio_socket.max_value = 10000
-        aspect_ratio_socket.default_attribute_name = "Aspect Ratio"
         aspect_ratio_socket.force_non_field = True
 
         # Socket Distance
@@ -2689,6 +2693,8 @@ class UNIV_OT_SmartScaleApply(Operator):
                 if 'Array' not in mod.name:
                     return
 
+                gn_mod = utils.GN(mod, print_missed_socket=True)
+                del mod
                 shape_type_sk = "Socket_2"
                 offset_method_type_sk = "Socket_14"
 
@@ -2706,21 +2712,21 @@ class UNIV_OT_SmartScaleApply(Operator):
                 circle_central_axis_sk = 'Socket_11'
                 circle_radius_sk = 'Socket_6'
 
-                if shape_type_sk not in mod:
+                if shape_type_sk not in gn_mod:
                     return
-                if offset_method_type_sk not in mod:
+                if offset_method_type_sk not in gn_mod:
                     return
 
-                match mod[shape_type_sk]:
+                match gn_mod[shape_type_sk]:
                     case 0:  # Line
-                        match mod[offset_method_type_sk]:
+                        match gn_mod[offset_method_type_sk]:
                             case 2: # Relative
                                 rel_sign = Vector([1 if i > 0 else -1 for i in tar_scale])
-                                mod[array_offset_sk][:] = Vector(mod[array_offset_sk]) * rel_sign  # Rescale offset.
+                                gn_mod[array_offset_sk][:] = Vector(gn_mod[array_offset_sk]) * rel_sign  # Rescale offset.
                             case 0: # Offset
-                                mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                                gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
                             case 1: # Endpoint
-                                mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                                gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
                             case offset_method:
                                 print(f"UniV: Smart Scale Apply: Unknow shape type {offset_method!r}")
                                 return
@@ -2729,7 +2735,7 @@ class UNIV_OT_SmartScaleApply(Operator):
                         import math
                         import mathutils
 
-                        rot = mathutils.Euler(mod[array_rotation_sk])
+                        rot = mathutils.Euler(gn_mod[array_rotation_sk])
                         scale_mat = Matrix.Diagonal(cur_scale).to_3x3()
 
                         # Adjust the rotation using the scale.
@@ -2741,11 +2747,11 @@ class UNIV_OT_SmartScaleApply(Operator):
                             if math.isclose(v, 0, abs_tol=1e-7):
                                 rot[i] = 0
 
-                        mod[array_rotation_sk][:] = rot
+                        gn_mod[array_rotation_sk][:] = rot
 
                     case 1:  # Circle
                         # TODO: Implement radius by axis
-                        match mod[circle_central_axis_sk]:
+                        match gn_mod[circle_central_axis_sk]:
                             case 0:  # X
                                 pass
                             case 1:  # Y
@@ -2753,23 +2759,24 @@ class UNIV_OT_SmartScaleApply(Operator):
                             case 2:  # Z
                                 pass
 
-                        mod[circle_radius_sk] *= abs(var)
+                        gn_mod[circle_radius_sk] *= abs(var)
                     case 2:  # Curve
-                        is_curve_distance_type = mod[curve_count_method_distance_sk] == 1
+                        is_curve_distance_type = gn_mod[curve_count_method_distance_sk] == 1
                         if is_curve_distance_type:
-                            mod[curve_distance_sk] *= abs(var)
+                            gn_mod[curve_distance_sk] *= abs(var)
                     case 3:  # Transform
-                        is_inputs = mod[transform_reference_sk] == 0
+                        is_inputs = gn_mod[transform_reference_sk] == 0
                         if is_inputs:
-                            mod[array_translation_sk][:] = Vector(mod[array_translation_sk]) * tar_scale
+                            gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
                     case shape_type:
                         print(f"UniV: Smart Scale Apply: Unknow shape type {shape_type!r}")
 
                 # Correct distance.
-                if merge_sk in mod:
-                    if mod[merge_sk]:
-                        if distance_sk in mod:
-                            mod[distance_sk] *= abs(var)
+                gn_mod.print_error = False
+                if merge_sk in gn_mod:
+                    if gn_mod[merge_sk]:
+                        if distance_sk in gn_mod:
+                            gn_mod[distance_sk] *= abs(var)
                         else:
                             print(f"UniV: Smart Scale Apply: Can't found distance merge socket")
                 else:

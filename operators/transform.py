@@ -2893,6 +2893,9 @@ class UNIV_OT_Shift(Operator):
 
     @staticmethod
     def shift_node_group_is_changed(node_group):
+        if not node_group:
+            return True
+
         if len(nodes := node_group.nodes) != 7:
             return True
 
@@ -3010,22 +3013,20 @@ class UNIV_OT_Shift(Operator):
                 has_checker_modifier = True
                 if m.node_group != node_group:
                     m.node_group = node_group
-                if 'Socket_1' in m:
-                    if m['Socket_1'] != uv_name:
-                        m['Socket_1'] = uv_name
-                else:
-                    # old version support (version???)
-                    if m['Input_1'] != uv_name:
-                        m['Input_1'] = uv_name
+
+                gn_mod = utils.GN(m, print_missed_socket=True)
+                if 'Socket_1' in gn_mod:
+                    if gn_mod['Socket_1'] != uv_name:
+                        gn_mod['Socket_1'] = uv_name
                 umesh.update_tag = True
                 break
         if not has_checker_modifier:
             m = umesh.obj.modifiers.new(name='UniV Shift', type='NODES')
             m.node_group = node_group
-            if 'Socket_1' in m:
-                m['Socket_1'] = uv_name
-            else:
-                m['Input_1'] = uv_name
+
+            gn_mod = utils.GN(m, print_missed_socket=True)
+            if 'Socket_1' in gn_mod:
+                gn_mod['Socket_1'] = uv_name
             umesh.update_tag = True
 
     def get_shift_node_group(self):
