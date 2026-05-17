@@ -118,22 +118,19 @@ class UNIV_OT_Mark_VIEW2D(Operator):
         self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            return self.remove_seams_in_object_mode(self.report)
+
         umeshes = UMeshes(report=self.report)
         umeshes.update_tag = False
 
-        if context.mode == 'EDIT_MESH':
-            selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
-            umeshes = selected if selected else visible
-            for umesh in umeshes:
-                if selected:
-                    umesh.sequence = utils.calc_selected_uv_edge(umesh)
-                else:
-                    umesh.sequence = utils.calc_visible_uv_corners(umesh)
-        else:
-            for umesh in umeshes:
-                umesh.sequence = [crn for f in umesh.bm.faces for crn in f.loops]
-                umesh.update_tag = bool(umesh.sequence)
-
+        selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
+        umeshes = selected if selected else visible
+        for umesh in umeshes:
+            if selected:
+                umesh.sequence = utils.calc_selected_uv_edge(umesh)
+            else:
+                umesh.sequence = utils.calc_visible_uv_corners(umesh)
 
         if not prefs().invert_toggle_logic:
             all_marked = all(all(crn.edge.seam for crn in u.sequence) for u in umeshes)
@@ -173,6 +170,22 @@ class UNIV_OT_Mark_VIEW2D(Operator):
 
         return res
 
+    @staticmethod
+    def remove_seams_in_object_mode(report) -> set[str]:
+        attr_counter = 0
+        for obj in utils.calc_any_unique_obj():
+            for attr in reversed(obj.data.attributes):
+                if attr.name.startswith('uv_seam'):
+                    obj.data.attributes.remove(attr)
+                    obj.update_tag()
+                    attr_counter += 1
+        if attr_counter:
+            report({'INFO'}, f"Cleaned seams from {attr_counter!r} objects.")
+            return {'FINISHED'}
+        else:
+            report({'INFO'}, 'All seams from all selected objects was cleaned.')
+            return {'CANCELLED'}
+
 
 class UNIV_OT_Mark_VIEW3D(Operator):
     bl_idname = 'mesh.univ_mark'
@@ -184,24 +197,22 @@ class UNIV_OT_Mark_VIEW3D(Operator):
         self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            return UNIV_OT_Mark_VIEW2D.remove_seams_in_object_mode(self.report)
+
         umeshes = UMeshes.calc_all_objects(verify_uv=False)
         umeshes.set_sync()
         umeshes.sync_invalidate()
         umeshes.update_tag = False
 
 
-        if context.mode == 'EDIT_MESH':
-            selected, visible = umeshes.filtered_by_selected_and_visible_3d_edges()
-            umeshes = selected if selected else visible
-            for umesh in umeshes:
-                if selected:
-                    umesh.sequence = [e for e in umesh.bm.edges if e.select]
-                else:
-                    umesh.sequence = [e for e in umesh.bm.edges if not e.hide]
-        else:
-            for umesh in umeshes:
-                umesh.sequence = umesh.bm.edges
-                umesh.update_tag = bool(umesh.sequence)
+        selected, visible = umeshes.filtered_by_selected_and_visible_3d_edges()
+        umeshes = selected if selected else visible
+        for umesh in umeshes:
+            if selected:
+                umesh.sequence = [e for e in umesh.bm.edges if e.select]
+            else:
+                umesh.sequence = [e for e in umesh.bm.edges if not e.hide]
 
 
         if not prefs().invert_toggle_logic:
