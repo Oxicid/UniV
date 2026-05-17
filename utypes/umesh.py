@@ -374,13 +374,15 @@ class UMesh:
                 return self.obj.data.auto_smooth_angle  # noqa
         else:
             for mod in self.obj.modifiers:
-                if 'Smooth by Angle' not in mod.name:
-                    continue
-                if not (mod.show_in_editmode and mod.show_viewport):
-                    continue
-                if 'Input_1' in mod:
-                    if isinstance(value := mod['Input_1'], float):
-                        return value
+                if isinstance(mod, bpy.types.NodesModifier) and 'Smooth by Angle' in mod.name:
+                    if not (mod.show_in_editmode and mod.show_viewport):
+                        continue
+
+                    gn_mod = utils.GN(mod, print_missed_socket=True)
+                    if 'Input_1' in gn_mod:
+                        if isinstance(value := gn_mod['Input_1'], float):
+                            return value
+                    break
         return pi
 
     @property
