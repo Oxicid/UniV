@@ -400,9 +400,10 @@ def register():
         try:
             fastapi.clib.FastAPI.load()
         except:  # noqa
-            if univ_pro:
-                print('UniV: Cannot load fastapi.')
-                traceback.print_exc()
+            pass
+            # if univ_pro:
+            #     print('UniV: Cannot load fastapi.')
+            #     traceback.print_exc()
 
     try:
         keymaps.add_keymaps()

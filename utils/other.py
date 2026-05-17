@@ -281,3 +281,46 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
     if lib is None:
         raise OSError(f"Could not load {lib_filename}. Tried: {candidates!r}\nLast error: {last_err}")
     return lib
+
+
+
+class GN:
+    def __init__(self, mod, print_missed_socket=False):
+        self.mod = mod
+        self.print_error = print_missed_socket
+
+    def _missed_socket_print(self,exist, name):
+        if not exist and self.print_error:
+            import inspect
+            caller_func_name = inspect.currentframe().f_back.f_back.f_code.co_name
+            print(f"UniV: {caller_func_name}: Socket {name!r} in {self.mod.name!r} modifier was changed.")
+
+    if bpy.app.version >= (5, 2, 0):
+        def __contains__(self, name: str):
+            exist = hasattr(self.mod.properties.inputs, name)
+            self._missed_socket_print(exist, name)
+            return exist
+        def __setitem__(self, name: str, val):
+            getattr(self.mod.properties.inputs, name).value = val
+        def __getitem__(self, name: str):
+            return getattr(self.mod.properties.inputs, name).value
+
+    elif bpy.app.version >= (4, 0, 0):
+        def __contains__(self, name: str):
+            exist = name in self.mod
+            self._missed_socket_print(exist, name)
+            return exist
+        def __setitem__(self,name: str, val):
+            self.mod[name] = val
+        def __getitem__(self, name: str):
+            return self.mod[name]
+    else:
+        def __contains__(self, name: str):
+            exist = name.replace('Input', 'Socket', 1) in self.mod
+            self._missed_socket_print(exist, name)
+            return exist
+        def __setitem__(self, name: str, val):
+            self.mod[name.replace('Input', 'Socket', 1)] = val
+        def __getitem__(self, name: str):
+            return self.mod[name.replace('Input', 'Socket', 1)]
+

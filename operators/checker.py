@@ -165,12 +165,29 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     @staticmethod
     def checker_node_group_is_changed(node_group):
-        if len(nodes := node_group.nodes) == 3:
-            if output_node := [n for n in nodes if n.bl_idname == 'NodeGroupOutput']:
-                if output_node[0].inputs and (output_links := output_node[0].inputs[0].links):
-                    if (set_material_node := output_links[0].from_node).bl_idname == 'GeometryNodeSetMaterial':
-                        geometry_links = set_material_node.inputs[0].links
-                        if geometry_links and geometry_links[0].from_node.bl_idname == 'NodeGroupInput':
+        if not node_group:
+            return True
+        if len(nodes := node_group.nodes) != 3:
+            return True
+        # Output node check.
+        output_node = [n for n in nodes if n.bl_idname == 'NodeGroupOutput']
+        if output_node and output_node[0].inputs:  # Check output node exist and exist inputs.
+            if output_links := output_node[0].inputs[0].links:  # Check links exist.
+
+                # Material node check.
+                set_mtl_node = output_links[0].from_node
+                if set_mtl_node.bl_idname == 'GeometryNodeSetMaterial':
+                    if not (geom_link_to_input_node := set_mtl_node.inputs[0].links):
+                        return True
+
+                    # Input node check.
+                    input_node = geom_link_to_input_node[0].from_node
+                    if input_node.bl_idname == 'NodeGroupInput':
+                        if len(input_node.outputs) != 3:
+                            return True
+
+                        mtl_link_to_input_node = set_mtl_node.inputs[2].links
+                        if mtl_link_to_input_node and mtl_link_to_input_node[0].from_node == input_node:
                             return False
         return True
 
@@ -231,23 +248,20 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     has_checker_modifier = True
                     if m.node_group != node_group:
                         m.node_group = node_group
-                    if 'Socket_1' in m:
-                        if m['Socket_1'] != mtl:
-                            m['Socket_1'] = mtl
-                    else:
-                        # old version support (version???)
-                        if m['Input_1'] != mtl:
-                            m['Input_1'] = mtl
-                    obj.update_tag()
+
+                    gn_mod = utils.GN(m, print_missed_socket=True)
+                    if 'Socket_1' in gn_mod:
+                        if gn_mod['Socket_1'] != mtl:
+                            gn_mod['Socket_1'] = mtl
+                    obj.update_tag()  # TODO: No update when not changed (check).
                     break
             if not has_checker_modifier:
                 m = obj.modifiers.new(name='UniV Checker', type='NODES')
                 m.node_group = node_group
                 m.show_render = False
-                if 'Socket_1' in m:
-                    m['Socket_1'] = mtl
-                else:
-                    m['Input_1'] = mtl
+                gn_mod = utils.GN(m, print_missed_socket=True)
+                if 'Socket_1' in gn_mod:
+                    gn_mod['Socket_1'] = mtl
 
     @staticmethod
     def all_has_enable_gn_checker_modifier():
@@ -274,6 +288,20 @@ class UNIV_OT_Checker(bpy.types.Operator):
                         m.show_in_editmode = True
                     if not m.show_viewport:
                         m.show_viewport = True
+
+                    # Set fixed node groups.
+                    if m.node_group != node_group:
+                        print(f"UniV: Checker: Restored {node_group.name!r} Node Group for {m.name!r} modifier for {obj.name!r} object.")
+                        m.node_group = node_group
+
+                    # Set fixed materials.
+                    gn_mod = utils.GN(m, print_missed_socket=True)
+                    if 'Socket_1' in gn_mod:
+                        if gn_mod['Socket_1'] != mtl:
+                            gn_mod['Socket_1'] = mtl
+                            print(f"UniV: Checker: Restored {mtl.name!r} material for {m.name!r} modifier for {obj.name!r} object.")
+
+
                     has_checker_modifier = True
                     obj.update_tag()
                     break
@@ -281,10 +309,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
                 m = obj.modifiers.new(name='UniV Checker', type='NODES')
                 m.node_group = node_group
                 m.show_render = False
-                if 'Socket_1' in m:
-                    m['Socket_1'] = mtl
-                else:
-                    m['Input_1'] = mtl
+
+                gn_mod = utils.GN(m, print_missed_socket=True)
+                if 'Socket_1' in gn_mod:
+                    gn_mod['Socket_1'] = mtl
 
     @staticmethod
     def disable_all_gn_checker_modifier():
