@@ -30,33 +30,52 @@ class UNIV_OT_Pin(Operator):
         f"This button is used to free the 'P' button for the Pack operator"
 
     def draw(self, context):
-        self.layout.prop(prefs(), 'invert_toggle_logic')
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            attr_counter = 0
+            for obj in utils.calc_any_unique_obj():
+                if uv := obj.data.uv_layers.active:
+                    size = len(obj.data.loops)
+                    if not size:
+                        continue
+                    pins = np.empty(size, dtype=bool)
+                    uv.data.foreach_get("pin_uv", pins)
+
+                    if pins.any():
+                        cleaned_arr = np.zeros_like(pins)
+                        uv.data.foreach_set("pin_uv", cleaned_arr)
+                        obj.update_tag()
+                        attr_counter += 1
+
+            if attr_counter:
+                self.report({'INFO'}, f"Cleaned pins from {attr_counter!r} objects.")
+                return {'FINISHED'}
+            else:
+                self.report({'INFO'}, 'All pins from all selected objects was cleaned.')
+                return {'CANCELLED'}
+
+
         from .transform import UNIV_OT_Align_pie
         umeshes = UMeshes(report=self.report)
         umeshes.update_tag = False
-
-        if context.mode == 'EDIT_MESH':
-            selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
-            umeshes = selected if selected else visible
-            if selected:
-                for umesh in umeshes:
-                    if umesh.elem_mode == 'VERT':
-                        umesh.sequence = utils.calc_selected_uv_vert(umesh)
-                    elif umesh.elem_mode == 'EDGE':
-                        corners = utils.calc_selected_uv_edge_iter(umesh)
-                        umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_edge(umesh, corners)
-                    else:
-                        corners = (crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
-                        umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_vert(umesh, corners)
-            else:
-                for umesh in umeshes:
-                    umesh.sequence = utils.calc_visible_uv_corners(umesh)
+        selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
+        umeshes = selected if selected else visible
+        if selected:
+            for umesh in umeshes:
+                if umesh.elem_mode == 'VERT':
+                    umesh.sequence = utils.calc_selected_uv_vert(umesh)
+                elif umesh.elem_mode == 'EDGE':
+                    corners = utils.calc_selected_uv_edge_iter(umesh)
+                    umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_edge(umesh, corners)
+                else:
+                    corners = (crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
+                    umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_vert(umesh, corners)
         else:
             for umesh in umeshes:
-                umesh.sequence = [crn for f in umesh.bm.faces for crn in f.loops]
-
+                umesh.sequence = utils.calc_visible_uv_corners(umesh)
 
         if not prefs().invert_toggle_logic:
             all_pinned = True
@@ -107,7 +126,6 @@ class UNIV_OT_Pin(Operator):
         return res
 
 
-
 class UNIV_OT_Mark_VIEW2D(Operator):
     bl_idname = 'uv.univ_mark'
     bl_label = 'Mark'
@@ -115,7 +133,8 @@ class UNIV_OT_Mark_VIEW2D(Operator):
     bl_description = "Set/Clear mark seam"
 
     def draw(self, context):
-        self.layout.prop(prefs(), 'invert_toggle_logic')
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
         if context.mode != 'EDIT_MESH':
@@ -194,7 +213,8 @@ class UNIV_OT_Mark_VIEW3D(Operator):
     bl_description = "Set/Clear mark seam"
 
     def draw(self, context):
-        self.layout.prop(prefs(), 'invert_toggle_logic')
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def execute(self, context):
         if context.mode != 'EDIT_MESH':
