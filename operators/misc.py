@@ -1951,9 +1951,6 @@ class UNIV_OT_Flatten(Operator):
     mix_factor: FloatProperty(name='Mix Factor', default=1, min=0, max=1)
     weld_distance: FloatProperty(name='Weld Distance', default=0.00001, min=0)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':

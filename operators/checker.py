@@ -24,10 +24,6 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_description = "Used as a texture for testing UV maps"
     bl_options = {'REGISTER', 'UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def draw(self, context):
         layout = self.layout
         pref = prefs()
@@ -53,10 +49,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
         self.batch = None
 
     def execute(self, context):
-        self.checker_default()
+        self.checker_default(prefs().checker_toggle == 'TOGGLE')
         return {'FINISHED'}
 
-    def checker_default(self):
+    def checker_default(self, toggle):
         if self.sanitize_generated_textures():
             return
 
@@ -66,8 +62,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
-            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker',
-                                                  toggle_enable=prefs().checker_toggle == 'TOGGLE')
+            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=toggle)
 
         def set_active_image():
             if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
@@ -79,7 +74,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
                             space_data.image = node.image
                             break
 
-        if prefs().checker_toggle == 'TOGGLE':
+        if toggle:
             if self.all_has_enable_gn_checker_modifier():
                 self.disable_all_gn_checker_modifier()
             else:

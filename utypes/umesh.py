@@ -805,11 +805,16 @@ class UMeshes:
             But it doesn't help when the operator is called via keymap."""
         if self.umeshes:
             active_obj = bpy.context.active_object
-            if any(True for umesh in self.umeshes if (act_umesh := umesh).obj == active_obj):
-                if not act_umesh.total_corners:
-                    bpy.context.view_layer.objects.active = self.umeshes[0].obj
-            else:
-                bpy.context.view_layer.objects.active = self.umeshes[0].obj
+            for umesh in self.umeshes:
+                if umesh.obj == active_obj:
+                    if umesh.total_corners:
+                        return True
+
+            for umesh in self.umeshes:
+                if umesh.total_corners:
+                    bpy.context.view_layer.objects.active = umesh.obj
+                    return True
+        return False
 
     def free(self, force=False):
         """self.umeshes save refs in init in OT classes, so it's necessary to free memory"""

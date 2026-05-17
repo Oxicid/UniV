@@ -839,13 +839,12 @@ def get_view3d_camera_data(v3d: bpy.types.SpaceView3D, rv3d: bpy.types.RegionVie
 
 def calc_any_unique_obj() -> list[bpy.types.Object]:
     # Get unique umeshes without uv
-    objects = []
+
     if bpy.context.mode == 'EDIT_MESH':
-        for obj in bpy.context.objects_in_mode_unique_data:
-            if obj.type == 'MESH':
-                objects.append(obj)
+        return list(bpy.context.objects_in_mode_unique_data)
     else:
         from collections import defaultdict
+        objects = []
         data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
 
         for obj in bpy.context.selected_objects:
@@ -855,7 +854,7 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
         for data, objs in data_and_objects.items():
             objs.sort(key=lambda a: a.name)
             objects.append(objs[0])
-    return objects
+        return objects
 
 
 def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bpy.types.Object]]]:

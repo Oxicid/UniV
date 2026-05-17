@@ -33,10 +33,6 @@ class UNIV_OT_Normal(bpy.types.Operator):
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
                                                description='Gets Aspect Correct from the active image from the shader node editor')
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def draw(self, context):
         col = self.layout.column(align=True)
         if not prefs().use_texel:
@@ -271,10 +267,6 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
                                                description='Gets Aspect Correct from the active image from the shader node editor')
     avoid_flip: bpy.props.BoolProperty(name='Avoid Flip', default=True)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def draw(self, context):
         self.layout.prop(self, 'scale', slider=True)
         col = self.layout.column(align=True)
@@ -477,10 +469,6 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
     use_crop: BoolProperty(name='Crop', default=True, description='Packs the islands into a base tile')
     use_orthographic: BoolProperty(name='Use Orthographic', default=False)
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -745,9 +733,6 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
     add_padding: IntProperty(name='Additional Padding', default=0, min=-16, max=16, subtype='PIXEL')
     angle_limit: FloatProperty(name='Angle', default=math.radians(66), min=0, max=pi/2, subtype='ANGLE')
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         settings = univ_settings()
@@ -783,6 +768,9 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
             umeshes.set_sync()
             umeshes.sync_invalidate()
 
+            if not context.active_object:
+                return umeshes.update()
+
             selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
                 for umesh in selected:
@@ -798,16 +786,20 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
                 self.report({'WARNING'}, 'Not found faces')
                 return {'CANCELLED'}
         else:
-            if not any(obj.data.polygons for obj in bpy.context.selected_objects if obj.type == 'MESH'):
+            meshes = utils.calc_any_unique_obj()
+            if not any(obj.data.polygons for obj in meshes):
                 self.report({'WARNING'}, 'Not found faces')
                 return {'CANCELLED'}
-            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
+            if not context.active_object or context.active_object.type != 'MESH':
+                for obj in meshes:
+                    bpy.context.view_layer.objects.active = obj
+                    break
+
+
+            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
             for umesh in utypes.UMeshes.calc(self.report, verify_uv=False):
                 umesh.check_uniform_scale(report=self.report)
-
-            umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
-            umeshes.fix_context()
 
             bpy.ops.mesh.reveal(select=True)
             bpy.ops.mesh.select_all(action='SELECT')

@@ -3641,7 +3641,7 @@ class UNIV_OT_Orient_VIEW3D(UNIV_OT_Orient):
 # The code was taken and modified from the TexTools addon:
 # https://github.com/Oxicid/TexTools-Blender/blob/master/op_island_align_world.py
 # noinspection PyTypeHints
-class UNIV_OT_Gravity(Operator):
+class UNIV_OT_Gravity_VIEW2D(Operator):
     bl_idname = 'uv.univ_gravity'
     bl_label = 'Gravity'
     bl_description = "Align selected UV islands or faces to world / gravity directions"
@@ -3658,8 +3658,8 @@ class UNIV_OT_Gravity(Operator):
 
     def draw(self, context):
         self.layout.prop(self, 'flip')
+        self.layout.prop(self, 'use_correct_aspect')
         self.layout.prop(self, 'additional_angle', slider=True)
-        self.layout.prop(self, 'use_correct_aspect', toggle=1)
         self.layout.row().prop(self, 'axis', expand=True)
 
     def __init__(self, *args, **kwargs):
@@ -3816,7 +3816,7 @@ class UNIV_OT_Gravity(Operator):
         return sum_angle / n_edges
 
 
-class UNIV_OT_Gravity_VIEW3D(UNIV_OT_Gravity):
+class UNIV_OT_Gravity_VIEW3D(UNIV_OT_Gravity_VIEW2D):
     bl_idname = 'mesh.univ_gravity'
 
 
