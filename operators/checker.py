@@ -297,7 +297,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     # Set fixed materials.
                     gn_mod = utils.GN(m, print_missed_socket=True)
                     if 'Socket_1' in gn_mod:
-                        if gn_mod['Socket_1'] != mtl:
+                        if not gn_mod['Socket_1']:
                             gn_mod['Socket_1'] = mtl
                             print(f"UniV: Checker: Restored {mtl.name!r} material for {m.name!r} modifier for {obj.name!r} object.")
 

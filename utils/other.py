@@ -14,17 +14,19 @@ def get_aspect_ratio(umesh=None):
     """Aspect Y. Used for multiply by Y axis."""
     if umesh:
         # Aspect from checker
-        if modifiers := [m for m in umesh.obj.modifiers if m.name.startswith('UniV Checker')]:
-            socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
-
-            if mtl := modifiers[0][socket]:
-                for node in mtl.node_tree.nodes:
-                    if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
-                        image_width, image_height = image.size
-                        if image_height:
-                            return image_width / image_height
+        for m in umesh.obj.modifiers:
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Checker'):
+                gn_mod = GN(m, print_missed_socket=True)
+                if 'Socket_1' in gn_mod:
+                    if mtl := gn_mod['Socket_1']:
+                        for node in mtl.node_tree.nodes:
+                            if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
+                                image_width, image_height = image.size
+                                if image_height:
+                                    return image_width / image_height
+                break
         # Aspect from material
-        elif mtl := umesh.obj.active_material:
+        if mtl := umesh.obj.active_material:
             if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
                 if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
                     image_width, image_height = image.size
