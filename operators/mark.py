@@ -18,6 +18,262 @@ from ..utypes import UMeshes, AdvIslands
 from ..preferences import prefs, univ_settings
 
 
+
+class UNIV_OT_Mark_VIEW2D(Operator):
+    bl_idname = 'uv.univ_mark'
+    bl_label = 'Mark'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Set/Clear mark seam"
+
+    def draw(self, context):
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
+
+    def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            return self.remove_seams_in_object_mode(self.report)
+
+        umeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
+
+        selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
+        umeshes = selected if selected else visible
+        for umesh in umeshes:
+            if selected:
+                umesh.sequence = utils.calc_selected_uv_edge(umesh)
+            else:
+                umesh.sequence = utils.calc_visible_uv_corners(umesh)
+
+        if not prefs().invert_toggle_logic:
+            all_marked = all(all(crn.edge.seam for crn in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_marked:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = False
+                else:
+                    # Extend mark seam.
+                    if all(crn.edge.seam for crn in umesh.sequence):  # Skip full marked.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = True
+        else:
+            all_unmarked = all(all(not crn.edge.seam for crn in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_unmarked:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = True
+                else:
+                    # Unset mark seam.
+                    if all(not crn.edge.seam for crn in umesh.sequence):  # Skip full unmarked.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn.edge.seam = False
+
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+
+        return res
+
+    @staticmethod
+    def remove_seams_in_object_mode(report) -> set[str]:
+        attr_counter = 0
+        for obj in utils.calc_any_unique_obj():
+            for attr in reversed(obj.data.attributes):
+                if attr.name.startswith(('uv_seam', '.uv_seam')):
+                    obj.data.attributes.remove(attr)
+                    obj.update_tag()
+                    attr_counter += 1
+        if attr_counter:
+            report({'INFO'}, f"Cleaned seams from {attr_counter!r} objects.")
+            return {'FINISHED'}
+        else:
+            report({'INFO'}, 'All seams from all selected objects was cleaned.')
+            return {'CANCELLED'}
+
+
+class UNIV_OT_Mark_VIEW3D(Operator):
+    bl_idname = 'mesh.univ_mark'
+    bl_label = 'Mark'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Set/Clear mark seam"
+
+    def draw(self, context):
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
+
+    def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            return UNIV_OT_Mark_VIEW2D.remove_seams_in_object_mode(self.report)
+
+        umeshes = UMeshes.calc_all_objects(verify_uv=False)
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
+        umeshes.update_tag = False
+
+
+        selected, visible = umeshes.filtered_by_selected_and_visible_3d_edges()
+        umeshes = selected if selected else visible
+        for umesh in umeshes:
+            if selected:
+                umesh.sequence = [e for e in umesh.bm.edges if e.select]
+            else:
+                umesh.sequence = [e for e in umesh.bm.edges if not e.hide]
+
+
+        if not prefs().invert_toggle_logic:
+            all_marked = all(all(e.seam for e in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_marked:
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = False
+                else:
+                    # Extend mark seam.
+                    if all(e.seam for e in umesh.sequence):  # Skip full marked.
+                        continue
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = True
+        else:
+            all_unmarked = all(all(not e.seam for e in u.sequence) for u in umeshes)
+
+            for umesh in umeshes:
+                if all_unmarked:
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = True
+                else:
+                    # Unset mark seam.
+                    if all(not e.seam for e in umesh.sequence):  # Skip full unmarked.
+                        continue
+                    umesh.update_tag = True
+                    for e in umesh.sequence:
+                        e.seam = False
+
+
+        if not umeshes.update_tag:
+            self.report({'WARNING'}, "Edges not found.")
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+
+        return res
+
+
+class UNIV_OT_Pin(Operator):
+    bl_idname = 'uv.univ_pin'
+    bl_label = 'Pin'
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = f"Set/Clear selected UV vertices as anchored between multiple unwrap operations\n\n" \
+        f"This button is used to free the 'P' button for the Pack operator"
+
+    def draw(self, context):
+        if context.mode == 'EDIT_MESH':
+            self.layout.prop(prefs(), 'invert_toggle_logic')
+
+    def execute(self, context):
+        if context.mode != 'EDIT_MESH':
+            import numpy as np
+            attr_counter = 0
+            for obj in utils.calc_any_unique_obj():
+                if uv := obj.data.uv_layers.active:
+                    size = len(obj.data.loops)
+                    if not size:
+                        continue
+                    pins = np.empty(size, dtype=bool)
+                    uv.data.foreach_get("pin_uv", pins)
+
+                    if pins.any():
+                        uv.data.foreach_set("pin_uv", np.zeros_like(pins))
+                        obj.update_tag()
+                        attr_counter += 1
+
+            if attr_counter:
+                self.report({'INFO'}, f"Cleaned pins from {attr_counter!r} objects.")
+                return {'FINISHED'}
+            else:
+                self.report({'INFO'}, 'All pins from all selected objects was cleaned.')
+                return {'CANCELLED'}
+
+
+        from .transform import UNIV_OT_Align_pie
+        umeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
+        selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
+        umeshes = selected if selected else visible
+        if selected:
+            for umesh in umeshes:
+                if umesh.elem_mode == 'VERT':
+                    umesh.sequence = utils.calc_selected_uv_vert(umesh)
+                elif umesh.elem_mode == 'EDGE':
+                    corners = utils.calc_selected_uv_edge_iter(umesh)
+                    umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_edge(umesh, corners)
+                else:
+                    corners = (crn for f in utils.calc_selected_uv_faces_iter(umesh) for crn in f.loops)
+                    umesh.sequence = UNIV_OT_Align_pie.get_unique_linked_corners_from_crn_vert(umesh, corners)
+        else:
+            for umesh in umeshes:
+                umesh.sequence = utils.calc_visible_uv_corners(umesh)
+
+        if not prefs().invert_toggle_logic:
+            all_pinned = True
+            for umesh in umeshes:
+                uv = umesh.uv
+                if not all(crn[uv].pin_uv for crn in umesh.sequence):
+                    all_pinned = False
+                    break
+
+            for umesh in umeshes:
+                uv = umesh.uv
+                if all_pinned:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = False
+                else:
+                    if all(crn[uv].pin_uv for crn in umesh.sequence):  # Skip full pinned.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = True
+        else:
+            all_unpinned = True
+            for umesh in umeshes:
+                uv = umesh.uv
+                if any(crn[uv].pin_uv for crn in umesh.sequence):
+                    all_unpinned = False
+                    break
+
+            for umesh in umeshes:
+                uv = umesh.uv
+                if all_unpinned:
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = True
+                else:
+                    if all(not crn[uv].pin_uv for crn in umesh.sequence):  # Skip full unpinned.
+                        continue
+                    umesh.update_tag = True
+                    for crn in umesh.sequence:
+                        crn[uv].pin_uv = False
+
+
+        res = umeshes.update()
+        if not umeshes.is_edit_mode:
+            umeshes.free()
+
+        return res
+
+
 # noinspection PyTypeHints
 class UNIV_OT_Cut_VIEW2D(Operator):
     bl_idname = "uv.univ_cut"

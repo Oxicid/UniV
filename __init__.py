@@ -32,7 +32,7 @@ from .operators import project
 from .operators import quadrify
 from .operators import quick_snap
 from .operators import relax
-from .operators import seam
+from .operators import mark
 from .operators import select
 from .operators import stitch_and_weld
 from .operators import stack
@@ -207,11 +207,14 @@ def load_register_types():
             # Icons Generator
             icons.UNIV_OT_IconsGenerator,
             # Seam
-            seam.UNIV_OT_Cut_VIEW2D,
-            seam.UNIV_OT_Cut_VIEW3D,
-            seam.UNIV_OT_Angle,
-            seam.UNIV_OT_SeamBorder,
-            seam.UNIV_OT_SeamBorder_VIEW3D,
+            mark.UNIV_OT_Pin,
+            mark.UNIV_OT_Mark_VIEW2D,
+            mark.UNIV_OT_Mark_VIEW3D,
+            mark.UNIV_OT_Cut_VIEW2D,
+            mark.UNIV_OT_Cut_VIEW3D,
+            mark.UNIV_OT_Angle,
+            mark.UNIV_OT_SeamBorder,
+            mark.UNIV_OT_SeamBorder_VIEW3D,
             # Project
             project.UNIV_OT_Normal,
             project.UNIV_OT_ViewProject,
@@ -219,9 +222,6 @@ def load_register_types():
             # Misc
             misc.UNIV_OT_RandomColor,
             misc.UNIV_OT_LinearGradient,
-            misc.UNIV_OT_Pin,
-            misc.UNIV_OT_Mark_VIEW2D,
-            misc.UNIV_OT_Mark_VIEW3D,
             misc.UNIV_OT_Hide,
             misc.UNIV_OT_Focus,
             misc.UNIV_OT_SetCursor2D,
