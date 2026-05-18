@@ -103,7 +103,7 @@ class UNIV_PT_General(Panel):
         set_idname = prefix + '.univ_texel_density_set'
         row.operator(prefix + '.univ_texel_density_get', icon_value=icons.td_get)
         row.operator(set_idname, icon_value=icons.td_set).td_preset_idx = -1
-        row.prop(settings, 'texel_density', text='')
+        row.prop(settings, 'texel', text='')
         row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
         if prefix == 'uv':
             row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
@@ -896,7 +896,12 @@ class UNIV_PT_TD_PresetsManager(Panel):
             layout.operator_context = 'EXEC_DEFAULT'
 
         settings = univ_settings()
-        layout.label(text=f"Texel Density: {round(settings.texel_density, 4)}")
+        layout.label(text=f"Texel Density: {round(settings.texel, 4)}")
+
+        split = layout.split(factor=0.282)
+        split.label(text='Unit')
+        split.prop(settings, 'texel_unit', text='')
+
         row = layout.row(align=True, heading='Global Size')
         row.prop(settings, 'size_x', text='')
         row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
@@ -946,10 +951,14 @@ class UNIV_PT_TD_PresetsManager(Panel):
         td_presets = univ_settings().texels_presets
         if len(td_presets) >= td_idx + 1:
             preset = td_presets[td_idx]
-            layout.prop(preset, 'texel')
-            row = layout.row(align=True)
-            row.prop(preset, 'size_x')
-            row.prop(preset, 'size_y')
+
+            split = layout.split(factor=0.5)
+            split.prop(preset, 'texel')
+            split.prop(preset, 'unit')
+
+            split = layout.split(factor=0.5)
+            split.prop(preset, 'size_x')
+            split.prop(preset, 'size_y')
 
 
 class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
@@ -1398,7 +1407,7 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
-        row.prop(settings, 'texel_density')
+        row.prop(settings, 'texel')
         row.operator('uv.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
 
@@ -1448,7 +1457,7 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
-        row.prop(settings, 'texel_density')
+        row.prop(settings, 'texel')
         row.operator('mesh.univ_select_texel_density', text='', icon_value=icons.arrow)
         row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
 

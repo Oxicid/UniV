@@ -304,9 +304,10 @@ class UNIV_OT_TD_PresetsProcessing(Operator):
 
         active_td_index = self.sanitize_index()
 
-        my_user = univ_settings().texels_presets.add()
-        my_user.name = str(round(univ_settings().texel_density))
-        my_user.texel = univ_settings().texel_density
+        my_user: preferences.UNIV_TexelPreset = univ_settings().texels_presets.add()
+        my_user.name = str(round(univ_settings().texel))
+        my_user.unit = univ_settings().texel_unit
+        my_user.texel = univ_settings().texel
         my_user.size_x = univ_settings().size_x
         my_user.size_y = univ_settings().size_y
         my_user.name += ' ' + utils.glob_resolutions_to_name()

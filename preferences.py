@@ -147,6 +147,44 @@ def _update_uv_layers_active_idx(self, context):
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
 
+units = (
+    ('cm', 'Centimeter', ''),
+    ('m', 'Meter', ''),
+    ('km', 'Kilometer', ''),
+    ('in', 'Inch', ''),
+    ('ft', 'Foot', ''),
+    ('yd', 'Yard', ''),
+    ('mi', 'Mile', ''),
+)
+
+
+def _set_transform_texel_unit(self, new_val, curr_val, is_set):
+    if not is_set or new_val == curr_val:
+        return new_val
+
+    old_unit = units[curr_val][0]
+    new_unit = units[new_val][0]
+
+    self.texel = utils.unit_conversion(
+        self.texel,
+        old_unit,
+        new_unit,
+    )
+    return new_val
+
+def _set_transform_preset_texel_unit(self, new_val, curr_val, is_set):
+    if not is_set or new_val == curr_val:
+        return new_val
+
+    old_unit = units[curr_val][0]
+    new_unit = units[new_val][0]
+
+    self.texel = utils.unit_conversion(
+        self.texel,
+        old_unit,
+        new_unit,
+    )
+    return new_val
 
 checker_generated_types = [
     ('UV_GRID', 'Grid', ''),
@@ -250,7 +288,12 @@ class UNIV_TrimPresetsSlot(bpy.types.PropertyGroup):
 
 # noinspection PyTypeHints
 class UNIV_TexelPreset(bpy.types.PropertyGroup):
-    texel: FloatProperty(name='Texel', default=512, min=1, max=100_000)
+    if bpy.app.version >= (5, 0, 0):
+        unit: EnumProperty(name='Unit', default='m', items=units, set_transform=_set_transform_preset_texel_unit)
+    else:
+        unit: EnumProperty(name='Unit', default='m', items=units)
+
+    texel: FloatProperty(name='Texel', default=512, min=0.01, max=100_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
     size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
@@ -288,7 +331,11 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
 
     # Texel Settings
     use_texel: BoolProperty(name='Use Texel', default=False, description='Set Texel from global values in operators')
-    texel_density: FloatProperty(name="Texel Density", default=512, min=1, max=100_000, precision=1,
+    if bpy.app.version >= (5, 0, 0):
+        texel_unit: EnumProperty(name='Unit', default='m', items=units, set_transform=_set_transform_texel_unit)
+    else:
+        texel_unit: EnumProperty(name='Unit', default='m', items=units)
+    texel: FloatProperty(name="Texel Density", default=512, min=0.01, max=100_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
@@ -563,6 +610,14 @@ Some operators, can interact with trims:
     @property
     def glob_size(self) -> tuple[int, int]:
         return int(prefs().size_x), int(prefs().size_y)
+
+    @property
+    def texel_density(self):
+        return utils.unit_conversion(self.texel, self.texel_unit, 'm')
+
+    @texel_density.setter
+    def texel_density(self, td):
+        self.texel = utils.unit_conversion(td, 'm', self.texel_unit)
 
     def draw(self, _context):
         layout = self.layout
