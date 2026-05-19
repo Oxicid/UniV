@@ -851,7 +851,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
                 return {'FINISHED'}
 
             td_preset = univ_settings().texels_presets[self.td_preset_idx]
-            self.texel = utils.unit_conversion(td_preset.texel, td_preset.unit, 'm')
+            self.texel = utils.unit_conversion(td_preset.texel, 'm', td_preset.unit)
             self.texture_size = (int(td_preset.size_x) + int(td_preset.size_y)) / 2
 
         self.umeshes = UMeshes(report=self.report)
@@ -1030,7 +1030,7 @@ class UNIV_OT_TexelDensityGet_VIEW3D(Operator):
             self.report({'WARNING'}, f"All faces has zero area")
             return {'CANCELLED'}
         texel = area_uv / area_3d
-        univ_settings().texel_density = bl_math.clamp(texel, 0.01, 100_000.0)
+        univ_settings().texel_density = bl_math.clamp(texel, 0.01, 850_000.0)
         utils.update_univ_panels()
         return {'FINISHED'}
 

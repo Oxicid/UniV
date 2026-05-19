@@ -158,8 +158,8 @@ units = (
 )
 
 
-def _set_transform_texel_unit(self, new_val, curr_val, is_set):
-    if not is_set or new_val == curr_val:
+def _set_transform_texel_unit(self, new_val, curr_val, _is_set):
+    if new_val == curr_val:
         return new_val
 
     old_unit = units[curr_val][0]
@@ -167,13 +167,13 @@ def _set_transform_texel_unit(self, new_val, curr_val, is_set):
 
     self.texel = utils.unit_conversion(
         self.texel,
-        old_unit,
         new_unit,
+        old_unit,
     )
     return new_val
 
-def _set_transform_preset_texel_unit(self, new_val, curr_val, is_set):
-    if not is_set or new_val == curr_val:
+def _set_transform_preset_texel_unit(self, new_val, curr_val, _is_set):
+    if new_val == curr_val:
         return new_val
 
     old_unit = units[curr_val][0]
@@ -181,8 +181,8 @@ def _set_transform_preset_texel_unit(self, new_val, curr_val, is_set):
 
     self.texel = utils.unit_conversion(
         self.texel,
-        old_unit,
         new_unit,
+        old_unit,
     )
     return new_val
 
@@ -293,7 +293,7 @@ class UNIV_TexelPreset(bpy.types.PropertyGroup):
     else:
         unit: EnumProperty(name='Unit', default='m', items=units)
 
-    texel: FloatProperty(name='Texel', default=512, min=0.01, max=100_000)
+    texel: FloatProperty(name='Texel', default=512, min=0.01, max=850_000)
     size_x: EnumProperty(name='Size X', default='2048', items=utils.resolutions)
     size_y: EnumProperty(name='Size Y', default='2048', items=utils.resolutions)
 
@@ -335,7 +335,7 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
         texel_unit: EnumProperty(name='Unit', default='m', items=units, set_transform=_set_transform_texel_unit)
     else:
         texel_unit: EnumProperty(name='Unit', default='m', items=units)
-    texel: FloatProperty(name="Texel Density", default=512, min=0.01, max=100_000, precision=1,
+    texel: FloatProperty(name="Texel Density", default=512, min=0.01, max=850_000, precision=1,
                                  description="The number of texture pixels (texels) per unit surface area in 3D space.")
     active_td_index: IntProperty(min=0, max=8, options={'SKIP_SAVE'})
     texels_presets: CollectionProperty(name="TD Presets", type=UNIV_TexelPreset)
@@ -613,11 +613,11 @@ Some operators, can interact with trims:
 
     @property
     def texel_density(self):
-        return utils.unit_conversion(self.texel, self.texel_unit, 'm')
+        return utils.unit_conversion(self.texel, 'm', self.texel_unit)
 
     @texel_density.setter
     def texel_density(self, td):
-        self.texel = utils.unit_conversion(td, 'm', self.texel_unit)
+        self.texel = utils.unit_conversion(td, self.texel_unit, 'm')
 
     def draw(self, _context):
         layout = self.layout
