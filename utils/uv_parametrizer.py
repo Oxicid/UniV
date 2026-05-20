@@ -1457,55 +1457,62 @@ class PChart:
                 # from ..draw import lines
                 # lines.LinesDrawSimple.draw_register([pin1.uv.copy(), pin2.uv.copy()], (1,0,0,1))
 
+            found_unique_pins = pin1 and pin2 and (pin1 != pin2)
+            if not found_unique_pins:
+                print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
+
             if seg.value == 'U':
-                if not pin1 or not pin2 or (pin1 == pin2):
-                    print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
+                if not found_unique_pins:
+                    if self.constr_h:
+                        e: PEdge = self.constr_h[0]
+                        pin1 = e.vert
+                        pin2 = e.next.vert
 
-                    e: PEdge = self.constr_h[0]
-                    pin1 = e.vert
-                    pin2 = e.next.vert
+                        pin1.uv[0] = 0.0
+                        pin1.uv[1] = 0.0
+                        pin2.uv[0] = 1.0
+                        pin2.uv[1] = 0.0
 
-                    pin1.uv[0] = 0.0
-                    pin1.uv[1] = 0.0
-                    pin2.uv[0] = 1.0
-                    pin2.uv[1] = 0.0
-                    # raise # TODO: Test
+                        return pin1, pin2
+
+
+                # TODO: Get center.x coord by weighted average by edge length
+                start = seg.start_co
+                if start.x > seg.end_co.x:
+                    card_dir = Vector((-1, 0))
                 else:
-                    # TODO: Get y coord by weighted
+                    card_dir = Vector((1, 0))
 
-                    start = seg.start_co
-                    if start.x > seg.end_co.x:
-                        card_dir = Vector((-1, 0))
-                    else:
-                        card_dir = Vector((1, 0))
-
-                    end = start + (card_dir * max(seg.length_uv, 0.001))
-                    pin2.uv[0] = end.x
-                    pin2.uv[1] = end.y
+                end = start + (card_dir * max(seg.length_uv, 0.001))
+                pin2.uv[0] = end.x
+                pin2.uv[1] = end.y
                 return pin1, pin2
+
             else:
-                if not pin1 or not pin2 or (pin1 == pin2):
-                    print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
-                    e: PEdge = self.constr_v[0]  # TODO: Get max edge length
-                    pin1 = e.vert
-                    pin2 = e.next.vert
+                if not found_unique_pins:
+                    if self.constr_v:
+                        e: PEdge = self.constr_v[0]  # TODO: Get max edge length
+                        pin1 = e.vert
+                        pin2 = e.next.vert
 
-                    pin1.uv[0] = 0.0
-                    pin1.uv[1] = 0.0
-                    pin2.uv[0] = 0.0
-                    pin2.uv[1] = 1.0
-                    # raise # TODO: Test
+                        pin1.uv[0] = 0.0
+                        pin1.uv[1] = 0.0
+                        pin2.uv[0] = 0.0
+                        pin2.uv[1] = 1.0
+
+                        return pin1, pin2
+
+
+                # TODO: Get center.y coord by weighted average by edge length
+                start = seg.start_co
+                if start.y > seg.end_co.y:
+                    card_dir = Vector((0, -1))
                 else:
-                    # TODO: Get y coord by weighted
-                    start = seg.start_co
-                    if start.y > seg.end_co.y:
-                        card_dir = Vector((0, -1))
-                    else:
-                        card_dir = Vector((0, 1))
+                    card_dir = Vector((0, 1))
 
-                    end = start + (card_dir * max(seg.length_uv, 0.001))
-                    pin2.uv[0] = end.x
-                    pin2.uv[1] = end.y
+                end = start + (card_dir * max(seg.length_uv, 0.001))
+                pin2.uv[0] = end.x
+                pin2.uv[1] = end.y
                 return pin1, pin2
         return None
 
@@ -2402,7 +2409,7 @@ class ParamHandleConstruct:
                                  uv: list[Vector], weight: list[float], pin: list[bool], select: list[bool]):
         """Fix overlap faces after triangulate, if exist"""
         nverts = len(co)
-        assert (nverts >= 3)
+        # assert (nverts >= 3)
 
         if nverts > 3:
             # Protect against (manifold) geometry which has a non-manifold triangulation.
@@ -2416,7 +2423,7 @@ class ParamHandleConstruct:
                 # For pentagons and higher, we might miss internal duplicate triangles, but note
                 # that such cases are rare if the source geometry is manifold and non-intersecting. */
                 pm: int = len(permute)
-                assert (pm > 3)
+                # assert (pm > 3)
                 i0: int = permute[i]
                 i1: int = permute[(i + 1) % pm]
                 i2: int = permute[(i + 2) % pm]
@@ -2434,6 +2441,7 @@ class ParamHandleConstruct:
                 permute.remove(i)
                 if len(permute) == 3:
                     break
+                i -= 1
 
             if len(permute) != nverts:
                 pm: int = len(permute)
