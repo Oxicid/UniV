@@ -652,7 +652,19 @@ class UNIV_OT_Check_Overlap(Operator):
         if umeshes.sync and umeshes.elem_mode != 'FACE':
             umeshes.elem_mode = 'FACE'
 
+        # In Blender 5.2.0, when `use_island_mode` is enabled,
+        # the `overlap` option selects the entire island rather than the overlapping edge itself.
+        # For Inspect, temporarily disable it.
+        restore_linked_selection_mode = False
+        if bpy.app.version >= (5, 2, 0) and bpy.context.tool_settings.use_uv_select_island:
+            restore_linked_selection_mode = True
+            bpy.context.tool_settings.use_uv_select_island = False
+
         bpy.ops.uv.select_overlap()
+
+        if restore_linked_selection_mode:
+            bpy.context.tool_settings.use_uv_select_island = True
+
 
         count = 0
         if check_mode == 'INEXACT':
@@ -894,8 +906,11 @@ class UNIV_OT_Check_Other(Operator):
             uv_maps_names.add('')
             for slot in umesh.obj.material_slots:
                 if (mtl := slot.material) and getattr(mtl, 'use_nodes', True):
-                    if non_valid_names := {f'{node.uv_map!r}' for node in mtl.node_tree.nodes
-                                           if node.type == 'UVMAP' and node.uv_map not in uv_maps_names}:
+                    non_valid_names = {f'{node.uv_map!r}'
+                                       for node in mtl.node_tree.nodes
+                                       if node.type == 'UVMAP' and node.uv_map not in uv_maps_names
+                                       }
+                    if non_valid_names:
                         error_description += f'Material {mtl.name!r} in {umesh.obj.name!r} object has non-valid UV Map name: '
                         error_description += ', '.join(non_valid_names) + '.\n'
         if error_description:
