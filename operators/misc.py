@@ -1584,9 +1584,14 @@ class UNIV_OT_CopyToLayer(Operator):
         if info:
             self.report({'WARNING'}, info)
 
-        # TODO: Split this for edit mode and obj?
-        for umesh in umeshes:
-            umesh.obj.update_tag()
+        if umeshes.is_edit_mode:
+            umeshes.silent_update()
+        else:
+            for umesh in umeshes:
+                umesh.obj.update_tag()
+            umeshes.free()
+            utils.update_area_by_type('VIEW_3D')
+
         return {'FINISHED'}
 
 
