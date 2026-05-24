@@ -927,7 +927,8 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             return {'FINISHED'}
 
     def pick_unwrap(self, **unwrap_kwargs):
-        if not (hit := self.ray_cast(prefs().max_pick_distance)):
+        hit = self.ray_cast(prefs().max_pick_distance)
+        if not hit:
             return {'CANCELLED'}
 
         umesh = hit.umesh
@@ -980,7 +981,8 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
             adv_island.calc_area_uv()
             adv_island.calc_area_3d(scale=umesh.value)
 
-            if (status := adv_island.set_texel(self.texel, self.texture_size)) is None:  # noqa
+            status = adv_island.set_texel(self.texel, self.texture_size)
+            if status is None:  # noqa
                 # zero_area_islands.append(isl)
                 pass
 

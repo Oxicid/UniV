@@ -121,7 +121,8 @@ class Shaders:
     @classmethod
     def init_functions(cls):
         global VK_ENABLED
-        if draw_engine_type := getattr(gpu.platform, "backend_type_get", None):
+        draw_engine_type = getattr(gpu.platform, "backend_type_get", None)
+        if draw_engine_type:
             VK_ENABLED = draw_engine_type() == "VULKAN"
 
         if VK_ENABLED:

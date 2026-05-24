@@ -693,7 +693,9 @@ class Align_by_Angle:
             for seg in grow_from_end:
                 if seg.is_start_lock:
                     continue
-                if (min_a := tar_vec.angle(seg[0].vec, 0)) < min_angle:
+
+                min_a = tar_vec.angle(seg[0].vec, 0)
+                if min_a < min_angle:
                     min_angle = min_a
                     min_seg = seg
 
@@ -737,7 +739,9 @@ class Align_by_Angle:
             for seg in grow_from_start:
                 if seg.is_end_lock:
                     continue
-                if (min_a := tar_vec.angle(seg[-1].vec, 0)) < min_angle:
+
+                min_a = tar_vec.angle(seg[-1].vec, 0)
+                if min_a < min_angle:
                     min_angle = min_a
                     min_seg = seg
 
@@ -1392,7 +1396,8 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 view_box_sync_block.skip_from_param(umesh, select=True)
 
                 uv = umesh.uv
-                if lgs := LoopGroup.calc_dirt_loop_groups(umesh):
+                lgs = LoopGroup.calc_dirt_loop_groups(umesh)
+                if lgs:
                     umesh.tag_visible_corners()  # TODO: Delete, use pair linked with ms for extend from linked
                     for lg in lgs:
                         if view_box_sync_block.isect_lg(lg):
@@ -1695,7 +1700,8 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -1706,20 +1712,23 @@ class UNIV_OT_Flip_VIEW3D(Operator):
 
     def flip_by_cursor(self, cursor):
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
     def flip_individual(self):
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
 
     def flip_flipped(self):
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
             umesh.update_tag = bool(islands)
@@ -1895,7 +1904,8 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
             umesh.update_tag = bool(islands)
@@ -1907,13 +1917,15 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
     def rotate_by_cursor(self):
         cursor = utils.get_cursor_location()
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 islands.rotate(self.angle, pivot=cursor, aspect=umesh.aspect)
             umesh.update_tag = bool(islands)
 
     def rotate_individual(self):
         for umesh in self.umeshes:
-            if islands := self.calc_island_type(umesh):
+            islands = self.calc_island_type(umesh)
+            if islands:
                 for island in islands:
                     island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=island.umesh.aspect)
             umesh.update_tag = bool(islands)
@@ -2031,7 +2043,8 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def sort_overlapped_preprocessing(self):
         all_islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := self.islands_calc_type(umesh):
+            adv_islands = self.islands_calc_type(umesh)
+            if adv_islands:
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 all_islands.extend(adv_islands)
@@ -2063,7 +2076,8 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
         all_islands: list[AdvIsland] | list[AdvIslands] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := self.islands_calc_type(umesh):
+            adv_islands = self.islands_calc_type(umesh)
+            if adv_islands:
                 if self.orient:
                     for island in adv_islands:
                         isl_coords = island.calc_convex_points()
@@ -2373,7 +2387,8 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         all_islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in self.umeshes:
-            if adv_islands := self.islands_calc_type(umesh):
+            adv_islands = self.islands_calc_type(umesh)
+            if adv_islands:
                 general_bbox.union(adv_islands.calc_bbox())
                 all_islands.extend(adv_islands)
         return all_islands, general_bbox
@@ -2381,7 +2396,8 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def distribute_preprocessing_overlap(self):
         all_islands: list[AdvIsland] = []
         for umesh in self.umeshes:
-            if adv_islands := self.islands_calc_type(umesh):
+            adv_islands = self.islands_calc_type(umesh)
+            if adv_islands:
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
                 all_islands.extend(adv_islands)
@@ -2478,7 +2494,8 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
                 if len(isl) < 2:
                     continue
 
-                if len(sub_islands := isl.calc_sub_islands_all().islands) <= 1:
+                sub_islands = isl.calc_sub_islands_all().islands
+                if len(sub_islands) <= 1:
                     continue
 
                 if self.is_horizontal(isl.bbox):
@@ -2539,10 +2556,9 @@ class UNIV_OT_Home(Operator):
         self.gn_mod_counter = 0
         self.shift_attrs_counter = 0
 
-        cursor_loc = Vector((0, 0))
-        if self.to_cursor and not (cursor_loc := utils.get_tile_from_cursor()):
-            self.report({'WARNING'}, "Cursor not found")
-            return {'CANCELLED'}
+        cursor_loc_delta = Vector((0, 0))
+        if self.to_cursor:
+            cursor_loc_delta = utils.get_tile_from_cursor()
 
         self.umeshes = UMeshes.calc_any_unique(verify_uv=False)
 
@@ -2589,7 +2605,7 @@ class UNIV_OT_Home(Operator):
         counter = 0
         for umesh in self.umeshes:
             for island in self.islands_calc_type(umesh):  # noqa
-                counter += self.home(island, cursor_loc)
+                counter += self.home(island, cursor_loc_delta)
 
         if counter or report_info:
             if report_info:
@@ -2896,44 +2912,72 @@ class UNIV_OT_Shift(Operator):
         if not node_group:
             return True
 
-        if len(nodes := node_group.nodes) != 7:
+        nodes = node_group.nodes
+        if len(nodes) != 7:
             return True
 
-        if not (output_node := [n for n in nodes if n.bl_idname == 'NodeGroupOutput']) or \
-                not output_node[0].inputs or not (output_links := output_node[0].inputs[0].links):
+        output_node = [n for n in nodes if n.bl_idname == 'NodeGroupOutput']
+        if not output_node or not output_node[0].inputs:
             return True
 
-        if (store_attr_node := output_links[0].from_node).bl_idname != 'GeometryNodeStoreNamedAttribute' or \
-                store_attr_node.data_type != 'FLOAT2' and store_attr_node.domain != 'CORNER':
+        output_links = output_node[0].inputs[0].links
+        if not output_links:
             return True
 
-        if not (store_attr_node_geometry_links := store_attr_node.inputs[0].links) or \
-                (store_attr_node_geometry_links[0].from_node.bl_idname != 'NodeGroupInput'):
+        store_attr_node = output_links[0].from_node
+        if store_attr_node.bl_idname != 'GeometryNodeStoreNamedAttribute':
             return True
 
-        if not (store_attr_node_name_links := store_attr_node.inputs['Name'].links) or \
-                store_attr_node_name_links[0].from_node.bl_idname != 'NodeGroupInput':
+        if store_attr_node.data_type != 'FLOAT2' or store_attr_node.domain != 'CORNER':
             return True
 
-        if not (store_attr_node_value_links := store_attr_node.inputs['Value'].links) or \
-                (vector_node := store_attr_node_value_links[0].from_node).bl_idname != 'ShaderNodeVectorMath':
+        store_attr_node_geometry_links = store_attr_node.inputs[0].links
+        if not store_attr_node_geometry_links or (store_attr_node_geometry_links[0].from_node.bl_idname != 'NodeGroupInput'):
+            return True
+
+        store_attr_node_name_links = store_attr_node.inputs['Name'].links
+        if not store_attr_node_name_links or store_attr_node_name_links[0].from_node.bl_idname != 'NodeGroupInput':
+            return True
+
+        store_attr_node_value_links = store_attr_node.inputs['Value'].links
+        if not store_attr_node_value_links:
+            return True
+
+        vector_node = store_attr_node_value_links[0].from_node
+        if vector_node.bl_idname != 'ShaderNodeVectorMath':
             return True
 
         if vector_node.operation != 'ADD':
             return True
 
-        if not (vector_node_a_links := vector_node.inputs[0].links) or not (
-                vector_node_b_links := vector_node.inputs[1].links):
+        vector_node_a_links = vector_node.inputs[0].links
+        if not vector_node_a_links:
             return True
 
-        if (uvmap_node := vector_node_a_links[0].from_node).bl_idname != 'GeometryNodeInputNamedAttribute' or \
-                not (uvmap_name_links := uvmap_node.inputs['Name'].links) or \
-                uvmap_name_links[0].from_node.bl_idname != 'NodeGroupInput' or uvmap_node.data_type != 'FLOAT_VECTOR':  # noqa
+        vector_node_b_links = vector_node.inputs[1].links
+        if not vector_node_b_links:
             return True
 
-        if (combine_xyz_node := vector_node_b_links[0].from_node).bl_idname != 'ShaderNodeCombineXYZ' or \
-                not (x_links := combine_xyz_node.inputs['X'].links) or \
-                (shift_node := x_links[0].from_node).bl_idname != 'GeometryNodeInputNamedAttribute':  # noqa
+        uvmap_node = vector_node_a_links[0].from_node
+        if uvmap_node.bl_idname != 'GeometryNodeInputNamedAttribute':
+            return True
+
+        uvmap_name_links = uvmap_node.inputs['Name'].links
+        if (not uvmap_name_links or
+                uvmap_name_links[0].from_node.bl_idname != 'NodeGroupInput' or
+                uvmap_node.data_type != 'FLOAT_VECTOR'):
+            return True
+
+        combine_xyz_node = vector_node_b_links[0].from_node
+        if combine_xyz_node.bl_idname != 'ShaderNodeCombineXYZ':
+            return True
+
+        x_links = combine_xyz_node.inputs['X'].links
+        if not x_links:
+            return True
+
+        shift_node = x_links[0].from_node
+        if shift_node.bl_idname != 'GeometryNodeInputNamedAttribute':
             return True
 
         if shift_node.data_type != 'BOOLEAN' or shift_node.inputs['Name'].default_value != 'univ_shift':
@@ -2972,7 +3016,8 @@ class UNIV_OT_Shift(Operator):
         vector_add_node = create_node(type="ShaderNodeVectorMath")
         vector_add_node.location = (-180, -180)
 
-        if iface := getattr(node_group, 'interface', None):
+        iface = getattr(node_group, 'interface', None)
+        if iface:
             iface.new_socket('Input', description="", in_out='INPUT', socket_type='NodeSocketGeometry')
             iface.new_socket('UVMap', description="", in_out='INPUT', socket_type='NodeSocketString')
             iface.new_socket('Output', description="", in_out='OUTPUT', socket_type='NodeSocketGeometry')
@@ -3766,7 +3811,8 @@ class UNIV_OT_Gravity_VIEW2D(Operator):
                     else:  # avg_normal.x == max_size:
                         angle = self.calc_world_orient_angle(uv, mtx, calc_loops, y, z, avg_normal.x < 0, False, aspect)
 
-                    if angle := (angle + self.additional_angle):
+                    angle = (angle + self.additional_angle)
+                    if angle:
                         umesh.update_tag |= island.rotate(angle, pivot=island.bbox.center, aspect=aspect)
             else:
                 self.skip_count += 1
@@ -3905,7 +3951,8 @@ class UNIV_OT_Pack(Operator):
         uvpm_settings.heuristic_max_wait_time = time_in_sec
         uvpm_settings.heuristic_search_time = time_in_sec * 4
 
-        if size := utils.get_active_image_size():
+        size = utils.get_active_image_size()
+        if size:
             uvpm_settings.tex_ratio = size[0] != size[1]
         else:
             uvpm_settings.tex_ratio = False

@@ -109,7 +109,8 @@ class QuickSnap_KDMeshes:
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_visible_uv_faces(umesh):
+            faces = utils.calc_visible_uv_faces(umesh)
+            if faces:
                 f_isl = FaceIsland(faces, umesh)
                 isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
@@ -123,7 +124,8 @@ class QuickSnap_KDMeshes:
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_selected_uv_faces(umesh):
+            faces = utils.calc_selected_uv_faces(umesh)
+            if faces:
                 f_isl = FaceIsland(faces, umesh)
                 isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
@@ -137,7 +139,8 @@ class QuickSnap_KDMeshes:
 
         kdmeshes = []
         for umesh in self.umeshes:
-            if faces := utils.calc_unselected_uv_faces(umesh):
+            faces = utils.calc_unselected_uv_faces(umesh)
+            if faces:
                 f_isl = FaceIsland(faces, umesh)
                 isl = Islands([f_isl], umesh)
                 kdmesh = KDMesh(umesh, isl)
@@ -160,7 +163,8 @@ class QuickSnap_KDMeshes:
     def calc_island_kdmeshes(self, extended=False):
         kdmeshes = []
         for umesh in self.umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+            islands = Islands.calc_extended_or_visible(umesh, extended=extended)
+            if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -169,7 +173,8 @@ class QuickSnap_KDMeshes:
     def recalc_island_kd_meshes(self):
         kdmeshes = []
         for umesh in self.umeshes:
-            if islands := Islands.calc_non_selected_extended(umesh):
+            islands = Islands.calc_non_selected_extended(umesh)
+            if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 kdmeshes.append(kdmesh)
@@ -391,7 +396,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         if event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
             return self.exit()
 
-        if axis_sliding_event := event.type in ('X', 'Y') and event.value == 'PRESS':
+        axis_sliding_event = event.type in ('X', 'Y')
+        if axis_sliding_event and event.value == 'PRESS':
             if event.type == 'X':
                 if self.axis == 'X':
                     self.axis = ''
@@ -419,7 +425,13 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.points = self.find_range()
             self.refresh_draw_points()
 
-            if not event.ctrl and (kd_data := self.find_nearest_target_pt()):
+            kd_data = None
+            is_snapped = not event.ctrl
+            if is_snapped:
+                kd_data = self.find_nearest_target_pt()
+                is_snapped = kd_data
+
+            if is_snapped:
                 self.nearest_point[0] = kd_data.pt
                 pos = kd_data.pt.to_2d()
             else:
@@ -448,7 +460,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.points = self.find_range()
             self.refresh_draw_points()
 
-            if kd_data := self.find():
+            kd_data = self.find()
+            if kd_data:
                 self.nearest_point[0] = kd_data.pt
             else:
                 self.nearest_point[0] = Vector((inf, inf, inf))
@@ -497,7 +510,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                 self.calc_island_kdmeshes(extended=False)
                 self.visible = True
                 if not self.kdmeshes:
-                    return {'CANCELLED'}
+                    return
         else:
             if self.sync:
                 if bpy.context.tool_settings.mesh_select_mode[2]:  # FACE
@@ -813,8 +826,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, f"Grid: {'Enabled' if GlobalSnapFlags.grid_snap else 'Disabled'}")
 
-        if (text := self.snap_points_mode.name if self.snap_points_mode else 'NONE') is None:
+        text = self.snap_points_mode.name if self.snap_points_mode else 'NONE'
+        if text is None:
             text = str(self.snap_points_mode).split('.')[1]
+
         blf.position(font_id, first_col, 20 + text_y_size*3, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
         blf.draw(font_id, '(Shift) 1-4')
@@ -852,11 +867,13 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.umeshes.umeshes = [self.move_object.umesh]
 
         elif isinstance(self.move_object, UnionIslands):
-            assert (umeshes := list({isl.umesh for isl in self.move_object}))
+            umeshes = list({isl.umesh for isl in self.move_object})
+            assert umeshes
             self.umeshes.umeshes = umeshes
 
         elif isinstance(self.move_object, UnionLoopGroup):
-            assert (umeshes := list({lg.umesh for lg in self.move_object}))
+            umeshes = list({lg.umesh for lg in self.move_object})
+            assert umeshes
             self.umeshes.umeshes = umeshes
 
         elif isinstance(self.move_object, LoopGroup):

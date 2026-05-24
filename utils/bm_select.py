@@ -219,9 +219,11 @@ else:
                             v2_co = crn.link_loop_next[uv].uv
                             pair_crn = crn.link_loop_radial_prev
 
-                            if pair_crn.face.select and not (pair_crn_uv := pair_crn[uv]).select_edge:
-                                if v2_co == pair_crn_uv.uv and vert_co_a == pair_crn.link_loop_next[uv].uv:
-                                    pair_crn_uv.select_edge = True
+                            if pair_crn.face.select:
+                                pair_crn_uv = pair_crn[uv]
+                                if not pair_crn_uv.select_edge:
+                                    if v2_co == pair_crn_uv.uv and vert_co_a == pair_crn.link_loop_next[uv].uv:
+                                        pair_crn_uv.select_edge = True
             return select_set
 
         return inner(umesh.uv, umesh.sync)
@@ -291,7 +293,8 @@ if USE_GENERIC_UV_SYNC:
                         to_deselect = []
                         # When deselecting uv_vert_select, make sure that there are no linked selected edges.
                         # Deselect A
-                        for linked_crn in (link_loops := crn.vert.link_loops):
+                        link_loops = crn.vert.link_loops
+                        for linked_crn in link_loops:
                             if not face_is_invisible(linked_crn.face):
                                 if linked_crn[uv].uv == v1_co:
                                     to_deselect.append(linked_crn)
@@ -312,7 +315,8 @@ if USE_GENERIC_UV_SYNC:
                         to_deselect.clear()
 
                         # Deselect B
-                        for linked_crn in (link_loops := crn.link_loop_next.vert.link_loops):
+                        link_loops = crn.link_loop_next.vert.link_loops
+                        for linked_crn in link_loops:
                             if not face_is_invisible(linked_crn.face):
                                 if linked_crn[uv].uv == v2_co:
                                     to_deselect.append(linked_crn)
@@ -354,9 +358,11 @@ else:
                     pair_crn = crn.link_loop_radial_prev
                     if state:
                         crn_uv.select_edge = True
-                        if pair_crn.face.select and not (pair_crn_uv := pair_crn[uv]).select_edge:
-                            if v2_co == pair_crn_uv.uv and v1_co == pair_crn.link_loop_next[uv].uv:
-                                pair_crn_uv.select_edge = True
+                        if pair_crn.face.select:
+                            pair_crn_uv = pair_crn[uv]
+                            if not pair_crn_uv.select_edge:
+                                if v2_co == pair_crn_uv.uv and v1_co == pair_crn.link_loop_next[uv].uv:
+                                    pair_crn_uv.select_edge = True
 
                         # Select A
                         for linked_crn_ in crn.vert.link_loops:
@@ -372,9 +378,11 @@ else:
                                     linked_crn_uv_.select = True
                     else:
                         crn_uv.select_edge = False
-                        if pair_crn.face.select and (pair_crn_uv := pair_crn[uv]).select_edge:
-                            if v2_co == pair_crn_uv.uv and v1_co == pair_crn.link_loop_next[uv].uv:
-                                pair_crn_uv.select_edge = False
+                        if pair_crn.face.select:
+                            pair_crn_uv = pair_crn[uv]
+                            if pair_crn_uv.select_edge:
+                                if v2_co == pair_crn_uv.uv and v1_co == pair_crn.link_loop_next[uv].uv:
+                                    pair_crn_uv.select_edge = False
 
                         to_deselect = []
                         has_linked_selected_edge = False
@@ -502,7 +510,8 @@ if USE_GENERIC_UV_SYNC:
         from .bm_tag import shared_is_linked
         from .bm_walk import linked_crn_uv_by_island_index_unordered_included
 
-        if (shared := crn.link_loop_radial_prev) != crn:
+        shared = crn.link_loop_radial_prev
+        if shared != crn:
             if shared.face.index == idx:
                 if shared_is_linked(crn, shared, uv):
                     shared.uv_select_edge = True
@@ -532,7 +541,8 @@ else:
         from .bm_tag import shared_is_linked
         from .bm_walk import linked_crn_uv_by_island_index_unordered_included
 
-        if (shared := crn.link_loop_radial_prev) != crn:
+        shared = crn.link_loop_radial_prev
+        if shared != crn:
             if shared.face.index == idx:
                 if shared_is_linked(crn, shared, uv):
                     shared[uv].select_edge = True

@@ -309,7 +309,8 @@ def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
     bm_iter = first
     first_co = first[uv].uv
     while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
+        bm_iter = prev_disc(bm_iter)
+        if bm_iter == first:
             break
         if not bm_iter.tag:
             continue
@@ -326,7 +327,8 @@ def linked_crn_vert_uv_for_transform(first, uv):
     bm_iter = first
     first_co = first[uv].uv
     while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
+        bm_iter = prev_disc(bm_iter)
+        if bm_iter == first:
             break
         if not bm_iter.tag:
             continue
@@ -342,7 +344,8 @@ def linked_crn_vert_uv_for_transform(first, uv):
 
         bm_iter = next_crn
         while True:
-            if (bm_iter := prev_disc(bm_iter)) == next_crn:
+            bm_iter = prev_disc(bm_iter)
+            if bm_iter == next_crn:
                 break
             if not bm_iter.tag:
                 continue
@@ -370,7 +373,8 @@ def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
     linked = [first]
     bm_iter = first
     while True:
-        if (bm_iter := prev_disc(bm_iter)) == first:
+        bm_iter = prev_disc(bm_iter)
+        if bm_iter == first:
             break
         if bm_iter.face.index == face_index and first[uv].uv == bm_iter[uv].uv:
             linked.append(bm_iter)
@@ -568,7 +572,9 @@ class ShortPath:
                 # This means we only step onto `l->prev` & `l->next`.
                 if l_b == l.link_loop_next:
                     l_b = l.link_loop_prev.link_loop_prev
-                if (l_b := l_b.link_loop_next) == l:
+
+                l_b = l_b.link_loop_next
+                if l_b == l:
                     break
 
     @staticmethod
@@ -621,7 +627,8 @@ class ShortPath:
                 # assert l.face.index == l_dst.face.index
                 while True:
                     path.appendleft(l)
-                    if not (l := loops_prev[l.index]):
+                    l = loops_prev[l.index]
+                    if not l:
                         break
                 break
 

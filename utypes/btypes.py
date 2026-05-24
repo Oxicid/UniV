@@ -553,7 +553,8 @@ class ARegion(StructBase):
                 raise AttributeError(f'Category \'{name.decode("utf-8")}\' not found in {available_categories}')
 
             # Check for the possibility to set an active category (for the presence of an allocated memory cell)
-            if not (category_history := list(category for category in c_region.panels_category_active)):
+            category_history = [category for category in c_region.panels_category_active]
+            if not category_history:
                 raise AttributeError(
                     f'Unable to set a category because Blender did not allocate memory for active panels')
 

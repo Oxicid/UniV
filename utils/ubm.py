@@ -45,7 +45,8 @@ def calc_face_area_3d(f, scale) -> float:
 
 def calc_face_area_uv(f, uv) -> float:
     corners = f.loops
-    if (n := len(corners)) == 4:
+    n = len(corners) == 4
+    if n:
         l1 = corners[0][uv].uv
         l2 = corners[1][uv].uv
         l3 = corners[2][uv].uv
@@ -113,16 +114,17 @@ def calc_total_area_3d(faces, scale):
 
 
 def calc_max_length_uv_crn_for_save_transform(corners, uv) -> BMLoop:
-    length = -1.0
-    crn_ = corners[-1]
-    prev_co = crn_[uv].uv
+    max_length = -1.0
+    max_crn = corners[-1]
+    prev_co = max_crn[uv].uv
     for crn in corners:
         curr_co = crn[uv].uv
-        if length < (length_ := (prev_co - curr_co).length_squared):
-            crn_ = crn
-            length = length_
+        new_length = (prev_co - curr_co).length_squared
+        if new_length > max_length:
+            max_crn = crn
+            max_length = new_length
         prev_co = curr_co
-    return crn_.link_loop_prev
+    return max_crn.link_loop_prev
 
 def calc_max_length_uv_crn_with_dist(corners, uv):
     max_length = -1.0
@@ -132,7 +134,8 @@ def calc_max_length_uv_crn_with_dist(corners, uv):
     for crn in corners:
         v1_ = crn[uv].uv
         v2_ = crn.link_loop_next[uv].uv
-        if (new_length := (v1_ - v2_).length) > max_length:
+        new_length = (v1_ - v2_).length
+        if new_length > max_length:
             v1 = v1_
             v2 = v2_
             max_length = new_length
@@ -185,7 +188,8 @@ def is_flipped_uv(f, uv) -> bool:
 
 def point_inside_face(pt, f, uv):
     corners = f.loops
-    if (n := len(corners)) == 4:
+    n = len(corners)
+    if n == 4:
         p1 = corners[0][uv].uv
         p2 = corners[1][uv].uv
         p3 = corners[2][uv].uv

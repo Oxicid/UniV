@@ -45,7 +45,8 @@ def add_mesh_keymaps(km, univ_pro):
 def add_keymaps():
     global keys
 
-    if not (kc := bpy.context.window_manager.keyconfigs.addon):
+    kc = bpy.context.window_manager.keyconfigs.addon
+    if not kc:
         return  # Can be None in background mode.
 
     try:
@@ -319,7 +320,8 @@ def add_keymaps():
 
 def add_keymaps_ws():
     global keys_ws
-    if not (kc := bpy.context.window_manager.keyconfigs.addon):
+    kc = bpy.context.window_manager.keyconfigs.addon
+    if not kc:
         return  # Can be None in background mode.
 
     try:

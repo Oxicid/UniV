@@ -232,7 +232,8 @@ class UNIV_OT_LinearGradient(Operator):
             output_min, output_max = output_max, output_min
 
         x_or_y_component = 0
-        if is_vertical := (self.axis == 'VERTICAL'):
+        is_vertical = (self.axis == 'VERTICAL')
+        if is_vertical:
             x_or_y_component = 1
 
         for umesh in umeshes:
@@ -298,7 +299,8 @@ class UNIV_OT_TD_PresetsProcessing(Operator):
         return {'FINISHED'}
 
     def add(self):
-        if len(td_presets := univ_settings().texels_presets) >= 8:
+        td_presets = univ_settings().texels_presets
+        if len(td_presets) >= 8:
             self.report({'WARNING'}, 'The preset limit of 8 units has been reached')
             return
 
@@ -320,7 +322,8 @@ class UNIV_OT_TD_PresetsProcessing(Operator):
             univ_settings().active_td_index = len(td_presets) - 1
 
     def remove(self):
-        if not len(td_presets := univ_settings().texels_presets):
+        td_presets = univ_settings().texels_presets
+        if not len(td_presets):
             self.report({'WARNING'}, 'The preset is empty')
             return
         active_td_index = self.sanitize_index()
@@ -371,7 +374,7 @@ class UNIV_OT_Join(Operator):
 
         if active_obj_type == 'MESH':
             objects = utils.calc_any_unique_obj()
-            removed_extra_channels_counter = sum(self.sanitize_uv(obj.data) for obj in objects)
+            removed_extra_channels_counter = sum(self.sanitize_uv(self.report, obj.data) for obj in objects)
 
             uv_names, conflicts_counter = self.sanitize_attr_names_and_get_names(objects)
 
@@ -379,7 +382,7 @@ class UNIV_OT_Join(Operator):
             added_uvs_counter = 0
             for obj in objects:
                 added_uvs_counter += self.add_missed_uvs(obj, max_uv_size)
-                self.rename_uvs(uv_names, obj.data)
+                self.rename_uvs(self.report, uv_names, obj.data)
 
             info = ''
             if conflicts_counter:
@@ -456,7 +459,8 @@ class UNIV_OT_Join(Operator):
                 mesh.uv_layers.new(do_init=True)
         return target_size - mesh_uv_size
 
-    def rename_uvs(self, names, mesh):
+    @staticmethod
+    def rename_uvs(report, names, mesh):
         assert len(mesh.uv_layers) == len(names)
         changed = False
         for _ in range(10):
@@ -469,16 +473,17 @@ class UNIV_OT_Join(Operator):
             if renamed:
                 return changed
         if preferences.debug():
-            self.report({'WARNING'}, f'Mesh {mesh.name} do not rename uv layers')
+            report({'WARNING'}, f'Mesh {mesh.name} do not rename uv layers')
         return changed
 
-    def sanitize_uv(self, mesh):
+    @staticmethod
+    def sanitize_uv(report, mesh):
         counter = 0
         if len(mesh.uv_layers) > 8:
             for uv in reversed(mesh.uv_layers[8:]):
                 mesh.uv_layers.remove(uv)
                 counter += 1
-            self.report({'WARNING'}, f'Mesh {mesh.name} delete {counter} extra channels')
+            report({'WARNING'}, f'Mesh {mesh.name} delete {counter} extra channels')
         return counter
 
 
@@ -489,10 +494,6 @@ class UNIV_OT_Hide(Operator):
     bl_description = f"Hide selected or unselected UV"
     # noinspection PyTypeHints
     unselected: BoolProperty(name='Unselected', default=False)
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if not (context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV'):
@@ -512,6 +513,10 @@ class UNIV_OT_Hide(Operator):
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
+        if bpy.context.mode != 'EDIT_MESH':
+            self.report({'WARNING'}, 'Expect Edit Mode.')
+            return {'CANCELLED'}
+
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
         if not self.umeshes.sync:
@@ -534,7 +539,10 @@ class UNIV_OT_Hide(Operator):
         if utils.USE_GENERIC_UV_SYNC:
             return bpy.ops.uv.hide(unselected=self.unselected)
 
+
+        # ================================================================================
         # Legacy
+        # ================================================================================
 
         # Unselected
         if self.unselected:
@@ -723,7 +731,8 @@ class UNIV_OT_SetCursor2D(Operator):
         if REPEAT_MOUSE_POS_COUNT != 1:
             if context.mode == 'EDIT_MESH' and REPEAT_MOUSE_POS_COUNT == 0:
                 grid_pt = Vector(utils.round_threshold(v, 1/2) for v in mouse_pos)
-                if (grid_dist := (grid_pt - mouse_pos).length * 2.0) < min_dist:
+                grid_dist = (grid_pt - mouse_pos).length * 2.0
+                if grid_dist < min_dist:
                     pt = grid_pt
                     min_dist = grid_dist
             else:
@@ -732,7 +741,8 @@ class UNIV_OT_SetCursor2D(Operator):
                 divider = divider if zoom <= 12800 else 1 / 64 / 8
 
                 grid_pt = Vector(utils.round_threshold(v, divider) for v in mouse_pos)
-                if (grid_dist := (grid_pt - mouse_pos).length) < min_dist:
+                grid_dist = (grid_pt - mouse_pos).length
+                if grid_dist < min_dist:
                     pt = grid_pt
                     min_dist = grid_dist
 
@@ -751,18 +761,21 @@ class UNIV_OT_SetCursor2D(Operator):
                         prev_co = corners[-1][uv].uv
                         for crn in corners:
                             cur_co = crn[uv].uv
-                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                            dist = (cur_co - mouse_pos).length
+                            if dist < min_dist:
                                 pt = cur_co
                                 min_dist = dist
                             edge_center = (prev_co + cur_co) * 0.5
-                            if (dist := (edge_center - mouse_pos).length) < min_dist:
+                            dist = (edge_center - mouse_pos).length
+                            if dist < min_dist:
                                 pt = edge_center
                                 min_dist = dist
 
                             prev_co = cur_co
                             face_center_sum += cur_co
                         face_center = face_center_sum / len(corners)
-                        if (dist := (face_center - mouse_pos).length) < min_dist:
+                        dist = (face_center - mouse_pos).length
+                        if dist < min_dist:
                             pt = face_center
                             min_dist = dist
 
@@ -770,7 +783,8 @@ class UNIV_OT_SetCursor2D(Operator):
                     for f in utils.calc_visible_uv_faces_iter(umesh):
                         for crn in f.loops:
                             uv_co = crn[uv].uv
-                            if (length := (mouse_pos - uv_co).length) < min_dist:
+                            length = (mouse_pos - uv_co).length
+                            if length < min_dist:
                                 pt = uv_co
                                 min_dist = length
                 elif umeshes.elem_mode == 'EDGE':
@@ -779,11 +793,13 @@ class UNIV_OT_SetCursor2D(Operator):
                         prev_co = corners[-1][uv].uv
                         for crn in corners:
                             cur_co = crn[uv].uv
-                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                            dist = (cur_co - mouse_pos).length
+                            if dist < min_dist:
                                 pt = cur_co
                                 min_dist = dist
                             edge_center = (prev_co + cur_co) * 0.5
-                            if (dist := (edge_center - mouse_pos).length) < min_dist:
+                            dist = (edge_center - mouse_pos).length
+                            if dist < min_dist:
                                 pt = edge_center
                                 min_dist = dist
                             prev_co = cur_co
@@ -793,12 +809,14 @@ class UNIV_OT_SetCursor2D(Operator):
                         corners = f.loops
                         for crn in corners:
                             cur_co = crn[uv].uv
-                            if (dist := (cur_co - mouse_pos).length) < min_dist:
+                            dist = (cur_co - mouse_pos).length
+                            if dist < min_dist:
                                 pt = cur_co
                                 min_dist = dist
                             face_center_sum += cur_co
                         face_center = face_center_sum / len(corners)
-                        if (dist := (face_center - mouse_pos).length) < min_dist:
+                        dist = (face_center - mouse_pos).length
+                        if dist < min_dist:
                             pt = face_center
                             min_dist = dist
 
@@ -827,20 +845,23 @@ class UNIV_OT_SetCursor2D(Operator):
 
         for trim in utils.get_trim_bboxes():
             center = trim.center
-            if (dist := (center - mouse_pos).length) < min_dist:
+            new_dist = (center - mouse_pos).length
+            if new_dist < min_dist:
                 pt = center
-                min_dist = dist
+                min_dist = new_dist
 
             for crn_pt in trim.draw_data_verts():
-                if (dist := (crn_pt - mouse_pos).length) < min_dist:
+                new_dist = (crn_pt - mouse_pos).length
+                if new_dist < min_dist:
                     pt = crn_pt
-                    min_dist = dist
+                    min_dist = new_dist
 
             for (line_a, line_b) in utils.reshape_to_pair(trim.draw_data_lines()):
                 line_center = (line_a + line_b) * 0.5
-                if (dist := (line_center - mouse_pos).length) < min_dist:
+                new_dist = (line_center - mouse_pos).length
+                if new_dist < min_dist:
                     pt = line_center
-                    min_dist = dist
+                    min_dist = new_dist
 
         return pt, min_dist
 
@@ -1139,7 +1160,8 @@ class UNIV_OT_UV_Layers_Manager(Operator):
 
     @staticmethod
     def sanitize_size(presets):
-        if (size := len(presets)) == 8:
+        size = len(presets)
+        if size == 8:
             return
 
         if size < 8:
@@ -1174,18 +1196,14 @@ class UNIV_OT_MoveUpDownBase(Operator):
     # noinspection PyTypeHints
     with_names: BoolProperty(default=False, options={'HIDDEN'})
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-        # and (settings := univ_settings()).uv_layers_size != settings.uv_layers_active_idx+1  TODO: Bug report
-
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
         self.with_names = not event.alt
         return self.execute(context)
 
-    def move_uv_bm(self, obj, idx, up, with_names=False):
+    @classmethod
+    def move_uv_bm(cls, obj, idx, up, with_names=False):
         idx_inc_dec = 1
         layers = obj.data.uv_layers
         if up:
@@ -1198,9 +1216,9 @@ class UNIV_OT_MoveUpDownBase(Operator):
 
         other_idx = idx - idx_inc_dec
         if bpy.context.mode == 'EDIT_MESH':
-            self._swap_uv_bm(obj, idx, other_idx, with_names)
+            cls._swap_uv_bm(obj, idx, other_idx, with_names)
         else:
-            self._swap_uv_mesh(obj, idx, other_idx, with_names)
+            cls._swap_uv_mesh(obj, idx, other_idx, with_names)
         return True
 
     @staticmethod
@@ -1274,7 +1292,12 @@ class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
             self.report({'WARNING'}, 'Cannot move up')
             return {'CANCELLED'}
 
-        for obj in utils.calc_any_unique_obj():
+        selected_objects = utils.calc_any_unique_obj()
+        if not selected_objects:
+            self.report({'WARNING'}, "Not found uvs or selected mesh objects.")
+            return {'CANCELLED'}
+
+        for obj in selected_objects:
             if self.move_uv_bm(obj, settings.uv_layers_active_idx, up=True, with_names=self.with_names):
                 if bpy.context.mode == 'EDIT_MESH':
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
@@ -1293,7 +1316,12 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
             self.report({'WARNING'}, 'Cannot move down')
             return {'CANCELLED'}
 
-        for obj in utils.calc_any_unique_obj():
+        selected_objects = utils.calc_any_unique_obj()
+        if not selected_objects:
+            self.report({'WARNING'}, "Not found uvs or selected mesh objects.")
+            return {'CANCELLED'}
+
+        for obj in selected_objects:
             if self.move_uv_bm(obj, settings.uv_layers_active_idx, up=False, with_names=self.with_names):
                 if bpy.context.mode == 'EDIT_MESH':
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
@@ -1309,9 +1337,6 @@ class UNIV_OT_Add(Operator):
     # noinspection PyTypeHints
     add_missed: BoolProperty(name='Add with Missed', default=False)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1321,7 +1346,8 @@ class UNIV_OT_Add(Operator):
 
     def execute(self, context):
         settings = univ_settings()
-        if not (objects := utils.calc_any_unique_obj()):
+        objects = utils.calc_any_unique_obj()
+        if not objects:
             self.report({'WARNING'}, 'Objects not found')
             return {'CANCELLED'}
 
@@ -1386,9 +1412,6 @@ class UNIV_OT_Remove(Operator):
     # noinspection PyTypeHints
     remove_all: BoolProperty(name='Remove All', default=False)
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1397,7 +1420,8 @@ class UNIV_OT_Remove(Operator):
         return self.execute(context)
 
     def execute(self, context):
-        if not (objects := utils.calc_any_unique_obj()):
+        objects = utils.calc_any_unique_obj()
+        if not objects:
             self.report({'WARNING'}, 'Objects not found')
             return {'CANCELLED'}
 
@@ -1442,13 +1466,7 @@ class UNIV_OT_CopyToLayer(Operator):
     bl_label = 'Copy'
     bl_options = {'REGISTER', 'UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def execute(self, context):
-        umeshes = UMeshes(report=self.report)
-
         copy_from = int(univ_settings().copy_to_layers_from)
         copy_to = int(univ_settings().copy_to_layers_to)
 
@@ -1457,6 +1475,7 @@ class UNIV_OT_CopyToLayer(Operator):
                 self.report({'WARNING'}, 'The From and To indexes are identical')
                 return {'CANCELLED'}
 
+        umeshes = UMeshes(report=self.report)
         source_and_target_same_count = 0
         missed_source_meshes_count = 0
         missed_target_meshes_count = 0
@@ -1565,6 +1584,7 @@ class UNIV_OT_CopyToLayer(Operator):
         if info:
             self.report({'WARNING'}, info)
 
+        # TODO: Split this for edit mode and obj?
         for umesh in umeshes:
             umesh.obj.update_tag()
         return {'FINISHED'}
@@ -1577,12 +1597,11 @@ class UNIV_OT_SetActiveRender(Operator):
     # noinspection PyTypeHints
     idx: IntProperty(name='Set Active', default=0, min=0, max=8, options={'HIDDEN'})
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def execute(self, context):
         objects = utils.calc_any_unique_obj()
+        if not objects:
+            self.report({'WARNING'}, 'Mesh objects not found.')
+            return {'CANCELLED'}
 
         for obj in objects:
             mesh = obj.data
@@ -1593,35 +1612,21 @@ class UNIV_OT_SetActiveRender(Operator):
         return {'FINISHED'}
 
 
-class UNIV_OT_FixUVs(UNIV_OT_Join):
+class UNIV_OT_FixUVs(Operator):
     bl_idname = "mesh.univ_fix_uvs"
     bl_label = "Fix UVs"
     bl_description = "Fix channels"
     bl_options = {'REGISTER', 'UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
-    # def invoke(self, context, event):
-    #     if event.value == 'PRESS':
-    #         return self.execute(context)
-    #
-    #     self.lock_overlap = event.shift
-    #     return self.execute(context)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
-
     def execute(self, context):
-        if not (objects := utils.calc_any_unique_obj()):
+        objects = utils.calc_any_unique_obj()
+        if not objects:
             self.report({'WARNING'}, 'Objects not found')
             return {'CANCELLED'}
 
-        removed_extra_channels_counter = sum(self.sanitize_uv(obj.data) for obj in objects)
+        removed_extra_channels_counter = sum(UNIV_OT_Join.sanitize_uv(self.report, obj.data) for obj in objects)
 
-        uv_names, conflicts_counter = self.sanitize_attr_names_and_get_names(objects)
+        uv_names, conflicts_counter = UNIV_OT_Join.sanitize_attr_names_and_get_names(objects)
 
         max_uv_size = max(len(obj.data.uv_layers) for obj in objects)
         if not max_uv_size:
@@ -1635,10 +1640,11 @@ class UNIV_OT_FixUVs(UNIV_OT_Join):
                 if UNIV_OT_Add.add_missed_uvs_bm(obj, max_uv_size, 8):
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
             else:
-                if res := self.add_missed_uvs(obj, max_uv_size):
+                res = UNIV_OT_Join.add_missed_uvs(obj, max_uv_size)
+                if res:
                     added_uvs_counter += res
 
-            self.rename_uvs(uv_names, obj.data)
+            UNIV_OT_Join.rename_uvs(self.report, uv_names, obj.data)
 
         active_uv_idx = 0
         active_render_uv_idx = 0
@@ -1751,7 +1757,8 @@ class UNIV_OT_Flatten(Operator):
                 for umesh in self.umeshes:
                     uv = umesh.uv
                     split_edges = set()
-                    for f in (selected_faces := utils.calc_selected_uv_faces(umesh)):
+                    selected_faces = utils.calc_selected_uv_faces(umesh)
+                    for f in selected_faces:
                         for crn in f.loops:
                             if not crn.link_loop_radial_prev.face.select or utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
@@ -1775,7 +1782,8 @@ class UNIV_OT_Flatten(Operator):
                 for umesh in self.umeshes:
                     uv = umesh.uv
                     split_edges = set()
-                    for f in (visible_faces := utils.calc_visible_uv_faces(umesh)):
+                    visible_faces = utils.calc_visible_uv_faces(umesh)
+                    for f in visible_faces:
                         for crn in f.loops:
                             if utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
@@ -1858,7 +1866,8 @@ class UNIV_OT_Flatten(Operator):
             umesh.obj.shape_key_add(name="model", from_mix=True)
             sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
         else:
-            if not (sk := umesh.obj.data.shape_keys.key_blocks.get('uv')):
+            sk = umesh.obj.data.shape_keys.key_blocks.get('uv')
+            if not sk:
                 sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
 
         idx = 0
@@ -2368,13 +2377,15 @@ class UNIV_OT_SmartScaleApply(Operator):
         prev_mode = bpy.context.mode
         if prev_mode == 'EDIT_MESH':
             if bpy.ops.object.mode_set.poll():
+                # TODO: No switch to object mode, when all objects is uniform
                 bpy.ops.object.mode_set(mode='OBJECT')
 
         for ob, instances in selected_object_with_instances:
             if ob.scale == UNIFORM_SCALE:
                 continue
 
-            if not self.valid_obj(ob):
+            if 0.0 in ob.scale:
+                # TODO: Apply scale, if has not instances (and modifiers?)
                 self.report({'WARNING'}, f"Object {ob.name} has zero scale component {ob.scale!r} and was skipped.")
                 continue
 
@@ -2437,7 +2448,8 @@ class UNIV_OT_SmartScaleApply(Operator):
             self.report({'INFO'}, f"All selected objects has uniform scale")
 
         from .inspect import INSPECT_INFO
-        if info_list := INSPECT_INFO.get('Other'):
+        info_list = INSPECT_INFO.get('Other')
+        if info_list:
             for i, (check_type, _) in enumerate(info_list):
                 if check_type == 'Unapplied Scales':
                     del info_list[i]
@@ -2449,10 +2461,6 @@ class UNIV_OT_SmartScaleApply(Operator):
 
 
         return {'FINISHED'}
-
-    @staticmethod
-    def valid_obj(obj):
-        return (obj.type == 'MESH') and (0 not in obj.scale)
 
     @staticmethod
     def modifier_compensation(mod, tar_scale, var, cur_scale):

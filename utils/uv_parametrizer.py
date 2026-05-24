@@ -124,7 +124,8 @@ def unwrap_time_report(report):
     try:
         yield
     finally:
-        if (total := (time.perf_counter() - t1)) > 2:
+        total = time.perf_counter() - t1
+        if total > 2:
             first_line = f'UniV uses an inefficient Linear Solver ({total:.3} sec).'
             import platform
             if platform.system() in ('Windows', 'Linux'):
@@ -949,7 +950,8 @@ class PChart:
 
             if len(pins) <= 1:
                 if constraints_segments:
-                    if res := self.extrema_verts_from_constr_segments(constraints_segments):
+                    res = self.extrema_verts_from_constr_segments(constraints_segments)
+                    if res:
                         self.pin1, self.pin2 = res
                     else:
                         print('UniV: Unwrap: Not found extrema pins from constraints.')
@@ -1726,7 +1728,8 @@ class PAbfSystem:
             e1: PEdge = e.next
             e2: PEdge = e1.next
 
-            if (e1_id := e1.id) == aid:
+            e1_id = e1.id
+            if e1_id == aid:
                 # we are computing a derivative for this angle,
                 # so we use cos and drop the other part
                 sin1 *= cosine[e1_id]
@@ -1734,7 +1737,8 @@ class PAbfSystem:
             else:
                 sin1 *= sine[e1_id]
 
-            if (e2_id := e2.id) == aid:
+            e2_id = e2.id
+            if e2_id == aid:
                 # see above
                 sin1 = 0.0
                 sin2 *= cosine[e2_id]
@@ -1941,7 +1945,8 @@ class PAbfSystem:
         return success
 
     def matrix_invert_solve(self, chart: PChart, context: LinearSolver, n_interior: int):
-        if success := context.solve():
+        success = context.solve()
+        if success:
             for face_idx, f in enumerate(chart.faces):
                 e1: PEdge = f.edge
                 e2: PEdge = e1.next
@@ -2560,7 +2565,8 @@ class ParamHandleConstruct:
         return GeoUVPinIndex(uv_co.copy(), reindex)
 
     def uv_prepare_pin_index(self, bm_vert_index: int, uv_co: Vector):
-        if (pin_uv_list := self.pin_hash.get(bm_vert_index)) is None:
+        pin_uv_list = self.pin_hash.get(bm_vert_index)
+        if pin_uv_list is None:
             self.pin_hash[bm_vert_index] = self.new_geo_uv_pin_index(uv_co)
             return
 
@@ -2577,7 +2583,8 @@ class ParamHandleConstruct:
         if not self.pin_hash:
             return bm_vert_index  # No verts pinned.
 
-        if (pin_uv_list := self.pin_hash.get(bm_vert_index)) is None:
+        pin_uv_list = self.pin_hash.get(bm_vert_index)
+        if pin_uv_list is None:
             return bm_vert_index  # Vert not pinned.
 
         # At least one of the UVs associated with bm_vert_index is pinned. Find the best one. */

@@ -254,7 +254,8 @@ class DrawCallConstraints2D:
         uv = umesh.uv
         if umesh.is_full_face_selected:
             for e in umesh.bm.edges:
-                if edge_idx := e[attr]:
+                edge_idx = e[attr]
+                if edge_idx:
                     for crn in getattr(e, 'link_loops', ()):
                         bits = edge_idx & 3
 
@@ -269,7 +270,8 @@ class DrawCallConstraints2D:
         else:
             if umesh.sync:
                 for e in umesh.bm.edges:
-                    if edge_idx := e[attr]:
+                    edge_idx = e[attr]
+                    if edge_idx:
                         for crn in getattr(e, 'link_loops', ()):
                             if not crn.face.hide:
                                 bits = edge_idx & 3
@@ -285,7 +287,8 @@ class DrawCallConstraints2D:
                 if umesh.is_full_face_deselected:
                     return [], []
                 for e in umesh.bm.edges:
-                    if edge_idx := e[attr]:
+                    edge_idx = e[attr]
+                    if edge_idx:
                         for crn in getattr(e, 'link_loops', ()):
                             if crn.face.select:
                                 bits = edge_idx & 3

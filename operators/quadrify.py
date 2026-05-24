@@ -96,7 +96,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
-            if dirt_islands := AdvIslands.calc_extended_with_mark_seam(umesh):
+            dirt_islands = AdvIslands.calc_extended_with_mark_seam(umesh)
+            if dirt_islands:
                 uv = umesh.uv
                 is_boundary = utils.is_boundary_func(umesh)
                 umesh.value = umesh.check_uniform_scale(report=self.report)
@@ -188,7 +189,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
 
         for umesh in self.umeshes:
-            if dirt_islands := AdvIslands.calc_visible_with_mark_seam(umesh):
+            dirt_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            if dirt_islands:
                 for d_island in dirt_islands:
                     hit.find_nearest_island_by_crn(d_island)
         if not hit:
@@ -285,7 +287,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         links_static_with_quads = []
         for f in faces:
             for crn in f.loops:
-                if linked_corners := linked_crn_uv_by_face_tag_unordered_included(crn, uv):
+                linked_corners = linked_crn_uv_by_face_tag_unordered_included(crn, uv)
+                if linked_corners:
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 

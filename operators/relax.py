@@ -246,7 +246,9 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                     for l_crn in linked_crn:
                         if l_crn.face.hide:
                             continue
-                        if (pair_crn := l_crn.link_loop_radial_prev) == l_crn:
+
+                        pair_crn = l_crn.link_loop_radial_prev
+                        if pair_crn == l_crn:
                             border = True
                             continue
 

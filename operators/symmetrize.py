@@ -125,7 +125,11 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
                     symmetric_3d_point = src_f.calc_center_median() * xyz_mirror_scale
                     for _, idx, _ in tree.find_range(symmetric_3d_point, self.threshold):
                         dst_f = faces[idx]
-                        if not dst_f.tag or len(dst_f.verts) != (size := len(dst_f.verts)):
+                        if not dst_f.tag:
+                            continue
+
+                        size = len(dst_f.verts)
+                        if len(dst_f.verts) != size:
                             continue
 
                         dst_f.tag = False

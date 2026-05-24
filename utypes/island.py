@@ -82,7 +82,8 @@ class SaveTransform:
                 max_length = -1.0
                 max_length_crn = None
                 for crn_ in itertools.chain(corners, pinned_corners):
-                    if max_length < (new_length := (crn_[uv].uv - crn_.link_loop_next[uv].uv).length_squared):
+                    new_length = (crn_[uv].uv - crn_.link_loop_next[uv].uv).length_squared
+                    if max_length < new_length:
                         max_length = new_length
                         max_length_crn = crn_
 
@@ -175,7 +176,8 @@ class SaveTransform:
             from ..preferences import univ_settings
             texel = univ_settings().texel_density
             texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
-            if (status := self.island.set_texel(texel, texture_size)) is None:  # noqa
+            status = self.island.set_texel(texel, texture_size)
+            if status is None:  # noqa
                 # zero_area_islands.append(isl)  # TODO: Add report callback
                 pass
 
@@ -193,7 +195,8 @@ class SaveTransform:
             # TODO: Optimize when implement simple scale_with_set_position
             self.island.set_position(self.bbox.center, pivot)
         else:  # TODO: Fix large islands
-            if angle := old_dir.angle_signed(new_dir, 0):
+            angle = old_dir.angle_signed(new_dir, 0)
+            if angle:
                 self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.island.calc_bbox()
 
@@ -256,7 +259,8 @@ class SaveTransform:
                 set_texel()
             self.island.set_position(self.bbox.center, pivot)
         else:
-            if angle := old_dir.angle_signed(new_dir, 0):
+            angle = old_dir.angle_signed(new_dir, 0)
+            if angle:
                 self.island.rotate(-angle, pivot=self.target_crn[uv].uv)
             new_bbox = self.target_subisland.calc_bbox()
 
@@ -771,13 +775,14 @@ class FaceIsland:
     # TODO: Add mark seam with index
     def calc_max_uv_area_face(self):
         uv = self.umesh.uv
-        area = -1.0
-        face = self.faces[0]
+        max_area = -1.0
+        max_face = self.faces[0]
         for f in self.faces:
-            if area < (area_ := utils.calc_face_area_uv(f, uv)):
-                area = area_
-                face = f
-        return face
+            new_area = utils.calc_face_area_uv(f, uv)
+            if max_area < new_area:
+                max_area = new_area
+                max_face = f
+        return max_face
 
     if USE_GENERIC_UV_SYNC:
         def tag_selected_faces(self):
@@ -811,8 +816,8 @@ class FaceIsland:
         return False
 
     def has_constraints_edge(self, selected=False):
-        constraints_attr = self.umesh.bm.edges.layers.int.get('univ_constraints')
-        if constraints_attr:
+        constr_attr = self.umesh.bm.edges.layers.int.get('univ_constraints')
+        if constr_attr:
             if selected:
                 get_edge_select = utils.edge_select_get_func(self.umesh)
                 # TODO: Check accidentally selected verts and edges (by mode)
@@ -822,7 +827,8 @@ class FaceIsland:
                 edges = (crn for f in self.faces for crn in f.loops)
 
             for crn in edges:
-                if edge_bits := crn.edge[constraints_attr]:
+                edge_bits = crn.edge[constr_attr]
+                if edge_bits:
                     for i, crn_l in enumerate(crn.edge.link_loops):
                         if crn == crn_l:
                             if i == 16:
@@ -950,7 +956,8 @@ class AdvIsland(FaceIsland):
         tris_isl_append = tris_isl.append
         for f in self:
             corners = f.loops
-            if (n := len(corners)) == 4:
+            n = len(corners)
+            if n == 4:
                 l1, l2, l3, l4 = corners
                 tris_isl_append((l1, l2, l3))
                 tris_isl_append((l3, l4, l1))
@@ -1921,14 +1928,15 @@ class Islands(IslandsBase):
 
     def calc_max_uv_area_face(self):
         uv = self.umesh.uv
-        area = -1.0
-        face = None
+        max_area = -1.0
+        max_face = None
         for isl in self:
             for f in isl:
-                if area < (area_ := utils.calc_face_area_uv(f, uv)):
-                    area = area_
-                    face = f
-        return face
+                new_area = utils.calc_face_area_uv(f, uv)
+                if new_area > max_area:
+                    max_area = new_area
+                    max_face = f
+        return max_face
 
     def move(self, delta: Vector) -> bool:
         return bool(sum(island.move(delta) for island in self.islands))

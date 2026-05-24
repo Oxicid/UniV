@@ -256,7 +256,8 @@ class KDMeshes:
     def calc_island_rmeshes(cls, umeshes: UMeshes, extended=False):
         rmeshes = []
         for umesh in umeshes:
-            if islands := Islands.calc_extended_or_visible(umesh, extended=extended):
+            islands = Islands.calc_extended_or_visible(umesh, extended=extended)
+            if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
                 rmeshes.append(kdmesh)
@@ -360,7 +361,8 @@ class IslandHit:
 
                     close_pt = closest_pt_to_line(pt, v_prev, v_curr)
 
-                    if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                    dist = (close_pt - pt).length
+                    if isclose(dist, min_dist, abs_tol=1e-07):
                         if point_inside_face(pt, f, uv):
                             min_dist = dist
                             # This is necessary for the inequality check to be successful
@@ -369,7 +371,8 @@ class IslandHit:
                         min_dist = dist
                     v_prev = v_curr
 
-                if (dist := (face_center / len(corners) - pt).length) < min_dist:
+                dist = (face_center / len(corners) - pt).length
+                if dist < min_dist:
                     min_dist = dist
 
         if self.min_dist != min_dist:
@@ -402,7 +405,8 @@ class IslandHit:
 
                     close_pt = closest_pt_to_line(pt, v_prev, v_curr)
 
-                    if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                    dist = (close_pt - pt).length
+                    if isclose(dist, min_dist, abs_tol=1e-07):
                         if point_inside_face(pt, f, uv):
                             min_dist = dist
                             min_face = f
@@ -413,7 +417,8 @@ class IslandHit:
                         min_face = f
                     v_prev = v_curr
 
-                if (dist := (face_center / len(corners) - pt).length) < min_dist:
+                dist = (face_center / len(corners) - pt).length
+                if dist < min_dist:
                     min_dist = dist
                     min_face = f
 
@@ -442,7 +447,8 @@ class IslandHit:
 
                 close_pt = closest_pt_to_line(pt, v_prev, v_curr)
 
-                if isclose((dist := (close_pt-pt).length), min_dist, abs_tol=1e-07):
+                dist = (close_pt - pt).length
+                if isclose(dist, min_dist, abs_tol=1e-07):
                     if point_inside_face(pt, f, uv):
                         min_dist = dist
                         min_crn = crn

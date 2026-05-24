@@ -676,7 +676,8 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                     all_islands.append(isl)
 
         for umesh in unselected_umeshes:
-            if faces := utils.calc_visible_uv_faces(umesh):
+            faces = utils.calc_visible_uv_faces(umesh)
+            if faces:
                 adv_islands = AdvIsland(faces, umesh)
                 tot_area_uv += adv_islands.calc_area_uv()
                 tot_area_3d += adv_islands.calc_area_3d(scale=umesh.value)
@@ -727,7 +728,8 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             umesh.update_tag = False
             umesh.value = umesh.check_uniform_scale(report=self.report)
 
-        for umesh in (unselected_umeshes := UMeshes.view_layer_context_unselected_with_uv()):
+        unselected_umeshes = UMeshes.view_layer_context_unselected_with_uv()
+        for umesh in unselected_umeshes:
             umesh.value = umesh.check_uniform_scale(report=self.report)
         unselected_umeshes.set_sync()
         unselected_umeshes.sync_invalidate()
@@ -891,7 +893,8 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         self.umeshes.update_tag = False
 
         for umesh in self.umeshes:
-            if adv_islands := self.islands_calc_type(umesh):  # noqa
+            adv_islands = self.islands_calc_type(umesh)
+            if adv_islands:
                 umesh.value = umesh.check_uniform_scale(report=self.report)
 
                 if self.grouping_type != 'NONE':
@@ -904,7 +907,8 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
 
                 if self.grouping_type == 'NONE':
                     for isl in adv_islands:
-                        if (status := isl.set_texel(self.texel, self.texture_size)) is None:
+                        status = isl.set_texel(self.texel, self.texture_size)
+                        if status is None:
                             zero_area_islands.append(isl)
                             continue
                         isl.umesh.update_tag |= status
@@ -917,7 +921,8 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
                 threshold = None if self.lock_overlap_mode == 'ANY' else self.threshold
                 groups_of_islands = UnionIslands.calc_overlapped_island_groups(all_islands, threshold)
                 for isl in groups_of_islands:
-                    if (status := isl.set_texel(self.texel, self.texture_size)) is None:
+                    status = isl.set_texel(self.texel, self.texture_size)
+                    if status is None:
                         zero_area_islands.append(isl)
                         continue
                     isl.umesh.update_tag |= status
@@ -1076,18 +1081,21 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
             self.report({'INFO'}, 'Resolution of active texture and resolution of texture in '
                                   'Texel Density do not match. The resolution from Texel Density is used.')
 
-        if size := self.get_physical_size_from_name(img.name):
+        size = self.get_physical_size_from_name(img.name)
+        if size:
             self.update_texel_from_size(size)
             return {'FINISHED'}
 
         if img.name.startswith('Poliigon_'):
-            if size := self.get_physical_size_poligon(img.name):
+            size = self.get_physical_size_poligon(img.name)
+            if size:
                 self.update_texel_from_size(size)
             return {'FINISHED'}
 
         if not img.packed_file:
             path = Path(img.filepath)
-            if size := self.get_physical_size_quixel(path):
+            size = self.get_physical_size_quixel(path)
+            if size:
                 self.update_texel_from_size(size)
                 return {'FINISHED'}
         self.report({'WARNING'}, 'Physical size not found in name or metadata')
@@ -1122,7 +1130,8 @@ class UNIV_OT_TexelDensityFromTexture(Operator):
         if not image_path.exists():
             return None
 
-        if not (prefix := image_path.stem.split('_')[0]):
+        prefix = image_path.stem.split('_')[0]
+        if not prefix:
             return None
 
         quixel_json = image_path.parent / f'{prefix}.json'
@@ -1275,10 +1284,6 @@ class UNIV_OT_CalcUDIMsFrom_3DArea(Operator):
     bl_description = f"Calculates the required UDIMs count coefficient from the 3D area \n" \
         "relative to the global texture resolution and texel size."
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
@@ -1330,10 +1335,6 @@ class UNIV_OT_Calc_UV_Area(Operator):
     bl_label = 'Area'
     bl_options = {'REGISTER', 'UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
-
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
         if not self.bl_idname.startswith('UV') or not umeshes.is_edit_mode:
@@ -1377,10 +1378,6 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
     bl_description = "Calculates coverage area. Overlaps do not increase the total value. \n\n" \
         "NOTE: The tiles used for coverage calculation are determined \nby vertex and face center inclusion in a tile.\n\n" \
         "For example, a plane scaled 10x will result in 6 tiles, not 100."
-
-    @classmethod
-    def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
 
     def execute(self, context):
         umeshes = UMeshes(report=self.report)

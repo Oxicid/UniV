@@ -106,7 +106,8 @@ class Stitch:
                     stack = []
                     for balance_isl in balanced_target_islands:
                         if balance_isl.tag:
-                            if lg := self.balancing_filter_for_lgs(balance_isl, exclude_indexes):
+                            lg = self.balancing_filter_for_lgs(balance_isl, exclude_indexes)
+                            if lg:
                                 trans_lg = lg.calc_shared_group_for_stitch()
                                 trans_isl_index = trans_lg[0].face.index
                                 exclude_indexes.add(trans_isl_index)
@@ -309,7 +310,8 @@ class Stitch:
 
                 # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
                 trans.set_boundary_tag(match_idx=True)
-                if loop_groups := LoopGroups.calc_by_boundary_crn_tags(trans):
+                loop_groups = LoopGroups.calc_by_boundary_crn_tags(trans)
+                if loop_groups:
                     trans_lg_is_basic_boundary = False
                     if len(loop_groups) != 1:
                         longest_border_lg = max(loop_groups, key=lambda lg: lg.length_uv)
@@ -371,7 +373,8 @@ class Stitch:
         """Enhances multi-stitching steps for a more even distribution"""
         if not balance_isl.sequence:
             self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
-            if loop_groups := LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl):
+            loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl)
+            if loop_groups:
                 filtered = self.split_lg_for_stitch_with_padding(loop_groups)
                 if len(filtered) == 1:
                     balance_isl.tag = False
@@ -642,7 +645,8 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
             global LAST_WELD_BY_DISTANCE_COUNTERS
             from time import perf_counter
 
-            if (delta_time := (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)) > 0.5:
+            delta_time = (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)
+            if delta_time > 0.5:
                 if LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams) or delta_time > 1.5:
                     info = ''
                     if counter_welded:
@@ -688,7 +692,8 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         for umesh in self.umeshes:
             uv = umesh.uv
             update_tag = False
-            if islands := AdvIslands.calc_extended_any_edge_non_manifold(umesh):
+            islands = AdvIslands.calc_extended_any_edge_non_manifold(umesh)
+            if islands:
                 umesh.set_corners_tag(False)
                 islands.indexing()
 
@@ -764,7 +769,8 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
                 edge_linked_select_set = utils.edge_select_linked_set_func(umesh)
 
                 for isl in islands:
-                    if single_selected_inner_edges := isl.sequence:
+                    single_selected_inner_edges = isl.sequence
+                    if single_selected_inner_edges:
                         update_tag = True
                         for crn in single_selected_inner_edges:
                             crn.edge.seam = False
@@ -902,7 +908,8 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         if utils.all_equal(_crn[uv].uv.to_tuple() for _crn in crn_in_vert):
             return []
 
-        for group in (corners_groups := self.calc_distance_corners_groups(crn_in_vert, uv)):
+        corners_groups = self.calc_distance_corners_groups(crn_in_vert, uv)
+        for group in corners_groups:
             # TODO: Add weighted center by face 'relax'
             value = Vector((0, 0))
             for c in group:
@@ -1056,7 +1063,8 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         if self.use_by_distance:
             self.weld_by_distance_from_3d()
         else:
-            if res := self.weld_by_edge_from_3d():
+            res = self.weld_by_edge_from_3d()
+            if res:
                 return res
 
         self.umeshes.update(info='Not found elements for weld')
@@ -1084,7 +1092,8 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
             global LAST_WELD_BY_DISTANCE_COUNTERS
             from time import perf_counter
 
-            if (delta_time := (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)) > 0.5:
+            delta_time = (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)
+            if delta_time > 0.5:
                 if LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams) or delta_time > 1.5:
                     info = ''
                     if counter_welded:
@@ -1106,7 +1115,8 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         if not self.umeshes:
             return self.umeshes.update(info='Not found edges for manipulate')
         if not selected_umeshes and self.mouse_pos_from_3d:
-            if hit := self.ray_cast(prefs().max_pick_distance):
+            hit = self.ray_cast(prefs().max_pick_distance)
+            if hit:
                 if len(hit.umesh.bm.loops.layers.uv):
                     hit.umesh.verify_uv()
                     self.pick_weld(hit)
@@ -1284,7 +1294,8 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         if self.between:
             self.stitch_between()
         else:
-            if res := self.stitch_by_edge():
+            res = self.stitch_by_edge()
+            if res:
                 return res
         self.umeshes.update(info='Not found islands for stitch')
         return {'FINISHED'}
@@ -1306,12 +1317,15 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         if not self.umeshes:
             return None
         if not selected_umeshes and self.mouse_pos_from_3d:
-            if self.padding and (img_size := utils.get_active_image_size()):  # TODO: Get active image size from material id
-                if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
-                    self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
-                                             'which will result in incorrect padding.')
+            if self.padding:
+                img_size = utils.get_active_image_size()
+                if img_size:  # TODO: Get active image size from material id
+                    if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
+                        self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
+                                                 'which will result in incorrect padding.')
 
-            if hit := self.ray_cast(prefs().max_pick_distance):
+            hit = self.ray_cast(prefs().max_pick_distance)
+            if hit:
                 if len(hit.umesh.bm.loops.layers.uv):
                     hit.umesh.verify_uv()
                     self.pick_stitch(hit)

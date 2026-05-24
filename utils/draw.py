@@ -252,7 +252,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
             self.batch_smooth_color.draw(self.shader_smooth_color)
             self.batch_smooth_color_2.draw(self.shader_smooth_color_vert)
 
-            blf.size(font_id := 0, 350)
+            font_id = 0
+            blf.size(font_id, 350)
             blf.position(font_id, 0, 0, 0)
             scale = 0.000015  # * 0.5
 
@@ -359,7 +360,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         edges: np.ndarray = edges.reshape(len(edges)//2, 2, 2)
         edges_midpoints = np.mean(edges, axis=1)
 
-        # blf.size(font_id := 0, 350)
+        # font_id = 0
+        # blf.size(font_id, 350)
         # blf.position(font_id, 0, 0, 0)
 
         texts = np.arange(size, dtype='uint32').astype(str)

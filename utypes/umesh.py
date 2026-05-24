@@ -380,7 +380,8 @@ class UMesh:
 
                     gn_mod = utils.GN(mod, print_missed_socket=True)
                     if 'Input_1' in gn_mod:
-                        if isinstance(value := gn_mod['Input_1'], float):
+                        value = gn_mod['Input_1']
+                        if isinstance(value, float):
                             return value
                     break
         return pi
@@ -718,7 +719,8 @@ class UMeshes:
                             for v in umesh.bm.verts:
                                 v.select = False
                 else:
-                    if selected_corners := utils.calc_selected_uv_vert(umesh):
+                    selected_corners = utils.calc_selected_uv_vert(umesh)
+                    if selected_corners:
                         umesh.update_tag = True
                         for crn in selected_corners:
                             crn.face.uv_select = False
@@ -742,7 +744,8 @@ class UMeshes:
                         for v in umesh.bm.verts:
                             v.select = False
                 else:
-                    if selected_corners := utils.calc_selected_uv_vert(umesh):
+                    selected_corners = utils.calc_selected_uv_vert(umesh)
+                    if selected_corners:
                         uv = umesh.uv
                         umesh.update_tag = True
                         for crn in selected_corners:
@@ -870,9 +873,12 @@ class UMeshes:
             Need for AdjustScale in object mode.
         """
         visible_objects = []
-        if (area := bpy.context.area).type == 'VIEW_3D' and not area.spaces.active.local_view:
+        area = bpy.context.area
+        if area.type == 'VIEW_3D' and not area.spaces.active.local_view:
             for obj in bpy.context.view_layer.objects:
-                if (not obj.select_get()) and obj.visible_get() and (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
+                if obj.select_get() and not obj.visible_get():
+                    continue
+                if (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
                     visible_objects.append(obj)
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()

@@ -186,7 +186,8 @@ class UNIV_OT_Pin(Operator):
             import numpy as np
             attr_counter = 0
             for obj in utils.calc_any_unique_obj():
-                if uv := obj.data.uv_layers.active:
+                uv = obj.data.uv_layers.active
+                if uv:
                     size = len(obj.data.loops)
                     if not size:
                         continue
@@ -535,7 +536,8 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
                 umesh.update()
 
     def pick_cut(self):
-        if hit := self.ray_cast(prefs().max_pick_distance):
+        hit = self.ray_cast(prefs().max_pick_distance)
+        if hit:
             if hit.crn.edge.seam:
                 return {'CANCELLED'}
             hit.crn.edge.seam = True
@@ -699,7 +701,8 @@ class UNIV_OT_SeamBorder_VIEW3D(Operator):
             has_update = False
             is_pair = utils.is_pair
             uv_layers_size = len(umesh.obj.data.uv_layers)
-            if _all_channels := self.all_channels and uv_layers_size > 1:
+
+            if self.all_channels and uv_layers_size > 1:
                 seams = [False] * umesh.total_corners
                 corners = [crn for f in faces for crn in f.loops]
 

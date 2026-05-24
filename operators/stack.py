@@ -143,11 +143,13 @@ class StackIsland:  # TODO: Split for target and target islands
             from ..utypes import bbox
             vert_3d_coords = [crn.vert.co for crn in face_start_pattern_crn]
             bbox3d_min = bbox.BBox3D.calc_bbox(vert_3d_coords).min
+
             min_idx = 0
             min_dist = float('inf')
             for idx, co in enumerate(vert_3d_coords):
-                if (dist := (bbox3d_min - co).length) < min_dist:
-                    min_dist = dist
+                new_dist = (bbox3d_min - co).length
+                if new_dist < min_dist:
+                    min_dist = new_dist
                     min_idx = idx
             return min_idx
 
@@ -411,7 +413,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                     target.calc_walked_reference_island_fw_and_for_bw()
                     for transfer in sort_stack_islands:
                         if transfer.island.tag:
-                            if res := target.calc_transfer_stack_island_fw(transfer):
+                            res = target.calc_transfer_stack_island_fw(transfer)
+                            if res:
                                 target.transfer_co_to(res, transfer.island.umesh.uv)
 
                                 transfer.island.mark_seam()
@@ -443,7 +446,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             self.report({'WARNING'}, 'Not found selected islands')
             return []
 
-        if not (sort_stack_islands_groups := utils.true_groupby(self.targets)):
+        sort_stack_islands_groups = utils.true_groupby(self.targets)
+        if not sort_stack_islands_groups:
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
             return []
         return sort_stack_islands_groups
@@ -457,7 +461,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         for target, stacks_transfer in sorted_target_islands_with_transfer:
             for transfer in stacks_transfer:
                 if transfer.island.tag:
-                    if res := target.calc_transfer_stack_island_fw(transfer):
+                    res = target.calc_transfer_stack_island_fw(transfer)
+                    if res:
                         target.transfer_co_to(res, transfer.island.umesh.uv)
 
                         transfer.island.mark_seam()
@@ -511,7 +516,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             self.report({'WARNING'}, 'Not found transfer islands')
             return []
 
-        if not (sort_stack_islands := self.sort_stack_islands_target_with_transfer()):
+        sort_stack_islands = self.sort_stack_islands_target_with_transfer()
+        if not sort_stack_islands:
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
         return sort_stack_islands
 

@@ -44,15 +44,6 @@ def is_pair_with_flip(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
         crn[uv].uv.to_tuple() == _rad_prev.link_loop_next[uv].uv.to_tuple()
 
 
-def has_pair_with_ms(crn: BMLoop, uv: BMLayerItem):
-    if crn.edge.seam or crn == (pair := crn.link_loop_radial_prev):
-        return False
-    if crn.vert == pair.vert:  # avoid flipped 3d
-        return False
-    return crn.link_loop_next[uv].uv == pair[uv].uv and \
-        crn[uv].uv == pair.link_loop_next[uv].uv
-
-
 def is_pair_by_idx(crn: BMLoop, _rad_prev: BMLoop, uv: BMLayerItem):
     if crn == _rad_prev or crn.face.index != _rad_prev.face.index:
         return False
@@ -70,7 +61,8 @@ def set_faces_tag(faces, tag=True):
 
 def is_boundary_non_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(l.face.select)
-    if (pair := crn.link_loop_radial_prev) == crn:
+    pair = crn.link_loop_radial_prev
+    if pair == crn:
         return True
     if not pair.face.select:
         return True
@@ -80,7 +72,8 @@ def is_boundary_non_sync(crn: BMLoop, uv: BMLayerItem):
 
 def is_boundary_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.hide)
-    if (pair := crn.link_loop_radial_prev) == crn:
+    pair = crn.link_loop_radial_prev
+    if pair == crn:
         return True
     if pair.face.hide:
         return True
@@ -89,7 +82,8 @@ def is_boundary_sync(crn: BMLoop, uv: BMLayerItem):
 
 def is_boundary_with_flip_check_non_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(l.face.select)
-    if (pair := crn.link_loop_radial_prev) == crn:
+    pair = crn.link_loop_radial_prev
+    if pair == crn:
         return True
     if not pair.face.select:
         return True
@@ -101,7 +95,8 @@ def is_boundary_with_flip_check_non_sync(crn: BMLoop, uv: BMLayerItem):
 
 def is_boundary_with_flip_check_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.hide)
-    if (pair := crn.link_loop_radial_prev) == crn:
+    pair = crn.link_loop_radial_prev
+    if pair == crn:
         return True
     if pair.face.hide:
         return True
@@ -141,7 +136,8 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_c
     else:
         if with_flipped_check:
             def is_boundary_with_flip_no_invisible_check(crn: BMLoop, uv: BMLayerItem):
-                if (pair := crn.link_loop_radial_prev) == crn:
+                pair = crn.link_loop_radial_prev
+                if pair == crn:
                     return True
                 if crn.vert == pair.vert:
                     return True
@@ -151,7 +147,8 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_c
             return catcher(umesh.uv, is_boundary_with_flip_no_invisible_check)
         else:
             def is_boundary_no_invisible_check(crn: BMLoop, uv: BMLayerItem):
-                if (pair := crn.link_loop_radial_prev) == crn:
+                pair = crn.link_loop_radial_prev
+                if pair == crn:
                     return True
                 return (crn[uv].uv.to_tuple() != pair.link_loop_next[uv].uv.to_tuple() or
                         crn.link_loop_next[uv].uv.to_tuple() != pair[uv].uv.to_tuple())

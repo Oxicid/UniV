@@ -816,13 +816,16 @@ class ToggleHandlers:
     def univ_toggle_rna_callback():
         tools = bpy.context.workspace.tools
 
-        if (mode := bpy.context.mode) == 'EDIT_MESH':
-            if tool := tools.from_space_view3d_mode(mode):
+        mode = bpy.context.mode
+        if mode == 'EDIT_MESH':
+            tool = tools.from_space_view3d_mode(mode)
+            if tool:
                 idname = tool.idname
                 if idname != 'tool.univ':
                     ToggleHandlers.last_tool_edit = idname
         elif mode == 'OBJECT':
-            if tool := tools.from_space_view3d_mode(mode):
+            tool = tools.from_space_view3d_mode(mode)
+            if tool:
                 idname = tool.idname
                 if idname != 'tool.univ':
                     ToggleHandlers.last_tool_object = idname

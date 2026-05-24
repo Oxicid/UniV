@@ -292,7 +292,8 @@ scaled islands from the calculation, focusing only on actual stretches"""
         # clamp angle
         result = self.over(umeshes, edge_threshold=self.edge_over_threshold, face_threshold=self.face_over_threshold)
 
-        if formatted_text := self.data_formatting(result):
+        formatted_text = self.data_formatting(result)
+        if formatted_text:
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
         else:
@@ -371,7 +372,8 @@ scaled islands from the calculation, focusing only on actual stretches"""
             face_coef_seq_append = face_coef_seq.append
 
             # Overscaled Faces:
-            if faces := utils.calc_visible_uv_faces(umesh):
+            faces = utils.calc_visible_uv_faces(umesh)
+            if faces:
                 if scale:
                     for f in faces:
                         face_area_3d = calc_face_area_3d(f, scale)
@@ -503,7 +505,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
             self.user_angle = bl_math.clamp(self.user_angle, 0.0, max_angle_from_obj_smooth)
 
         result = self.non_splitted(umeshes, self.use_auto_smooth, self.user_angle)
-        if formatted_text := self.data_formatting(result):
+        formatted_text = self.data_formatting(result)
+        if formatted_text:
             self.report({'WARNING'}, formatted_text)
             umeshes.update()
         else:
@@ -535,7 +538,8 @@ class UNIV_OT_Check_Non_Splitted(Operator):
 
             uv = umesh.uv
             for crn in utils.calc_visible_uv_corners(umesh):
-                if (pair_crn := crn.link_loop_radial_prev) in to_select:
+                pair_crn = crn.link_loop_radial_prev
+                if pair_crn in to_select:
                     continue
 
                 edge = crn.edge
@@ -547,7 +551,10 @@ class UNIV_OT_Check_Non_Splitted(Operator):
                     non_seam_counter += 1
                 elif not edge.smooth:
                     sharps_counter += 1
-                elif (face_angle := edge.calc_face_angle(1000.0)) >= angle:
+                    continue
+
+                face_angle = edge.calc_face_angle(1000.0)
+                if face_angle >= angle:
                     if face_angle == 1000.0:
                         non_manifold_counter += 1  # TODO: Check if batch_inspect disabled, after implement non manifold
                     else:
@@ -718,7 +725,8 @@ class UNIV_OT_Check_Other(Operator):
 
     @classmethod
     def poll(cls, context):
-        return (obj := context.active_object) and obj.type == 'MESH'
+        obj = context.active_object
+        return obj and obj.type == 'MESH'
 
     def draw(self, context):
 
@@ -726,7 +734,8 @@ class UNIV_OT_Check_Other(Operator):
         col = layout.column()
         global INSPECT_INFO
 
-        if info_list := INSPECT_INFO.get('Other'):
+        info_list = INSPECT_INFO.get('Other')
+        if info_list:
             for check_type, info in info_list:
                 box = col.box()
                 wrapped_lines = textwrap.wrap(check_type + ': ' + info, width=72)
@@ -743,7 +752,8 @@ class UNIV_OT_Check_Other(Operator):
         umeshes = UMeshes()
         umeshes.update_tag = False
 
-        if info := self.check_other(umeshes):
+        info = self.check_other(umeshes)
+        if info:
             INSPECT_INFO['Other'] = info
             # umeshes.silent_update()
             return context.window_manager.invoke_popup(self, width=420)
@@ -863,17 +873,22 @@ class UNIV_OT_Check_Other(Operator):
         aspects = {}
 
         def get_aspects_ratio(u):  # noqa
-            if modifiers := [m for m in u.obj.modifiers if m.name.startswith('UniV Checker')]:
-                socket = 'Socket_1' if 'Socket_1' in modifiers[0] else 'Input_1'
-                if mtl := modifiers[0][socket]:  # noqa
-                    for node in mtl.node_tree.nodes:
-                        if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
-                            image_width, image_height = image.size
-                            if image_height:
-                                aspects[image_width / image_height] = modifiers[0][socket].name
-                            else:
-                                aspects[1.0] = mtl.name
-                            return
+            modifiers = [m for m in u.obj.modifiers if m.name.startswith('UniV Checker')]
+            if modifiers:
+                gn_mod = utils.GN(modifiers[0], print_missed_socket=True)
+                mtl_socket = 'Socket_1'
+                mtl_local = gn_mod[mtl_socket]
+                if mtl_local:
+                    for node in mtl_local.node_tree.nodes:
+                        if node.bl_idname == 'ShaderNodeTexImage':
+                            image = node.image
+                            if image:
+                                image_width, image_height = image.size
+                                if image_height:
+                                    aspects[image_width / image_height] = gn_mod[mtl_socket].name
+                                else:
+                                    aspects[1.0] = mtl_local.name
+                                return
                 aspects[1.0] = 'Default'
 
             # Aspect from material
@@ -883,12 +898,16 @@ class UNIV_OT_Check_Other(Operator):
                     if not slot.material:
                         aspects[1.0] = 'Default'
                         continue
-                    if getattr(mtl, 'use_nodes', True) and (active_node := mtl.node_tree.nodes.active):
-                        if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
-                            image_width, image_height = image.size
-                            if image_height:
-                                aspects[image_width / image_height] = mtl.name
-                                continue
+                    if getattr(mtl, 'use_nodes', True):
+                        active_node = mtl.node_tree.nodes.active
+                        if active_node:
+                            if active_node.bl_idname == 'ShaderNodeTexImage':
+                                image = active_node.image
+                                if image:
+                                    image_width, image_height = image.size
+                                    if image_height:
+                                        aspects[image_width / image_height] = mtl.name
+                                        continue
                     aspects[1.0] = mtl.name
             else:
                 aspects[1.0] = 'Default'
@@ -905,7 +924,8 @@ class UNIV_OT_Check_Other(Operator):
             uv_maps_names = {uv.name for uv in umesh.obj.data.uv_layers}
             uv_maps_names.add('')
             for slot in umesh.obj.material_slots:
-                if (mtl := slot.material) and getattr(mtl, 'use_nodes', True):
+                mtl = slot.material
+                if mtl and getattr(mtl, 'use_nodes', True):
                     non_valid_names = {f'{node.uv_map!r}'
                                        for node in mtl.node_tree.nodes
                                        if node.type == 'UVMAP' and node.uv_map not in uv_maps_names
@@ -945,7 +965,7 @@ class UNIV_OT_BatchInspectFlags(Operator):
         tag = Inspect(self.flag)
 
         # Turn off the old (all) overlap flag if it doesn't match the new one.
-        if tag in Inspect.AllOverlapFlags:
+        if tag in Inspect.AllOverlapFlags:  # noqa
             if tag not in Inspect(univ_settings().batch_inspect_flags):
                 univ_settings().batch_inspect_flags &= ~Inspect.AllOverlapFlags
 
@@ -977,13 +997,15 @@ class UNIV_OT_BatchInspect(Operator):
             col.separator()
 
         for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Over', 'Non-Splitted'):
-            if info := INSPECT_INFO.get(inspect_flag):
+            info = INSPECT_INFO.get(inspect_flag)
+            if info:
                 box = col.box()
                 wrapped_lines = textwrap.wrap(inspect_flag + ': ' + info, width=72)
                 for line in wrapped_lines:
                     box.label(text=line)
 
-        if info_list := INSPECT_INFO.get('Other'):
+        info_list = INSPECT_INFO.get('Other')
+        if info_list:
             for check_type, info in info_list:
                 box = col.box()
                 wrapped_lines = textwrap.wrap(check_type + ': ' + info, width=72)
@@ -1013,7 +1035,8 @@ class UNIV_OT_BatchInspect(Operator):
         umeshes.update_tag = False
 
         if (Inspect.Other in flags) or self.inspect_all:
-            if info := UNIV_OT_Check_Other.check_other(umeshes):
+            info = UNIV_OT_Check_Other.check_other(umeshes)
+            if info:
                 INSPECT_INFO['Other'] = info
                 if not umeshes:
                     return context.window_manager.invoke_popup(self, width=420)
@@ -1025,33 +1048,39 @@ class UNIV_OT_BatchInspect(Operator):
 
         if (flags & Inspect.AllOverlapFlags) or self.inspect_all:
             if Inspect.Overlap in flags or (self.inspect_all and not (flags & Inspect.AllOverlapFlags)):
-                if count := UNIV_OT_Check_Overlap.overlap_check(umeshes, 'ALL'):
+                count = UNIV_OT_Check_Overlap.overlap_check(umeshes, 'ALL')
+                if count:
                     INSPECT_INFO['Overlap'] = UNIV_OT_Check_Overlap.get_info_from_count(count, 'ALL')[1]
 
             elif Inspect.OverlapInexact in flags:
-                if count := UNIV_OT_Check_Overlap.overlap_check(umeshes, 'INEXACT'):
+                count = UNIV_OT_Check_Overlap.overlap_check(umeshes, 'INEXACT')
+                if count:
                     INSPECT_INFO['Overlap'] = UNIV_OT_Check_Overlap.get_info_from_count(count, 'INEXACT')[1]
         else:
             bpy.ops.uv.select_all(action='DESELECT')
 
         if Inspect.Zero in flags or self.inspect_all:
-            if count := UNIV_OT_Check_Zero.zero(umeshes):
+            count = UNIV_OT_Check_Zero.zero(umeshes)
+            if count:
                 INSPECT_INFO['Zero'] = f'Detected {count} degenerate triangles'
 
         if Inspect.Flipped in flags or self.inspect_all:
             result = UNIV_OT_Check_Flipped.flipped(umeshes)
-            if info := UNIV_OT_Check_Flipped.data_formatting(result):
+            info = UNIV_OT_Check_Flipped.data_formatting(result)
+            if info:
                 INSPECT_INFO['Flipped'] = info
 
         if Inspect.Over in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
             result = UNIV_OT_Check_Over.over(umeshes, batch_inspect=True)
-            if info := UNIV_OT_Check_Over.data_formatting(result):
+            info = UNIV_OT_Check_Over.data_formatting(result)
+            if info:
                 INSPECT_INFO['Over'] = info
 
         if Inspect.NonSplitted in flags or self.inspect_all:  # Last check, because it switches elem mode to EDGE.
             result = UNIV_OT_Check_Non_Splitted.non_splitted(
                 umeshes, use_auto_smooth=True, user_angle=180, batch_inspect=True)
-            if info := UNIV_OT_Check_Non_Splitted.data_formatting(result):
+            info = UNIV_OT_Check_Non_Splitted.data_formatting(result)
+            if info:
                 INSPECT_INFO['Non-Splitted'] = info
 
         has_hidden_faces = False

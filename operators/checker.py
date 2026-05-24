@@ -65,7 +65,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
             utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=toggle)
 
         def set_active_image():
-            if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+            area = bpy.context.area
+            if area and area.type == 'IMAGE_EDITOR':
                 for node in mtl.node_tree.nodes:
                     if node.bl_idname == 'ShaderNodeTexImage':
                         if node.image:
@@ -88,7 +89,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def get_exist_texture_or_create(self) -> bpy.types.Image:
         for image in reversed(bpy.data.images):
-            if (image_name := image.name).startswith(self.full_pattern_name):
+            image_name = image.name
+            if image_name.startswith(self.full_pattern_name):
                 if self.has_x_after_resolution(image_name) or tuple(image.size) != prefs().glob_size:
                     if image.users == 0:
                         bpy.data.images.remove(image)
@@ -100,9 +102,11 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def material_is_changed_by_context(self, mtl):
         if getattr(mtl, 'use_nodes', True):
-            if len(nodes := mtl.node_tree.nodes) == 3:
+            nodes = mtl.node_tree.nodes
+            if len(nodes) == 3:
                 # TODO: Log it.
-                if output_node := [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']:
+                output_node = [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']
+                if output_node:
                     if output_node[0].target == 'ALL' and output_node[0].inputs[0].links:
                         diffuse = output_node[0].inputs[0].links[0].from_node
                         if not diffuse.mute and diffuse.bl_idname == 'ShaderNodeBsdfDiffuse':
@@ -117,7 +121,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     def get_exist_material_or_create(self) -> bpy.types.Material | None:
         for mtl in reversed(bpy.data.materials):
-            if (mtl_name := mtl.name).startswith(self.full_pattern_name):
+            mtl_name = mtl.name
+            if mtl_name.startswith(self.full_pattern_name):
                 if self.has_x_after_resolution(mtl_name) or self.material_is_changed_by_context(mtl):
                     if mtl.users == 0:
                         bpy.data.materials.remove(mtl)
@@ -128,7 +133,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
         # Create Material
         img = self.get_exist_texture_or_create()
 
-        if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+        area = bpy.context.area
+        if area and area.type == 'IMAGE_EDITOR':
             space_data = area.spaces.active
             if space_data:
                 if space_data.image != img:
@@ -162,17 +168,20 @@ class UNIV_OT_Checker(bpy.types.Operator):
     def checker_node_group_is_changed(node_group):
         if not node_group:
             return True
-        if len(nodes := node_group.nodes) != 3:
+        nodes = node_group.nodes
+        if len(nodes) != 3:
             return True
         # Output node check.
         output_node = [n for n in nodes if n.bl_idname == 'NodeGroupOutput']
         if output_node and output_node[0].inputs:  # Check output node exist and exist inputs.
-            if output_links := output_node[0].inputs[0].links:  # Check links exist.
+            output_links = output_node[0].inputs[0].links
+            if output_links:  # Check links exist.
 
                 # Material node check.
                 set_mtl_node = output_links[0].from_node
                 if set_mtl_node.bl_idname == 'GeometryNodeSetMaterial':
-                    if not (geom_link_to_input_node := set_mtl_node.inputs[0].links):
+                    geom_link_to_input_node = set_mtl_node.inputs[0].links
+                    if not geom_link_to_input_node:
                         return True
 
                     # Input node check.
@@ -210,7 +219,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
         input_node.location = (-200, 0)
         output_node.location = (200, 0)
 
-        if iface := getattr(node_group, 'interface', None):
+        iface = getattr(node_group, 'interface', None)
+        if iface:
             iface.new_socket('Input', description="", in_out='INPUT', socket_type='NodeSocketGeometry')
             iface.new_socket('Checker Material', description="", in_out='INPUT', socket_type='NodeSocketMaterial')
             iface.new_socket('Output', description="", in_out='OUTPUT', socket_type='NodeSocketGeometry')
@@ -261,7 +271,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
     @staticmethod
     def all_has_enable_gn_checker_modifier():
         counter = 0
-        for obj in (selected_objects := [obj_ for obj_ in bpy.context.selected_objects if obj_.type == 'MESH']):
+        selected_objects = [obj_ for obj_ in bpy.context.selected_objects if obj_.type == 'MESH']
+        for obj in selected_objects:
             for m in obj.modifiers:
                 if isinstance(m, bpy.types.NodesModifier):
                     if m.name.startswith('UniV Checker'):
@@ -389,7 +400,8 @@ class UNIV_OT_Checker(bpy.types.Operator):
             bpy.context.view_layer.update()
 
     def has_x_after_resolution(self, name):
-        return len(name) > (x_idx := len(self.full_pattern_name)) and name[x_idx] == 'x'
+        x_idx = len(self.full_pattern_name)
+        return len(name) > x_idx and name[x_idx] == 'x'
 
 
 class UNIV_OT_CheckerCleanup(bpy.types.Operator):
@@ -405,7 +417,8 @@ class UNIV_OT_CheckerCleanup(bpy.types.Operator):
         # TODO: Close img from selected meshes
         for a in utils.get_areas_by_type('IMAGE_EDITOR'):
             space = a.spaces.active
-            if (img := space.image) and img.name.startswith('UniV_'):  # noqa
+            img = space.image
+            if img and img.name.startswith('UniV_'):
                 space.image = None
         self.remove_images()
         return {'FINISHED'}

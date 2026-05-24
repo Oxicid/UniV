@@ -304,7 +304,8 @@ def largest_gap_midpoint_for_hue(values: list[float]):
         a = values[i]
         b = values[i+1]
 
-        if (gap := (b - a)) > max_gap:
+        gap = b - a
+        if gap > max_gap:
             max_gap = gap
             mid = (a + b) / 2
     return mid

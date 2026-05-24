@@ -37,8 +37,11 @@ resolution_value_to_name = {128: '128', 256: '256', 512: '512', 1024: '1K', 2048
 
 def glob_resolutions_to_name():
     from ..preferences import prefs
-    x_size_name = resolution_value_to_name[xsize := int(prefs().size_x)]
-    y_size_name = resolution_value_to_name[ysize := int(prefs().size_y)]
+    xsize = int(prefs().size_x)
+    ysize = int(prefs().size_y)
+
+    x_size_name = resolution_value_to_name[xsize]
+    y_size_name = resolution_value_to_name[ysize]
     return f'{x_size_name}x{y_size_name}' if xsize != ysize else x_size_name
 
 def resolutions_to_name(xsize, ysize):
@@ -189,12 +192,14 @@ class PaddingHelper:
             min(int(pref.size_x), int(pref.size_y))
 
     def report_padding(self):
-        if self.padding and (img_size := get_active_image_size()):  # TODO: Get active image size from material id
-            from .. import preferences
-            pref = preferences.prefs()
-            if min(int(pref.size_x), int(pref.size_y)) != min(img_size):
-                self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
-                                         'which will result in incorrect padding.')
+        if self.padding:
+            img_size = get_active_image_size()
+            if img_size:  # TODO: Get active image size from material id
+                from .. import preferences
+                pref = preferences.prefs()
+                if min(int(pref.size_x), int(pref.size_y)) != min(img_size):
+                    self.report({'WARNING'}, 'Global and Active texture sizes have different values, '  # noqa
+                                             'which will result in incorrect padding.')
 
     @staticmethod
     def get_padding_multiplayer_from_aspect_by_axis(aspect, is_horizontal):
@@ -868,7 +873,8 @@ def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bp
         from collections import defaultdict
 
         selected = bpy.context.selected_objects[:]
-        if active := bpy.context.active_object:
+        active = bpy.context.active_object
+        if active:
             selected.insert(0, active)  # Set active to first
 
         data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
@@ -923,7 +929,8 @@ def has_visible_active_trim(report=None):
             report({'WARNING'}, 'Trims preset is empty')
         return False
 
-    if len(trim_preset) >= (idx := trim_slot.active_trim_index)+1:
+    idx = trim_slot.active_trim_index + 1
+    if len(trim_preset) >= idx:
         if trim_preset[idx].visible:
             return True
         if report:
@@ -1004,8 +1011,10 @@ def get_transform_from_box(src: 'utypes.BBox',
     pad_x = attenuate_padding(pad, tar.width)
     pad_y = attenuate_padding(pad, tar.height)
 
-    scale_x = ((tar.width - pad_x) / w) if (w := src.width) else 1
-    scale_y = ((tar.height - pad_y) / h) if (h := src.height) else 1
+    w = src.width
+    h = src.height
+    scale_x = ((tar.width - pad_x) / w) if w else 1
+    scale_y = ((tar.height - pad_y) / h) if h else 1
 
     if use_crop:
         if axis == 'XY':

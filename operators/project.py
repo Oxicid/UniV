@@ -345,7 +345,8 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         return mtx_x, mtx_y, mtx_z, r
 
     def get_aspect_matrix(self, umesh):
-        if (aspect := (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)) >= 1.0:
+        aspect = (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)
+        if aspect >= 1.0:
             aspect_x_mtx = Matrix.Diagonal((1, 1 / aspect, 1))
             aspect_y_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
             aspect_z_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
@@ -432,7 +433,8 @@ class ProjCameraInfo:
         uci.cam_size = math.tan(uci.cam_angle) if uci.do_persp else camera.ortho_scale
 
         cam_inv = ob.matrix_world.normalized()
-        if (res := cam_inv.inverted(None)) is not None:
+        res = cam_inv.inverted(None)
+        if res is not None:
             uci.cam_inv = res
             # normal projection
             if rot_mat:
@@ -706,8 +708,10 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
     @staticmethod
     def crop(pointers_to_coords, padding=0.001):
         bbox = BBox.calc_bbox(pointers_to_coords)
-        scale_x = ((1.0 - padding) / w) if (w := bbox.width) else 1
-        scale_y = ((1.0 - padding) / h) if (h := bbox.height) else 1
+        w = bbox.width
+        h = bbox.height
+        scale_x = ((1.0 - padding) / w) if w else 1
+        scale_y = ((1.0 - padding) / h) if h else 1
 
         scale_x = scale_y = min(scale_x, scale_y)
 

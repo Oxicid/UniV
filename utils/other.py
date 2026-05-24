@@ -18,23 +18,31 @@ def get_aspect_ratio(umesh=None):
             if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Checker'):
                 gn_mod = GN(m, print_missed_socket=True)
                 if 'Socket_1' in gn_mod:
-                    if mtl := gn_mod['Socket_1']:
+                    mtl = gn_mod['Socket_1']
+                    if mtl:
                         for node in mtl.node_tree.nodes:
-                            if node.bl_idname == 'ShaderNodeTexImage' and (image := node.image):
-                                image_width, image_height = image.size
-                                if image_height:
-                                    return image_width / image_height
+                            if node.bl_idname == 'ShaderNodeTexImage':
+                                image = node.image
+                                if image:
+                                    image_width, image_height = image.size
+                                    if image_height:
+                                        return image_width / image_height
                 break
         # Aspect from material
-        if mtl := umesh.obj.active_material:
-            if mtl.use_nodes and (active_node := mtl.node_tree.nodes.active):
-                if active_node.bl_idname == 'ShaderNodeTexImage' and (image := active_node.image):
+        mtl = umesh.obj.active_material
+        if mtl and getattr(mtl, 'use_nodes', True):
+            active_node = mtl.node_tree.nodes.active
+            if active_node and active_node.bl_idname == 'ShaderNodeTexImage':
+                image = active_node.image
+                if image:
                     image_width, image_height = image.size
                     if image_height:
                         return image_width / image_height
         return 1.0
+
     # Aspect from active area
-    if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+    area = bpy.context.area
+    if area and area.type == 'IMAGE_EDITOR':
         space_data = area.spaces.active
         if space_data and space_data.image:
             image_width, image_height = space_data.image.size
@@ -54,7 +62,8 @@ def get_aspect_ratio(umesh=None):
 
 
 def get_active_image_size():
-    if (area := bpy.context.area) and area.type == 'IMAGE_EDITOR':
+    area = bpy.context.area
+    if area and area.type == 'IMAGE_EDITOR':
         space_data = area.spaces.active
         if space_data and space_data.image:
             image_width, image_height = space_data.image.size
@@ -120,7 +129,8 @@ T_uv_select_modes = typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']
 
 
 def get_select_mode_uv() -> T_uv_select_modes:
-    if (mode := bpy.context.scene.tool_settings.uv_select_mode) == 'VERTEX':
+    mode = bpy.context.scene.tool_settings.uv_select_mode
+    if mode == 'VERTEX':
         return 'VERT'
     return mode  # noqa
 

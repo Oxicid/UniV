@@ -12,8 +12,7 @@ from mathutils import Vector
 from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import (prev_disc,
-                     linked_crn_uv,
+from ..utils import (linked_crn_uv,
                      vec_isclose_to_zero,
                      linked_crn_uv_by_idx_unordered)
 from math import pi
@@ -67,12 +66,14 @@ class LoopGroup:
         crn.tag = False
         group = [crn]
         while True:
-            if next_crn := self.next_walk_boundary(group[-1]):
+            next_crn = self.next_walk_boundary(group[-1])
+            if next_crn:
                 group.append(next_crn)
             else:
                 break
         while True:
-            if prev_crn := self.prev_walk_boundary(group[0]):
+            prev_crn = self.prev_walk_boundary(group[0])
+            if prev_crn:
                 group.insert(0, prev_crn)
             else:
                 break
@@ -88,7 +89,8 @@ class LoopGroup:
         uv = self.umesh.uv
         bm_iter = crn_next
         while True:
-            if (bm_iter := prev_disc(bm_iter)) == crn_next:
+            bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # prev disk
+            if bm_iter == crn_next:
                 break
             if bm_iter.tag and crn_next[uv].uv == bm_iter[uv].uv:
                 bm_iter.tag = False
@@ -103,7 +105,8 @@ class LoopGroup:
         uv = self.umesh.uv
         bm_iter = crn
         while True:
-            if (bm_iter := prev_disc(bm_iter)) == crn:
+            bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # prev disk
+            if bm_iter == crn:
                 break
             if bm_iter.link_loop_prev.tag and crn[uv].uv == bm_iter[uv].uv:
                 bm_iter.link_loop_prev.tag = False

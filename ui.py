@@ -208,7 +208,8 @@ class UNIV_PT_General(Panel):
 
 
         # Transforms
-        if panel := draw_panel(layout, 'Transforms'):
+        panel = draw_panel(layout, 'Transforms')
+        if panel:
             col_align = panel.column(align=True)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
@@ -270,7 +271,8 @@ class UNIV_PT_General(Panel):
 
 
         # Misc
-        if panel := draw_panel(layout, 'Misc'):
+        panel = draw_panel(layout, 'Misc')
+        if panel:
             # TODO: Move Rectify, Unwrap, Relax, Straighten, Quadrify to Unfold
             col_align = panel.column(align=True)
             if univ_pro:
@@ -306,7 +308,8 @@ class UNIV_PT_General(Panel):
 
 
         # Select
-        if panel := draw_panel(layout, 'Select'):
+        panel = draw_panel(layout, 'Select')
+        if panel:
             col_align = panel.column(align=True)
             grid = col_align.grid_flow(row_major=True, columns=2, align=True)
 
@@ -336,7 +339,8 @@ class UNIV_PT_General(Panel):
 
 
         # Mark
-        if panel := draw_panel(layout, 'Mark'):
+        panel = draw_panel(layout, 'Mark')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -358,7 +362,8 @@ class UNIV_PT_General(Panel):
 
 
         # Other
-        if panel := draw_panel(layout, 'Other'):
+        panel = draw_panel(layout, 'Other')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -375,7 +380,8 @@ class UNIV_PT_General(Panel):
             if univ_pro:
                 row.popover(panel='UNIV_PT_CheckerSettings', text='', icon_value=icons.settings_a)
 
-            if sub_panel := getattr(panel, 'panel', None):
+            sub_panel = getattr(panel, 'panel', None)
+            if sub_panel:
                 header, sub_panel = sub_panel("UniV_Specific", default_closed=True)
                 header.label(text='Specific')
                 if sub_panel:
@@ -390,12 +396,14 @@ class UNIV_PT_General(Panel):
 
         # UV Maps
         if pref.uv_layers_show:
-            if panel := draw_panel(layout, 'UV Maps'):
+            panel = draw_panel(layout, 'UV Maps')
+            if panel:
                 self.draw_uv_layers(panel,draw_label=False)
 
         if univ_pro:
             # Trim
-            if panel := draw_trim_panel(layout, 'Trims'):
+            panel = draw_trim_panel(layout, 'Trims')
+            if panel:
                 self.draw_trims(panel)
 
 class UNIV_PT_General_VIEW_3D(Panel):
@@ -424,7 +432,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
             layout.operator_context = 'EXEC_DEFAULT'
         # col = layout.column(align=True)
 
-        if panel := draw_panel(layout, 'Transforms'):
+
+        # Transform
+        panel = draw_panel(layout, 'Transforms')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -463,7 +474,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             UNIV_PT_General.draw_texel_density(col_align, 'mesh')
 
 
-        if panel := draw_panel(layout, 'Misc'):
+        # Misk
+        panel = draw_panel(layout, 'Misc')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -481,7 +494,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
                 row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
-        if panel := draw_panel(layout, 'Select'):
+        # Select
+        panel = draw_panel(layout, 'Select')
+        if panel:
             col_align = panel.column(align=True)
             if univ_pro:
                 row = col_align.row(align=True)
@@ -492,7 +507,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
 
 
-        if panel := draw_panel(layout, 'Mark'):
+        # Mark
+        panel = draw_panel(layout, 'Mark')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -505,7 +522,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
 
-        if panel := draw_panel(layout, 'Project'):
+        # Project
+        panel = draw_panel(layout, 'Project')
+        if panel:
             col_align = panel.column(align=True)
             if univ_pro:
                 row = col_align.row(align=True)
@@ -524,7 +543,9 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
 
 
-        if panel := draw_panel(layout, 'Other'):
+        # Other
+        panel = draw_panel(layout, 'Other')
+        if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
@@ -532,8 +553,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_checker', icon_value=icons.checker)
             row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
 
+        # UV Maps
         if pref.uv_layers_show:
-            if panel := draw_panel(layout, 'UV Maps'):
+            panel = draw_panel(layout, 'UV Maps')
+            if panel:
                 UNIV_PT_General.draw_uv_layers(panel, draw_label=False)
 
 
@@ -575,7 +598,8 @@ class UNIV_PT_GlobalSettings(Panel):
 
         pref = prefs()
         if univ_pro:
-            if panel := draw_panel_with_pref_checkbox(layout, 'overlay_2d_enable'):
+            panel = draw_panel_with_pref_checkbox(layout, 'overlay_2d_enable')
+            if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
@@ -585,7 +609,8 @@ class UNIV_PT_GlobalSettings(Panel):
                 col.prop(pref, 'overlay_2d_uv_edge_h_constraints_color')
                 col.prop(pref, 'overlay_2d_uv_edge_v_constraints_color')
 
-            if panel := draw_panel_with_pref_checkbox(layout, 'overlay_3d_enable'):
+            panel = draw_panel_with_pref_checkbox(layout, 'overlay_3d_enable')
+            if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
@@ -597,7 +622,8 @@ class UNIV_PT_GlobalSettings(Panel):
 
                 col.prop(pref, 'overlay_toggle_xray')
 
-            if panel := draw_panel_with_pref_checkbox(layout, 'use_trims'):
+            panel = draw_panel_with_pref_checkbox(layout, 'use_trims')
+            if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
@@ -606,7 +632,8 @@ class UNIV_PT_GlobalSettings(Panel):
                 col.prop(pref, 'trim_line_opacity')
                 col.prop(pref, 'trim_tris_opacity')
 
-        if panel := draw_panel_with_pref_checkbox(layout, 'uv_layers_show'):
+        panel = draw_panel_with_pref_checkbox(layout, 'uv_layers_show')
+        if panel:
             split = panel.split(factor=indent)
             _ = split.column()
             col = split.column()
@@ -627,9 +654,8 @@ class UNIV_PT_PackSettings(Panel):
         layout = self.layout
         settings = univ_settings()
 
-        if uvpm_exist := hasattr(context.scene, 'uvpm3_props'):
-            layout.prop(settings, 'use_uvpm')
-        elif uvpm_exist := hasattr(context.scene, 'uvpm4_props'):
+        uvpm_exist = hasattr(context.scene, 'uvpm4_props') or hasattr(context.scene, 'uvpm3_props')
+        if uvpm_exist:
             layout.prop(settings, 'use_uvpm')
 
         row = layout.row(align=True, heading='Global Size')
@@ -673,7 +699,9 @@ class UNIV_PT_PackSettings(Panel):
     def draw_uvpm(self):
         layout = self.layout
         settings = univ_settings()
-        if not (uvpm_settings := getattr(bpy.context.scene, 'uvpm4_props', None)):
+
+        uvpm_settings = getattr(bpy.context.scene, 'uvpm4_props', None)
+        if not uvpm_settings:
             uvpm_settings = bpy.context.scene.uvpm3_props
 
         if hasattr(uvpm_settings, 'default_main_props'):
@@ -804,7 +832,8 @@ class UNIV_PT_CheckerTextures(Panel):
     def draw(self, context):
         layout = self.layout
         for img in bpy.data.images:
-            if (name := img.name).startswith('UniV_'):
+            name = img.name
+            if name.startswith('UniV_'):
                 if name.startswith(('UniV_Grid_', 'UniV_ColorGrid_')):
                     continue
                 row = layout.row(align=True)
@@ -851,7 +880,9 @@ class UNIV_UL_UV_LayersManager(bpy.types.UIList):
         settings = univ_settings()
         if index >= settings.uv_layers_size:
             return
-        if flag := item.flag:  # noqa
+
+        flag = item.flag  # noqa
+        if flag:
             if flag == 2:
                 layout.alert = True
             else:
@@ -866,7 +897,8 @@ class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
         settings = univ_settings()
         if index >= settings.uv_layers_size:
             return
-        if flag := item.flag:  # noqa
+        flag = item.flag  # noqa
+        if flag:
             if flag == 2:
                 layout.alert = True
             else:

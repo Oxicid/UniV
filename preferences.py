@@ -126,7 +126,8 @@ def _update_uv_layers_name(_self, context):
 
 def _update_uv_layers_active_idx(self, context):
     if UV_LAYERS_ENABLE:
-        if is_edit := bpy.context.mode == 'EDIT_MESH':
+        is_edit = bpy.context.mode == 'EDIT_MESH'
+        if is_edit:
             objects = context.objects_in_mode_unique_data
         else:
             objects = (obj_ for obj_ in context.selected_objects if obj_.type == 'MESH')
@@ -138,7 +139,8 @@ def _update_uv_layers_active_idx(self, context):
                 if not uvs[idx].active:
                     uvs[idx].active = True
         if prefs().enable_uv_layers_sync_borders_seam and is_edit:
-            if area := bpy.context.area:
+            area = bpy.context.area
+            if area:
                 if area.type == 'VIEW_3D':
                     bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
                 else:
@@ -239,7 +241,8 @@ copy_to_layers_uv_channels_items_from = [
 copy_to_layers_uv_channels_items_to = copy_to_layers_uv_channels_items_from.copy()
 copy_to_layers_uv_channels_items_to[0] = ('0', 'Other', '')
 
-if _is_360_pack := bpy.app.version >= (3, 6, 0):
+_is_360_pack = bpy.app.version >= (3, 6, 0)
+if _is_360_pack:
     _udim_source.append(('ORIGINAL_AABB', 'Original BBox', "Pack to starting bounding box of islands"))
 
 
