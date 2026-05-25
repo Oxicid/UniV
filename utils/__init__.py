@@ -826,7 +826,7 @@ def set_cursor_location(loc):
                 return
 
 
-def update_area_by_type(area_type: str):
+def update_area_by_type(area_type: "typing.Literal['VIEW_3D', 'IMAGE_EDITOR']" = 'VIEW_3D'):
     for window in bpy.context.window_manager.windows:
         screen = window.screen
         for area in screen.areas:

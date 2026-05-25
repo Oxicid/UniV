@@ -1297,10 +1297,17 @@ class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
             self.report({'WARNING'}, "Not found uvs or selected mesh objects.")
             return {'CANCELLED'}
 
+        is_edit_mode = bpy.context.mode == 'EDIT_MESH'
         for obj in selected_objects:
-            if self.move_uv_bm(obj, settings.uv_layers_active_idx, up=True, with_names=self.with_names):
-                if bpy.context.mode == 'EDIT_MESH':
+            do_update = self.move_uv_bm(obj, settings.uv_layers_active_idx, up=True, with_names=self.with_names)
+            if do_update:
+                if is_edit_mode:
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
+                else:
+                    obj.data.update()
+
+        if not is_edit_mode:
+            utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
 
 
@@ -1321,10 +1328,18 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
             self.report({'WARNING'}, "Not found uvs or selected mesh objects.")
             return {'CANCELLED'}
 
+        is_edit_mode = bpy.context.mode == 'EDIT_MESH'
         for obj in selected_objects:
-            if self.move_uv_bm(obj, settings.uv_layers_active_idx, up=False, with_names=self.with_names):
-                if bpy.context.mode == 'EDIT_MESH':
+            do_update = self.move_uv_bm(obj, settings.uv_layers_active_idx, up=False, with_names=self.with_names)
+            if do_update:
+                if is_edit_mode:
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
+                else:
+                    obj.data.update()
+
+        if not is_edit_mode:
+            utils.update_area_by_type('VIEW_3D')
+
         return {'FINISHED'}
 
 
@@ -1361,13 +1376,17 @@ class UNIV_OT_Add(Operator):
             self.report({'WARNING'}, 'The limit of 8 channels has been reached.')
             return {'CANCELLED'}
 
+        is_edit_mode = bpy.context.mode == 'EDIT_MESH'
         for obj in objects:
-            if bpy.context.mode == 'EDIT_MESH':
+            if is_edit_mode:
                 if self.add_missed_uvs_bm(obj, target_min_size, settings.uv_layers_active_idx):
                     bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
             else:
                 if UNIV_OT_Join.add_missed_uvs(obj, target_min_size, settings.uv_layers_active_idx):
                     obj.data.update()
+
+        if not is_edit_mode:
+            utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
 
     @staticmethod
@@ -1431,6 +1450,7 @@ class UNIV_OT_Remove(Operator):
             self.report({'WARNING'}, 'All uv maps removed')
             return {'CANCELLED'}
 
+        is_edit_mode = bpy.context.mode == 'EDIT_MESH'
         target_idx = univ_settings().uv_layers_active_idx
         for obj in objects:
             mesh = obj.data
@@ -1439,7 +1459,7 @@ class UNIV_OT_Remove(Operator):
                 continue
 
             if self.remove_all:
-                if bpy.context.mode == 'EDIT_MESH':
+                if is_edit_mode:
                     bm = bmesh.from_edit_mesh(mesh)
                     for uv_layer in reversed(bm.loops.layers.uv):
                         bm.loops.layers.uv.remove(uv_layer)
@@ -1450,7 +1470,7 @@ class UNIV_OT_Remove(Operator):
                     obj.data.update()
             else:
                 if len(uv_layers) >= target_idx + 1:
-                    if bpy.context.mode == 'EDIT_MESH':
+                    if is_edit_mode:
                         bm = bmesh.from_edit_mesh(mesh)
                         bm.loops.layers.uv.remove(bm.loops.layers.uv[target_idx])
                         bmesh.update_edit_mesh(obj.data, loop_triangles=False, destructive=False)
@@ -1458,6 +1478,8 @@ class UNIV_OT_Remove(Operator):
                         uv_layers.remove(uv_layers[target_idx])
                         obj.data.update()
 
+        if not is_edit_mode:
+            utils.update_area_by_type('VIEW_3D')
         return {'FINISHED'}
 
 
