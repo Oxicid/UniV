@@ -437,7 +437,9 @@ class TrimDrawer:
         try:
             TrimDrawer.register()
         except Exception as e:
+            import traceback
             print('UniV: Failed to add a handler for Drawer2D system.', e)
+            traceback.print_exc()
 
 
 class DrawerSubscribeRNA:
@@ -446,6 +448,7 @@ class DrawerSubscribeRNA:
 
     @staticmethod
     def univ_uv_sync_rna_callback():
+        # print('univ_uv_sync_rna_callback')
         Drawer2D.update_data(univ_settings(), bpy.context)
         Drawer3D.update_data(univ_settings(), bpy.context)
 
@@ -656,6 +659,7 @@ class Drawer2D:
 
             if not has_update_tracker():
                 bpy.app.handlers.depsgraph_update_post.append(univ_drawer_update_tracker)
+
             cls.sync = bpy.context.tool_settings.use_uv_select_sync
 
     @classmethod
@@ -682,7 +686,9 @@ class Drawer2D:
             if univ_settings().overlay_2d_enable:
                 Drawer2D.register()
         except Exception as e:
+            import traceback
             print('UniV: Failed to add a handler for Drawer2D system.', e)
+            traceback.print_exc()
 
     @staticmethod
     def update_data(self, _context):
@@ -921,7 +927,9 @@ class Drawer3D:
             if univ_settings().overlay_3d_enable:
                 Drawer3D.register()
         except Exception as e:
+            import traceback
             print('UniV: Failed to add a handler for Drawer2D system.', e)
+            traceback.print_exc()
 
     @staticmethod
     def update_data(self, _context):

@@ -49,8 +49,6 @@ from . import keymaps
 from . import fastapi
 from . import preferences
 
-from bpy.app.timers import register as tm_register
-
 # univ_pro: "type[bpy?] | None"
 try:
     from . import univ_pro
@@ -322,6 +320,27 @@ load_workspace_types()
 is_enabled = False
 
 
+def univ_load_post_for_timer():
+    """For avoid context restrict"""
+    # TODO: Add to inspect
+    draw.shaders.Shaders.init_shaders()
+    misc.UNIV_OT_UV_Layers_Manager.uv_layers_watcher_append_handler()
+
+    if univ_pro:
+        draw.DrawerSubscribeRNA.register_handler()
+        # TODO: Check why this double called ?
+        # This was called before without persist (why???)
+        draw.DrawerSubscribeRNA.subscribe()  # NOTE: Call after register_handler
+
+        draw.Drawer2D.append_handler_with_delay()
+        draw.Drawer3D.append_handler_with_delay()
+        draw.TrimDrawer.append_handler_with_delay()
+
+@bpy.app.handlers.persistent
+def univ_load_post(_):
+    univ_load_post_for_timer()
+
+
 def register():
     if bpy.app.background:
         print("UniV: Skipping registration in background mode")
@@ -380,14 +399,12 @@ def register():
     # Perhaps it does not allow to reload operators in a normal way.
     # bpy.types.WindowManager.univ_settings = bpy.props.PointerProperty(type=classes[3])
 
-    tm_register(draw.shaders.Shaders.init_shaders, first_interval=0.09, persistent=True)
-    tm_register(misc.UNIV_OT_UV_Layers_Manager.append_handler_with_delay, first_interval=0.1, persistent=True)
-    if univ_pro:
-        tm_register(draw.DrawerSubscribeRNA.register_handler, first_interval=0.1, persistent=True)
-        tm_register(draw.DrawerSubscribeRNA.subscribe, first_interval=0.15)  # NOTE: Call after register_handler
-        tm_register(draw.Drawer2D.append_handler_with_delay, first_interval=0.1, persistent=True)
-        tm_register(draw.Drawer3D.append_handler_with_delay, first_interval=0.1, persistent=True)
-        tm_register(draw.TrimDrawer.append_handler_with_delay, first_interval=0.1, persistent=True)
+    # TODO: Add checks to inspect
+    # After restarting the add-on, it doesn't work, but older versions of Blender don't have context-restricted mode,
+    # so you can load it without any delay
+    # bpy.app.handlers.load_post.append(univ_load_post)
+    from bpy.app.timers import register
+    register(univ_load_post_for_timer, first_interval = 0.0, persistent = True)
 
     bpy.types.VIEW3D_HT_header.prepend(toggle.univ_header_split_btn)
     bpy.types.IMAGE_HT_header.prepend(toggle.univ_header_sync_btn)
@@ -462,6 +479,9 @@ def unregister():
 
     toggle.ToggleHandlers.unregister_handler()
 
+    for handler in reversed(bpy.app.handlers.load_post):
+        if handler.__name__ == univ_load_post.__name__:
+            bpy.app.handlers.load_post.remove(handler)
 
 if __name__ == "__main__":
     register()

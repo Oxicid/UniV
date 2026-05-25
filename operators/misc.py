@@ -1183,7 +1183,7 @@ class UNIV_OT_UV_Layers_Manager(Operator):
                 return
 
     @staticmethod
-    def append_handler_with_delay():
+    def uv_layers_watcher_append_handler():
         try:
             if univ_settings().uv_layers_show:
                 bpy.app.handlers.depsgraph_update_post.append(UNIV_OT_UV_Layers_Manager.univ_uv_layers_update)
