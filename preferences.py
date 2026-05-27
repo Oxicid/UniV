@@ -633,6 +633,16 @@ Some operators, can interact with trims:
 
             import platform
             if platform.system() in ('Windows', 'Linux'):
+
+                from .fastapi import clib
+                failed_ver = clib.FastAPI.failed_version
+                if failed_ver != -1:
+                    if failed_ver > clib.EXPECTED_FASTAPI_VERSION:
+                        text="You installed an OLD version of the library"
+                    else:
+                        text = "You installed a version of the library that is too NEW"
+                    layout.label(text=f"{text} - {failed_ver}, expected - {clib.EXPECTED_FASTAPI_VERSION}.", icon='ERROR')
+
                 row = layout.row()
                 row.prop(self, 'use_fastapi')
                 row.operator("wm.url_open", text="Open Download Link...").url = r"https://github.com/Oxicid/UniV/releases"

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy
@@ -17,20 +17,26 @@ from ctypes import (
     byref
 )
 
+EXPECTED_FASTAPI_VERSION = 4
+
 class FastAPI:
     lib: ctypes.CDLL | None = None
-    _expected_fastapi_min_version = 4
+    failed_version = -1
+
     @classmethod
     def load(cls):
         cls.lib = utils.load_lib('univ_fastapi')
         if hasattr(cls.lib, 'version'):  # TODO: Delete after 3 month
-            if cls.lib.version() < cls._expected_fastapi_min_version:
+            if cls.lib.version() != EXPECTED_FASTAPI_VERSION:
+                cls.failed_version = cls.lib.version()
                 cls.close()
-                print(f"UniV: FastAPI: Expected minimal version {cls._expected_fastapi_min_version}, given: {cls.lib.version()!r}.")
+                print(f"UniV: FastAPI: Expected version {EXPECTED_FASTAPI_VERSION}, given: {cls.lib.version()!r}.")
                 return
         else:
             cls.close()
             return
+
+        cls.failed_version = -1
         cls.init_linear_solver()
         cls.init_extract_data()
 
