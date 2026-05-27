@@ -107,6 +107,13 @@ def is_boundary_with_flip_check_sync(crn: BMLoop, uv: BMLayerItem):
 
 
 def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_check=True) -> typing.Callable[[BMLoop], bool]:
+    """
+    with_seam - check seams
+
+    with_flipped_check - if True, non-manifolds edges returns True (this is not flipped correction check)
+
+    invisible_check - hidden shared face return True
+    """
     def catcher(uv: BMLayerItem, is_boundary_):
         if with_seam:
             def is_boundary(crn: BMLoop):

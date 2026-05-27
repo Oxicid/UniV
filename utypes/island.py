@@ -1112,25 +1112,6 @@ class AdvIsland(FaceIsland):
         self.area_uv = area
         return area
 
-    def calc_edge_length(self, selected=True):  # TODO: Add aspect ratio
-        uv = self.umesh.uv
-        total_length = 0.0
-        corners = (_crn for _f in self for _crn in _f.loops)
-        if selected:
-            if not self.umesh.sync:
-                for crn in corners:
-                    uv_crn = crn[uv]
-                    if uv_crn.select_edge:
-                        total_length += (uv_crn.uv - crn.link_loop_next[uv].uv).length
-            else:
-                for crn in corners:
-                    if crn.edge.select:
-                        total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
-        else:
-            for crn in corners:
-                total_length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
-        return total_length
-
     def calc_sub_islands_all(self) -> 'AdvIslands':
         self.set_tag()
         islands = [AdvIsland(i, self.umesh) for i in IslandsBase.calc_all_ex(self.umesh)]

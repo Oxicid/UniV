@@ -45,20 +45,29 @@ class Stitch:
         self.zero_area_count = 0
         self.flipped_3d_count = 0
         for umesh in self.umeshes:
+
+            # This contains `Targets` and potentially `Transformed` islands, which will be sorted later.
             if self.between:
-                adv_islands = AdvIslands.calc_extended_with_mark_seam(umesh)
+                islands = AdvIslands.calc_extended_with_mark_seam(umesh)
             else:
-                adv_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
-            if len(adv_islands) <= 1:
+                islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            if len(islands) <= 1:
                 continue
 
-            adv_islands.indexing()
+            islands.indexing()
             umesh.set_corners_tag(False)
             if self.between:
-                target_islands = adv_islands.islands.copy()
+                target_islands = islands.islands.copy()
             else:
-                target_islands = [
-                    isl for isl in adv_islands if utypes.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+                if umesh.elem_mode in ('VERT', 'EDGE'):
+                    target_islands = [
+                        isl for isl in islands if
+                        utypes.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+                else:
+                    target_islands = [
+                        isl for isl in islands if
+                        utypes.IslandsBase.island_filter_is_any_face_selected(isl.faces, umesh)]
+
             self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
 
             if not target_islands:
@@ -91,7 +100,7 @@ class Stitch:
                     trans_isl_index = trans_lg[0].face.index
                     exclude_indexes.add(trans_isl_index)
 
-                    trans_isl = adv_islands[trans_isl_index]
+                    trans_isl = islands[trans_isl_index]
                     if trans_isl.select_state:
                         trans_isl.area_3d = ref_lg.length_3d
                         balanced_target_islands.append(trans_isl)
@@ -112,7 +121,7 @@ class Stitch:
                                 trans_isl_index = trans_lg[0].face.index
                                 exclude_indexes.add(trans_isl_index)
 
-                                trans_isl = adv_islands[trans_isl_index]
+                                trans_isl = islands[trans_isl_index]
                                 if trans_isl.select_state:
                                     trans_isl.area_3d = lg.length_3d
                                     stack.append(trans_isl)
@@ -511,10 +520,35 @@ class Stitch:
 
 
     def sort_by_dist_to_mouse_or_sel_edge_length(self, target_islands, umesh):
-        if umesh.sync and self.mouse_position:
-            target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
-        else:
-            target_islands.sort(key=lambda isl: isl.calc_edge_length(selected=False), reverse=True)
+
+        if not utils.USE_GENERIC_UV_SYNC:
+            if umesh.sync and self.mouse_position:
+                if umesh.elem_mode in ('VERT', 'EDGE'):
+                    if not umesh.has_selected_uv_faces():
+                        target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
+                        return
+
+        def calc_edge_length(isl: utypes.AdvIsland):
+            uv = isl.umesh.uv
+            aspect_vec = Vector((1 / isl.umesh.aspect, 1))
+
+            total_length = 0.0
+            is_boundary = utils.is_boundary_func(isl.umesh, with_seam=True, invisible_check=True)
+            get_edge_select = utils.edge_select_get_func(isl.umesh)
+            get_face_select = utils.face_select_get_func(isl.umesh)
+
+            for crn in isl.corners_iter():
+                if get_edge_select(crn) and is_boundary(crn):
+                    diff = (crn[uv].uv - crn.link_loop_next[uv].uv) * aspect_vec
+                    if get_face_select(crn.face):
+                        # Prioritize edges with selected face, for correct targeting when circular stitches.
+                        total_length += diff.length * 1.5
+                    else:
+                        total_length += diff.length
+
+            return total_length
+
+        target_islands.sort(key=lambda isl: calc_edge_length(isl), reverse=True)
 
     @staticmethod
     def filter_and_draw_lines(umeshes_a, umeshes_b):
