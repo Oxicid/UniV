@@ -7,6 +7,7 @@ if 'bpy' in locals():
 
 import bpy
 import bl_math
+import collections
 from itertools import chain
 from mathutils import Vector
 
@@ -54,6 +55,7 @@ class Stitch:
             if len(islands) <= 1:
                 continue
 
+            # Prepare for stitch
             islands.indexing()
             umesh.set_corners_tag(False)
             if self.between:
@@ -89,7 +91,9 @@ class Stitch:
                 self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, temp_exclude_indexes)
 
                 loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
-                filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+                filtered = self.split_lg_for_stitch(loop_groups)
+                filtered.sort(key=lambda lg_: lg_.length_uv, reverse=True) # Prioritize multi-stitch by length
+
                 if filtered:
                     # An island may not have any selected edges, but it can still be a reoriented island.
                     # Therefore, we add it to the exclude list, making sure an LG exists.
@@ -138,6 +142,7 @@ class Stitch:
 
                     if not balanced_target_islands:
                         break
+
         if self.zero_area_count:
             self.report({'WARNING'}, f'Found {self.zero_area_count} zero length edge loop. Use inspect tools to find the problem')  # noqa
         if self.flipped_3d_count:
@@ -384,7 +389,7 @@ class Stitch:
             self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
             loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl)
             if loop_groups:
-                filtered = self.split_lg_for_stitch_with_padding(loop_groups)
+                filtered = self.split_lg_for_stitch(loop_groups)
                 if len(filtered) == 1:
                     balance_isl.tag = False
                     return filtered[0]
@@ -408,47 +413,50 @@ class Stitch:
         return min_lg
 
     @staticmethod
-    def split_lg_for_stitch_with_padding(lgs: LoopGroups) -> list[LoopGroup]:
+    def split_lg_for_stitch(lgs: LoopGroups) -> list[LoopGroup]:
+        # TODO: Segment has a similar feature that groups data by indices. Use it, when refactor the LoopGroup to Segments.
         filtered_lg = []
         uv = lgs.umesh.uv
-        def key(crn_): return crn_.link_loop_radial_prev.face.index
+        def get_shared_face_idx(crn_):
+            return crn_.link_loop_radial_prev.face.index
+
         for lg in lgs:
-            if utils.all_equal(lg, key=key):
+            if utils.all_equal(lg, key=get_shared_face_idx):
                 filtered_lg.append(lg)
             else:
-                split_lg_groups: list[list[BMLoop]] = utils.split_by_similarity(lg, key)
+                split_lgs: list[list[BMLoop]] = utils.split_by_similarity(lg, get_shared_face_idx)
 
                 # # Join same index LG, case when border loop circular but with different indexes
-                a_crn = split_lg_groups[0][0]
-                b_crn = split_lg_groups[-1][-1].link_loop_next
-                if a_crn.vert == b_crn.vert and a_crn[uv].uv == b_crn[uv].uv and key(a_crn) == key(split_lg_groups[-1][-1]):
-                    lg_start = split_lg_groups.pop()
-                    lg_end = split_lg_groups[0]
-                    del split_lg_groups[0]
+                start_crn = split_lgs[0][0]
+                end_next_crn = split_lgs[-1][-1].link_loop_next
+                # Circular case
+                is_cyclic = start_crn.vert == end_next_crn.vert and start_crn[uv].uv == end_next_crn[uv].uv
+                if is_cyclic:
+                    # Join, if cyclic similar index.
+                    crn_from_last_group = split_lgs[-1][-1]
+                    if get_shared_face_idx(start_crn) == get_shared_face_idx(crn_from_last_group):
+                        lg_start = split_lgs.pop()
+                        lg_end = split_lgs[0]
+                        del split_lgs[0]
 
-                    lg_start.extend(lg_end)
+                        lg_start.extend(lg_end)
+                        lg_combined = LoopGroup(lgs.umesh)
+                        lg_combined.corners = lg_start
+                        filtered_lg.append(lg_combined)
+
+                # Convert to LoopGroup.
+                for sub_lg in split_lgs:
                     lg_combined = LoopGroup(lgs.umesh)
-                    lg_combined.corners = lg_start
+                    lg_combined.corners = sub_lg
                     filtered_lg.append(lg_combined)
 
-                for lg_ in split_lg_groups:
-                    lg_combined = LoopGroup(lgs.umesh)
-                    lg_combined.corners = lg_
-                    filtered_lg.append(lg_combined)
 
-        # Remove duplicates by length 3D
-        # TODO: Replace length 3d by length uv with aspect
-        import collections
+        # There can be multiple shared segments between islands.
+        # Here we remove redundant segments using indices taken from the shared face.
         groups = collections.defaultdict(list)
         for lg in filtered_lg:
-            groups[key(lg[0])].append(lg)
-        end_filtered = []
-        for g in groups.values():
-            if len(g) == 1:
-                end_filtered.append(g[0])
-            else:
-                end_filtered.append(max(g, key=lambda lg__: lg__.length_3d))
-        return end_filtered
+            groups[get_shared_face_idx(lg[0])].append(lg)
+        return [max(g, key=lambda lg_: lg_.length_uv) for g in groups.values()]  # Remove duplicates by length uv
 
     def set_selected_boundary_tag_with_exclude_face_idx(self, isl, exclude_idx: set):
         """Sets tags for the segments that will be used for stitching. Islands that have already been stitched are ignored."""
