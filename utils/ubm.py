@@ -76,6 +76,60 @@ def calc_signed_face_area_uv(f, uv) -> float:
         first_crn_co = next_crn_co
     return area * 0.5
 
+def calc_signed_face_area_uv_exact_unnormalized(f, uv) -> float:
+    corners = f.loops
+
+    n = len(corners)
+    if n == 4:
+        l0, l1, l2, l3 = f.loops
+
+        a = l0[uv].uv
+        b = l1[uv].uv
+        c = l2[uv].uv
+        d = l3[uv].uv
+
+        return (
+                a.cross(b) +
+                b.cross(c) +
+                c.cross(d) +
+                d.cross(a)
+        )
+
+    elif n== 3:
+        a = corners[0][uv].uv
+        b = corners[1][uv].uv
+        c = corners[2][uv].uv
+
+        ab = b - a
+        ac = c - a
+
+        return ab.cross(ac)
+    else:
+
+        bm = bmesh.new()
+        bm.faces.new([bm.verts.new(crn[uv].uv.to_3d()) for crn in corners])
+        bm.faces.ensure_lookup_table()
+        bm.normal_update()
+
+        res = bmesh.ops.triangulate(bm, faces=bm.faces)  # beauty by default
+
+        total_area = 0.0
+        for f in res['faces']:
+            verts = f.verts
+
+            a = verts[0].co.xy
+            b = verts[1].co.xy
+            c = verts[2].co.xy
+
+            ab = b - a
+            ac = c - a
+
+            total_area += ab.cross(ac)
+
+        bm.free()
+        return total_area
+
+
 
 def calc_total_area_uv(faces, uv):
     return sum(calc_face_area_uv(f, uv) for f in faces)

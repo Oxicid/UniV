@@ -174,6 +174,7 @@ class LoopGroup:
 
     def calc_signed_face_area(self):
         uv = self.umesh.uv
+        # TODO: Report small areas in stitch
         return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
 
     def tagging(self, island: 'AdvIsland | FaceIsland'):
