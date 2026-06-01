@@ -115,12 +115,12 @@ class icons:
         for attr in dir(cls):
             if not attr.endswith('_'):
                 if not isinstance(getattr(cls, attr), int):
-                    print(f'UniV: Attribute {attr} not icon_id')
+                    print(f"UniV: Attribute {attr} not icon_id")
                     continue
 
                 full_path = png_file_path + attr + ".png"
                 if not os.path.exists(full_path):
-                    print(f'UniV: File {full_path} for {attr} icon not found')
+                    print(f"UniV: File {full_path} for {attr} icon not found")
                     continue
 
                 icon = cls._icons_.load(attr, full_path, 'IMAGE')
@@ -148,8 +148,11 @@ class icons:
                     bpy.utils.unregister_tool(p)
                     p.bl_icon = str(new_path)
                     bpy.utils.register_tool(p)
-                except Exception as e:
-                    print(f'UniV: Updating icons for workspaces has failed:\n{e}')
+                except:  # noqa
+                    print(f"UniV: Updating icons for workspaces has failed:\n")
+                    import traceback
+                    traceback.print_exc()
+
             keymaps.add_keymaps_ws()
 
     @classmethod
@@ -180,7 +183,7 @@ class icons:
                 # For the property to apply to the panel, it must be applied to all panels in use.
                 all_panels = [c for c in classes if issubclass(c, bpy.types.Panel)]
                 if not len(all_panels):
-                    print(f'UniV: Panels: N-Panel not found to set icon in compact mode.')
+                    print("UniV: Panels: N-Panel not found to set icon in compact mode.")
                 else:
                     for panel in all_panels:
                         if "bl_rna" in panel.__dict__:
@@ -471,7 +474,7 @@ class IconsCreator:
 
                 svg_file = svg_folder / f"{attr}.svg"
                 if not svg_file.exists():
-                    print(f'UniV: File {svg_file} not found')
+                    print("UniV: File {svg_file} not found")
                     continue
                 png_save_path = png_folder / f"{attr}.png"
 
@@ -479,7 +482,7 @@ class IconsCreator:
 
                 svg_objects = list(set(bpy.context.scene.objects) - prev_data.prev_objects)
                 if not svg_objects:
-                    raise AttributeError(f'{attr!r} not have objects')
+                    raise AttributeError(f"{attr!r} not have objects")
 
                 bpy.context.view_layer.objects.active = svg_objects[0]
                 for svg_obj in svg_objects:
@@ -625,7 +628,7 @@ class IconsCreator:
             return *srgb_color_, lin_color[-1]
 
         found_color = True
-        if vec_isclose(srgb_color, hex_to_rgb('#ffffff'), 0.001):  # White
+        if vec_isclose(srgb_color, hex_to_rgb("#ffffff"), 0.001):  # White
             linear_white = prefs().icon_white_color
             ret_color = linear_to_ret_color(linear_white)
         elif vec_isclose(srgb_color, hex_to_rgb('#ececec'), 0.001):  # Select Arrow
@@ -642,14 +645,14 @@ class IconsCreator:
             else:
                 found_color = False
         else:
-            if vec_isclose(srgb_color, hex_to_rgb('#7d87ff'), 0.001):  # Violet
+            if vec_isclose(srgb_color, hex_to_rgb("#7d87ff"), 0.001):  # Violet
                 linear_violet = prefs().icon_colored_violet
                 ret_color = linear_to_ret_color(linear_violet)
             elif vec_isclose(srgb_color, hex_to_rgb('#62cdf9'), 0.001):  # Cian
                 linear_cian = prefs().icon_colored_cian
                 ret_color = linear_to_ret_color(linear_cian)
 
-            elif vec_isclose(srgb_color, hex_to_rgb('#dc87ff'), 0.001):  # Purple
+            elif vec_isclose(srgb_color, hex_to_rgb("#dc87ff"), 0.001):  # Purple
                 linear_purple = prefs().icon_colored_purple
                 ret_color = linear_to_ret_color(linear_purple)
             elif vec_isclose(srgb_color, hex_to_rgb('#ff87a9'), 0.001):  # Pink
@@ -660,7 +663,7 @@ class IconsCreator:
 
         if not found_color:
             from ..utils import rgb_to_hex
-            print(f'UniV: Generate Icons: Not found color {rgb_to_hex(srgb_color)!r} for icon {icon_name!r}')
+            print(f"UniV: Generate Icons: Not found color {rgb_to_hex(srgb_color)!r} for icon {icon_name!r}")
 
         return ret_color
 

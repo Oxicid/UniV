@@ -143,9 +143,7 @@ class UNIV_PT_General(Panel):
             active_dataptr=settings,
             active_propname="uv_layers_active_idx",
             rows=4,
-            maxrows=4,
-            columns=4,
-            # type='GRID'
+            maxrows=4
         )
         col = row.column(align=True)
         col.operator('mesh.univ_add', icon='ADD', text='')

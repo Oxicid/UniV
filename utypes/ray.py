@@ -304,7 +304,7 @@ class KDMeshes:
         return len(self.kdmeshes)
 
     def __str__(self):
-        return f'KD Meshes count = {len(self.kdmeshes)}'
+        return f"KD Meshes count = {len(self.kdmeshes)}."
 
 
 class TrimKDTree:
@@ -704,7 +704,7 @@ class RayCast:
             flat_tris_coords_append(crn_b.vert.co)
             flat_tris_coords_append(crn_c.vert.co)
 
-        indices = np.arange(len(flat_tris_coords), dtype='uint32').reshape(-1, 3).tolist()
+        indices = np.arange(len(flat_tris_coords), dtype="uint32").reshape(-1, 3).tolist()
         bvh = BVHTree.FromPolygons(flat_tris_coords, indices, all_triangles=True)
         return bvh, faces
 
@@ -714,7 +714,7 @@ class RayCast:
         # draw.LinesDrawSimple3D.max_draw_time = 5
 
         max_dist = 50_000
-        best_length_squared = float('inf')
+        best_length_squared = float("inf")
         umesh: UMesh | None = None
         face_index: int = 0
         for umesh_iter in self.umeshes:

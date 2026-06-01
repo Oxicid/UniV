@@ -169,7 +169,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 raise NotImplementedError(self.mode)
 
         ot_name_to_report_name = 'cropped' if self.use_crop == 'Crop' else 'filled'
-        self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
+        self.umeshes.update(info=f"All islands {ot_name_to_report_name}")
 
         if not self.umeshes.is_edit_mode:
             self.umeshes.free()
@@ -334,7 +334,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             self.report({'WARNING'}, 'Not found islands in active trim')
         else:
             ot_name_to_report_name = 'cropped' if self.use_crop else 'filled'
-            self.umeshes.update(info=f'All islands {ot_name_to_report_name}')
+            self.umeshes.update(info=f"All islands {ot_name_to_report_name}")
 
         if skipped_counter:
             self.report({'WARNING'}, f"Found {skipped_counter} islands for which no trim was found")
@@ -416,7 +416,7 @@ class UNIV_OT_SnapToPixels(Operator):
                 scale, delta, pivot = utils.get_transform_from_box(cur_bbox, tar_bb, use_crop=False)
                 umesh.update_tag |= isl.scale_with_move(scale, delta, pivot)
 
-        umeshes.update(info=f'All islands snapped to pixels')
+        umeshes.update(info=f"All islands snapped to pixels")
 
         if not umeshes.is_edit_mode:
             umeshes.free()
@@ -453,7 +453,7 @@ class Align_by_Angle:
                 has_segments = True
 
         if not has_segments:
-            self.report({'INFO'}, f'Not found edges with {math.degrees(self.angle):.1f} angle')  # noqa
+            self.report({'INFO'}, f"Not found edges with {math.degrees(self.angle):.1f} angle")  # noqa
         elif not umeshes.update_tag:
             self.report({'INFO'}, 'All edges aligned')  # noqa
         umeshes.silent_update()
@@ -465,7 +465,6 @@ class Align_by_Angle:
 
     @classmethod
     def get_segments_by_angle(cls, umesh, angle, is_x_axis, has_selected_umeshes):
-        has_segments = False
 
         uv = umesh.uv
         edge_orient = Vector((not is_x_axis, is_x_axis))
@@ -542,7 +541,7 @@ class Align_by_Angle:
                 yield cls.join_segments_by_angle(segments)
 
             isl.reset_aspect_ratio()
-        return has_segments
+
 
     @staticmethod
     def align_by_angle_ex(segments: Segments, x_axis=True):
@@ -3738,9 +3737,9 @@ class UNIV_OT_Gravity_VIEW2D(Operator):
         self.umeshes.update(info="All islands oriented")
 
         if self.skip_zero:
-            self.report({'WARNING'}, f'Found {self.skip_zero} zero area islands')
+            self.report({'WARNING'}, f"Found {self.skip_zero} zero area islands")
         if self.count_flipped:
-            self.report({'WARNING'}, f'Found {self.count_flipped} islands with flipped faces, the result may be incorrect')
+            self.report({'WARNING'}, f"Found {self.count_flipped} islands with flipped faces, the result may be incorrect")
 
         if not self.is_edit_mode:
             self.umeshes.free()

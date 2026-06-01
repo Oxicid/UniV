@@ -667,7 +667,7 @@ class UNIV_OT_Check_Overlap(Operator):
             restore_linked_selection_mode = True
             bpy.context.tool_settings.use_uv_select_island = False
 
-        bpy.ops.uv.select_overlap()
+        bpy.ops.uv.select_overlap(extend=False)
 
         if restore_linked_selection_mode:
             bpy.context.tool_settings.use_uv_select_island = True

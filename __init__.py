@@ -376,14 +376,14 @@ def register():
                 item.properties.deselect = True
 
         except Exception:  # noqa
-            print(f'UniV: Failed to register a class {c.__name__}')
+            print(f"UniV: Failed to register a class {c.__name__}")
             traceback.print_exc()
 
     for c in classes_workspace:
         try:
             bpy.utils.register_tool(c)
         except Exception:  # noqa
-            print(f'UniV: Failed to register a class {c.__name__}')
+            print(f"UniV: Failed to register a class {c.__name__}")
             traceback.print_exc()
 
     # Icons register.

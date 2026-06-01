@@ -74,8 +74,10 @@ def update_panel(_self, _context):
 
                 panel.bl_category = prefs().panel_3d_view_category
                 bpy.utils.register_class(panel)
-        except Exception as e:
-            print(f'UniV: Updating Panel View 3D category has failed:\n{e}')
+        except:  # noqa
+            print(f"UniV: Updating Panel View 3D category has failed:\n")
+            import traceback
+            traceback.print_exc()
 
 
 def _update_drawer_2d_enable(self, context):

@@ -11,9 +11,9 @@ from bl_math import clamp
 
 
 def rgb_to_hex(rgb):
-    return f"#{int(clamp(rgb[0]) * 255.0):02x}" \
-        f"{int(clamp(rgb[1]) * 255.0):02x}" \
-        f"{int(clamp(rgb[2]) * 255.0):02x}"
+    return "#%02x%02x%02x" % (int(clamp(rgb[0]) * 255.0),
+                              int(clamp(rgb[1]) * 255.0),
+                              int(clamp(rgb[2]) * 255.0))
 
 
 def hex_to_rgb(hexcode):
