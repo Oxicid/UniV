@@ -3986,10 +3986,10 @@ class UNIV_OT_Pack(Operator):
             args['pin_method'] = settings.pin_method
             args['shape_method'] = settings.shape_method
 
+
         import platform
         if is_360v and settings.shape_method != 'AABB' and platform.system() == 'Windows':
-            import threading
-            threading.Thread(target=self.press_enter_key).start()
+            bpy.app.timers.register(self.press_enter_key)
             return bpy.ops.uv.pack_islands('INVOKE_DEFAULT', **args)  # noqa
         else:
             return bpy.ops.uv.pack_islands('EXEC_DEFAULT', **args)  # noqa

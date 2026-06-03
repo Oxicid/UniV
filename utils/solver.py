@@ -169,7 +169,7 @@ class LinearSolver:
         v.locked = True
         v.value = value
 
-    def solve(self):
+    def solve1(self):
         # nothing to solve
         assert self.state == 'MATRIX_CONSTRUCT'
 
@@ -227,6 +227,97 @@ class LinearSolver:
                 pass
 
         self.b.fill(0.0)  # TODO: Remove ???
+
+        self.state = 'MATRIX_SOLVED'
+        return True
+
+    def solve(self):
+        # Faster when locked exist (>= 10%)
+        assert self.state == 'MATRIX_CONSTRUCT'
+
+        if self.m == 0 or self.n == 0:
+            raise ValueError("Empty matrix")
+
+        if not self.M_triplets:
+            raise ValueError("No triplets to build matrix")
+
+        # Build dense matrix
+        M = np.zeros((self.m, self.n), dtype=np.float64)
+        for r, c, val in self.M_triplets:
+            M[r, c] += val
+
+        # RHS with locked variables applied
+        b_vec = self.b.copy()
+
+        for i in range(self.num_variables):
+            var = self.variable[i]
+            if var.locked and var.coeffs:
+                locked_value = var.value
+                for coeff in var.coeffs:
+                    idx = coeff.index
+                    if 0 <= idx < b_vec.shape[0]:
+                        b_vec[idx] -= coeff.value * locked_value
+
+
+        # Remove zero rows
+        active_rows = np.any(M != 0.0, axis=1)
+
+        if not np.all(active_rows):
+            M = M[active_rows]
+            b_vec = b_vec[active_rows]
+
+        # Remove zero columns
+        active_cols = np.any(M != 0.0, axis=0)
+
+        x_full = np.zeros(self.n, dtype=np.float64)
+
+        if not np.any(active_cols):
+            self.x[:] = x_full
+
+            for i in range(self.num_variables):
+                v = self.variable[i]
+                if not v.locked:
+                    v.value = 0.0
+
+            self.b.fill(0.0)
+            self.state = 'MATRIX_SOLVED'
+            return True
+
+        M_red = M[:, active_cols]
+
+
+        # Solve
+        if self.least_squares:
+            x_red = np.linalg.lstsq(M_red, b_vec, rcond=None)[0]
+
+        else:
+            rows, cols = M_red.shape
+
+            if rows == cols:
+                try:
+                    x_red = np.linalg.solve(M_red, b_vec)
+                except np.linalg.LinAlgError:
+                    x_red = np.linalg.lstsq(M_red, b_vec, rcond=None)[0]
+            else:
+                x_red = np.linalg.lstsq(M_red, b_vec, rcond=None)[0]
+
+
+        # Expand solution
+        x_full[active_cols] = x_red
+        self.x[:] = x_full
+
+
+        # Write back variables
+        for i in range(self.num_variables):
+            v = self.variable[i]
+
+            if not v.locked:
+                idx = v.index
+
+                if 0 <= idx < self.n:
+                    v.value = self.x[idx]
+
+        # self.b.fill(0.0)
 
         self.state = 'MATRIX_SOLVED'
         return True

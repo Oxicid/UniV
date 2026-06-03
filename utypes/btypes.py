@@ -7,6 +7,7 @@
 import bpy
 # import bmesh
 import typing
+import ctypes
 from ctypes import (
     POINTER,
     Union,
@@ -54,6 +55,8 @@ def info_(self):
     total_size = 0
     for name, *dtype in self._fields_:
         value = getattr(self, name)
+        if isinstance(value, ctypes.Array):
+            value = tuple(value)
         size = sizeof(*dtype)
         total_size += size
 
@@ -758,6 +761,30 @@ class context(StructBase):  # Anonymous
     area: c_void_p  # ScrArea ptr
     region: c_void_p  # ARegion ptr
     region_type: c_short
+
+# noinspection PyTypeHints
+class wmEvent(StructBase):
+    next: lambda: POINTER(wmEvent)
+    prev: lambda: POINTER(wmEvent)
+
+    # Event code itself (short, is also in key-map).
+    type: c_short
+    # Press, release, scroll-value.
+    val: c_short
+    # Mouse pointer position, screen coord.
+    xy: c_int * 2
+    # Region relative mouse position (name convention before Blender 2.5).
+    mval: c_int * 2
+    # A single UTF8 encoded character.
+    utf8_buf: c_char * 6
+    # Modifier states: #KM_SHIFT, #KM_CTRL, #KM_ALT, #KM_OSKEY & #KM_HYPER.
+    modifier: c_uint8
+    # The direction (for #KM_PRESS_DRAG events only).
+    direction: c_char
+    # Raw-key modifier (allow using any key as a modifier).
+    # Compatible with values in `type`.
+    keymodifier: c_short
+    # ...
 
 # source\blender\windowmanager\wm_event_system.h
 class wmEventHandler_Op(StructBase):

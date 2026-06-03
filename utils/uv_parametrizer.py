@@ -70,6 +70,7 @@ class UnwrapOptions:
     # slim: ParamSlimOptions = None
     weight_group: str = ''
 
+
 def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
                       unwrap_along: typing.Literal['UV', 'U', 'V'],
                       use_abf=True,
@@ -1860,7 +1861,7 @@ class PAbfSystem:
 
     def matrix_invert(self, chart: PChart) -> bool:
         n_interior: int = self.n_interior
-        context: LinearSolver = LinearSolver.new(0, 2 * n_interior, 1)
+        context: LinearSolver = LinearSolver.new(0, 2 * n_interior, False)
 
         for i, v in enumerate(self.bInterior):
             context.right_hand_side_add(i, v)
