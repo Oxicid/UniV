@@ -1741,7 +1741,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
             if grew:
                 if utils.USE_GENERIC_UV_SYNC:
-                    umesh.sync_from_mesh_if_needed()
+                    if umesh.sync:
+                        umesh.sync_from_mesh_if_needed()
                     for grew_crn in grew:
                         utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
 
@@ -1793,17 +1794,16 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                             shrink.append(crn)
 
             if shrink:
+                # TODO: Don't forget to use use clam_by_seams
                 if utils.USE_GENERIC_UV_SYNC:
-                    umesh.sync_from_mesh_if_needed()
-
-                    umesh.bm.uv_select_foreach_set(False, loop_edges=shrink)
                     if umesh.sync:
-                        umesh.bm.uv_select_sync_to_mesh()
-                    # TODO: Don't forget to use use clam_by_seams
-                    # edge_select_set = utils.edge_select_linked_set_func(umesh)
-                    # for crn in shrink:
-                    #     edge_select_set(crn, False)
+                        umesh.sync_from_mesh_if_needed()
 
+                    edge_select_set = utils.edge_select_linked_set_func(umesh)
+                    for crn in shrink:
+                        edge_select_set(crn, False)
+                    if umesh.sync:
+                        umesh.bm.select_history.validate()  # Active elem validate
                 else:
                     if umesh.sync:
                         edge_deselect = utils.edge_deselect_safe_3d_func(umesh)
@@ -2027,6 +2027,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
                 for grew_crn in grew:
                     grew_crn.edge.select = True
+
+                # TODO: Improve behavior, if uv space exist - no invalidate.
                 if grew:
                     umesh.sync_valid = False
                 umesh.update_tag = bool(grew)
