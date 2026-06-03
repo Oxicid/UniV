@@ -569,33 +569,8 @@ Some operators, can interact with trims:
                                                  subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.83879, 0.83879, 0.83879, 1))
 
     # ----------
-    keymap_workspace_filter: EnumProperty(name='Workspace Filter',
-                                          items=(
-                                              ('ALL', 'Show All', ''),
-                                              ('DEFAULT', 'Default', 'Show keymaps from default workspaces'),
-                                              ('WORKSPACE', 'Workspace', 'Show keymaps from univ workspaces')
-                                          ),
-                                          default='ALL')
 
-    keymap_spaces_filter: EnumProperty(name='Space Filter',
-                                       items=(
-                                           ('ALL', 'Show All Spaces', ''),
-                                           ('UV Editor', 'UV', ''),
-                                           ('Window', 'Window', ''),
-                                           ('Object', 'Object', ''),
-                                           ('Mesh', 'Mesh', ''),
-
-                                       ),
-                                       default='ALL')
-
-    keymap_conflict_filter: EnumProperty(name='Conflict Filter',
-                                         items=(
-                                             ('ALL', 'Show All', ''),
-                                             ('ONLY_ERROR', 'Only Error', ''),
-                                             ('HIDE_ERROR', 'Hide Error', ''),
-
-                                         ),
-                                         default='ALL')
+    keymap_conflict_filter: BoolProperty(name='Show Only Error', default=False)
 
     keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
     keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
@@ -723,6 +698,7 @@ Some operators, can interact with trims:
             from . import ui
             ui.UNIV_PT_GlobalSettings.draw_ui_settings(layout)
         elif self.tab == 'KEYMAPS':
+            from .ui import draw_panel
             row = layout.row()
             row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
             row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
@@ -730,22 +706,11 @@ Some operators, can interact with trims:
             row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
 
             col = layout.column(align=True)
-            row = col.row(align=True)
-            sub_row = row.row(align=True)
-            sub_row.scale_x = 0.4
-            sub_row.prop(self, 'keymap_workspace_filter', expand=True)
 
-            row.separator()
-            sub_row = row.row()
-            sub_row.prop(self, 'keymap_spaces_filter', text='')
+            split = col.split(factor=0.25, align=True)
+            split.prop(self, 'keymap_conflict_filter', toggle=True)
 
-            row = col.row(align=True)
-            sub_row = row.row()
-            sub_row.scale_x = 0.8
-            sub_row.prop(self, 'keymap_conflict_filter', expand=True)
-            row.separator()
-
-            sub_row = row.row(align=True)
+            sub_row = split.row(align=True)
             if bpy.app.version >= (4, 0, 0):
                 sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
                 sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
@@ -754,19 +719,11 @@ Some operators, can interact with trims:
                 sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET')
 
             # Draw Keymaps
-            if self.keymap_workspace_filter in ('ALL', 'DEFAULT'):
-                if self.keymap_spaces_filter == 'ALL':
-                    areas = keymaps.keys_areas
-                else:
-                    areas = []
-                    for a in keymaps.keys_areas:
-                        if self.keymap_spaces_filter in a:
-                            areas.append(a)
-                            break
-                it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude(areas)
-                for area, kc, km, filtered_keymaps in it:
-                    layout.label(text=area)
-                    col = layout.column(align=True)
+            it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude(keymaps.keys_areas)
+            for area, kc, km, filtered_keymaps in it:
+                panel = draw_panel(layout, area)
+                if panel:
+                    col = panel.column(align=True)
 
                     for config_filtered in filtered_keymaps.values():
                         box = None
@@ -784,7 +741,7 @@ Some operators, can interact with trims:
                                 if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
                                     conflict_state_user_defined = 'ERROR'
 
-                            if self.keymap_conflict_filter == 'ONLY_ERROR':
+                            if self.keymap_conflict_filter:
                                 if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
                                     continue
 
@@ -792,24 +749,17 @@ Some operators, can interact with trims:
                                 box = col.box()
 
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-                            if self.keymap_conflict_filter != 'HIDE_ERROR':
+                            # Skip showing errors when univ keymap disabled.
+                            if univ_kmi.active:
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
 
-            if self.keymap_workspace_filter in ('ALL', 'WORKSPACE'):
-                layout.label(text='Workspace Tool')
-                if self.keymap_spaces_filter == 'ALL':
-                    areas = keymaps.keys_areas_workspace
-                else:
-                    areas = []
-                    for a in keymaps.keys_areas_workspace:
-                        if self.keymap_spaces_filter in a:
-                            areas.append(a)
-                            break
 
-                it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude_ws(areas)
-                for area, kc, km, filtered_keymaps in it:
-                    layout.label(text=area)
-                    col = layout.column(align=True)
+            # Workspace Tool.
+            it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude_ws(keymaps.keys_areas_workspace)
+            for area, kc, km, filtered_keymaps in it:
+                subpanel = draw_panel(layout, "Workspace Tool: " + area)
+                if subpanel:
+                    col = subpanel.column(align=True)
 
                     for config_filtered in filtered_keymaps.values():
                         box = None
@@ -827,7 +777,7 @@ Some operators, can interact with trims:
                                 if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
                                     conflict_state_user_defined = 'ERROR'
 
-                            if self.keymap_conflict_filter == 'ONLY_ERROR':
+                            if self.keymap_conflict_filter:
                                 if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
                                     continue
                                 if univ_kmi.idname == 'view3d.select_box':
@@ -840,7 +790,8 @@ Some operators, can interact with trims:
                             if univ_kmi.idname == 'view3d.select_box':
                                 continue
 
-                            if self.keymap_conflict_filter != 'HIDE_ERROR':
+                            # Skip showing errors when univ keymap disabled.
+                            if univ_kmi.active:
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
 
             layout.label(
