@@ -11,6 +11,7 @@
 /* ################## */
 
 
+#include <algorithm>
 #include <stdio.h>
 #include <iostream>
 #include "BLI_compiler_attrs.h"
@@ -252,7 +253,7 @@ DLL_EXPORT void solver_matrix_add_angles(LinearSolver* solver, int row, double a
     double sina2 = sin(a2);
     double sina3 = sin(a3);
 
-    const double sinmax = max_ddd(sina1, sina2, sina3);
+    const double sinmax = std::max({sina1, sina2, sina3});
 
     /* Shift vertices to find most stable order. */
     if (sina3 != sinmax) {

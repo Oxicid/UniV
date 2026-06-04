@@ -174,6 +174,8 @@ else()
         -ffunction-sections
         -fdata-sections
         -fmerge-all-constants
+        -funsigned-char
+
     )
 
     target_link_options(univ_fastapi PRIVATE
@@ -211,7 +213,7 @@ if(MSVC)
 	target_compile_options(univ_fastapi PRIVATE /wd4996)
 else()
 	target_compile_options(univ_fastapi PRIVATE -w)
-	target_compile_options(univ_fastapi PRIVATE -Wno-macro-redefined)
+	# target_compile_options(univ_fastapi PRIVATE -Wno-macro-redefined)
 endif()
 
 
