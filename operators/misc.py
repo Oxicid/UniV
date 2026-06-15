@@ -519,6 +519,10 @@ class UNIV_OT_Hide(Operator):
 
         self.umeshes = UMeshes(report=self.report)
         self.umeshes.fix_context()
+
+        # NOTE: Filter before changing mode.
+        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
+
         if not self.umeshes.sync:
             # Fix incorrect for hide in non-sync mode
             if utils.get_select_mode_mesh() != 'FACE':
@@ -528,7 +532,6 @@ class UNIV_OT_Hide(Operator):
                 utils.update_area_by_type('VIEW_3D')
             self.umeshes.sync = False
 
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
         self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         if not self.umeshes:
