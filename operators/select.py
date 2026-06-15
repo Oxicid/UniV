@@ -3197,10 +3197,14 @@ class UNIV_OT_SelectMode(Operator):
                     update = True
 
 
-        # TODO: Need flush 3d ?
         umeshes.silent_update()
         update |= umeshes.update_tag
-        return {'FINISHED'} if update else {'CANCELLED'}
+        if update:
+            utils.update_area_by_type("VIEW_3D")
+            utils.update_area_by_type("IMAGE_EDITOR")
+            return {'FINISHED'}
+        else:
+          return {'CANCELLED'}
 
 
     def toggle_sticky_mode(self):
