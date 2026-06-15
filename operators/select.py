@@ -1726,17 +1726,17 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             uv = umesh.uv
             for isl in islands:
                 for crn in isl.calc_selected_edge_corners_iter():
-                    with_seam_clamp = self.clamp_on_seam and crn.edge.seam
+                    check_seam = self.clamp_on_seam and not crn.edge.seam
                     selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
 
-                    grow_prev_crn = self.grow_prev(crn, selected_dir, uv, self.max_angle, with_seam_clamp, is_clamped)
+                    grow_prev_crn = self.grow_prev(crn, selected_dir, uv, self.max_angle, check_seam, is_clamped)
                     if grow_prev_crn:
-                        if not (with_seam_clamp and grow_prev_crn.edge.seam):
+                        if not (check_seam and grow_prev_crn.edge.seam):
                             grew.append(grow_prev_crn)
 
-                    grow_next_crn = self.grow_next(crn, selected_dir, uv, self.max_angle, with_seam_clamp, is_clamped)
+                    grow_next_crn = self.grow_next(crn, selected_dir, uv, self.max_angle, check_seam, is_clamped)
                     if grow_next_crn:
-                        if not (with_seam_clamp and grow_next_crn.edge.seam):
+                        if not (check_seam and grow_next_crn.edge.seam):
                             grew.append(grow_next_crn)
 
             if grew:

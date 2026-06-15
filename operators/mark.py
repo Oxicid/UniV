@@ -559,8 +559,8 @@ class UNIV_OT_Angle(Operator):
     mtl: BoolProperty(name='Mtl', default=True)
     by_weight: BoolProperty(name='By Weight', default=True)
     by_sharps: BoolProperty(name='By Sharps', default=True)
-    seams_to_sharps: BoolProperty(name='Seams to Sharps', default=True)
-    obj_smooth: BoolProperty(name='Auto Smooth', default=True)
+    seams_to_sharps: BoolProperty(name='Seams to Sharps', default=False)
+    obj_smooth: BoolProperty(name='Angle from Auto Smooth', default=True)
     angle: FloatProperty(name='Smooth Angle', default=math.radians(66.0), subtype='ANGLE', min=math.radians(5.0), max=math.radians(180.0))
 
     @classmethod
