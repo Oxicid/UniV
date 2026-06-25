@@ -63,6 +63,8 @@ class UNIV_OT_RandomColor(Operator):
         else:
             umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
             isl_type = utypes.MeshIslands
+        if not umeshes:
+            return umeshes.update()
 
         if context.mode == 'EDIT_MESH':
             if self.island_type == 'MESH':
@@ -148,8 +150,11 @@ class UNIV_OT_RandomColor(Operator):
         if color_layer is None:
             color_layer = umesh.bm.loops.layers.color.new('Color')
 
+        # Set to active.
         attr = umesh.obj.data.attributes
         if not attr.active_color or attr.active_color.name != color_layer.name:
+            if not umesh.is_edit_bm:
+                umesh.bm.to_mesh(umesh.obj.data)
             attr.active_color = attr[color_layer.name]
 
         changed = False
