@@ -944,7 +944,7 @@ class UNIV_PT_TD_PresetsManager(Panel):
         row = col.row(align=True)
         row.operator(ot_prefix + ".univ_calc_uv_area", icon_value=icons.area)
         row.operator(ot_prefix + ".univ_calc_uv_coverage", icon_value=icons.coverage)
-        if ot_prefix == 'uv':
+        if univ_pro and ot_prefix == 'uv':
             col.operator("uv.univ_texel_density_from_texture")
         row = col.row(align=True)
         row.operator('uv.univ_texel_density_from_physical_size')

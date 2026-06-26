@@ -123,7 +123,6 @@ def load_register_types():
             texel.UNIV_OT_TexelDensitySet_VIEW3D,
             texel.UNIV_OT_TexelDensityGet,
             texel.UNIV_OT_TexelDensityGet_VIEW3D,
-            texel.UNIV_OT_TexelDensityFromTexture,
             texel.UNIV_OT_TexelDensityFromPhysicalSize,
             texel.UNIV_OT_CalcUDIMsFrom_3DArea_VIEW3D,
             texel.UNIV_OT_CalcUDIMsFrom_3DArea,
@@ -281,6 +280,7 @@ def load_register_types():
                 univ_pro.mark.UNIV_OT_Constraint,
                 univ_pro.mark.UNIV_OT_ConstraintByAngle,
                 # Misc
+                univ_pro.misc.UNIV_OT_TexelDensityFromTexture,
                 univ_pro.rectify.UNIV_OT_Rectify,
                 univ_pro.projection.UNIV_OT_BoxProject,
                 # Unwrap
@@ -475,7 +475,8 @@ def unregister():
     bpy.types.IMAGE_HT_header.remove(toggle.univ_header_sync_btn)
     bpy.types.VIEW3D_MT_object_apply.remove(misc.draw_smart_scale_menu)
 
-    texel.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
+    if univ_pro:
+        univ_pro.misc.UNIV_OT_TexelDensityFromTexture.store_poliigon_physical_size_cache()
 
     toggle.ToggleHandlers.unregister_handler()
 
