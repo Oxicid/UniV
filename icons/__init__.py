@@ -556,7 +556,7 @@ class IconsCreator:
             gpu.matrix.load_matrix(mtx)
             gpu.matrix.load_projection_matrix(Matrix.Identity(4))
 
-            shader = draw.shaders.POLYLINE_FLAT_COLOR_2D
+            shader = draw.shaders.SMOOTH_COLOR_2D
             batch = batch_for_shader(shader, 'TRIS', {"pos": coords, "color": colors})
             batch.draw(shader)
 
