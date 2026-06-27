@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The icons were created by Vitaly Zhdanov https://www.youtube.com/@diffusecolor , for which he is very thankful!

@@ -1,9 +1,7 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
+_needs_reload = "bpy" in locals()
 
 import bpy
 import math
@@ -17,6 +15,11 @@ from bpy.props import *
 from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
 from ..preferences import prefs, univ_settings
+
+if _needs_reload:
+    from .. import reload
+    reload.reload(globals())
+
 
 # noinspection PyTypeHints
 class UNIV_OT_Normal(bpy.types.Operator):

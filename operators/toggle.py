@@ -1,9 +1,7 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
+_needs_reload = "bpy" in locals()
 
 import bpy
 import time
@@ -16,6 +14,11 @@ from ..utypes import UMeshes, ARegion
 from collections import defaultdict
 from bpy.props import *
 from bpy.types import Operator
+
+if _needs_reload:
+    from .. import reload
+    reload.reload(globals())
+
 
 AREA: bpy.types.Area | None = None
 AREA_TICKS: int = False

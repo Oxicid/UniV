@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Everything that happens below is thanks to the K-410

@@ -1,9 +1,7 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
+_needs_reload = "bpy" in locals()
 
 import bpy
 from mathutils import Vector
@@ -13,6 +11,10 @@ from .. import utypes
 from .. import utils
 from ..preferences import prefs, univ_settings
 from ..utils import linked_crn_uv_by_island_index_unordered_included
+
+if _needs_reload:
+    from .. import reload
+    reload.reload(globals())
 
 
 class UnwrapData:

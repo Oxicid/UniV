@@ -1,11 +1,17 @@
-# SPDX-FileCopyrightText: 2024 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+_needs_reload = "bpy" in locals()
 
 import bpy
 
 from .. import utypes
 from .. import utils
 from ..preferences import prefs, checker_generated_types
+
+if _needs_reload:
+    from .. import reload
+    reload.reload(globals())
 
 # Patterns for future
 # _ARS-10.5  # Arrow Scale
