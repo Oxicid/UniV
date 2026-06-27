@@ -599,7 +599,7 @@ Some operators, can interact with trims:
     def texel_density(self, td):
         self.texel = utils.unit_conversion(td, self.texel_unit, 'm')
 
-    def draw(self, _context):
+    def draw(self, context):
         layout = self.layout
         row = layout.row()
         row.prop(self, "tab", expand=True)
@@ -620,9 +620,15 @@ Some operators, can interact with trims:
                         text = "You installed a version of the library that is too NEW"
                     layout.label(text=f"{text} - {failed_ver}, expected - {clib.EXPECTED_FASTAPI_VERSION}.", icon='ERROR')
 
-                row = layout.row()
-                row.prop(self, 'use_fastapi')
+                split = layout.split(factor=0.33)
+                split.prop(self, 'use_fastapi')
+
+                split_sub = split.split(factor=0.5)
+                row = split_sub.row()
+                row.enabled = getattr(bpy.app, 'online_access', True)
                 row.operator("wm.url_open", text="Open Download Link...").url = r"https://github.com/Oxicid/UniV/releases"
+
+                row = split_sub.row()
                 row.operator('wm.univ_check_lib')
             # TODO: Add link
 
@@ -805,61 +811,90 @@ Some operators, can interact with trims:
                 enable = bpy.app.online_access
             row = layout.row(align=True)
             row.enabled = enable
-            row.operator("wm.url_open", text="YouTube").url = r"https://www.youtube.com/@oxicid6058"
-            row.operator("wm.url_open", text="Discord").url = r"https://discord.gg/SAvEbGTkjR"
             row.operator("wm.url_open", text="GitHub").url = r"https://github.com/Oxicid/UniV"
-            row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
 
-            from .icons import icons
+            if univ_pro:
+                row.operator("wm.url_open", text="YouTube").url = r"https://www.youtube.com/@oxicid6058"
+                row.operator("wm.url_open", text="Discord").url = r"https://discord.gg/SAvEbGTkjR"
+                row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
 
-            if not univ_pro:
-                layout.label(
-                    text="You have the free version of the addon installed, which does not have some advanced operators and options", icon='INFO')
-                layout.label(text="which does not have some advanced operators and options")
-            else:
+                from .icons import icons
                 layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
 
-            layout.label(text="UniV Pro includes such advanced operators and features as:")
-            row = layout.row(align=True)
-            row.label(text='', icon_value=icons.horizontal_c)
-            row.label(text="Constraints System - straightening along supporting edge loops.", icon_value=icons.vertical_b)
+                layout.label(text="UniV Pro includes such advanced operators and features as:")
+                row = layout.row(align=True)
+                row.label(text='', icon_value=icons.horizontal_c)
+                row.label(text="Constraints System - straightening along supporting edge loops.", icon_value=icons.vertical_b)
 
-            row = layout.row(align=True)
-            row.label(text='', icon_value=icons.x)
-            row.label(text="Unwrap Along Axis.", icon_value=icons.y)
-            layout.label(text="Trim System.", icon='MOD_MULTIRES')
-            layout.label(text="More Checker Textures like: Gravity, Atlux, Simple.", icon_value=icons.checker)
-            layout.label(text="Real-time seam display.", icon_value=icons.cut)
-            layout.label(text="Real-time display of selected geometry in non-sync mode.", icon_value=icons.arrow)
-            layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gon too.",
-                         icon_value=icons.rectify)
-            layout.separator(factor=0.35)
-            layout.label(text="Transfer - interactively transfers a UV layer from one object to another.",
-                         icon_value=icons.transfer)
-            layout.separator(factor=0.35)
-            layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
-            layout.separator(factor=0.35)
-            layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gon too.",
-                         icon_value=icons.loop_select)
-            layout.separator(factor=0.35)
-            layout.label(text="Drag [Alt + Drag LMB] - this operator is similar to the QuickSnap operator, but has fundamental differences:",
-                         icon_value=icons.fill)
-            layout.label(text="     1) It works only with islands")
-            layout.label(text="     2) Moves only one island")
-            layout.label(text="     3) Unselects all other elements and selects the picked island.")
-            layout.label(
-                text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
-            layout.label(text="     5) Can pull out overlapped flipped islands.")
-            layout.label(text="     6) Snapping is not a key and intrusive feature.")
-            layout.separator(factor=0.35)
-            layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
-                         icon_value=icons.stack)
-            layout.label(
-                text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
-            layout.label(
-                text="Box Projection Pro- Has an Orient 3D option, which tightly projects cube-shaped elements ", icon_value=icons.box)
-            if not univ_pro:
-                layout.label(text="You can get the Pro version for free in the Discord channel.", icon='INFO')
+                row = layout.row(align=True)
+                row.label(text='', icon_value=icons.x)
+                row.label(text="Unwrap Along Axis.", icon_value=icons.y)
+                layout.label(text="Trim System.", icon='MOD_MULTIRES')
+                layout.label(text="More Checker Textures like: Gravity, Atlux, Simple.", icon_value=icons.checker)
+                layout.label(text="Real-time seam display.", icon_value=icons.cut)
+                layout.label(text="Real-time display of selected geometry in non-sync mode.", icon_value=icons.arrow)
+                layout.label(text="Rectify - straightens the island by selected 4 boundary vertices, works also with triangles and N-Gon too.",
+                             icon_value=icons.rectify)
+                layout.separator(factor=0.35)
+                layout.label(text="Transfer - interactively transfers a UV layer from one object to another.",
+                             icon_value=icons.transfer)
+                layout.separator(factor=0.35)
+                layout.label(text="Select by Flat [2D and 3D] - select linked flat faces by angle", icon_value=icons.flat)
+                layout.separator(factor=0.35)
+                layout.label(text="Loop Select [2D and 3D] [Ctrl+Alt+WheelUp] - edge loop select, works also with triangles and N-Gon too.",
+                             icon_value=icons.loop_select)
+                layout.separator(factor=0.35)
+                layout.label(text="Drag [Alt + Drag LMB] - this operator is similar to the QuickSnap operator, but has fundamental differences:",
+                             icon_value=icons.fill)
+                layout.label(text="     1) It works only with islands")
+                layout.label(text="     2) Moves only one island")
+                layout.label(text="     3) Unselects all other elements and selects the picked island.")
+                layout.label(
+                    text="     4) Faster manipulation, LMB + Alt + Drag moves the islands, if you release LMB - the operator ends.")
+                layout.label(text="     5) Can pull out overlapped flipped islands.")
+                layout.label(text="     6) Snapping is not a key and intrusive feature.")
+                layout.separator(factor=0.35)
+                layout.label(text="Stack - has more advanced options such as working with symmetrical UV islands as well as working with Mesh islands ",
+                             icon_value=icons.stack)
+                layout.label(
+                    text="Select Similar - Selects similar islands, useful in combination with the Stack operator ", icon_value=icons.arrow)
+                layout.label(
+                    text="Box Projection Pro- Has an Orient 3D option, which tightly projects cube-shaped elements ", icon_value=icons.box)
+
+            import textwrap
+            light_docs_info = textwrap.dedent("""
+            Many operators support the Pick system. 
+            This means that when an operation is triggered via a keymap with no mesh elements selected, it is applied to the nearest vert & edge & island. This greatly improves convenience, letting you avoid the effects Sync (select) mode has on shared edges and vertices.
+            
+            There is much more to UniV operators than you might think at first glance. Many operators are context-dependent, for example, on Sync state, selection mode (Verts, Edge, Face and Islands), as well as on pressed Ctrl, Shift, Alt (CSA) keys and combinations thereof.
+            
+            That is, before pressing the LMB button press CSA, then other modes of the operator are called. And these modifications are subject to a certain logic, which in most cases works:
+            
+            Ctrl - To Cursor for transform or Deselect for select
+            Alt - Alternative operation that is fundamentally different from the default.
+            Shift - Individual, Inplace for transform or Extend for select
+            
+            But you don't have to use the CSA keys, because a panel appears in the lower left corner where you can change the properties
+            
+            
+            Also, the addon doesn't impose its hotkeys on you, but you can easily enable them in Edit->Preferences->Extensions->UniV->Keymaps. But some operators due to their specificity can be called only through keymaps (QuickSnap, SplitUVToggle, SyncUVToggle).
+            """)
+
+            width = 80
+            for r in context.area.regions:
+                if r.type == "WINDOW":
+                    width = r.width // 6
+                    break
+            width = width * (1 / context.preferences.view.ui_scale) - 2
+
+            box = layout.box()
+            for paragraph in light_docs_info.strip().splitlines():
+                if paragraph.strip():
+                    for line in textwrap.fill(paragraph, width=width).splitlines():
+                        box.label(text=line)
+                else:
+                    box.separator()
+
 
     @staticmethod
     def draw_conflict_keymaps(box, config_filtered, kc):
