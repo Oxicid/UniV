@@ -451,8 +451,23 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             save_transform_islands = []
             for isl in islands:
                 if isl.tag:
-                    has_non_static_face = any(not all(c[uv].pin_uv for c in f.loops) for f in isl if f.select)
-                    if has_non_static_face:
+                    has_non_static_elem = False
+                    if umesh.elem_mode == 'VERT':
+                        get_vert_select = utils.vert_select_get_func(umesh)
+                        for crn in isl.corners_iter():
+                            if get_vert_select(crn):
+                                if not crn[uv].pin_uv:
+                                    has_non_static_elem = True
+                                    break
+                    else:
+                        get_edge_select = utils.edge_select_get_func(umesh)
+                        for crn in isl.corners_iter():
+                            if get_edge_select(crn):
+                                if not crn[uv].pin_uv or not crn.link_loop_next[uv].pin_uv:
+                                    has_non_static_elem = True
+                                    break
+
+                    if has_non_static_elem:
                         isl.apply_aspect_ratio()
                         save_t = isl.save_transform(flip_if_needed=True)
                         save_t.save_coords(self.blend_factor)
@@ -466,6 +481,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
+        print(f'{has_native_unwrapped=}')
         if has_native_unwrapped:
             for to_lock_isl in to_lock_constraints_islands:
                 to_lock_isl.sequence = self.lock_island_from_unwrap_and_get_pins_sync(to_lock_isl)

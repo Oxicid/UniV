@@ -420,8 +420,7 @@ else:
 if USE_GENERIC_UV_SYNC:
     def edge_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], bool]:
         def inner(sync, sync_valid):
-            def select_get(crn):  # noqa
-                return crn.uv_select_edge
+            select_get = BMLoop.uv_select_edge.__get__
             if sync and not sync_valid:
                 def select_get(crn):  # noqa
                     return crn.edge.select
@@ -485,8 +484,7 @@ else:
 if USE_GENERIC_UV_SYNC:
     def vert_select_get_func(umesh: 'utypes.UMesh') -> typing.Callable[[BMLoop], bool]:
         def inner(sync, sync_valid):
-            def select_get(crn):  # noqa
-                return crn.uv_select_vert
+            select_get = BMLoop.uv_select_vert.__get__
             if sync and not sync_valid:
                 def select_get(crn):  # noqa
                     return crn.vert.select
