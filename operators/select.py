@@ -961,7 +961,8 @@ if utils.USE_GENERIC_UV_SYNC:
                             to_select.append(f)
 
                 if to_select:
-                    umesh.sync_from_mesh_if_needed()
+                    if sync:
+                        umesh.sync_from_mesh_if_needed()
                     is_boundary = utils.is_boundary_func(umesh, with_seam=self.clamp_on_seam)
                     face_select_set = utils.face_select_set_func(umesh)
                     linked_faces = set()
@@ -1051,7 +1052,8 @@ if utils.USE_GENERIC_UV_SYNC:
                                     if vert_select_get(l_crn):
                                         to_deselect.add(l_crn.face)
                     if to_deselect:
-                        umesh.sync_from_mesh_if_needed()
+                        if sync:
+                            umesh.sync_from_mesh_if_needed()
                         face_select_set = utils.face_select_set_func(umesh)
                         for f in to_deselect:
                             face_select_set(f, False)
@@ -1081,7 +1083,8 @@ if utils.USE_GENERIC_UV_SYNC:
 
                     if to_deselect:
                         # TODO: Use foreach for non-clamped case
-                        umesh.sync_from_mesh_if_needed()
+                        if sync:
+                            umesh.sync_from_mesh_if_needed()
 
                         for crn in to_deselect:
                             crn.uv_select_vert = False
