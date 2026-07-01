@@ -2538,14 +2538,14 @@ class UNIV_OT_SmartScaleApply(Operator):
                     return
 
                 match gn_mod[shape_type_sk]:
-                    case 0:  # Line
+                    case "Line" | 0:
                         match gn_mod[offset_method_type_sk]:
-                            case 2: # Relative
+                            case "Relative" | 2:
                                 rel_sign = Vector([1 if i > 0 else -1 for i in tar_scale])
                                 gn_mod[array_offset_sk][:] = Vector(gn_mod[array_offset_sk]) * rel_sign  # Rescale offset.
-                            case 0: # Offset
+                            case "Offset" | 0:
                                 gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
-                            case 1: # Endpoint
+                            case "Endpoint" | 1:
                                 gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
                             case offset_method:
                                 print(f"UniV: Smart Scale Apply: Unknow shape type {offset_method!r}")
@@ -2569,24 +2569,22 @@ class UNIV_OT_SmartScaleApply(Operator):
 
                         gn_mod[array_rotation_sk][:] = rot
 
-                    case 1:  # Circle
+                    case "Circle" | 1:
                         # TODO: Implement radius by axis
                         match gn_mod[circle_central_axis_sk]:
-                            case 0:  # X
+                            case "X" | 0:  # X
                                 pass
-                            case 1:  # Y
+                            case "Y" | 1:  # Y
                                 pass
-                            case 2:  # Z
+                            case "Z" | 2:  # Z
                                 pass
 
                         gn_mod[circle_radius_sk] *= abs(var)
-                    case 2:  # Curve
-                        is_curve_distance_type = gn_mod[curve_count_method_distance_sk] == 1
-                        if is_curve_distance_type:
+                    case "Curve" | 2:
+                        if gn_mod[curve_count_method_distance_sk] in ("Distance", 1):
                             gn_mod[curve_distance_sk] *= abs(var)
-                    case 3:  # Transform
-                        is_inputs = gn_mod[transform_reference_sk] == 0
-                        if is_inputs:
+                    case "Transform" | 3:
+                        if gn_mod[transform_reference_sk] in ("Inputs", 0):
                             gn_mod[array_translation_sk][:] = Vector(gn_mod[array_translation_sk]) * tar_scale
                     case shape_type:
                         print(f"UniV: Smart Scale Apply: Unknow shape type {shape_type!r}")
