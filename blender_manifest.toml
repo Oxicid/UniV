@@ -1,14 +1,14 @@
 schema_version = "1.0.0"
 id = "univ"
 name = "UniV"
-version = "4.0.0-RC"
-tagline = "UV Toolkit - Release Candidate"
+version = "4.0.0"
+tagline = "Smart UV Tools"
 maintainer = "Oxicid <oxicid2019@gmail.com>"
 type = "add-on"
 tags = ["UV"]
 blender_version_min = "4.2.0"
 license = ["SPDX:GPL-3.0-or-later"]
 website = "https://github.com/Oxicid/UniV"
-copyright = ["2024 Oxicid"]
+copyright = ["2026 Oxicid"]
 [permissions]
 files = "Creates and updates icon files in the add-on directory"

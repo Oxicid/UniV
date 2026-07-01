@@ -481,7 +481,6 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
         self.multiply_relax(unique_number_for_multiply, unwrap_kwargs)
 
-        print(f'{has_native_unwrapped=}')
         if has_native_unwrapped:
             for to_lock_isl in to_lock_constraints_islands:
                 to_lock_isl.sequence = self.lock_island_from_unwrap_and_get_pins_sync(to_lock_isl)
