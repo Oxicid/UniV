@@ -1852,7 +1852,7 @@ class UNIV_OT_Flatten(Operator):
 
                 if self.flatten_type == 'SHAPE_KEY':
                     umesh.free()
-                    self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
+                    self.apply_shape_keys((f for f in umesh.obj.data.polygons), umesh)
                     umesh.obj.data.update_tag()
                 else:
                     self.apply_coords(umesh.bm.faces, umesh)
