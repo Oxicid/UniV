@@ -6,7 +6,6 @@
 # Excellent detailing and stylish design made the interface more convenient and pleasant.
 # Thank you for the work done!
 
-import os
 import gpu
 import bpy
 import traceback
@@ -103,56 +102,84 @@ class icons:
 
     @classmethod
     def register_icons_(cls):
+
+        from .. import utils
+        from ..preferences import prefs
         from bpy.utils import previews
         if cls._icons_:
             cls.unregister_icons_()
         cls._icons_ = previews.new()
 
-        from ..preferences import prefs
-        png_folder_name = 'png_mono/' if prefs().color_mode == 'MONO' else 'png/'
-        png_file_path = __file__.replace('__init__.py', png_folder_name)
+        is_mono = prefs().color_mode == 'MONO'
+        addon_icons = Path(__file__).parent / ("png_mono" if is_mono else "png")
+        extension_icons = None
+
+        extension_path = utils.extension_path_user(utils.univ_root_path, path=f"icons/{addon_icons.name}", create=False)
+        if extension_path:
+            extension_icons = Path(extension_path)
 
         for attr in dir(cls):
-            if not attr.endswith('_'):
-                if not isinstance(getattr(cls, attr), int):
-                    print(f"UniV: Attribute {attr} not icon_id")
-                    continue
+            if attr.endswith("_"):
+                continue
 
-                full_path = png_file_path + attr + ".png"
-                if not os.path.exists(full_path):
-                    print(f"UniV: File {full_path} for {attr} icon not found")
-                    continue
+            if not isinstance(getattr(cls, attr), int):
+                print(f"UniV: Attribute '{attr}' is not an icon id")
+                continue
 
-                icon = cls._icons_.load(attr, full_path, 'IMAGE')
-                _ = icon.icon_pixels[0]  # Need to force load icons, bugreport?
-                setattr(cls, attr, icon.icon_id)
+            candidates = []
+            if extension_icons:
+                candidates.append(extension_icons / f"{attr}.png")
+            candidates.append(addon_icons / f"{attr}.png")
+
+            for full_path in candidates:
+                if full_path.exists():
+                    break
+            else:
+                print(f"UniV: Icon '{attr}' not found")
+                continue
+
+            icon = cls._icons_.load(attr, str(full_path), "IMAGE")
+            # Force Blender to load the icon immediately (workaround for Blender bug)
+            _ = icon.icon_pixels[0]
+            setattr(cls, attr, icon.icon_id)
+
 
         # Register category icons
         cls.update_general_panels_icon_()
 
-        # Register icons for workspaces
-        from pathlib import Path
+    @staticmethod
+    def register_ws_icons_():
         from .. import ui
+        from .. import utils
+        from ..preferences import prefs
 
-        panels = [ui.UNIV_WT_edit_VIEW3D, ui.UNIV_WT_object_VIEW3D]
+        # Default icon path inside the add-on
+        is_mono = prefs().color_mode == 'MONO'
+        expected_icon = "univ_mono" if is_mono else "univ"
+        expected_path = Path(__file__).with_name(expected_icon)
 
-        icon_path = Path(panels[0].bl_icon)
-        expected_icon = 'univ_mono' if prefs().color_mode == 'MONO' else 'univ'
+        # Use the extension icon if it exists
+        extension_icons = utils.extension_path_user(utils.univ_root_path, path="icons", create=False)
 
-        if icon_path.parts[-1] != expected_icon:
+        if extension_icons:
+            extension_icon = Path(extension_icons) / f"{expected_icon}.dat"
+            if extension_icon.exists():
+                expected_path = extension_icon.with_suffix("")
+
+        # Skip updating if every workspace already uses the expected icon
+        panels = (ui.UNIV_WT_edit_VIEW3D, ui.UNIV_WT_object_VIEW3D)
+        if any(Path(panel.bl_icon) != expected_path for panel in panels):
             from .. import keymaps
             keymaps.remove_keymaps_ws()
-            new_path = icon_path.parent / expected_icon
-            for p in panels:
-                try:
-                    bpy.utils.unregister_tool(p)
-                    p.bl_icon = str(new_path)
-                    bpy.utils.register_tool(p)
-                except:  # noqa
-                    print(f"UniV: Updating icons for workspaces has failed:\n")
-                    import traceback
-                    traceback.print_exc()
 
+            for panel in panels:
+                try:
+                    bpy.utils.unregister_tool(panel)
+                    panel.bl_icon = str(expected_path)
+                    bpy.utils.register_tool(panel)
+                except Exception:  # noqa
+                    print(f"UniV: Failed to update workspace icon for {panel.__name__}")
+                    traceback.print_exc()
             keymaps.add_keymaps_ws()
 
     @classmethod
@@ -173,6 +200,19 @@ class icons:
                 traceback.print_exc()
 
         cls.reset_icon_value_()
+
+    # @staticmethod
+    # def unregister_ws_icons_():
+    #     from .. import ui
+    #     from bl_ui.space_toolsystem_common import _icon_cache as wst_icons_cache  # noqa
+    #
+    #     icon_name = ui.UNIV_WT_object_VIEW3D.bl_icon
+    #     if icon_name in wst_icons_cache:
+    #         if wst_icons_cache[icon_name] != 0:
+    #             bpy.app.icons.release(wst_icons_cache[icon_name])
+    #     ui.UNIV_WT_edit_VIEW3D.bl_icon = ""
+    #     ui.UNIV_WT_object_VIEW3D.bl_icon = ""
+
 
     @classmethod
     def update_general_panels_icon_(cls):
@@ -366,7 +406,7 @@ class WSToolIconsGenerator:
             u_col = [convert_float_to_srgb_int(prefs().icon_mono_gray)]
             leaf_col = [convert_float_to_srgb_int(prefs().icon_mono_green) for _ in range(4)]
         else:
-            u_col = [int(v*255) for v in prefs().icon_white_color]
+            u_col = [int(v*255) for v in prefs().icon_common_white]
             leaf_col = [convert_float_to_srgb_int(prefs().icon_colored_pink),
                         convert_float_to_srgb_int(prefs().icon_colored_purple),
                         convert_float_to_srgb_int(prefs().icon_colored_violet),
@@ -392,24 +432,55 @@ class WSToolIconsGenerator:
 
     @classmethod
     def create_dat_icons(cls):
-        from ..preferences import prefs
-        base_path = Path(__file__).resolve().parent
-        filename = base_path / ('univ_mono.dat' if prefs().color_mode == 'MONO' else 'univ.dat')
-        with open(filename, 'wb') as file:
-            fw = file.write
-            # Header (version 0).
-            fw(b'VCO\x00')
-            # Width, Height
-            fw(bytes((255, 255)))
-            # X, Y
-            fw(bytes((0, 0)))
-            icon_flat_data = cls.create_batch_from_tris_and_colors()
-            fw(icon_flat_data)
+        from .. import preferences
+        from .. import utils
 
-        cls.update_wst_icon(str(filename))
+        is_mono = preferences.prefs().color_mode == "MONO"
+
+        icon_name = "univ_mono" if is_mono else "univ"
+        dat_filename = f"{icon_name}.dat"
+
+        addon_icon = Path(__file__).resolve().parent / dat_filename
+
+        use_default_icons = IconsCreator.is_default_icons_colors(is_mono)
+        create_directory = not use_default_icons
+
+        output_path = addon_icon
+        extension_icons = utils.extension_path_user(utils.univ_root_path, path="icons", create=create_directory)
+
+        if extension_icons:
+            extension_icon = Path(extension_icons) / dat_filename
+            if use_default_icons:
+                # Remove previously generated custom icon.
+                if extension_icon.exists():
+                    extension_icon.unlink()
+                    print(f"UniV: Removed custom workspace icon: {extension_icon}")
+            else:
+                output_path = extension_icon
+        elif create_directory:
+            print(
+                "UniV: Failed to create the custom icon directory. "
+                "Using the bundled workspace icon instead."
+            )
+
+        # If the bundled icon already exists, reuse it.
+        if output_path == addon_icon and addon_icon.exists():
+            cls.update_wst_icon(str(addon_icon))
+            print(f"{addon_icon = }")
+            return
+
+        with output_path.open("wb") as file:
+            fw = file.write
+            fw(b"VCO\x00")  # Header (version 0).
+            fw(bytes((255, 255)))  # Width, Height.
+            fw(bytes((0, 0)))  # X, Y.
+            fw(cls.create_batch_from_tris_and_colors())
+
+        print(f"{output_path=}")
+        cls.update_wst_icon(str(output_path))
 
     @staticmethod
-    def update_wst_icon(filename: str):
+    def update_wst_icon(filepath: str):
         """ Icons for WST are cached during class registration and remain even after unregister.
         To update an icon, the old one must be removed and the new one registered.
 
@@ -425,11 +496,11 @@ class WSToolIconsGenerator:
                 bpy.app.icons.release(wst_icons_cache[icon_name])
 
             try:
-                icon_value = bpy.app.icons.new_triangles_from_file(filename)
+                icon_value = bpy.app.icons.new_triangles_from_file(filepath)
             except Exception as e:  # noqa
                 import traceback
                 traceback.print_exc()
-                print(f"UniV: WS Tool icon could not be reloaded from {filename!r}")
+                print(f"UniV: WS Tool icon could not be reloaded from {filepath!r}")
                 icon_value = 0
             wst_icons_cache[icon_name] = icon_value
             utils.update_area_by_type('VIEW_3D')
@@ -451,9 +522,8 @@ class IconsCreator:
 
     @classmethod
     def convert_svg_to_png_builtin(cls, icon_size=32, mono=False, antialiasing=2, scale_mul=1.0):
-        base_path = Path(__file__).resolve().parent
-        svg_folder = base_path / ('svg_mono' if mono else 'svg')
-        png_folder = base_path / ('png_mono' if mono else 'png')
+        is_default = cls.is_default_icons_settings(mono)
+        png_folder, svg_folder = cls.get_png_and_svg_icon_paths_and_delete_extension_path_if_default(mono, is_default)
 
         prev_data = PreviousData()
         try:
@@ -478,6 +548,11 @@ class IconsCreator:
                     continue
                 png_save_path = png_folder / f"{attr}.png"
 
+                if is_default:
+                    if png_save_path.exists():
+                        continue
+                    print(f"UniV: Icons: The {attr!r} icon not exist, and was saved to the add-on directory.")
+
                 import_svg.load(None, bpy.context, filepath=str(svg_file))
 
                 svg_objects = list(set(bpy.context.scene.objects) - prev_data.prev_objects)
@@ -490,6 +565,7 @@ class IconsCreator:
                     svg_obj.select_set(True)
                 bpy.ops.object.convert(target='MESH', keep_original=False)
 
+                # Draw to buffer.
                 mesh_objects = list(set(bpy.context.scene.objects) - prev_data.prev_objects)
                 tris, colors = cls.calc_tris_for_draw(mesh_objects, attr)  # extract draw data
 
@@ -512,6 +588,59 @@ class IconsCreator:
                     bpy.data.objects.remove(obj)
 
         prev_data.restore()
+
+    @classmethod
+    def get_png_and_svg_icon_paths_and_delete_extension_path_if_default(cls, mono: bool, is_default_icons_settings: bool) -> tuple[Path, Path]:
+        """Returns the add-on's PNG path if the settings are the default ones."""
+        mono_suffix = "_mono" if mono else ""
+        create_folder_if_not_exist = not is_default_icons_settings
+        univ_icon_base_path = Path(__file__).resolve().parent
+        svg_folder = univ_icon_base_path / ("svg" + mono_suffix)
+
+        icons_subdirectory = "icons/" + ("png" + mono_suffix)
+        from .. import utils
+        path = utils.extension_path_user(utils.univ_root_path, path=icons_subdirectory, create=create_folder_if_not_exist)
+        if is_default_icons_settings and path:
+            import shutil
+            shutil.rmtree(path, ignore_errors=True)
+            print(f"UniV: Icons: Default settings is set, the {path} folder has been deleted.")
+            path = ""
+
+        if not path:
+            if create_folder_if_not_exist:
+                print("UniV: Icons: Failed to create a directory for custom icons. "
+                      "The directory from the add-on will be used instead.")
+            png_folder = univ_icon_base_path / ("png" + mono_suffix)
+        else:
+            png_folder = Path(path)
+        return png_folder, svg_folder
+
+    @classmethod
+    def is_default_icons_settings(cls, mono):
+        return cls.is_default_icon_scales() and cls.is_default_icons_colors(mono)
+
+    @staticmethod
+    def is_default_icons_colors(mono):
+        from .. import preferences
+        pref = preferences.prefs()
+        all_props = pref.bl_rna.properties
+
+        icon_prefix = "icon_mono_" if mono else "icon_colored_"
+        for prop in all_props:
+            idname: str = prop.identifier
+            if idname.startswith((icon_prefix, "icon_common_")):
+                if tuple(prop.default_array) != tuple(getattr(pref, idname)):  # noqa
+                    return False
+        return True
+
+    @staticmethod
+    def is_default_icon_scales():
+        from .. import preferences
+        pref = preferences.prefs()
+        all_props = pref.bl_rna.properties
+
+        attrs = ["icon_scale", "icon_size", "icon_antialiasing"]
+        return all(all_props[attr].default == getattr(pref, attr) for attr in attrs)
 
     # TODO: Implement flat vertices with indexes (with index offset)
     @classmethod
@@ -629,10 +758,10 @@ class IconsCreator:
 
         found_color = True
         if vec_isclose(srgb_color, hex_to_rgb("#ffffff"), 0.001):  # White
-            linear_white = prefs().icon_white_color
+            linear_white = prefs().icon_common_white
             ret_color = linear_to_ret_color(linear_white)
         elif vec_isclose(srgb_color, hex_to_rgb('#ececec'), 0.001):  # Select Arrow
-            linear_select_arrow = prefs().icon_select_arrow_color
+            linear_select_arrow = prefs().icon_common_select_arrow
             ret_color = linear_to_ret_color(linear_select_arrow)
 
         elif prefs().color_mode == 'MONO':
@@ -691,5 +820,6 @@ class UNIV_OT_IconsGenerator(bpy.types.Operator):
             )
             icons.unregister_icons_()
             icons.register_icons_()
+
             WSToolIconsGenerator.create_dat_icons()
         return {'FINISHED'}

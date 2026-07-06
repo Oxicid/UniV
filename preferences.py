@@ -190,6 +190,11 @@ def _set_transform_preset_texel_unit(self, new_val, curr_val, _is_set):
     )
     return new_val
 
+def _update_color_mode(_self, _context):
+    from .icons import icons
+    icons.register_icons_()
+    icons.register_ws_icons_()
+
 checker_generated_types = [
     ('UV_GRID', 'Grid', ''),
     ('COLOR_GRID', 'Color Grid', ''),
@@ -525,7 +530,7 @@ Some operators, can interact with trims:
     color_mode: EnumProperty(name='Color Mode',
                              items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
                              default='COLOR',
-                             update=lambda self, _: __import__(__package__.replace('preferences', '')+'.icons', fromlist=['icons']).icons.register_icons_())
+                             update=_update_color_mode)
 
     icon_scale: FloatProperty(name='Icon Scale', default=1.0, min=1.0, soft_max=1.25, max=2.0)
 
@@ -535,6 +540,9 @@ Some operators, can interact with trims:
     icon_antialiasing: EnumProperty(name='Anti-Aliasing',
                                     items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
                                     default='4')
+
+    # NOTE: The prefixes "icon + [mono | colored | common]" must be used to specify whether,
+    #  a default value should be included when generating icons.
     # Mono
     icon_mono_green: FloatVectorProperty(name='Green',
                                          # 8bc6a1
@@ -561,10 +569,10 @@ Some operators, can interact with trims:
                                            # ff87a9
                                            subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 0.24228, 0.396755, 1))
     # Common
-    icon_white_color: FloatVectorProperty(name='White Color',
+    icon_common_white: FloatVectorProperty(name='White Color',
                                           subtype="COLOR", size=4, min=0.0, max=1.0, default=(1, 1, 1, 1))  # ffffff
 
-    icon_select_arrow_color: FloatVectorProperty(name='Select Arrow Color',
+    icon_common_select_arrow: FloatVectorProperty(name='Select Arrow Color',
                                                  # ececec
                                                  subtype="COLOR", size=4, min=0.0, max=1.0, default=(0.83879, 0.83879, 0.83879, 1))
 
@@ -674,8 +682,8 @@ Some operators, can interact with trims:
                 col.prop(self, "icon_colored_purple", text="")
                 col.prop(self, "icon_colored_pink", text="")
 
-            col.prop(self, "icon_white_color", text="")
-            col.prop(self, "icon_select_arrow_color", text="")
+            col.prop(self, "icon_common_white", text="")
+            col.prop(self, "icon_common_select_arrow", text="")
 
 
             box_split = box.split(factor=0.25)

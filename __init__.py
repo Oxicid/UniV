@@ -388,6 +388,7 @@ def register():
 
     # Icons register.
     try:
+        icons.icons.register_ws_icons_()
         icons.icons.register_icons_()  # NOTE: Need registered AddonPreferences.
     except:  # noqa
         print('UniV: Icons not loaded.')
@@ -439,6 +440,7 @@ def unregister():
     keymaps.remove_keymaps()
     keymaps.remove_keymaps_ws()
     icons.icons.unregister_icons_()
+    # icons.icons.unregister_ws_icons_()
 
     draw.DrawerSubscribeRNA.unregister_handler()
     draw.Drawer2D.unregister()

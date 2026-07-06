@@ -32,6 +32,41 @@ resolutions = (('128', '128', ''), ('256', '256', ''), ('512', '512', ''), ('102
 resolution_name_to_value = {'128': 128, '256': 256, '512': 512, '1K': 1024, '2K': 2048, '4K': 4096, '8K': 8192}
 resolution_value_to_name = {128: '128', 256: '256', 512: '512', 1024: '1K', 2048: '2K', 4096: '4K', 8192: '8K'}
 
+univ_root_path = __package__.rsplit(".", 1)[0]
+
+if bpy.app.version >= (4, 2, 0):
+    extension_path_user = bpy.utils.extension_path_user
+else:
+    def extension_path_user(package, *, path="", create=False):
+        import os
+        import _bpy  # noqa
+        from addon_utils import _extension_module_name_decompose  # noqa
+
+        # Handles own errors.
+        repo_module, pkg_idname = _extension_module_name_decompose(package)
+
+        target_path = _bpy.user_resource("DATAFILES")
+        # Should always be true.
+        if target_path:
+            if path:
+                target_path = os.path.join(target_path, ".user", repo_module, pkg_idname, path)
+            else:
+                target_path = os.path.join(target_path, ".user", repo_module, pkg_idname)
+            if create:
+                # create path if not existing.
+                if not os.path.exists(target_path):
+                    try:
+                        os.makedirs(target_path)
+                    except Exception:  # noqa
+                        import traceback
+                        traceback.print_exc()
+                        target_path = ""
+                elif not os.path.isdir(target_path):
+                    print("Path {!r} found but isn't a directory!".format(target_path))
+                    target_path = ""
+
+        return target_path
+
 
 def glob_resolutions_to_name():
     from ..preferences import prefs
