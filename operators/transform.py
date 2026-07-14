@@ -3953,10 +3953,13 @@ class UNIV_OT_Pack(Operator):
         uvpm_settings.heuristic_search_time = time_in_sec * 4
 
         size = utils.get_active_image_size()
-        if size:
-            uvpm_settings.tex_ratio = size[0] != size[1]
+        if not size:
+            size = (128, 128)
+
+        if hasattr(uvpm_settings, 'non_square_packing'):  # for UVPM4 version
+            uvpm_settings.non_square_packing = size[0] != size[1]
         else:
-            uvpm_settings.tex_ratio = False
+            uvpm_settings.tex_ratio = size[0] != size[1]
 
         if uvpm_settings.precision == 500:
             uvpm_settings.precision = 800
