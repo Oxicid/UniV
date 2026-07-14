@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 0),
+    "version": (4, 0, 1),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
