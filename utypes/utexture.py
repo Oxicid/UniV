@@ -1,11 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
-
-import bpy  # noqa
 
 import gpu
 import typing

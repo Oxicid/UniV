@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
 
 import bpy
 import math
@@ -19,13 +18,7 @@ from .. import utypes
 from ..preferences import prefs, univ_settings
 from ..utypes import Islands, AdvIslands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands
 
-from ..utils import (
-    face_centroid_uv,
-)
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
+from ..utils import face_centroid_uv
 
 
 class UNIV_OT_SelectLinked(Operator):

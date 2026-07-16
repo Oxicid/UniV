@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
 
 import bpy
 import gpu
@@ -18,10 +17,6 @@ from .text import TextDraw
 from ..utypes import UMesh
 from ..preferences import univ_settings, prefs
 from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 class DrawerNonSyncSelectProcessing:

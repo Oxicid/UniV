@@ -413,7 +413,8 @@ Some operators, can interact with trims:
     copy_to_layers_to: EnumProperty(name='To', default='0', items=copy_to_layers_uv_channels_items_to)
 
     # Pack Settings
-    use_uvpm: BoolProperty(name='Use UVPackmaster', default=False)
+    if "NOT_BL_EXT":
+        use_uvpm: BoolProperty(name='Use UVPackmaster', default=False)
     shape_method: EnumProperty(name='Shape Method', default='CONCAVE',
                                items=(('CONCAVE', 'Exact', 'Uses exact geometry'),
                                       ('AABB', 'Fast', 'Uses bounding boxes'))
@@ -501,17 +502,18 @@ Some operators, can interact with trims:
                        ),
                        default='EXTENDED')
 
-    use_fastapi: BoolProperty(
-        default=True,
-        name="Use FastAPI",
-        update=_update_fastapi,
-        description="The FastAPI library is written in a low-level programming language and is typically 50–100 times faster.\n"
-        "It is well-suited for draw systems, as well as for UV parameterization in solvers and other CPU-bound functions.\n\n"
-        "After enabling the library, it is strongly recommended to test it to avoid crashes.\n"
-        "The library uses low-level access to data, whose structures may change.\n"
-        "It is also not recommended to enable FastAPI for alpha or beta versions.\n\n"
-        "For the library to work, place univ_fastapi.dll / libuniv_fastapi.so in the add-on folder"
-        )
+    if "NOT_BL_EXT":
+        use_fastapi: BoolProperty(
+            default=True,
+            name="Use FastAPI",
+            update=_update_fastapi,
+            description="The FastAPI library is written in a low-level programming language and is typically 50–100 times faster.\n"
+            "It is well-suited for draw systems, as well as for UV parameterization in solvers and other CPU-bound functions.\n\n"
+            "After enabling the library, it is strongly recommended to test it to avoid crashes.\n"
+            "The library uses low-level access to data, whose structures may change.\n"
+            "It is also not recommended to enable FastAPI for alpha or beta versions.\n\n"
+            "For the library to work, place univ_fastapi.dll / libuniv_fastapi.so in the add-on folder"
+            )
 
     use_csa_mods: bpy.props.BoolProperty(default=True,
                                          name="Use Modifier Keys",
@@ -616,28 +618,29 @@ Some operators, can interact with trims:
             layout.prop(self, 'debug')
             layout.prop(self, 'mode')
 
-            import platform
-            if platform.system() in ('Windows', 'Linux'):
+            if "NOT_BL_EXT":
+                import platform
+                if platform.system() in ('Windows', 'Linux'):
 
-                from .fastapi import clib
-                failed_ver = clib.FastAPI.failed_version
-                if failed_ver != -1:
-                    if failed_ver > clib.EXPECTED_FASTAPI_VERSION:
-                        text="You installed an OLD version of the library"
-                    else:
-                        text = "You installed a version of the library that is too NEW"
-                    layout.label(text=f"{text} - {failed_ver}, expected - {clib.EXPECTED_FASTAPI_VERSION}.", icon='ERROR')
+                    from .fastapi import clib
+                    failed_ver = clib.FastAPI.failed_version
+                    if failed_ver != -1:
+                        if failed_ver > clib.EXPECTED_FASTAPI_VERSION:
+                            text="You installed an OLD version of the library"
+                        else:
+                            text = "You installed a version of the library that is too NEW"
+                        layout.label(text=f"{text} - {failed_ver}, expected - {clib.EXPECTED_FASTAPI_VERSION}.", icon='ERROR')
 
-                split = layout.split(factor=0.33)
-                split.prop(self, 'use_fastapi')
+                    split = layout.split(factor=0.33)
+                    split.prop(self, 'use_fastapi')
 
-                split_sub = split.split(factor=0.5)
-                row = split_sub.row()
-                row.enabled = getattr(bpy.app, 'online_access', True)
-                row.operator("wm.url_open", text="Open Download Link...").url = r"https://github.com/Oxicid/UniV/releases"
+                    split_sub = split.split(factor=0.5)
+                    row = split_sub.row()
+                    row.enabled = getattr(bpy.app, 'online_access', True)
+                    row.operator("wm.url_open", text="Open Download Link...").url = r"https://github.com/Oxicid/UniV/releases"
 
-                row = split_sub.row()
-                row.operator('wm.univ_check_lib')
+                    row = split_sub.row()
+                    row.operator('wm.univ_check_lib')
             # TODO: Add link
 
             # layout.separator(factor=0.5)
@@ -713,11 +716,12 @@ Some operators, can interact with trims:
             ui.UNIV_PT_GlobalSettings.draw_ui_settings(layout)
         elif self.tab == 'KEYMAPS':
             from .ui import draw_panel
-            row = layout.row()
-            row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
-            row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
-            row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
-            row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
+            if "NOT_BL_EXT":
+                row = layout.row()
+                row.operator('wm.univ_keymaps_config', text='Restore').mode = 'RESTORE'
+                row.operator('wm.univ_keymaps_config', text='Off/On').mode = 'TOGGLE'
+                row.operator('wm.univ_keymaps_config', text='Delete User').mode = 'DELETE_USER'
+                row.operator('wm.univ_keymaps_config', text='Resolve Conflicts').mode = 'RESOLVE_ALL'
 
             col = layout.column(align=True)
 
@@ -821,13 +825,16 @@ Some operators, can interact with trims:
             row.enabled = enable
             row.operator("wm.url_open", text="GitHub").url = r"https://github.com/Oxicid/UniV"
 
-            if univ_pro:
+            if "NOT_BL_EXT":
                 row.operator("wm.url_open", text="YouTube").url = r"https://www.youtube.com/@oxicid6058"
                 row.operator("wm.url_open", text="Discord").url = r"https://discord.gg/SAvEbGTkjR"
                 row.operator("wm.url_open", text="Blender Market").url = r"https://blendermarket.com/products/univ?search_id=32308413"
 
                 from .icons import icons
-                layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
+                if univ_pro:
+                    layout.label(text="You are using the Pro version", icon='FAKE_USER_ON')
+                else:
+                    layout.label(text="You are using the Lite version", icon='FAKE_USER_OFF')
 
                 layout.label(text="UniV Pro includes such advanced operators and features as:")
                 row = layout.row(align=True)

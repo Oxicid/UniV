@@ -4,11 +4,7 @@
 # NOTE: Use functions after sync validation
 # NOTE: To avoid using flush, in order to correct defective face selections, first need deselect and then select
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
 
-import bpy  # noqa
 import bmesh
 import typing
 

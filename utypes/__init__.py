@@ -1,30 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-if 'bpy' in locals():
-    from . import btypes
-    from . import bbox
-    from . import island
-    from . import loop_group
-    from . import mesh_island
-    from . import ray
-    from . import umesh
-    from . import utexture
-    from . import llvm
-
-    from .. import reload
-    reload.reload(globals())
-
-    del btypes
-    del bbox
-    del island
-    del mesh_island
-    del loop_group
-    del ray
-    del umesh
-    del utexture
-
-import bpy  # noqa: F401
 from .btypes import *
 from .bbox import *
 from .island import *
@@ -33,4 +9,3 @@ from .mesh_island import *
 from .ray import *
 from .umesh import *
 from .utexture import *
-from . import llvm

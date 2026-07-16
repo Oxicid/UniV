@@ -1,7 +1,6 @@
-# SPDX-FileCopyrightText: 2025 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
 
 import bpy
 import math
@@ -9,10 +8,6 @@ import math
 from .. import utils
 from .. import utypes
 from mathutils import Vector, kdtree
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 # noinspection PyTypeHints

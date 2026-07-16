@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
 
 import bpy
 import bl_math
@@ -25,10 +24,6 @@ from ..utypes import (
     LoopGroups
 )
 from ..preferences import prefs, univ_settings
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 class Stitch:

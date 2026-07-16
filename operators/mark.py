@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
-
 import bpy
 import math
 import bl_math
@@ -15,9 +13,6 @@ from .. import utypes
 from ..utypes import UMeshes, AdvIslands
 from ..preferences import prefs, univ_settings
 
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 class UNIV_OT_Mark_VIEW2D(Operator):

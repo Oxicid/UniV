@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-_needs_reload = "bpy" in locals()
 
 import bpy
 import math
@@ -36,10 +35,6 @@ from ..utypes import (
 
 )
 from ..preferences import prefs, univ_settings
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 # noinspection PyTypeHints
@@ -3886,7 +3881,7 @@ class UNIV_OT_Pack(Operator):
         self.pack_op_type = '0'
 
     def execute(self, context):
-        if univ_settings().use_uvpm:
+        if "NOT_BL_EXT" and univ_settings().use_uvpm:
             if hasattr(context.scene, 'uvpm4_props') or hasattr(context.scene, 'uvpm3_props'):
                 return self.pack_uvpm()
             else:
@@ -3896,80 +3891,80 @@ class UNIV_OT_Pack(Operator):
         else:
             return self.pack_native()
 
+    if "NOT_BL_EXT":
+        def pack_uvpm(self):
+            # TODO: Add Info about unselected and hidden faces
+            # TODO: Use UniV orient (instead Pre-Rotation) and remove AXIS_ALIGNED method
+            # TODO: Use UniV normalize
+            # TODO: Add for Exact Overlap Mode threshold
+            # TODO: Add scale checker for packed meshes
 
-    def pack_uvpm(self):
-        # TODO: Add Info about unselected and hidden faces
-        # TODO: Use UniV orient (instead Pre-Rotation) and remove AXIS_ALIGNED method
-        # TODO: Use UniV normalize
-        # TODO: Add for Exact Overlap Mode threshold
-        # TODO: Add scale checker for packed meshes
+            settings = univ_settings()
+            uvpm_addon_prefs = None
 
-        settings = univ_settings()
-        uvpm_addon_prefs = None
+            if hasattr(bpy.context.scene, 'uvpm4_props'):
+                uvpm_settings = bpy.context.scene.uvpm4_props
+                uvpm_package = 'bl_ext.user_default.uvpackmaster4'
+            else:
+                uvpm_settings = bpy.context.scene.uvpm3_props
+                uvpm_package = 'bl_ext.user_default.uvpackmaster3'
 
-        if hasattr(bpy.context.scene, 'uvpm4_props'):
-            uvpm_settings = bpy.context.scene.uvpm4_props
-            uvpm_package = 'bl_ext.user_default.uvpackmaster4'
-        else:
-            uvpm_settings = bpy.context.scene.uvpm3_props
-            uvpm_package = 'bl_ext.user_default.uvpackmaster3'
-
-        try:
-            uvpm_addon_prefs = bpy.context.preferences.addons[uvpm_package].preferences
-        except:  # noqa
-            import traceback
-            traceback.print_exc()
-            from ..preferences import debug
-            if debug():
-                self.report({'ERROR'}, 'Not found UVPackMaster addon preferences')
-
-
-        if uvpm_addon_prefs:
-            if getattr(uvpm_addon_prefs, 'dont_transform_pinned_uvs', False):
-                uvpm_addon_prefs.dont_transform_pinned_uvs = False
+            try:
+                uvpm_addon_prefs = bpy.context.preferences.addons[uvpm_package].preferences
+            except:  # noqa
+                import traceback
+                traceback.print_exc()
+                from ..preferences import debug
+                if debug():
+                    self.report({'ERROR'}, 'Not found UVPackMaster addon preferences')
 
 
-        if hasattr(uvpm_settings, 'default_main_props'):
-            uvpm_settings = uvpm_settings.default_main_props
-
-        if hasattr(uvpm_settings, 'scale_mode'):
-            uvpm_settings.scale_mode = '0' if settings.scale else '1'
-        else:
-            uvpm_settings.fixed_scale = not settings.scale
-
-        uvpm_settings.pixel_margin_enable = True
-        uvpm_settings.pixel_margin_tex_size = min(int(settings.size_x), int(settings.size_y))
-        uvpm_settings.pixel_margin = settings.padding
-
-        uvpm_settings.heuristic_enable = True
-        total_selected = sum(umesh.total_face_sel for umesh in UMeshes.calc(verify_uv=False))
-        if total_selected > 50_000:
-            time_in_sec = 8
-        elif total_selected > 10_000:
-            time_in_sec = 4
-        else:
-            time_in_sec = 2
-        uvpm_settings.heuristic_max_wait_time = time_in_sec
-        uvpm_settings.heuristic_search_time = time_in_sec * 4
-
-        size = utils.get_active_image_size()
-        if not size:
-            size = (128, 128)
-
-        if hasattr(uvpm_settings, 'non_square_packing'):  # for UVPM4 version
-            uvpm_settings.non_square_packing = size[0] != size[1]
-        else:
-            uvpm_settings.tex_ratio = size[0] != size[1]
-
-        if uvpm_settings.precision == 500:
-            uvpm_settings.precision = 800
+            if uvpm_addon_prefs:
+                if getattr(uvpm_addon_prefs, 'dont_transform_pinned_uvs', False):
+                    uvpm_addon_prefs.dont_transform_pinned_uvs = False
 
 
-        if hasattr(bpy.context.scene, 'uvpm4_props'):
-            pack = bpy.ops.uvpackmaster4.pack  # noqa
-        else:
-            pack = bpy.ops.uvpackmaster3.pack  # noqa
-        return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type=self.pack_op_type)
+            if hasattr(uvpm_settings, 'default_main_props'):
+                uvpm_settings = uvpm_settings.default_main_props
+
+            if hasattr(uvpm_settings, 'scale_mode'):
+                uvpm_settings.scale_mode = '0' if settings.scale else '1'
+            else:
+                uvpm_settings.fixed_scale = not settings.scale
+
+            uvpm_settings.pixel_margin_enable = True
+            uvpm_settings.pixel_margin_tex_size = min(int(settings.size_x), int(settings.size_y))
+            uvpm_settings.pixel_margin = settings.padding
+
+            uvpm_settings.heuristic_enable = True
+            total_selected = sum(umesh.total_face_sel for umesh in UMeshes.calc(verify_uv=False))
+            if total_selected > 50_000:
+                time_in_sec = 8
+            elif total_selected > 10_000:
+                time_in_sec = 4
+            else:
+                time_in_sec = 2
+            uvpm_settings.heuristic_max_wait_time = time_in_sec
+            uvpm_settings.heuristic_search_time = time_in_sec * 4
+
+            size = utils.get_active_image_size()
+            if not size:
+                size = (128, 128)
+
+            if hasattr(uvpm_settings, 'non_square_packing'):  # for UVPM4 version
+                uvpm_settings.non_square_packing = size[0] != size[1]
+            else:
+                uvpm_settings.tex_ratio = size[0] != size[1]
+
+            if uvpm_settings.precision == 500:
+                uvpm_settings.precision = 800
+
+
+            if hasattr(bpy.context.scene, 'uvpm4_props'):
+                pack = bpy.ops.uvpackmaster4.pack  # noqa
+            else:
+                pack = bpy.ops.uvpackmaster3.pack  # noqa
+            return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type=self.pack_op_type)
 
     def pack_native(self):
         umeshes = UMeshes.calc(verify_uv=False)

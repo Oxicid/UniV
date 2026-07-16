@@ -1,13 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+
+import typing
 import numpy as np
 
-if 'bpy' in locals():
-    from .. import reload
-    reload.reload(globals())
-
-import bpy  # noqa: F401
-import typing
 from mathutils import Vector
 from collections import defaultdict, deque
 from itertools import chain
@@ -15,6 +12,7 @@ from bmesh.types import BMLoop
 from ..utils import (linked_crn_uv,
                      vec_isclose_to_zero,
                      linked_crn_uv_by_idx_unordered)
+
 from math import pi
 from . import umesh as _umesh
 from . import bbox

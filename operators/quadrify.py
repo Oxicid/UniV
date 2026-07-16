@@ -1,9 +1,7 @@
-# SPDX-FileCopyrightText: 2025 Oxicid
+# SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # The code was taken and modified from the UvSquares addon: https://github.com/Radivarig/UvSquares/blob/master/uv_squares.py
-
-_needs_reload = "bpy" in locals()
 
 import bpy
 import typing
@@ -19,10 +17,6 @@ from .. import utypes
 from ..preferences import univ_settings
 from ..utypes import AdvIslands, AdvIsland, UMeshes
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
-
-if _needs_reload:
-    from .. import reload
-    reload.reload(globals())
 
 
 QUAD_SIZE = 4
