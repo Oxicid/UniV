@@ -106,7 +106,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
     def pick_unwrap(self, **unwrap_kwargs):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            for isl in utypes.AdvIslands.calc_visible_with_mark_seam(umesh):
+            for isl in utypes.Islands.calc_visible_with_mark_seam(umesh):
                 hit.find_nearest_island(isl)
 
         if not hit or (self.max_distance < hit.min_dist):
@@ -150,7 +150,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         if self.mark_seam_inner_island:
             isl.mark_seam(additional=True)
         else:
-            islands = utypes.AdvIslands([isl], isl.umesh)
+            islands = utypes.Islands([isl], isl.umesh)
             islands.indexing()
             isl.mark_seam_by_index(additional=True)
 
@@ -242,7 +242,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             # TODO: Full select unselected verts (with pins) of island for avoid incorrect behavior for relax OT
-            islands = utypes.AdvIslands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = utypes.Islands.calc_extended_any_elem_with_mark_seam(umesh)
             islands.indexing()
 
             for isl in islands:
@@ -576,7 +576,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         for umesh in reversed(self.umeshes):
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands_extended = utypes.AdvIslands.calc_extended_with_mark_seam(umesh)
+            islands_extended = utypes.Islands.calc_extended_with_mark_seam(umesh)
             islands_extended.indexing()
 
             for isl in islands_extended:
@@ -681,7 +681,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
 
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands = utypes.AdvIslands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = utypes.Islands.calc_extended_any_elem_with_mark_seam(umesh)
 
             if not self.mark_seam_inner_island or umesh.bm.edges.layers.int.get('univ_constraints'):
                 islands.indexing()

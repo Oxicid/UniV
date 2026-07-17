@@ -10,7 +10,7 @@ import numpy.typing as npt
 from .. import utils
 from ..utils import linked_crn_to_vert_by_idx_without_co_check_unordered
 from .. import utypes
-from ..utypes import UMeshes, AdvIsland, AdvIslands
+from ..utypes import UMeshes, AdvIsland, Islands
 from collections import deque, defaultdict
 from collections.abc import Callable
 
@@ -379,8 +379,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         self.targets: list[StackIsland] = []
         self.transfer: list[StackIsland] = []
         self.counter: int = 0
-        self.calc_selected: Callable = AdvIslands.calc_selected
-        self.calc_non_selected: Callable = AdvIslands.calc_non_selected
+        self.calc_selected: Callable = Islands.calc_selected
+        self.calc_non_selected: Callable = Islands.calc_non_selected
 
     def execute(self, context) -> set[str]:
         self.counter = 0
@@ -491,7 +491,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             elif not non_selected:
                 proxi = selected
             else:
-                proxi = AdvIslands(non_selected.islands + selected.islands, umesh)
+                proxi = Islands(non_selected.islands + selected.islands, umesh)
 
             proxi.indexing()
 

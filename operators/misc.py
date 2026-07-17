@@ -56,7 +56,7 @@ class UNIV_OT_RandomColor(Operator):
     def execute(self, context):
         if self.island_type == 'UV':
             umeshes = UMeshes(report=self.report)
-            isl_type = utypes.AdvIslands
+            isl_type = utypes.Islands
         else:
             umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
             isl_type = utypes.MeshIslands
@@ -204,12 +204,12 @@ class UNIV_OT_LinearGradient(Operator):
             selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
                 umeshes = selected
-                calc_islands_type = utypes.AdvIslands.calc_selected_with_mark_seam
+                calc_islands_type = utypes.Islands.calc_selected_with_mark_seam
             else:
                 umeshes = visible
-                calc_islands_type = utypes.AdvIslands.calc_visible_with_mark_seam
+                calc_islands_type = utypes.Islands.calc_visible_with_mark_seam
         else:
-            calc_islands_type = utypes.AdvIslands.calc_with_hidden_with_mark_seam
+            calc_islands_type = utypes.Islands.calc_with_hidden_with_mark_seam
 
 
         bb = utypes.BBox()
@@ -240,7 +240,7 @@ class UNIV_OT_LinearGradient(Operator):
 
         for umesh in umeshes:
             uv = umesh.uv
-            islands: utypes.AdvIslands = umesh.sequence
+            islands: utypes.Islands = umesh.sequence
             color_layer = UNIV_OT_RandomColor.create_and_get_color_attribute(umesh)
 
             for isl in islands:
@@ -618,7 +618,7 @@ class UNIV_OT_Hide(Operator):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         all_islands = []
         for umesh in self.umeshes:
-            for isl in utypes.AdvIslands.calc_visible_with_mark_seam(umesh):
+            for isl in utypes.Islands.calc_visible_with_mark_seam(umesh):
                 if self.unselected:
                     all_islands.append(isl)
                 hit.find_nearest_island_by_crn(isl)
@@ -2681,7 +2681,7 @@ class UNIV_OT_AlignBorderVerts(Operator):
             if not umesh.update_tag:
                 continue
 
-            islands = utypes.AdvIslands.calc_visible(umesh)
+            islands = utypes.Islands.calc_visible(umesh)
             islands.indexing()
             for crn in selected_contiguous_edges:
                 crn.tag = True

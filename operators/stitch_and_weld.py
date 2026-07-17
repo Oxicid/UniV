@@ -18,7 +18,6 @@ from ..utypes import (
     BBox,
     UMeshes,
     Islands,
-    AdvIslands,
     AdvIsland,
     LoopGroup,
     LoopGroups
@@ -46,9 +45,9 @@ class Stitch:
 
             # This contains `Targets` and potentially `Transformed` islands, which will be sorted later.
             if self.between:
-                islands = AdvIslands.calc_extended_with_mark_seam(umesh)
+                islands = Islands.calc_extended_with_mark_seam(umesh)
             else:
-                islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+                islands = Islands.calc_visible_with_mark_seam(umesh)
             if len(islands) <= 1:
                 continue
 
@@ -731,7 +730,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         for umesh in self.umeshes:
             uv = umesh.uv
             update_tag = False
-            islands = AdvIslands.calc_extended_any_edge_non_manifold(umesh)
+            islands = Islands.calc_extended_any_edge_non_manifold(umesh)
             if islands:
                 umesh.set_corners_tag(False)
                 islands.indexing()

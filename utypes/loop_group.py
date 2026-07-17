@@ -19,7 +19,7 @@ from . import bbox
 from .. import utils
 
 if typing.TYPE_CHECKING:
-    from . import AdvIsland, FaceIsland  # noqa
+    from . import AdvIsland  # noqa
 
 
 class LoopGroup:
@@ -175,7 +175,7 @@ class LoopGroup:
         # TODO: Report small areas in stitch
         return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
 
-    def tagging(self, island: 'AdvIsland | FaceIsland'):
+    def tagging(self, island: 'AdvIsland'):
         face_is_invisible = utils.is_invisible_func(island.umesh.sync)
         get_edge_select = utils.edge_select_get_func(island.umesh)
         is_pair = utils.is_pair

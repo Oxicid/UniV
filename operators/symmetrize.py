@@ -74,7 +74,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
             tree.balance()
 
             # Islands are sorted by their bounding box to determine which one is the source and which is the destination.
-            islands = utypes.AdvIslands.calc_selected_with_mark_seam(umesh)
+            islands = utypes.Islands.calc_selected_with_mark_seam(umesh)
             if self.axis_uv == '-X to +X':
                 islands.islands.sort(key=lambda isl_: isl_.bbox.center.x % 1, reverse=self.axis_uv_flip)
             else:

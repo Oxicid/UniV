@@ -15,7 +15,7 @@ from collections.abc import Callable
 from .. import utils
 from .. import utypes
 from ..preferences import univ_settings
-from ..utypes import AdvIslands, AdvIsland, UMeshes
+from ..utypes import Islands, AdvIsland
 from ..utils import linked_crn_uv_by_face_tag_unordered_included
 
 
@@ -63,7 +63,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         self.shear = False
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
-        self.umeshes: UMeshes | None = None
+        self.umeshes: utypes.UMeshes | None = None
         self.mouse_pos: Vector | None = None
         self.max_distance: float | None = None
 
@@ -72,7 +72,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             self.report({'WARNING'}, 'Active area must be UV')
             return {'CANCELLED'}
 
-        self.umeshes = UMeshes(report=self.report)
+        self.umeshes = utypes.UMeshes(report=self.report)
 
         selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
         if selected_umeshes:
@@ -90,7 +90,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
-            dirt_islands = AdvIslands.calc_extended_with_mark_seam(umesh)
+            dirt_islands = Islands.calc_extended_with_mark_seam(umesh)
             if dirt_islands:
                 uv = umesh.uv
                 is_boundary = utils.is_boundary_func(umesh)
@@ -149,7 +149,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return [None] * umesh.total_corners
 
     @staticmethod
-    def init_edge_sequence_from_island(island: utypes.FaceIsland) -> list[None | float]:
+    def init_edge_sequence_from_island(island: utypes.AdvIsland) -> list[None | float]:
         idx = 0
         for f in island:
             for crn in f.loops:
@@ -160,7 +160,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
     def quad_normalize(self, quad_islands, umesh):
         # adjust and normalize
-        quad_islands = AdvIslands(quad_islands, umesh)
+        quad_islands = Islands(quad_islands, umesh)
         quad_islands.calc_tris_simple()
         quad_islands.calc_flat_uv_coords(save_triplet=True)
         quad_islands.calc_flat_unique_uv_coords()
@@ -182,7 +182,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
 
         for umesh in self.umeshes:
-            dirt_islands = AdvIslands.calc_visible_with_mark_seam(umesh)
+            dirt_islands = Islands.calc_visible_with_mark_seam(umesh)
             if dirt_islands:
                 for d_island in dirt_islands:
                     hit.find_nearest_island_by_crn(d_island)
@@ -255,7 +255,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
         # Calc sub-islands
-        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
     def split_by_static_faces_and_quad_islands_pick(self, island) -> tuple[list[tuple[BMLoop, list[BMLoop]]], list[BMFace], list[AdvIsland]]:
@@ -278,7 +278,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         utils.set_faces_tag(quad_faces)
         links_static_with_quads = self.store_links_static_with_quads(static_faces, uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
-        islands = [AdvIslands.island_type(i, umesh) for i in AdvIslands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
         return links_static_with_quads, static_faces, islands
 
     @staticmethod

@@ -102,7 +102,7 @@ class MeshIsland:
             all_added.update(adv_island)
             adv_islands.append(island.AdvIsland(list(adv_island), self.umesh))
 
-        return island.AdvIslands(adv_islands, self.umesh)
+        return island.Islands(adv_islands, self.umesh)
 
     def calc_selected_edge_corners_iter(self):
         return (crn for f in self for crn in f.loops if crn.edge.select)
@@ -463,13 +463,13 @@ class MeshIslands(MeshIslandsBase):
             for face in mesh_island:
                 face.index = idx
 
-    def to_adv_islands(self) -> island.AdvIslands:
+    def to_adv_islands(self) -> island.Islands:
         adv_islands = []
         for mesh_isl in self:
             adv_isl = island.AdvIsland(mesh_isl.faces, self.umesh)
             adv_isl.value = mesh_isl.value
             adv_islands.append(adv_isl)
-        adv_islands_t = island.AdvIslands(adv_islands, self.umesh)
+        adv_islands_t = island.Islands(adv_islands, self.umesh)
         adv_islands_t.value = self.value
         return adv_islands_t
 

@@ -61,9 +61,9 @@ class UNIV_OT_Straight(bpy.types.Operator):
             need_hide = self.need_hide(umesh)
 
             if umeshes.elem_mode in ('VERT', 'EDGE'):
-                islands = utypes.AdvIslands.calc_visible_with_mark_seam(umesh)
+                islands = utypes.Islands.calc_visible_with_mark_seam(umesh)
             else:
-                islands = utypes.AdvIslands.calc_extended_with_mark_seam(umesh)
+                islands = utypes.Islands.calc_extended_with_mark_seam(umesh)
             islands.indexing()
 
             is_boundary = utils.is_boundary_func(umesh, with_seam=False)

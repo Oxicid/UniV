@@ -200,7 +200,7 @@ class ViewBoxSyncBlock:
             islands.islands = [isl for isl in islands if self.isect_island(isl)]
 
     @staticmethod
-    def _isl_has_inner_elem(island: 'utypes.FaceIsland | utypes.AdvIsland'):
+    def _isl_has_inner_elem(island: 'utypes.AdvIsland'):
         uv = island.umesh.uv
 
         if island.umesh.elem_mode == 'VERT':
@@ -233,7 +233,7 @@ class ViewBoxSyncBlock:
     def isect_island(self, island):
         """ NOTE: For the intersection check (isect) to work correctly,
         all islands must be sorted by their intersection data first, before applying any transformations."""
-        from ..utypes import BBox, FaceIsland, AdvIsland
+        from ..utypes import BBox, AdvIsland
         if self.skip:
             return True
 
@@ -254,9 +254,6 @@ class ViewBoxSyncBlock:
             return True
         if view.isect_y(isl_bbox.ymin) and view.isect_y(isl_bbox.ymax):
             return True
-
-        if type(island) == FaceIsland:
-            island = AdvIsland(island.faces, island.umesh)
 
         if not island.flat_coords:
             island.calc_tris_simple()

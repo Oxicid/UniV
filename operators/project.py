@@ -575,7 +575,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
                             self.uv_project_from_camera(crn_co, crn.vert.co, uci)
                 else:
                     self.report({'WARNING'}, 'Not found camera info')
-                    return {'FINISHED'}
+                    return
             else:
 
                 winx = self.region.width

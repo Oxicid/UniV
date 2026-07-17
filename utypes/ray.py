@@ -16,7 +16,7 @@ from mathutils.bvhtree import BVHTree
 from itertools import chain
 from bpy_extras import view3d_utils
 
-from . import Islands, FaceIsland, AdvIslands, AdvIsland, MeshIsland, UnionIslands, LoopGroups
+from . import AdvIsland, Islands, MeshIsland, UnionIslands, LoopGroups
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 from .. import utils
@@ -61,9 +61,9 @@ class KDData:
 
 
 class KDMesh:
-    def __init__(self, umesh, islands: Islands | AdvIslands | None = None, loop_groups=None):
+    def __init__(self, umesh, islands: Islands | None = None, loop_groups=None):
         self.umesh: UMesh = umesh
-        self.islands: Islands | AdvIslands | None = islands
+        self.islands: Islands | list | None = islands
         self.loop_groups: LoopGroups | None = loop_groups
         self.corners_vert: list[BMLoop] = []
         self.corners_center: list[BMLoop] = []
@@ -333,13 +333,13 @@ class TrimKDTree:
 
 class IslandHit:
     def __init__(self, pt, min_dist=1e200):
-        self.island: AdvIsland | FaceIsland | UnionIslands | None = None
+        self.island: AdvIsland | UnionIslands | None = None
         self.point = pt
         self.min_dist = min_dist
         self.crn = None
         self.face = None
 
-    def find_nearest_island(self, island: AdvIsland | FaceIsland | UnionIslands):
+    def find_nearest_island(self, island: AdvIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
             island = (island, )
         pt = self.point
@@ -382,7 +382,7 @@ class IslandHit:
             return True
         return False
 
-    def find_nearest_island_with_face(self, island: AdvIsland | FaceIsland | UnionIslands):
+    def find_nearest_island_with_face(self, island: AdvIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
             island = (island, )
         pt = self.point
