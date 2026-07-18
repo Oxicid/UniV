@@ -255,7 +255,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
         # Calc sub-islands
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_without_ms_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
     def split_by_static_faces_and_quad_islands_pick(self, island) -> tuple[list[tuple[BMLoop, list[BMLoop]]], list[BMFace], list[AdvIsland]]:
@@ -278,7 +278,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         utils.set_faces_tag(quad_faces)
         links_static_with_quads = self.store_links_static_with_quads(static_faces, uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(fake_umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_without_ms_ex(fake_umesh)]
         return links_static_with_quads, static_faces, islands
 
     @staticmethod

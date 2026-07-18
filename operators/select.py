@@ -838,7 +838,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
             case delimit if "SEAM" in delimit:
                 calc_type = MeshIslands.calc_with_markseam_non_manifold_iter_ex
             case delimit if "UV" in delimit:
-                calc_type = Islands.calc_with_markseam_iter_ex
+                calc_type = Islands.calc_iter_ex
             case delimit if "MATERIAL" in delimit:
                 calc_type = MeshIslands.calc_by_material_non_manifold_iter_ex
             case delimit if "SHARP" in delimit:
@@ -3040,7 +3040,7 @@ class UNIV_OT_SelectMode(Operator):
 
                         Islands.tag_filter_visible(umesh)
                         select_get = utils.face_select_get_func(umesh)
-                        for faces in Islands.calc_with_markseam_iter_ex(umesh):
+                        for faces in Islands.calc_iter_ex(umesh):
                             if not utils.all_equal(faces, select_get):
                                 utypes.AdvIsland(faces, umesh).select = False
                                 umesh.update_tag = True
@@ -3250,7 +3250,7 @@ class UNIV_OT_SelectMode(Operator):
                 for umesh in umeshes:
                     Islands.tag_filter_visible(umesh)
                     select_get = utils.face_select_get_func(umesh)
-                    for faces in Islands.calc_with_markseam_iter_ex(umesh):
+                    for faces in Islands.calc_iter_ex(umesh):
                         if not utils.all_equal(faces, select_get):
                             utypes.AdvIsland(faces, umesh).select = False
                             umesh.update_tag = True

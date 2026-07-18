@@ -1739,7 +1739,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             if f.tag:
                 f.tag = utils.is_flipped_uv(f, uv)
 
-        islands_ = [AdvIsland(i, umesh) for i in Islands.calc_with_markseam_iter_ex(umesh)]
+        islands_ = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh)]
         return Islands(islands_, umesh)
 
     @staticmethod
@@ -1754,8 +1754,8 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             if f.tag:
                 f.tag = utils.is_flipped_uv(f, uv)
 
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_with_markseam_iter_ex(umesh) if
-                    Islands.island_filter_is_any_face_selected(i, umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh) if
+                   Islands.island_filter_is_any_face_selected(i, umesh)]
         return Islands(islands, umesh)
 
     @staticmethod
@@ -1764,7 +1764,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         for f in umesh.bm.faces:
             f.tag = utils.is_flipped_uv(f, uv)
 
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_with_markseam_iter_ex(umesh)]
+        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh)]
         return Islands(islands, umesh)
 
     def pick_flip(self):
