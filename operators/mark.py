@@ -366,7 +366,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
         for umesh in self.umeshes:
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
-            islands = Islands.calc_selected_with_mark_seam(umesh)
+            islands = Islands.calc_selected(umesh)
             for isl in islands:
                 isl.apply_aspect_ratio()
                 save_transform_islands.append(isl.save_transform(flip_if_needed=True))

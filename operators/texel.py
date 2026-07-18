@@ -75,9 +75,9 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
         if self.umeshes.is_edit_mode:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
-            islands_calc_type = Islands.calc_extended_with_mark_seam if selected_umeshes else Islands.calc_visible_with_mark_seam
+            islands_calc_type = Islands.calc_extended if selected_umeshes else Islands.calc_visible
         else:
-            islands_calc_type = Islands.calc_with_hidden
+            islands_calc_type = Islands.calc_with_hidden_without_ms
             for umesh in self.umeshes:
                 umesh.ensure(face=True)
 
@@ -298,9 +298,9 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
             # TODO: Islands with FLIPPED_3D
-            islands_calc_type = Islands.calc_extended_with_mark_seam if selected_umeshes else Islands.calc_visible_with_mark_seam
+            islands_calc_type = Islands.calc_extended if selected_umeshes else Islands.calc_visible
         else:
-            islands_calc_type = Islands.calc_with_hidden
+            islands_calc_type = Islands.calc_with_hidden_without_ms
             for umesh in self.umeshes:
                 umesh.ensure(face=True)
 
@@ -584,7 +584,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         all_islands = []
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+            adv_islands = Islands.calc_visible(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
             adv_islands.calc_tris()
@@ -652,7 +652,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
 
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
-            adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+            adv_islands = Islands.calc_visible(umesh)
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
             adv_islands.calc_tris()
@@ -731,7 +731,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         tot_area_uv = tot_area_3d = 0
         for umesh in self.umeshes:
             umesh.ensure()
-            adv_islands = Islands.calc_with_hidden(umesh)
+            adv_islands = Islands.calc_with_hidden_without_ms(umesh)
 
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
@@ -862,18 +862,18 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
                 cancel = True
             else:
                 self.has_selected = False
-                self.islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+                self.islands_calc_type = Islands.calc_with_hidden
                 self.umeshes.ensure(True)
         else:
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected_umeshes:
                 self.has_selected = True
                 self.umeshes = selected_umeshes
-                self.islands_calc_type = Islands.calc_extended_with_mark_seam
+                self.islands_calc_type = Islands.calc_extended
             elif unselected_umeshes:
                 self.has_selected = False
                 self.umeshes = unselected_umeshes
-                self.islands_calc_type = Islands.calc_visible_with_mark_seam
+                self.islands_calc_type = Islands.calc_visible
             else:
                 cancel = True
 
@@ -1196,7 +1196,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
         for umesh in umeshes:
             uv = umesh.uv
             if umeshes.is_edit_mode:
-                islands = Islands.calc_extended_or_visible(umesh, extended=has_selected)
+                islands = Islands.calc_extended_or_visible_without_ms(umesh, extended=has_selected)
                 islands.calc_tris()
                 tris_iter = (t for isl in islands for t in isl.tris)
             else:

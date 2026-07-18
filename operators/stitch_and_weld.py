@@ -45,9 +45,9 @@ class Stitch:
 
             # This contains `Targets` and potentially `Transformed` islands, which will be sorted later.
             if self.between:
-                islands = Islands.calc_extended_with_mark_seam(umesh)
+                islands = Islands.calc_extended(umesh)
             else:
-                islands = Islands.calc_visible_with_mark_seam(umesh)
+                islands = Islands.calc_visible(umesh)
             if len(islands) <= 1:
                 continue
 
@@ -730,7 +730,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         for umesh in self.umeshes:
             uv = umesh.uv
             update_tag = False
-            islands = Islands.calc_extended_any_edge_non_manifold(umesh)
+            islands = Islands.calc_extended_any_edge_non_manifold_without_ms(umesh)
             if islands:
                 umesh.set_corners_tag(False)
                 islands.indexing()
@@ -846,7 +846,10 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
             local_counter_welded = 0
             all_linked_corners = set()
 
-            islands = Islands.calc_any_extended_or_visible_non_manifold(umesh, extended=extended)
+            if extended:
+                islands = Islands.calc_extended_any_vert_non_manifold_without_ms(umesh)
+            else:
+                islands = Islands.calc_visible_non_manifold_without_ms(umesh)
             islands.indexing()
 
             for idx, isl in enumerate(islands):

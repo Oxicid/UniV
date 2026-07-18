@@ -72,12 +72,12 @@ class UNIV_OT_RandomColor(Operator):
             selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
                 umeshes = selected
-                calc_islands_type = isl_type.calc_selected_with_mark_seam
+                calc_islands_type = isl_type.calc_selected
             else:
                 umeshes = visible
-                calc_islands_type = isl_type.calc_visible_with_mark_seam
+                calc_islands_type = isl_type.calc_visible
         else:
-            calc_islands_type = isl_type.calc_with_hidden_with_mark_seam
+            calc_islands_type = isl_type.calc_with_hidden
 
 
         seed = sum(id(umesh.obj) for umesh in umeshes) // len(umeshes) + self.rand_seed
@@ -204,12 +204,12 @@ class UNIV_OT_LinearGradient(Operator):
             selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
                 umeshes = selected
-                calc_islands_type = utypes.Islands.calc_selected_with_mark_seam
+                calc_islands_type = utypes.Islands.calc_selected
             else:
                 umeshes = visible
-                calc_islands_type = utypes.Islands.calc_visible_with_mark_seam
+                calc_islands_type = utypes.Islands.calc_visible
         else:
-            calc_islands_type = utypes.Islands.calc_with_hidden_with_mark_seam
+            calc_islands_type = utypes.Islands.calc_with_hidden
 
 
         bb = utypes.BBox()
@@ -618,7 +618,7 @@ class UNIV_OT_Hide(Operator):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         all_islands = []
         for umesh in self.umeshes:
-            for isl in utypes.Islands.calc_visible_with_mark_seam(umesh):
+            for isl in utypes.Islands.calc_visible(umesh):
                 if self.unselected:
                     all_islands.append(isl)
                 hit.find_nearest_island_by_crn(isl)
@@ -2681,7 +2681,7 @@ class UNIV_OT_AlignBorderVerts(Operator):
             if not umesh.update_tag:
                 continue
 
-            islands = utypes.Islands.calc_visible(umesh)
+            islands = utypes.Islands.calc_visible_without_ms(umesh)
             islands.indexing()
             for crn in selected_contiguous_edges:
                 crn.tag = True

@@ -253,7 +253,7 @@ class KDMeshes:
     def calc_island_rmeshes(cls, umeshes: UMeshes, extended=False):
         rmeshes = []
         for umesh in umeshes:
-            islands = Islands.calc_extended_or_visible(umesh, extended=extended)
+            islands = Islands.calc_extended_or_visible_without_ms(umesh, extended=extended)
             if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()

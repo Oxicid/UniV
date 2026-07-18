@@ -379,8 +379,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         self.targets: list[StackIsland] = []
         self.transfer: list[StackIsland] = []
         self.counter: int = 0
-        self.calc_selected: Callable = Islands.calc_selected
-        self.calc_non_selected: Callable = Islands.calc_non_selected
+        self.calc_selected: Callable = Islands.calc_selected_without_ms
+        self.calc_non_selected: Callable = Islands.calc_non_selected_without_ms
 
     def execute(self, context) -> set[str]:
         self.counter = 0

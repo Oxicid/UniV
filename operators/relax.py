@@ -125,7 +125,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 selected_elem = utils.calc_selected_3d_edges(umesh)
 
             uv = umesh.uv
-            islands = Islands.calc_visible(umesh)
+            islands = Islands.calc_visible_without_ms(umesh)
             for isl in islands:
                 isl.mark_seam()
 
@@ -228,7 +228,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         relax_data: list[RelaxData] = []
         for umesh in self.umeshes:
             uv = umesh.uv
-            islands = Islands.calc_extended(umesh)
+            islands = Islands.calc_extended_without_ms(umesh)
 
             for isl in islands:
                 isl.mark_seam()
@@ -317,7 +317,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             is_vert_select = vert_select_get_func(umesh)
             is_visible = is_visible_func(umesh.sync)
             uv = umesh.uv
-            islands = Islands.calc_extended_any_elem(umesh)
+            islands = Islands.calc_extended_any_elem_without_ms(umesh)
 
             for isl in islands:
                 isl.mark_seam()

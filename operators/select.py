@@ -194,7 +194,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                     if need_sync_validation_check and to_deselect:
                         umesh.bm.uv_select_sync_to_mesh()
             else:
-                adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+                adv_islands = Islands.calc_visible(umesh)
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords(save_triplet=True)
 
@@ -239,7 +239,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                     for f in to_select:
                         face_select_set(f, True)
             else:
-                adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+                adv_islands = Islands.calc_visible(umesh)
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords(save_triplet=True)
 
@@ -274,7 +274,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
                     for f in to_deselect:
                         face_select_set(f, False)
             else:
-                adv_islands = Islands.calc_visible_with_mark_seam(umesh)
+                adv_islands = Islands.calc_visible(umesh)
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords(save_triplet=True)
 
@@ -361,7 +361,7 @@ class UNIV_OT_Select_Square_Island(Operator):
 
     def select(self, need_sync_validation_check):
         for umesh in self.umeshes:
-            islands = Islands.calc_visible_with_mark_seam(umesh)
+            islands = Islands.calc_visible(umesh)
             if islands:
                 if need_sync_validation_check:
                     umesh.sync_from_mesh_if_needed()
@@ -384,7 +384,7 @@ class UNIV_OT_Select_Square_Island(Operator):
         for umesh in self.umeshes:
             update_tag = False
             if not umesh.has_full_selected_uv_faces():
-                for island in Islands.calc_non_full_selected_with_mark_seam(umesh):
+                for island in Islands.calc_non_full_selected(umesh):
                     if self.is_target_island(island):
                         if need_sync_validation_check:
                             umesh.sync_from_mesh_if_needed()
@@ -395,7 +395,7 @@ class UNIV_OT_Select_Square_Island(Operator):
     def deselect(self, need_sync_validation_check):
         for umesh in self.umeshes:
             update_tag = False
-            for island in Islands.calc_visible_with_mark_seam(umesh):
+            for island in Islands.calc_visible(umesh):
                 if utils.USE_GENERIC_UV_SYNC:
                     if island.is_full_vert_deselected():
                         continue
@@ -555,7 +555,7 @@ class UNIV_OT_Select_Border(Operator):
             to_select = []
             to_deselect = []
 
-            islands = Islands.calc_extended_any_elem_with_mark_seam(umesh)
+            islands = Islands.calc_extended_any_elem(umesh)
             islands.indexing(force=False)
             if self.mode == 'SELECT':
                 for island in islands:
@@ -749,7 +749,7 @@ class UNIV_OT_Select_Pick(Operator):
                 if not umesh.has_selected_uv_verts():
                     continue
 
-            for isl in Islands.calc_visible_with_mark_seam(umesh):
+            for isl in Islands.calc_visible(umesh):
                 if self.select:  # Skip full selected island
                     if isl.is_full_face_selected():
                         continue
@@ -1117,9 +1117,9 @@ else:
 
             # TODO: Implement without island calc (use linked with pair iter and mark seam)
             if self.clamp_on_seam:
-                self.calc_islands = Islands.calc_visible_with_mark_seam
-            else:
                 self.calc_islands = Islands.calc_visible
+            else:
+                self.calc_islands = Islands.calc_visible_without_ms
 
             if self.grow:
                 return self.grow_select()
@@ -1698,9 +1698,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         if self.clamp_on_seam:
-            self.calc_islands = Islands.calc_extended_any_edge_with_markseam
-        else:
             self.calc_islands = Islands.calc_extended_any_edge
+        else:
+            self.calc_islands = Islands.calc_extended_any_edge_without_ms
 
         self.umeshes.filter_by_selected_uv_edges()
         self.umeshes.update_tag = False
@@ -2294,7 +2294,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         counter_skipped = 0
         for umesh in umeshes:
             if self.island_mode == 'ISLAND':
-                islands = Islands.calc_visible_with_mark_seam(umesh)
+                islands = Islands.calc_visible(umesh)
             else:
                 islands = [AdvIsland([f], umesh) for f in utils.calc_visible_uv_faces(umesh)]
 
@@ -2377,7 +2377,7 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         umesh = self.umeshes[0]
         # uv = umesh.uv
 
-        islands = Islands.calc_visible_with_mark_seam(umesh)
+        islands = Islands.calc_visible(umesh)
         islands.indexing()
 
         is_boundary = utils.is_boundary_func(umesh, with_seam=False)
@@ -2492,7 +2492,7 @@ class UNIV_OT_SelectByArea(Operator):
 
         for umesh in umeshes:
             umesh.update_tag = False
-            islands = Islands.calc_visible_with_mark_seam(umesh)
+            islands = Islands.calc_visible(umesh)
             if islands:
                 islands_of_mesh.append(islands)
 
@@ -2621,7 +2621,7 @@ class UNIV_OT_Stacked(Operator):
         all_islands = []
         for umesh in umeshes:
             umesh.update_tag = False
-            islands = Islands.calc_visible_with_mark_seam(umesh)
+            islands = Islands.calc_visible(umesh)
             all_islands.extend(islands)
 
         union_islands = UnionIslands.calc_overlapped_island_groups(all_islands, self.threshold)
@@ -2815,7 +2815,7 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
                         elif has_any_select(f):
                             to_deselect.append(f)
                 else:
-                    for isl in Islands.calc_visible_with_mark_seam(umesh):
+                    for isl in Islands.calc_visible(umesh):
                         if all(is_target_face(f) for f in isl):
                             if isl.is_full_face_selected():
                                 counter_without_effect += 1
@@ -2828,7 +2828,7 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
                 if self.elem_mode == 'FACE':
                     to_select.extend(f for f in utils.calc_unselected_uv_faces_iter(umesh) if is_target_face(f))
                 else:
-                    for isl in Islands.calc_visible_with_mark_seam(umesh):
+                    for isl in Islands.calc_visible(umesh):
                         if all(is_target_face(f) for f in isl):
                             if not isl.is_full_face_selected():
                                 to_select.append(isl)
@@ -2844,7 +2844,7 @@ class UNIV_OT_SelectByVertexCount_VIEW2D(UNIV_OT_SelectByVertexCount_Base):
                             else:
                                 counter_without_effect += 1
                 else:
-                    for isl in Islands.calc_visible_with_mark_seam(umesh):
+                    for isl in Islands.calc_visible(umesh):
                         if all(is_target_face(f) for f in isl):
                             if not isl.is_full_deselected_by_context():
                                 to_deselect.append(isl)

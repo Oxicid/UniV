@@ -90,7 +90,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         selected_non_quads_counter = 0
         for umesh in self.umeshes:
             umesh.update_tag = False
-            dirt_islands = Islands.calc_extended_with_mark_seam(umesh)
+            dirt_islands = Islands.calc_extended(umesh)
             if dirt_islands:
                 uv = umesh.uv
                 is_boundary = utils.is_boundary_func(umesh)
@@ -182,7 +182,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
 
         for umesh in self.umeshes:
-            dirt_islands = Islands.calc_visible_with_mark_seam(umesh)
+            dirt_islands = Islands.calc_visible(umesh)
             if dirt_islands:
                 for d_island in dirt_islands:
                     hit.find_nearest_island_by_crn(d_island)

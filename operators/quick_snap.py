@@ -161,7 +161,7 @@ class QuickSnap_KDMeshes:
     def calc_island_kdmeshes(self, extended=False):
         kdmeshes = []
         for umesh in self.umeshes:
-            islands = Islands.calc_extended_or_visible(umesh, extended=extended)
+            islands = Islands.calc_extended_or_visible_without_ms(umesh, extended=extended)
             if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()
@@ -171,7 +171,7 @@ class QuickSnap_KDMeshes:
     def recalc_island_kd_meshes(self):
         kdmeshes = []
         for umesh in self.umeshes:
-            islands = Islands.calc_non_selected_extended(umesh)
+            islands = Islands.calc_non_selected_extended_without_ms(umesh)
             if islands:
                 kdmesh = KDMesh(umesh, islands)
                 kdmesh.calc_all_trees()

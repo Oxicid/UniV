@@ -674,7 +674,7 @@ class UNIV_OT_Check_Overlap(Operator):
         if check_mode == 'INEXACT':
             all_islands = []
             for umesh in umeshes:
-                adv_islands = utypes.Islands.calc_extended_with_mark_seam(umesh)
+                adv_islands = utypes.Islands.calc_extended(umesh)
                 # The following subdivision is needed to ignore the exact self overlaps
                 # that are created from the flipped face
                 for isl in reversed(adv_islands):

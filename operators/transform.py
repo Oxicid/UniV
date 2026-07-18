@@ -79,7 +79,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
         self.mode: str = 'DEFAULT'
         self.use_crop: bool = True
         self.umeshes: UMeshes | None = None
-        self.calc_island_method = Islands.calc_extended_with_mark_seam
+        self.calc_island_method = Islands.calc_extended
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -138,14 +138,14 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 return
 
             if selected_umeshes:
-                self.calc_island_method = Islands.calc_extended_with_mark_seam
+                self.calc_island_method = Islands.calc_extended
             else:
-                self.calc_island_method = Islands.calc_visible_with_mark_seam
+                self.calc_island_method = Islands.calc_visible
         else:
             if not self.umeshes:
                 return
             self.umeshes.ensure()
-            self.calc_island_method = Islands.calc_with_hidden_with_mark_seam
+            self.calc_island_method = Islands.calc_with_hidden
 
         match self.mode:
             case 'DEFAULT':
@@ -259,15 +259,15 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 return
 
             if selected_umeshes:
-                self.calc_island_method = Islands.calc_extended_with_mark_seam
+                self.calc_island_method = Islands.calc_extended
             else:
-                self.calc_island_method = Islands.calc_visible_with_mark_seam
+                self.calc_island_method = Islands.calc_visible
         else:
             if not self.umeshes:
                 return
             selected_umeshes = []
             self.umeshes.ensure()
-            self.calc_island_method = Islands.calc_with_hidden_with_mark_seam
+            self.calc_island_method = Islands.calc_with_hidden
 
 
         match self.mode:
@@ -380,12 +380,12 @@ class UNIV_OT_SnapToPixels(Operator):
             umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if selected_umeshes:
-                calc_island_method = Islands.calc_extended_with_mark_seam
+                calc_island_method = Islands.calc_extended
             else:
-                calc_island_method = Islands.calc_visible_with_mark_seam
+                calc_island_method = Islands.calc_visible
         else:
             umeshes.ensure()
-            calc_island_method = Islands.calc_with_hidden_with_mark_seam
+            calc_island_method = Islands.calc_with_hidden
 
         if not umeshes:
             return umeshes.update()
@@ -483,9 +483,9 @@ class Align_by_Angle:
 
 
         if umesh.is_edit_bm:
-            islands = Islands.calc_visible_with_mark_seam(umesh)
+            islands = Islands.calc_visible(umesh)
         else:
-            islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+            islands = Islands.calc_with_hidden(umesh)
 
         islands.indexing()
         for isl in islands:
@@ -787,12 +787,12 @@ class Collect(utils.OverlapHelper):
             umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if selected_umeshes:
-                islands_calc_type = Islands.calc_selected_with_mark_seam
+                islands_calc_type = Islands.calc_selected
             else:
-                islands_calc_type = Islands.calc_visible_with_mark_seam
+                islands_calc_type = Islands.calc_visible
         else:
             selected_umeshes = []
-            islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+            islands_calc_type = Islands.calc_with_hidden
             umeshes.ensure()
 
 
@@ -1182,9 +1182,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
         for umesh in self.umeshes:
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
             else:
-                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                islands = Islands.calc_with_hidden(umesh)
 
             if selected:
                 umesh.update_tag = bool(islands)
@@ -1208,9 +1208,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             for umesh in self.umeshes:
                 view_box_sync_block.skip_from_param(umesh, selected)
                 if umesh.is_edit_bm:
-                    islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                    islands = Islands.calc_extended_or_visible(umesh, extended=selected)
                 else:
-                    islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                    islands = Islands.calc_with_hidden(umesh)
                 view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
 
@@ -1255,9 +1255,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         for umesh in self.umeshes:
             view_box_sync_block.skip_from_param(umesh, selected)
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
             else:
-                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                islands = Islands.calc_with_hidden(umesh)
             view_box_sync_block.filter_by_isect_islands(islands)
             umesh.update_tag = bool(islands)
 
@@ -1306,10 +1306,10 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 view_box_sync_block.skip_from_param(umesh, selected)
 
                 if umesh.is_edit_bm:
-                    islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                    islands = Islands.calc_extended_or_visible(umesh, extended=selected)
                     view_box_sync_block.filter_by_isect_islands(islands)
                 else:
-                    islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                    islands = Islands.calc_with_hidden(umesh)
 
                 umesh.update_tag = bool(islands)
                 for island in islands:
@@ -1360,9 +1360,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         for umesh in self.umeshes:
             view_box_sync_block.skip_from_param(umesh, selected)
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
             else:
-                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                islands = Islands.calc_with_hidden(umesh)
             view_box_sync_block.filter_by_isect_islands(islands)
 
             umesh.update_tag = bool(islands)
@@ -1379,7 +1379,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         if self.umeshes.elem_mode == 'FACE':
             for umesh in self.umeshes:
                 view_box_sync_block.skip_from_param(umesh, select=True)
-                islands = Islands.calc_selected_with_mark_seam(umesh)
+                islands = Islands.calc_selected(umesh)
                 view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
                 for isl in islands:
@@ -1651,11 +1651,11 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if selected_umeshes:
-                self.calc_island_type = Islands.calc_extended_with_mark_seam
+                self.calc_island_type = Islands.calc_extended
                 if self.mode == 'FLIPPED':
                     self.calc_island_type = self.calc_selected_flipped_islands_with_mark_seam
             else:
-                self.calc_island_type = Islands.calc_visible_with_mark_seam
+                self.calc_island_type = Islands.calc_visible
                 if self.mode == 'FLIPPED':
                     self.calc_island_type = self.calc_visible_flipped_islands_with_mark_seam
 
@@ -1668,7 +1668,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
                 return self.umeshes.update()
 
             self.umeshes.ensure()
-            self.calc_island_type = Islands.calc_with_hidden_with_mark_seam
+            self.calc_island_type = Islands.calc_with_hidden
             if self.mode == 'FLIPPED':
                 self.calc_island_type = self.calc_with_hidden_flipped_islands_with_mark_seam
 
@@ -1864,9 +1864,9 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
             self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if selected_umeshes:
-                self.calc_island_type = Islands.calc_extended_with_mark_seam
+                self.calc_island_type = Islands.calc_extended
             else:
-                self.calc_island_type = Islands.calc_visible_with_mark_seam
+                self.calc_island_type = Islands.calc_visible
 
             if not self.umeshes:
                 return self.umeshes.update()
@@ -1877,7 +1877,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
                 return self.umeshes.update()
 
             self.umeshes.ensure()
-            self.calc_island_type = Islands.calc_with_hidden_with_mark_seam
+            self.calc_island_type = Islands.calc_with_hidden
 
         if self.mode == 'DEFAULT':
             self.rotate()
@@ -1927,7 +1927,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
     def pick_rotate(self):
         hit = IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            for isl in Islands.calc_visible_with_mark_seam(umesh):
+            for isl in Islands.calc_visible(umesh):
                 hit.find_nearest_island_by_crn(isl)
 
         if not hit:
@@ -2013,12 +2013,12 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected_umeshes:
                 self.umeshes = selected_umeshes
-                self.islands_calc_type = Islands.calc_extended_with_mark_seam
+                self.islands_calc_type = Islands.calc_extended
             else:
                 self.umeshes = unselected_umeshes
-                self.islands_calc_type = Islands.calc_visible_with_mark_seam
+                self.islands_calc_type = Islands.calc_visible
         else:
-            self.islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+            self.islands_calc_type = Islands.calc_with_hidden
         if not self.umeshes:
             return self.umeshes.update()
 
@@ -2247,12 +2247,12 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected_umeshes:
                 self.umeshes = selected_umeshes
-                self.islands_calc_type = Islands.calc_extended_with_mark_seam
+                self.islands_calc_type = Islands.calc_extended
             else:
                 self.umeshes = unselected_umeshes
-                self.islands_calc_type = Islands.calc_visible_with_mark_seam
+                self.islands_calc_type = Islands.calc_visible
         else:
-            self.islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+            self.islands_calc_type = Islands.calc_with_hidden
         if not self.umeshes:
             return self.umeshes.update()
 
@@ -2457,12 +2457,12 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
             selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected_umeshes:
                 self.umeshes = selected_umeshes
-                self.islands_calc_type = Islands.calc_extended
+                self.islands_calc_type = Islands.calc_extended_without_ms
             else:
                 self.umeshes = unselected_umeshes
-                self.islands_calc_type = Islands.calc_visible
+                self.islands_calc_type = Islands.calc_visible_without_ms
         else:
-            self.islands_calc_type = Islands.calc_with_hidden
+            self.islands_calc_type = Islands.calc_with_hidden_without_ms
         if not self.umeshes:
             return self.umeshes.update()
 
@@ -2581,10 +2581,10 @@ class UNIV_OT_Home(Operator):
 
         if selected_umeshes:
             self.umeshes = selected_umeshes
-            self.islands_calc_type = Islands.calc_extended_with_mark_seam
+            self.islands_calc_type = Islands.calc_extended
         elif unselected_umeshes:
             self.umeshes = unselected_umeshes
-            self.islands_calc_type = Islands.calc_visible_with_mark_seam
+            self.islands_calc_type = Islands.calc_visible
         else:
             if report_info:
                 self.report({'INFO'}, report_info)
@@ -2594,7 +2594,7 @@ class UNIV_OT_Home(Operator):
                 return {'CANCELLED'}
 
         if not self.umeshes.is_edit_mode:
-            self.islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+            self.islands_calc_type = Islands.calc_with_hidden
 
         counter = 0
         for umesh in self.umeshes:
@@ -2756,11 +2756,11 @@ class UNIV_OT_Shift(Operator):
             self.has_selected = True
             self.umeshes = selected_umeshes
 
-            self.islands_calc_type = Islands.calc_extended_with_mark_seam
+            self.islands_calc_type = Islands.calc_extended
         elif unselected_umeshes:
             self.has_selected = False
             self.umeshes = unselected_umeshes
-            self.islands_calc_type = Islands.calc_visible_with_mark_seam
+            self.islands_calc_type = Islands.calc_visible
         else:
             if changed_modifiers:
                 self.report({'INFO'}, f"Changed {changed_modifiers} modifiers")
@@ -2770,7 +2770,7 @@ class UNIV_OT_Shift(Operator):
                 return {'CANCELLED'}
 
         if not self.umeshes.is_edit_mode:
-            self.islands_calc_type = Islands.calc_with_hidden_with_mark_seam
+            self.islands_calc_type = Islands.calc_with_hidden
 
         umeshes_without_attributes = []
         if self.with_modifier and self.gn_shift:
@@ -3209,9 +3209,9 @@ class UNIV_OT_Random(Operator, utils.OverlapHelper):
         _islands = []
         for umesh in self.umeshes:
             if self.is_edit_mode:
-                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
+                islands = Islands.calc_extended_or_visible(umesh, extended=extended)
             else:
-                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                islands = Islands.calc_with_hidden(umesh)
             if islands:
                 if self.lock_overlap:
                     islands.calc_tris()
@@ -3486,7 +3486,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     def orient_islands_with_selected_faces(self):
         for umesh in self.umeshes:
             self.view_box_sync_block.skip_from_param(umesh, True)
-            islands = Islands.calc_extended_with_mark_seam(umesh)
+            islands = Islands.calc_extended(umesh)
             self.view_box_sync_block.filter_by_isect_islands(islands)
             for island in islands:
                 self.orient_island(island)
@@ -3495,7 +3495,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     def orient_islands_with_selected_edges(self):
         for umesh in self.umeshes:
             self.view_box_sync_block.skip_from_param(umesh, True)
-            islands = Islands.calc_extended_any_edge_with_markseam(umesh)
+            islands = Islands.calc_extended_any_edge(umesh)
 
             for isl in islands:
                 corners = isl.calc_selected_edge_corners_iter()
@@ -3510,7 +3510,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     def orient_pick_or_visible(self):
         hit = IslandHit(self.mouse_pos, self.max_distance)
         for umesh in self.umeshes:
-            for isl in Islands.calc_visible_with_mark_seam(umesh):
+            for isl in Islands.calc_visible(umesh):
                 if self.mouse_pos:
                     hit.find_nearest_island_by_crn(isl)
                 else:
@@ -3542,7 +3542,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         islands_of_mesh = []
         for umesh in self.umeshes:
             self.view_box_sync_block.skip_from_param(umesh, extended)
-            islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
+            islands = Islands.calc_extended_or_visible(umesh, extended=extended)
             self.view_box_sync_block.filter_by_isect_islands(islands)
 
             if islands:
@@ -3556,7 +3556,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
     def orient_islands_overlap_obj_mode(self):
         islands_of_mesh = []
         for umesh in self.umeshes:
-            islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+            islands = Islands.calc_with_hidden(umesh)
 
             if islands:
                 islands.calc_tris()
@@ -3568,7 +3568,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
 
     def orient_islands_obj_mode(self):
         for umesh in self.umeshes:
-            for isl in Islands.calc_with_hidden_with_mark_seam(umesh):
+            for isl in Islands.calc_with_hidden(umesh):
                 self.orient_island(isl)
 
     def orient_islands_with_selected_edges_overlap(self):
@@ -3577,7 +3577,7 @@ class UNIV_OT_Orient(Operator, utils.OverlapHelper):
         for umesh in self.umeshes:
             self.view_box_sync_block.skip_from_param(umesh, True)
 
-            islands = Islands.calc_extended_any_edge_with_markseam(umesh)
+            islands = Islands.calc_extended_any_edge(umesh)
             for isl in islands:
                 corners = isl.calc_selected_edge_corners_iter()
                 if not self.view_box_sync_block.skip:
@@ -3760,9 +3760,9 @@ class UNIV_OT_Gravity_VIEW2D(Operator):
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             umesh.update_tag = False
             if self.is_edit_mode:
-                islands = Islands.calc_extended_or_visible_with_mark_seam(umesh, extended=extended)
+                islands = Islands.calc_extended_or_visible(umesh, extended=extended)
             else:
-                islands = Islands.calc_with_hidden_with_mark_seam(umesh)
+                islands = Islands.calc_with_hidden(umesh)
 
             if islands:
                 uv = islands.umesh.uv
