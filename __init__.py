@@ -190,6 +190,8 @@ def load_register_types():
             operators.project.UNIV_OT_Normal,
             operators.project.UNIV_OT_ViewProject,
             operators.project.UNIV_OT_SmartProject,
+            operators.project.UNIV_OT_Flatten,
+            operators.project.UNIV_OT_FlattenCleanup,
             operators.project.UNIV_OT_WrapProject,
             # Misc
             operators.misc.UNIV_OT_RandomColor,
@@ -208,9 +210,6 @@ def load_register_types():
             operators.misc.UNIV_OT_SetActiveRender,
             operators.misc.UNIV_OT_SmartScaleApply,
             operators.misc.UNIV_OT_AlignBorderVerts,
-            # Mesh
-            operators.misc.UNIV_OT_Flatten,
-            operators.misc.UNIV_OT_FlattenCleanup,
         ])
 
         if univ_pro_exist:

@@ -25,6 +25,17 @@ else:
         return layout
 
 if bpy.app.version >= (4, 1, 0):
+    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
+        header, panel = layout.panel("UniV_"+_name, default_closed=True)
+        header.label(text=_name)
+        return panel
+else:
+    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
+        layout.label(text=_name)
+        return layout
+
+
+if bpy.app.version >= (4, 1, 0):
     def draw_trim_panel(layout, _name) -> bpy.types.UILayout:
         pref = prefs()
         header, panel = layout.panel("UniV_"+_name, default_closed=not pref.use_trims)
@@ -305,36 +316,6 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_symmetrize', icon_value=icons.symmetrize)
 
 
-        # Select
-        panel = draw_panel(layout, 'Select')
-        if panel:
-            col_align = panel.column(align=True)
-            grid = col_align.grid_flow(row_major=True, columns=2, align=True)
-
-            if univ_pro_exist:
-                grid.operator('uv.univ_select_flat', icon_value=icons.flat)
-                grid.operator('uv.univ_select_loop', icon_value=icons.loop_select)
-
-            grid.operator('uv.univ_select_grow', icon_value=icons.grow)
-            grid.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
-
-            grid.operator('uv.univ_select_linked', icon_value=icons.linked)
-            grid.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
-
-            grid.operator('uv.univ_select_border', icon_value=icons.border)
-            grid.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
-
-            col_align.separator(factor=0.25)
-
-            grid = col_align.grid_flow(row_major=True, columns=3, align=True)
-            grid.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
-            grid.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
-            grid.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
-
-            grid.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
-            grid.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
-            grid.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
-
 
         # Mark
         panel = draw_panel(layout, 'Mark')
@@ -391,6 +372,38 @@ class UNIV_PT_General(Panel):
                     col.operator('uv.univ_linear_gradient')
                     col.separator(factor=0.35)
                     col.operator('mesh.univ_smart_scale_apply')
+
+
+        # Select
+        panel = draw_panel_hidden(layout, 'Select')
+        if panel:
+            col_align = panel.column(align=True)
+            grid = col_align.grid_flow(row_major=True, columns=2, align=True)
+
+            if univ_pro_exist:
+                grid.operator('uv.univ_select_flat', icon_value=icons.flat)
+                grid.operator('uv.univ_select_loop', icon_value=icons.loop_select)
+
+            grid.operator('uv.univ_select_grow', icon_value=icons.grow)
+            grid.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
+
+            grid.operator('uv.univ_select_linked', icon_value=icons.linked)
+            grid.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
+
+            grid.operator('uv.univ_select_border', icon_value=icons.border)
+            grid.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
+
+            col_align.separator(factor=0.25)
+
+            grid = col_align.grid_flow(row_major=True, columns=3, align=True)
+            grid.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
+            grid.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
+            grid.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
+
+            grid.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
+            grid.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
+            grid.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
+
 
         # UV Maps
         if pref.uv_layers_show:
@@ -492,19 +505,6 @@ class UNIV_PT_General_VIEW_3D(Panel):
                 row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
-        # Select
-        panel = draw_panel(layout, 'Select')
-        if panel:
-            col_align = panel.column(align=True)
-            if univ_pro_exist:
-                row = col_align.row(align=True)
-                row.operator('mesh.univ_select_flat', icon_value=icons.flat)
-                row.operator('mesh.univ_select_loop', icon_value=icons.loop_select)
-            row = col_align.row(align=True)
-            row.operator('mesh.univ_select_grow', icon_value=icons.grow)
-            row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
-
-
         # Mark
         panel = draw_panel(layout, 'Mark')
         if panel:
@@ -553,6 +553,20 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.scale_y = 1.35
             row.operator('mesh.univ_checker', icon_value=icons.checker)
             row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
+
+
+        # Select
+        panel = draw_panel_hidden(layout, 'Select ')
+        if panel:
+            col_align = panel.column(align=True)
+            if univ_pro_exist:
+                row = col_align.row(align=True)
+                row.operator('mesh.univ_select_flat', icon_value=icons.flat)
+                row.operator('mesh.univ_select_loop', icon_value=icons.loop_select)
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_select_grow', icon_value=icons.grow)
+            row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
+
 
         # UV Maps
         if pref.uv_layers_show:
