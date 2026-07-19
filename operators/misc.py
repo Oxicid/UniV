@@ -1941,13 +1941,13 @@ class UNIV_OT_Flatten(Operator):
         else:
             axis = {'z': 2, 'y': 3, 'x': 4}
         for umesh in self.umeshes:
-            has_checker_modifier = False
+            has_flatten_modifier = False
 
             for m in umesh.obj.modifiers:
                 if not isinstance(m, bpy.types.NodesModifier):
                     continue
                 if m.name.startswith('UniV Flatten'):
-                    has_checker_modifier = True
+                    has_flatten_modifier = True
                     if m.node_group != node_group:
                         m.node_group = node_group
 
@@ -1955,26 +1955,25 @@ class UNIV_OT_Flatten(Operator):
                     gn_mod['Socket_2'] = umesh.uv.name
                     gn_mod['Socket_3'] = axis[self.axis]
                     gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                    gn_mod['Socket_5'] = self.weld_distance
-                    gn_mod['Socket_6'] = self.mix_factor
+                    gn_mod['Socket_5'] = self.mix_factor
                     umesh.obj.update_tag()
                     break
 
-            if not has_checker_modifier:
+            if not has_flatten_modifier:
                 m = umesh.obj.modifiers.new(name='UniV Flatten', type='NODES')
                 m.node_group = node_group
                 gn_mod = utils.GN(m)
                 gn_mod['Socket_2'] = umesh.uv.name
                 gn_mod['Socket_3'] = axis[self.axis]
                 gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                gn_mod['Socket_5'] = self.weld_distance
-                gn_mod['Socket_6'] = self.mix_factor
+                gn_mod['Socket_5'] = self.mix_factor
 
     def get_flatten_node_group(self):
         """Get exist flatten node group"""
         for ng in reversed(bpy.data.node_groups):
             if ng.name.startswith('UniV Flatten'):
                 if self.flatten_node_group_is_changed(ng):
+                    print(f"UniV: Flatten: Node Group {ng.name!r} is changed.")
                     if ng.users == 0:
                         bpy.data.node_groups.remove(ng)
                 else:
@@ -1984,7 +1983,7 @@ class UNIV_OT_Flatten(Operator):
     @staticmethod
     def flatten_node_group_is_changed(ng):
         items = ng.interface.items_tree
-        if len(items) != 7:
+        if len(items) != 6:
             return True
         expect_types = (
             'Geometry',
@@ -1992,18 +1991,46 @@ class UNIV_OT_Flatten(Operator):
             'String',
             'Menu',
             'Vector',
-            'Float',
             'Float'
         )
         for str_typ, item in zip(expect_types, items):
             bpy_type = (getattr(bpy.types, 'NodeTreeInterfaceSocket' + str_typ))
             if not isinstance(item.rna_type, bpy_type):
                 return True
+
+        for node in ng.nodes:
+            if node.type == "GROUP":
+                if not node.node_tree:
+                    return True
+                if node.node_tree.name.startswith(utils.GN_IsUVEdgeBoundary.name):
+                    if utils.GN_IsUVEdgeBoundary.is_changed(node.node_tree):
+                        print(f"UniV: Flatten: Node Group {node.node_tree.name!r} is changed.")
+                        return True
+
+        if len(ng.nodes) != 25:
+            return True
+
+        sockets_count = sum(sk.is_linked for n in ng.nodes for sk in n.inputs)
+        if sockets_count != 44:
+            return True
+
+        all_nodes_types = {'VECT_MATH', 'SET_POSITION', 'SEPXYZ', 'SPLIT_EDGES', 'GROUP_OUTPUT', 'INDEX_SWITCH',
+                           'COMBXYZ', 'MATH', 'BOUNDING_BOX', 'MENU_SWITCH', 'MIX', 'SWITCH', 'GROUP', 'GROUP_INPUT',
+                           'POSITION', 'INPUT_ATTRIBUTE'}
+
+        if {n.type for n in ng.nodes} != all_nodes_types:
+            return True
+
         return False
 
     @staticmethod
     def _create_flatten_node_group():
         bb = bpy.data.node_groups.new(type='GeometryNodeTree', name="UniV Flatten")
+        # bb = bpy.data.node_groups["UniV Flatten"]
+        # bb.nodes.clear()
+        # bb.interface.clear()
+        # for item in list(bb.interface.items_tree):
+        #     bb.interface.remove(item)
 
         # Interface
         # Socket Geometry
@@ -2033,14 +2060,6 @@ class UNIV_OT_Flatten(Operator):
         aspect_ratio_socket.max_value = 10000
         aspect_ratio_socket.force_non_field = True
 
-        # Socket Distance
-        distance_socket = bb.interface.new_socket(name="Distance", in_out='INPUT', socket_type='NodeSocketFloat')
-        distance_socket.default_value = 0.00001
-        distance_socket.min_value = 0.0
-        distance_socket.subtype = 'DISTANCE'
-        distance_socket.attribute_domain = 'POINT'
-        distance_socket.force_non_field = True
-
         # Socket Factor
         factor_socket = bb.interface.new_socket(name="Factor", in_out='INPUT', socket_type='NodeSocketFloat')
         factor_socket.default_value = 1.0
@@ -2058,8 +2077,12 @@ class UNIV_OT_Flatten(Operator):
         group_output = bb.nodes.new("NodeGroupOutput")
         group_output.is_active_output = True
 
+        # Is Boundary
+        is_uv_bound = bb.nodes.new("GeometryNodeGroup")
+        is_uv_bound.node_tree = utils.GN_IsUVEdgeBoundary.get()
+        is_uv_bound.location = (400, -50)
+
         # node Split Edges
-        # TODO: Use uv_is_boundary
         split_edges = bb.nodes.new("GeometryNodeSplitEdges")
         split_edges.name = "Split Edges"
 
@@ -2148,17 +2171,6 @@ class UNIV_OT_Flatten(Operator):
         combine_xyz_001 = bb.nodes.new("ShaderNodeCombineXYZ")
         combine_xyz_001.label = "Front swizzle combine"
 
-        # node Merge by Distance
-        merge_by_distance = bb.nodes.new("GeometryNodeMergeByDistance")
-        merge_by_distance.name = "Merge by Distance"
-
-        is_inputs = False  # TODO: use version check instead
-        try:
-            merge_by_distance.mode = 'ALL'
-        except:  # noqa
-            is_inputs = True
-            merge_by_distance.inputs[2].default_value = 'All'
-
         # node Aspect Ratio Scale
         vector_math_004 = bb.nodes.new("ShaderNodeVectorMath")
         vector_math_004.label = "Aspect Ratio Scale"
@@ -2183,7 +2195,7 @@ class UNIV_OT_Flatten(Operator):
 
         # Set locations
         group_input.location = (-1465, -10)
-        group_output.location = (1600, 30)
+        group_output.location = (1350, 30)
         split_edges.location = (685, 1)
         set_position.location = (1138, 28)
         named_attribute.location = (-782, -155)
@@ -2202,107 +2214,60 @@ class UNIV_OT_Flatten(Operator):
         max_length_3.location = (-590, -730)
         separate_xyz_002.location = (268, -400)
         combine_xyz_001.location = (460, -400)
-        merge_by_distance.location = (1315, 18)
         vector_math_004.location = (-165, -460)
         mix_factor.location = (920, -40)
         position.location = (685, -335)
         switch.location = (680, 160)
 
         # initialize bb links
-        # group_input.Geometry -> split_edges.Mesh
-        bb.links.new(group_input.outputs[0], split_edges.inputs[0])
-        # split_edges.Mesh -> set_position.Geometry
-        bb.links.new(split_edges.outputs[0], set_position.inputs[0])
-        # group_input.Geometry -> bounding_box.Geometry
-        bb.links.new(group_input.outputs[0], bounding_box.inputs[0])
+        new_links = utils.NewLinks(bb)
 
-        # named_attribute.Attribute -> vector_math_001.Vector
-        bb.links.new(named_attribute.outputs[0], remap_to_center.inputs[0])
-        # vector_math_001.Vector -> vector_math_002.Vector
-        bb.links.new(remap_to_center.outputs[0], scale_uv.inputs[0])
+        new_links(is_uv_bound) >> (split_edges, 1)  # UVMap > Select
+        new_links(group_input, 1) >> is_uv_bound  # Attribute Name > Attribute Name
+        new_links(group_input) >> split_edges  # Geometry > Mesh
+        new_links(split_edges) >> set_position  # Mesh > Geometry
+        new_links(group_input) >> bounding_box  # Geometry > Geometry
+        new_links(named_attribute) >> remap_to_center  # Attribute > Vector
+        new_links(remap_to_center) >> scale_uv  # Vector > Vector
+        new_links(vector_math) >> separate_xyz_widths  # Vector > Vector
+        new_links(separate_xyz_widths) >> max_length_1  # X > Value
+        new_links(separate_xyz_widths, 1) >> (max_length_1, 1)  # Y > Value
+        new_links(max_length_1) >> (index_switch, 1)  # Value > 0
+        new_links(separate_xyz_widths, 1) >> max_length_2  # Y > Value
+        new_links(separate_xyz_widths, 2) >> (max_length_2, 1)  # Z > Value
+        new_links(max_length_2) >> (index_switch, 2)  # Value > 1
+        new_links(separate_xyz_widths) >> max_length_3  # X > Value
+        new_links(separate_xyz_widths, 2) >> (max_length_3, 1)  # z > Value
+        new_links(max_length_3) >> (index_switch, 3)  # Value > 2
+        new_links(scale_uv) >> (index_switch_001, 1)  # Vector > 0
+        new_links(scale_uv) >> separate_xyz_001  # Vector > Vector
+        new_links(scale_uv) >> separate_xyz_002  # Vector > Vector
 
-        # vector_math.Vector -> separate_xyz.Vector
-        bb.links.new(vector_math.outputs[0], separate_xyz_widths.inputs[0])
-        # separate_xyz.X -> math.Value
-        bb.links.new(separate_xyz_widths.outputs[0], max_length_1.inputs[0])
-        # separate_xyz.Y -> math.Value
-        bb.links.new(separate_xyz_widths.outputs[1], max_length_1.inputs[1])
-        # math.Value -> index_switch.0
-        bb.links.new(max_length_1.outputs[0], index_switch.inputs[1])
-        # separate_xyz.Y -> math_001.Value
-        bb.links.new(separate_xyz_widths.outputs[1], max_length_2.inputs[0])
-        # separate_xyz.Z -> math_001.Value
-        bb.links.new(separate_xyz_widths.outputs[2], max_length_2.inputs[1])
-        # math_001.Value -> index_switch.1
-        bb.links.new(max_length_2.outputs[0], index_switch.inputs[2])
-        # separate_xyz.X -> math_002.Value
-        bb.links.new(separate_xyz_widths.outputs[0], max_length_3.inputs[0])
-        # separate_xyz.Z -> math_002.Value
-        bb.links.new(separate_xyz_widths.outputs[2], max_length_3.inputs[1])
-        # math_002.Value -> index_switch.2
-        bb.links.new(max_length_3.outputs[0], index_switch.inputs[3])
-        # vector_math_002.Vector -> index_switch_001.0
-        bb.links.new(scale_uv.outputs[0], index_switch_001.inputs[1])
-        # vector_math_002.Vector -> separate_xyz_001.Vector
-        bb.links.new(scale_uv.outputs[0], separate_xyz_001.inputs[0])
-        # vector_math_002.Vector -> separate_xyz_002.Vector
-        bb.links.new(scale_uv.outputs[0], separate_xyz_002.inputs[0])
+        new_links(bounding_box, 2) >> vector_math  # Max > Vector
+        new_links(bounding_box, 1) >> (vector_math, 1)  # Min > Vector
+        new_links(group_input, 1) >> named_attribute  # UV Map > Name
+        new_links(set_position) >> group_output  # Geometry > Geometry
 
-        # bounding_box.Max -> vector_math.Vector
-        bb.links.new(bounding_box.outputs[2], vector_math.inputs[0])
-        # bounding_box.Min -> vector_math.Vector
-        bb.links.new(bounding_box.outputs[1], vector_math.inputs[1])
-        # group_input.UV Map -> named_attribute.Name
-        bb.links.new(group_input.outputs[1], named_attribute.inputs[0])
-        # merge_by_distance.Geometry -> group_output.Geometry
-        bb.links.new(merge_by_distance.outputs[0], group_output.inputs[0])
-        # group_input.Axis -> menu_switch.Menu
-        bb.links.new(group_input.outputs[2], menu_switch.inputs[0])
-        # menu_switch.Output -> index_switch.Index
-        bb.links.new(menu_switch.outputs[0], index_switch.inputs[0])
-        # separate_xyz_001.Z -> combine_xyz.X
-        bb.links.new(separate_xyz_001.outputs[2], combine_xyz.inputs[0])
-        # separate_xyz_001.X -> combine_xyz.Y
-        bb.links.new(separate_xyz_001.outputs[0], combine_xyz.inputs[1])
-        # separate_xyz_001.Y -> combine_xyz.Z
-        bb.links.new(separate_xyz_001.outputs[1], combine_xyz.inputs[2])
-        # combine_xyz.Vector -> index_switch_001.1
-        bb.links.new(combine_xyz.outputs[0], index_switch_001.inputs[2])
-        # menu_switch.Output -> index_switch_001.Index
-        bb.links.new(menu_switch.outputs[0], index_switch_001.inputs[0])
-        # separate_xyz_002.X -> combine_xyz_001.X
-        bb.links.new(separate_xyz_002.outputs[0], combine_xyz_001.inputs[0])
-        # separate_xyz_002.Z -> combine_xyz_001.Y
-        bb.links.new(separate_xyz_002.outputs[2], combine_xyz_001.inputs[1])
-        # separate_xyz_002.Y -> combine_xyz_001.Z
-        bb.links.new(separate_xyz_002.outputs[1], combine_xyz_001.inputs[2])
-        # combine_xyz_001.Vector -> index_switch_001.2
-        bb.links.new(combine_xyz_001.outputs[0], index_switch_001.inputs[3])
-        # set_position.Geometry -> merge_by_distance.Geometry
-        bb.links.new(set_position.outputs[0], merge_by_distance.inputs[0])
-        # group_input.Distance -> merge_by_distance.Distance
-        if is_inputs:
-            bb.links.new(group_input.outputs[4], merge_by_distance.inputs[3])
-        else:
-            bb.links.new(group_input.outputs[4], merge_by_distance.inputs[2])
-        # index_switch.Output -> vector_math_004.Vector
-        bb.links.new(index_switch.outputs[0], vector_math_004.inputs[0])
-        # vector_math_004.Vector -> vector_math_002.Vector
-        bb.links.new(vector_math_004.outputs[0], scale_uv.inputs[1])
-        # group_input.Aspect Ratio -> vector_math_004.Vector
-        bb.links.new(group_input.outputs[3], vector_math_004.inputs[1])
-        # index_switch_001.Output -> mix.B
-        bb.links.new(index_switch_001.outputs[0], mix_factor.inputs[5])
-        # position.Position -> mix.A
-        bb.links.new(position.outputs[0], mix_factor.inputs[4])
-        # mix.Result -> set_position.Position
-        bb.links.new(mix_factor.outputs[1], set_position.inputs[2])
-        # named_attribute.Exists -> switch.Switch
-        bb.links.new(named_attribute.outputs[1], switch.inputs[0])
-        # group_input.Factor -> switch.True
-        bb.links.new(group_input.outputs[5], switch.inputs[2])
-        # switch.Output -> mix.Factor
-        bb.links.new(switch.outputs[0], mix_factor.inputs[0])
+        new_links(group_input, 2) >> menu_switch  # Axis > Menu
+        new_links(menu_switch) >> index_switch  # Output > Index
+        new_links(separate_xyz_001, 2) >> combine_xyz  # Z > X
+        new_links(separate_xyz_001) >> (combine_xyz, 1)  # X > Y
+        new_links(separate_xyz_001, 1) >> (combine_xyz, 2)  # Y > Z
+        new_links(combine_xyz) >> (index_switch_001, 2)  # Vector > 1
+        new_links(menu_switch) >> index_switch_001  # Output > Index
+        new_links(separate_xyz_002) >> combine_xyz_001  # X > X
+        new_links(separate_xyz_002, 2) >> (combine_xyz_001, 1)  # Z > Y
+        new_links(separate_xyz_002, 1) >> (combine_xyz_001, 2)  # Y > Z
+        new_links(combine_xyz_001) >> (index_switch_001, 3)  # Vector > 2
+        new_links(index_switch) >> vector_math_004  # Output > Vector
+        new_links(vector_math_004) >> (scale_uv, 1)  # Vector > Vector
+        new_links(group_input, 3) >> (vector_math_004, 1)  # Aspect Ratio > Vector
+        new_links(index_switch_001) >> (mix_factor, 5)  # Output > B
+        new_links(position) >> (mix_factor, 4)  # Position > A
+        new_links(mix_factor, 1) >> (set_position, 2)  # Result > Position
+        new_links(named_attribute, 1) >> switch  # Exists > Switch
+        new_links(group_input, 4) >> (switch, 2)  # Factor > True
+        new_links(switch) >> mix_factor  # Output > Factor
         return bb
 
     @staticmethod
