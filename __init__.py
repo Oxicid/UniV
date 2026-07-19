@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 1),
+    "version": (4, 0, 2),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -190,6 +190,7 @@ def load_register_types():
             operators.project.UNIV_OT_Normal,
             operators.project.UNIV_OT_ViewProject,
             operators.project.UNIV_OT_SmartProject,
+            operators.project.UNIV_OT_WrapProject,
             # Misc
             operators.misc.UNIV_OT_RandomColor,
             operators.misc.UNIV_OT_LinearGradient,

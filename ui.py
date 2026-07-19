@@ -536,7 +536,10 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_smart_project', icon_value=icons.smart)
             row.operator('mesh.univ_view_project', icon_value=icons.view)
 
-            row = col_align.row(align=True)
+            split = col_align.split(align=True)
+            split.operator('mesh.univ_wrap')
+
+            row = split.row(align=True)
             row.operator('mesh.univ_flatten', icon_value=icons.flatten)
             row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
 

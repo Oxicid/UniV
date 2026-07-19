@@ -9,6 +9,7 @@ from math import pi
 
 from .bench import timer, profile
 from .draw import *
+from .gn import *
 from .other import *
 from .shapes import *
 from .ubm import *

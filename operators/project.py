@@ -809,3 +809,112 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
             bpy.ops.object.editmode_toggle()
 
         return {'FINISHED'}
+
+
+class UNIV_OT_WrapProject(bpy.types.Operator):
+    bl_idname = "mesh.univ_wrap"
+    bl_label = "Wrap"
+    bl_description = "Swap UV to XYZ coordinates"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        active = context.active_object
+        if not active or active.type != "MESH":
+            self.report({'WARNING'}, "Not found active mesh object")
+            return {"FINISHED"}
+
+        for_wrapping_objects = [obj for obj in bpy.context.selected_objects if obj.type == "MESH" and obj != active]
+
+        # Check existing flatten.
+        if not active.data.shape_keys or len(active.data.shape_keys.key_blocks) <= 1:
+            for m in active.modifiers:
+                if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                    gn_mod = utils.GN(m, print_missed_socket=True)
+                    if 'Socket_5' in gn_mod:
+                        break
+            else:
+                for_wrapping_objects = [obj for obj in bpy.context.selected_objects if obj.type == "MESH"]
+                count = self.remove_surface_deform(for_wrapping_objects)
+                if count:
+                    self.report({"INFO"}, f"Not found shape keys or flatten modifier. "
+                                          f"But removed {count!r} surface deform modifiers.")
+                else:
+                    self.report({"WARNING"}, "Not found shape keys or flatten modifier.")
+
+                return {"CANCELLED"}
+
+        if self.is_toggle(active, for_wrapping_objects):
+            return {"FINISHED"}
+
+        if len(for_wrapping_objects) == 0:
+            self.report({"WARNING"}, "No meshes found for wrapping")
+            return {"FINISHED"}
+
+        for obj in for_wrapping_objects:
+            # Delete previous modifiers
+            for modifier in reversed(obj.modifiers):
+                if modifier.type == 'SURFACE_DEFORM':
+                    obj.modifiers.remove(modifier)
+
+            # Add mesh modifier
+            modifier_deform = obj.modifiers.new(name="SurfaceDeform", type='SURFACE_DEFORM')
+            modifier_deform.target = active
+
+            obj.select_set(state=True, view_layer=None)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.surfacedeform_bind(modifier="SurfaceDeform")
+
+
+        # Set shape keys to 1.0.
+        if active.data.shape_keys and len(active.data.shape_keys.key_blocks) >= 2:
+            block = active.data.shape_keys.key_blocks[1]
+            block.value = 0.0
+
+        # Set flatten modifier to 0.0.
+        for m in active.modifiers:
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                gn_mod = utils.GN(m, print_missed_socket=True)
+                if 'Socket_5' in gn_mod:
+                    gn_mod['Socket_5'] = 0.0
+
+        bpy.context.view_layer.objects.active = active
+        active.update_tag()
+        return {"FINISHED"}
+
+    @classmethod
+    def is_toggle(cls, active, for_wrapping_objects):
+        is_unflatten = False
+        if active.data.shape_keys and len(active.data.shape_keys.key_blocks) >= 2:
+            block = active.data.shape_keys.key_blocks[1]
+            if block.value == 0.0:
+                block.value = 1.0
+                is_unflatten = True
+
+        # Set flatten modifier to 1.0.
+        for m in active.modifiers:
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                gn_mod = utils.GN(m, print_missed_socket=True)
+                if 'Socket_5' in gn_mod:
+                    if gn_mod['Socket_5'] == 0.0:
+                        gn_mod['Socket_5'] = 1.0
+                        is_unflatten = True
+
+        if is_unflatten:
+            active.update_tag()
+            cls.remove_surface_deform(for_wrapping_objects)
+        return is_unflatten
+
+    @staticmethod
+    def remove_surface_deform(for_wrapping_objects):
+        count = 0
+        for obj in for_wrapping_objects:
+            # Delete previous modifiers
+            for modifier in reversed(obj.modifiers):
+                if modifier.type == 'SURFACE_DEFORM':
+                    obj.modifiers.remove(modifier)
+                    count += 1
+        return count
