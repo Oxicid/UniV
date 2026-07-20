@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 2),
+    "version": (4, 0, 3),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -108,8 +108,6 @@ def load_register_types():
             operators.symmetrize.UNIV_OT_Symmetrize,
             # Quadrify
             operators.quadrify.UNIV_OT_Quadrify,
-            # Straight
-            operators.straight.UNIV_OT_Straight,
             # Relax
             operators.relax.UNIV_OT_Relax,
             operators.relax.UNIV_OT_Relax_VIEW3D,
@@ -260,6 +258,8 @@ def load_register_types():
                 univ_pro.projection.UNIV_OT_BoxProject,
                 # Unwrap
                 univ_pro.unwrap.UNIV_OT_Unwrap,
+                # Straight
+                univ_pro.straight.UNIV_OT_Straight,
 
             ))
 
@@ -273,7 +273,9 @@ def load_register_types():
                 operators.stack.UNIV_OT_Stack,
                 operators.stack.UNIV_OT_Stack_VIEW3D,
                 # Unwrap
-                operators.unwrap.UNIV_OT_Unwrap
+                operators.unwrap.UNIV_OT_Unwrap,
+                # Straight
+                operators.straight.UNIV_OT_Straight
             ))
     except AttributeError:
         traceback.print_exc()

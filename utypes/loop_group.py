@@ -933,6 +933,26 @@ class Segment:
             for l_crn in corners:
                 l_crn[uv].uv = co
 
+    def get_corners_for_marking(self):
+        # if seg.is_end_lock:
+        #     seg.lengths_seq.pop()
+        # if not seg.lengths_seq:
+        #     continue
+        #
+        # if seg.is_start_lock:
+        #     del seg.lengths_seq[0]
+        # if not seg.lengths_seq:
+        #     continue
+
+        for adv_crn in self:
+            if adv_crn.invert:
+                yield adv_crn.crn.link_loop_prev
+            else:
+                yield adv_crn.crn
+
+            if adv_crn.is_pair:
+                yield adv_crn.crn.link_loop_radial_prev
+
     def __iter__(self):
         return iter(self.seg)
 

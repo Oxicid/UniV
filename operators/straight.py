@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
 import bpy
 import math
 import numpy as np
@@ -12,7 +11,7 @@ from mathutils import Vector, Matrix
 
 
 class StraightIsland:
-    def __init__(self, isl: utypes.AdvIsland, segment: utypes.Segment):
+    def __init__(self, isl: utypes.AdvIsland, segment: utypes.Segment | list):
         self.isl = isl
         self.segment = segment
         self.pivot: Vector | None = None
@@ -51,8 +50,10 @@ class UNIV_OT_Straight(bpy.types.Operator):
         umeshes.fix_context()
         if umeshes.elem_mode in ('VERT', 'EDGE'):
             umeshes.filter_by_selected_uv_edges()
+            islands_calc_type = utypes.Islands.calc_visible
         else:
             umeshes.filter_by_selected_uv_faces()
+            islands_calc_type = utypes.Islands.calc_extended
 
         temporary_hidden_islands = []
         straight_islands = []
@@ -60,57 +61,11 @@ class UNIV_OT_Straight(bpy.types.Operator):
         for umesh in umeshes:
             need_hide = self.need_hide(umesh)
 
-            if umeshes.elem_mode in ('VERT', 'EDGE'):
-                islands = utypes.Islands.calc_visible(umesh)
-            else:
-                islands = utypes.Islands.calc_extended(umesh)
+            islands = islands_calc_type(umesh)
             islands.indexing()
 
-            is_boundary = utils.is_boundary_func(umesh, with_seam=False)
-            get_edge_select = utils.edge_select_get_func(umesh)
-            get_face_select = utils.face_select_get_func(umesh)
-
             for idx, isl in enumerate(islands):
-                to_segmenting_corners = []
-                if umeshes.elem_mode in ('VERT', 'EDGE'):
-                    for crn in isl.corners_iter():
-                        if not get_edge_select(crn):
-                            crn.tag = False
-                            continue
-
-                        if is_boundary(crn):
-                            crn.tag = True
-                            to_segmenting_corners.append(crn)
-                            continue
-
-                        pair_face = crn.link_loop_radial_prev.face
-                        has_two_selected_faces = get_face_select(crn.face) and get_face_select(pair_face) and pair_face.index == idx
-
-                        if has_two_selected_faces:
-                            crn.tag = False
-                        else:
-                            crn.tag = True
-                            to_segmenting_corners.append(crn)
-                else:
-                    to_deselect_faces = []
-                    for crn in isl.corners_iter():
-                        if get_face_select(crn.face):
-                            if is_boundary(crn):
-                                crn.tag = True
-                                to_segmenting_corners.append(crn)
-                                continue
-
-                            pair_face = crn.link_loop_radial_prev.face
-                            if pair_face.index != idx or not get_face_select(pair_face):
-                                crn.tag = True
-                                to_segmenting_corners.append(crn)
-                            else:
-                                crn.tag = False
-
-                        else:
-                            crn.tag = False
-                            to_deselect_faces.append(crn.face)
-                    isl.sequence = to_deselect_faces
+                to_segmenting_corners = self.tagging_corners(isl, idx)
 
                 if to_segmenting_corners:
                     isl.apply_aspect_ratio()
@@ -224,6 +179,57 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
         umeshes.update()
         return {'FINISHED'}
+
+    @staticmethod
+    def tagging_corners(isl, idx) -> list:
+        umesh = isl.umesh
+        to_segmenting_corners = []
+
+        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        get_edge_select = utils.edge_select_get_func(umesh)
+        get_face_select = utils.face_select_get_func(umesh)
+
+        if umesh.elem_mode in ('VERT', 'EDGE'):
+            for crn in isl.corners_iter():
+                if not get_edge_select(crn):
+                    crn.tag = False
+                    continue
+
+                if is_boundary(crn):
+                    crn.tag = True
+                    to_segmenting_corners.append(crn)
+                    continue
+
+                pair_face = crn.link_loop_radial_prev.face
+                has_two_selected_faces = get_face_select(crn.face) and get_face_select(
+                    pair_face) and pair_face.index == idx
+
+                if has_two_selected_faces:
+                    crn.tag = False
+                else:
+                    crn.tag = True
+                    to_segmenting_corners.append(crn)
+        else:
+            to_deselect_faces = []
+            for crn in isl.corners_iter():
+                if get_face_select(crn.face):
+                    if is_boundary(crn):
+                        crn.tag = True
+                        to_segmenting_corners.append(crn)
+                        continue
+
+                    pair_face = crn.link_loop_radial_prev.face
+                    if pair_face.index != idx or not get_face_select(pair_face):
+                        crn.tag = True
+                        to_segmenting_corners.append(crn)
+                    else:
+                        crn.tag = False
+
+                else:
+                    crn.tag = False
+                    to_deselect_faces.append(crn.face)
+            isl.sequence = to_deselect_faces
+        return to_segmenting_corners
 
     @staticmethod
     def need_hide(umesh):
