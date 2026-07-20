@@ -279,11 +279,11 @@ class UNIV_PT_General(Panel):
             row.popover(panel='UNIV_PT_PackSettings', text='', icon_value=icons.settings_a)
 
 
-        # Misc
-        panel = draw_panel(layout, 'Misc')
+        # Unfold
+        panel = draw_panel(layout, 'Unfold')
         if panel:
-            # TODO: Move Rectify, Unwrap, Relax, Straighten, Quadrify to Unfold
             col_align = panel.column(align=True)
+
             if univ_pro_exist:
                 col_align.operator('uv.univ_rectify', icon_value=icons.rectify)
 
@@ -300,21 +300,6 @@ class UNIV_PT_General(Panel):
                 row.operator('uv.univ_unwrap', text='', icon_value=icons.y).unwrap_along = 'V'
             else:
                 split.operator('uv.univ_unwrap', icon_value=icons.unwrap)
-
-            row = col_align.row(align=True)
-            row.operator('uv.univ_weld', icon_value=icons.weld)
-            row.operator('uv.univ_stitch', icon_value=icons.stitch)
-
-            split = col_align.split(align=True)
-            split.scale_y = 1.3
-            row = split.row(align=True)
-            row.operator('uv.univ_stack', icon_value=icons.stack)
-            if univ_pro_exist:
-                row.operator('uv.univ_select_similar', text='', icon_value=icons.arrow)
-
-            row = split.row(align=True)
-            row.operator('uv.univ_symmetrize', icon_value=icons.symmetrize)
-
 
 
         # Mark
@@ -338,6 +323,26 @@ class UNIV_PT_General(Panel):
             row = col_align.row(align=True)
             row.operator('uv.univ_mark')
             row.operator('uv.univ_pin', icon_value=icons.pin)
+
+
+        # Misc
+        panel = draw_panel(layout, 'Misc')
+        if panel:
+            col_align = panel.column(align=True)
+
+            row = col_align.row(align=True)
+            row.operator('uv.univ_weld', icon_value=icons.weld)
+            row.operator('uv.univ_stitch', icon_value=icons.stitch)
+
+            split = col_align.split(align=True)
+            split.scale_y = 1.3
+            row = split.row(align=True)
+            row.operator('uv.univ_stack', icon_value=icons.stack)
+            if univ_pro_exist:
+                row.operator('uv.univ_select_similar', text='', icon_value=icons.arrow)
+
+            row = split.row(align=True)
+            row.operator('uv.univ_symmetrize', icon_value=icons.symmetrize)
 
 
         # Other
@@ -485,24 +490,14 @@ class UNIV_PT_General_VIEW_3D(Panel):
             UNIV_PT_General.draw_texel_density(col_align, 'mesh')
 
 
-        # Misk
-        panel = draw_panel(layout, 'Misc')
+        # Unfold
+        panel = draw_panel(layout, 'Unfold')
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
             row.operator('mesh.univ_relax', icon_value=icons.relax)
             row.operator('mesh.univ_unwrap', icon_value=icons.unwrap)
-
-            row = col_align.row(align=True)
-            row.operator('mesh.univ_weld', icon_value=icons.weld)
-            row.operator('mesh.univ_stitch', icon_value=icons.stitch)
-
-            row = col_align.row(align=True)
-            row.scale_y = 1.35
-            row.operator('mesh.univ_stack', icon_value=icons.stack)
-            if univ_pro_exist:
-                row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
         # Mark
@@ -542,6 +537,22 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row = split.row(align=True)
             row.operator('mesh.univ_flatten', icon_value=icons.flatten)
             row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
+
+
+        # Misk
+        panel = draw_panel(layout, 'Misc')
+        if panel:
+            col_align = panel.column(align=True)
+
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_weld', icon_value=icons.weld)
+            row.operator('mesh.univ_stitch', icon_value=icons.stitch)
+
+            row = col_align.row(align=True)
+            row.scale_y = 1.35
+            row.operator('mesh.univ_stack', icon_value=icons.stack)
+            if univ_pro_exist:
+                row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
         # Other
