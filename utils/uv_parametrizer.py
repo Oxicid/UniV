@@ -2205,10 +2205,8 @@ class ParamHandleConstruct:
         from ..utypes import Segments
         v_corners = []
         h_corners = []
-        h_p_corners = []
 
         for crn in isl.corners_iter():
-            crn.tag = False
             crn_e = crn.edge
             edge_bits: int = crn_e[constraints_attr]
 
@@ -2231,30 +2229,20 @@ class ParamHandleConstruct:
                                 v_corners.append(crn)
                             elif bits == 3:  # horizontal
                                 e.flag |= PEDGE_H_CONSTRAIN
-                                h_p_corners.append(e)
                                 h_corners.append(crn)
                             break
                 # else: raise
 
-        segments = []
+        segments: list[utypes.Segment] = []
         if v_corners and UnwrapOptions.unwrap_along != 'V':
-            for crn in v_corners:
-                crn.tag = True
-
-            v_segments = Segments.from_tagged_corners(v_corners, isl.umesh)
+            v_segments = Segments.from_corners(v_corners, isl.umesh)
             for s in v_segments:
                 s.value = 'V'
             segments.extend(v_segments)
 
-            for crn in v_corners:
-                crn.tag = False
-
 
         if h_corners and UnwrapOptions.unwrap_along != 'U':
-            for crn in h_corners:
-                crn.tag = True
-
-            h_segments = Segments.from_tagged_corners(h_corners, isl.umesh)
+            h_segments = Segments.from_corners(h_corners, isl.umesh)
             for s in h_segments:
                 s.value = 'U'
             segments.extend(h_segments)

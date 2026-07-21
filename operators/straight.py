@@ -43,7 +43,6 @@ class UNIV_OT_Straight(bpy.types.Operator):
         assert (context.area.ui_type == 'UV')
 
         umeshes = utypes.UMeshes(report=self.report)
-
         if self.use_correct_aspect:
             umeshes.calc_aspect_ratio(from_mesh=False)
 
@@ -62,15 +61,18 @@ class UNIV_OT_Straight(bpy.types.Operator):
             need_hide = self.need_hide(umesh)
 
             islands = islands_calc_type(umesh)
-            islands.indexing()
+            for isl in islands:
 
-            for idx, isl in enumerate(islands):
-                to_segmenting_corners = self.tagging_corners(isl, idx)
+                to_segmenting_corners = self.get_to_segmenting_corners_and_deselecting_faces(isl)
+                for crn in isl.corners_iter():
+                    crn.tag = False
+                for crn in to_segmenting_corners:
+                    crn.tag = True
 
                 if to_segmenting_corners:
                     isl.apply_aspect_ratio()
 
-                    segments = utypes.Segments.from_tagged_corners(to_segmenting_corners, umesh)
+                    segments = utypes.Segments.from_corners(to_segmenting_corners, umesh)
                     segment = max(segments.segments, key=lambda seg: seg.length_uv)
                     # TODO: Join segment (if possible).
                     #  This is necessary to avoid squashing when segment might be circular, but there are also randomly selected non-circle segments.
@@ -113,17 +115,13 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
                 straight_isl.pivot = start.copy()
 
-            # Set pins
+            # Set seams and pins
+            isl.mark_seam(additional=True)
             for linked in segment.chain_linked_corners:
                 for crn in linked:
                     crn[uv].pin_uv = True
 
-            # Mark Seam
-            is_boundary = utils.is_boundary_func(isl.umesh)
-            for crn in isl.corners_iter():
-                if is_boundary(crn):
-                    crn.edge.seam = True
-
+            # Select for unwrap.
             if umeshes.elem_mode in ('VERT', 'EDGE'):
                 isl.select = True
             else:
@@ -181,52 +179,39 @@ class UNIV_OT_Straight(bpy.types.Operator):
         return {'FINISHED'}
 
     @staticmethod
-    def tagging_corners(isl, idx) -> list:
+    def get_to_segmenting_corners_and_deselecting_faces(isl) -> list:
         umesh = isl.umesh
         to_segmenting_corners = []
 
-        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        is_boundary = utils.is_boundary_func(umesh)
         get_edge_select = utils.edge_select_get_func(umesh)
         get_face_select = utils.face_select_get_func(umesh)
 
         if umesh.elem_mode in ('VERT', 'EDGE'):
             for crn in isl.corners_iter():
-                if not get_edge_select(crn):
-                    crn.tag = False
-                    continue
+                if get_edge_select(crn):
+                    if is_boundary(crn):
+                        to_segmenting_corners.append(crn)
+                        continue
+                    else:
+                        pair_face = crn.link_loop_radial_prev.face
+                        has_two_selected_faces = get_face_select(crn.face) and get_face_select(pair_face)
 
-                if is_boundary(crn):
-                    crn.tag = True
-                    to_segmenting_corners.append(crn)
-                    continue
-
-                pair_face = crn.link_loop_radial_prev.face
-                has_two_selected_faces = get_face_select(crn.face) and get_face_select(
-                    pair_face) and pair_face.index == idx
-
-                if has_two_selected_faces:
-                    crn.tag = False
-                else:
-                    crn.tag = True
-                    to_segmenting_corners.append(crn)
+                        if not has_two_selected_faces:
+                            to_segmenting_corners.append(crn)
         else:
             to_deselect_faces = []
             for crn in isl.corners_iter():
                 if get_face_select(crn.face):
                     if is_boundary(crn):
-                        crn.tag = True
                         to_segmenting_corners.append(crn)
                         continue
 
                     pair_face = crn.link_loop_radial_prev.face
-                    if pair_face.index != idx or not get_face_select(pair_face):
-                        crn.tag = True
+                    if not get_face_select(pair_face):
                         to_segmenting_corners.append(crn)
-                    else:
-                        crn.tag = False
 
                 else:
-                    crn.tag = False
                     to_deselect_faces.append(crn.face)
             isl.sequence = to_deselect_faces
         return to_segmenting_corners

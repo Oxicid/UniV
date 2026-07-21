@@ -1992,29 +1992,18 @@ class UNIV_OT_AlignBorderVerts(Operator):
         utils.get_aspect_ratio()
         for umesh in umeshes:
             is_boundary_with_pair = utils.is_boundary_func(umesh, with_seam=False)
-            selected_contiguous_edges = []
+            boundary_with_pair_edges = []
             for crn in utils.calc_selected_uv_edge_iter(umesh):
                  if crn.edge.is_contiguous and is_boundary_with_pair(crn):
-                     crn.tag = False
-                     selected_contiguous_edges.append(crn)
+                     boundary_with_pair_edges.append(crn)
 
-            umesh.set_corners_tag(False)
-
-
-            umesh.update_tag = bool(selected_contiguous_edges)
+            umesh.update_tag = bool(boundary_with_pair_edges)
             if not umesh.update_tag:
                 continue
 
-            islands = utypes.Islands.calc_visible_without_ms(umesh)
-            islands.indexing()
-            for crn in selected_contiguous_edges:
-                crn.tag = True
-
-            segments = utypes.Segments.from_tagged_corners(selected_contiguous_edges, umesh)
-
             v = []
             h = []
-            for seg in segments:
+            for seg in utypes.Segments.from_corners(boundary_with_pair_edges, umesh):
                 center = (seg.start_co - seg.end_co)
 
                 if is_vertical(center * aspect_vec):
@@ -2039,9 +2028,12 @@ class UNIV_OT_AlignBorderVerts(Operator):
 
 
             uv = umesh.uv
+            sync = umesh.sync
             for crn in h:
-                linked_corners_a = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn, uv)]
-                linked_corners_b = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn.link_loop_next, uv)]
+                linked_corners_a = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)]
+                linked_corners_a.append(crn)
+                linked_corners_b = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn.link_loop_next, uv, sync)]
+                linked_corners_b.append(crn.link_loop_next)
 
                 shared_crn = crn.link_loop_radial_prev
                 x = shared_crn[uv].uv.x
@@ -2054,8 +2046,10 @@ class UNIV_OT_AlignBorderVerts(Operator):
                     l_crn[uv].uv.x = x
 
             for crn in v:
-                linked_corners_a = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn, uv)]
-                linked_corners_b = [l_crn for l_crn in utils.linked_crn_uv_by_idx_unordered_included(crn.link_loop_next, uv)]
+                linked_corners_a = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)]
+                linked_corners_a.append(crn)
+                linked_corners_b = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn.link_loop_next, uv, sync)]
+                linked_corners_b.append(crn.link_loop_next)
 
                 shared_crn = crn.link_loop_radial_prev
                 y = shared_crn[uv].uv.y

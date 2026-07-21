@@ -806,6 +806,29 @@ def calc_any_unique_obj() -> list[bpy.types.Object]:
             objects.append(objs[0])
         return objects
 
+def get_hv_constraints(corners, attr) -> tuple[list[BMLoop], list[BMLoop]]:
+    h_corners = []
+    v_corners = []
+
+    for crn in corners:
+        crn_e = crn.edge
+        edge_bits: int = crn_e[attr]
+
+        if edge_bits:
+            for i, crn_l in enumerate(crn_e.link_loops):
+                if crn == crn_l:
+                    if i == 16:
+                        break
+
+                    shift = i * 2
+                    bits = (edge_bits >> shift) & 3
+                    if bits == 2:  # vertical
+                        v_corners.append(crn)
+                    elif bits == 3:  # horizontal
+                        h_corners.append(crn)
+                    break
+
+    return h_corners, v_corners
 
 def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bpy.types.Object]]]:
     """ Get unique selected meshes with/without uv and get selected/visible/hidden instances (non-included) """

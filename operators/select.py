@@ -2378,28 +2378,26 @@ class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
         # uv = umesh.uv
 
         islands = Islands.calc_visible(umesh)
-        islands.indexing()
 
-        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        is_boundary = utils.is_boundary_func(umesh)
         get_edge_select = utils.edge_select_get_func(umesh)
         get_face_select = utils.face_select_get_func(umesh)
 
-        for idx, isl in enumerate(islands):
+        for isl in islands:
             to_segmenting_corners = []
             for crn in isl.corners_iter():
                 pair_face = crn.link_loop_radial_prev.face
 
                 if not get_edge_select(crn):
-                    crn.tag = False
-                elif get_face_select(crn.face):
-                    crn.tag = False
-                elif not is_boundary(crn) and get_face_select(pair_face) and pair_face.index == idx:
-                    crn.tag = False
+                    continue
+                if get_face_select(crn.face):
+                    continue
+                if not is_boundary(crn) and get_face_select(pair_face):
+                    continue
                 else:
-                    crn.tag = True
                     to_segmenting_corners.append(crn)
             if to_segmenting_corners:
-                segments = utypes.Segments.from_tagged_corners(to_segmenting_corners, umesh)
+                segments = utypes.Segments.from_corners(to_segmenting_corners, umesh)
                 self.calc_from_segments(segments)
             break
 
