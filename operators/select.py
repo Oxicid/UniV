@@ -3274,3 +3274,77 @@ class UNIV_OT_SelectMode(Operator):
                 update = True
                 tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
         return update
+
+class UNIV_OT_LocalInvertSelection(Operator):
+    bl_idname = "uv.univ_local_invert_selection"
+    bl_label = "L-Invert"
+    bl_description = "Invert Local Selection"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        umeshes = UMeshes(report=self.report)
+        umeshes.filter_by_selected_uv_by_context()
+
+        for umesh in umeshes:
+            islands = Islands.calc_extended_by_context(umesh)
+            if utils.USE_GENERIC_UV_SYNC and umesh.sync:
+                umesh.sync_from_mesh_if_needed()
+
+            has_selected_faces = False
+            if not utils.USE_GENERIC_UV_SYNC and umesh.sync:
+                has_selected_faces = bool(umesh.total_face_sel)
+
+            to_select = []
+            full_selected_islands = []
+            partial_selected_islands = []
+
+            for isl in islands:
+                if isl.is_full_face_selected():
+                    full_selected_islands.append(isl)
+                    continue
+                else:
+                    partial_selected_islands.append(isl)
+                    if has_selected_faces:
+                        if isl.is_full_face_deselected():
+                            continue
+
+                if umeshes.elem_mode == "VERT" and not has_selected_faces:
+                    get_vert_select = utils.vert_select_get_func(umesh)
+                    for crn in isl.corners_iter():
+                        if not get_vert_select(crn):
+                            to_select.append(crn)
+                elif umeshes.elem_mode == "EDGE" and not has_selected_faces:
+                    get_edge_select = utils.edge_select_get_func(umesh)
+                    for crn in isl.corners_iter():
+                        if not get_edge_select(crn):
+                            to_select.append(crn)
+                else:
+                    get_face_select = utils.face_select_get_func(umesh)
+                    for f in isl:
+                        if not get_face_select(f):
+                            to_select.append(f)
+
+            if not to_select:
+                umesh.update_tag = False
+                continue
+
+            for isl in partial_selected_islands:
+                isl.select = False
+            for isl in full_selected_islands:
+                isl.select = True
+
+
+            if umeshes.elem_mode == "VERT" and not has_selected_faces:
+                select_vert_set = utils.vert_select_linked_full_func(umesh)
+                for crn in to_select:
+                    select_vert_set(crn)
+            elif umeshes.elem_mode == "EDGE" and not has_selected_faces:
+                select_edge_set = utils.edge_select_linked_full_func(umesh)
+                for crn in to_select:
+                    select_edge_set(crn)
+            else:
+                # TODO: Replace with utils.face_select_linked_full_func
+                utypes.AdvIsland(to_select, umesh).select = True
+
+        umeshes.update(info="Not found partial selected islands.")
+        return {"FINISHED"}

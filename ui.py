@@ -409,6 +409,7 @@ class UNIV_PT_General(Panel):
             grid.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
             grid.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
 
+            col_align.operator("uv.univ_local_invert_selection", icon_value=icons.local_invert)
 
         # UV Maps
         if pref.uv_layers_show:

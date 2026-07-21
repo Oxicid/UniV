@@ -171,6 +171,7 @@ def add_keymaps():
     kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
     keys.append((km, kmi))
 
+    # Select
     kmi = km.keymap_items.new('uv.univ_select_mode', 'ONE', 'PRESS')
     kmi.properties.type = 'VERTEX'
     keys.append((km, kmi))
@@ -185,6 +186,9 @@ def add_keymaps():
 
     kmi = km.keymap_items.new('uv.univ_select_mode', 'FOUR', 'PRESS')
     kmi.properties.type = 'ISLAND'
+    keys.append((km, kmi))
+
+    kmi = km.keymap_items.new("uv.univ_local_invert_selection", "I", "PRESS", ctrl=True, shift=True)
     keys.append((km, kmi))
 
     # Rotate

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 3),
+    "version": (4, 0, 4),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -144,6 +144,7 @@ def load_register_types():
             operators.select.UNIV_OT_SelectByVertexCount_VIEW2D,
             operators.select.UNIV_OT_SelectByVertexCount_VIEW3D,
             operators.select.UNIV_OT_SelectMode,
+            operators.select.UNIV_OT_LocalInvertSelection,
             operators.select.UNIV_OT_Tests,
             # QuickSnap
             operators.quick_snap.UNIV_OT_QuickSnap,

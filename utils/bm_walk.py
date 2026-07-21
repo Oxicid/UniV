@@ -184,6 +184,11 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
     # assert len(linked) == len(set(linked))
     return linked
 
+def linked_crn_to_vert_pair_with_seam_included(crn: BMLoop, uv, sync: bool) -> list[BMLoop]:
+    linked = linked_crn_to_vert_pair_with_seam(crn, uv, sync)
+    linked.insert(0, crn)
+    return linked
+
 def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop):
     """Linked to arg corner with_seam without coord check(non-included)
         NOTE: Need for unwrap in vert/edge mode for check

@@ -794,9 +794,10 @@ class AdvIsland:
                 if self.umesh.sync_valid:
                     self.umesh.bm.uv_select_foreach_set_from_mesh(state, faces=self.faces, sticky_select_mode='DISABLED')
 
-                if state:  # FAST_LOAD
+                # Additional select in 3D.
+                if state:
                     for face in self.faces:
-                        face.select = True
+                        face.select = True   # FAST_LOAD
                 else:
                     for face in self.faces:
                         face.select = False
