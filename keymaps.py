@@ -233,8 +233,8 @@ def add_keymaps():
         kmi.properties.unwrap_along = 'UV'
     keys.append((km, kmi))
 
-    # Pack
-    kmi = km.keymap_items.new('uv.univ_pack', 'P', 'PRESS')
+    # Pin
+    kmi = km.keymap_items.new('uv.univ_pin', 'P', 'PRESS')
     keys.append((km, kmi))
 
     # Quadrify

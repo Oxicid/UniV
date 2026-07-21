@@ -554,6 +554,60 @@ class CrnEdgeHit:
             return True
         return False
 
+    def find_nearest_vert_by_visible_faces(self, umesh, use_faces_from_umesh_seq=False):
+        from .. import utils
+        from math import nextafter, inf
+
+        pt = self.point
+        min_dist = self.min_dist
+        min_crn = None
+
+        uv = umesh.uv
+
+        if use_faces_from_umesh_seq:
+            visible_faces = umesh.sequence
+        else:
+            visible_faces = utils.calc_visible_uv_faces_iter(umesh)
+
+        for f in visible_faces:
+            for crn in f.loops:
+                dist = (crn[uv].uv - pt).length
+                if dist < min_dist:
+                    # If the point is inside the face, we add it immediately,
+                    # otherwise, we do nextafter and check again for nearest.
+                    if point_inside_face(pt, f, uv):
+                        min_crn = crn
+                        min_dist = dist
+                    else:
+                        # Adding dist after nextafter is necessary for the next for_each loop
+                        # to “hook” another edge (thus avoiding float point errors).
+                        dist = nextafter(dist, inf)
+                        if dist < min_dist:
+                            min_crn = crn
+                            min_dist = dist
+
+
+        if min_crn:
+            self.crn = min_crn#.link_loop_prev
+            self.min_dist = min_dist
+
+            # radial_prev = self.crn.link_loop_radial_prev
+            # if (utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and
+            #         utils.is_visible_func(umesh.sync)(radial_prev.face)):
+            #     if point_inside_face(pt, radial_prev.face, uv):
+            #         self.crn = radial_prev
+            # else:
+            #     # Prioritize boundary edges where the point is inside the face,
+            #     # otherwise lower the priority to find other boundary edges with the point inside the face.
+            #     if point_inside_face(pt, self.crn.face, uv):
+            #         self.min_dist = nextafter(min_dist, -inf)
+            #     else:
+            #         self.min_dist = nextafter(min_dist, inf)
+
+            self.umesh = umesh
+            return True
+        return False
+
     def calc_island_with_seam(self):
         assert self.crn, 'Not found picked corner'
 

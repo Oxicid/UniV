@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 id = "univ"
 name = "UniV"
-version = "4.0.4"
+version = "4.0.5"
 tagline = "Smart UV Tools"
 maintainer = "Oxicid <oxicid2019@gmail.com>"
 type = "add-on"

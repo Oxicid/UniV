@@ -177,6 +177,19 @@ class UNIV_OT_Pin(Operator):
         if context.mode == 'EDIT_MESH':
             self.layout.prop(prefs(), 'invert_toggle_logic')
 
+    def invoke(self, context, event):
+        if context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV':
+            if event.value == 'PRESS':
+                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
+                self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+                return self.execute(context)
+        return self.execute(context)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_distance: float = 0.0
+        self.mouse_pos: Vector | None = None
+
     def execute(self, context):
         if context.mode != 'EDIT_MESH':
             import numpy as np
@@ -221,6 +234,28 @@ class UNIV_OT_Pin(Operator):
         else:
             for umesh in umeshes:
                 umesh.sequence = utils.calc_visible_uv_corners(umesh)
+
+            # Pick pinning.
+            if self.mouse_pos:
+                hit = utypes.CrnEdgeHit(self.mouse_pos, self.max_distance)
+                for umesh in umeshes:
+                    hit.find_nearest_vert_by_visible_faces(umesh)
+
+                if not hit:
+                    self.report({'WARNING'}, 'Vertex not found within a given radius')
+                    return {'CANCELLED'}
+                else:
+                    uv = hit.umesh.uv
+                    linked = utils.linked_crn_to_vert_pair_with_seam_included(hit.crn, uv, hit.umesh.sync)
+                    if all(crn[uv].pin_uv for crn in linked):
+                        for crn in linked:
+                            crn[uv].pin_uv = False
+                    else:
+                        for crn in linked:
+                            crn[uv].pin_uv = True
+                    hit.umesh.update_tag = True
+                    hit.umesh.update()
+                    return {'FINISHED'}
 
         if not prefs().invert_toggle_logic:
             all_pinned = True
@@ -401,7 +436,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
                 if coords:
                     bpy.context.area.tag_redraw()
-            return {'FINISHED'} if had_seam else {'FINISHED'}
+            return {'FINISHED'}
 
 
 # noinspection PyTypeHints
