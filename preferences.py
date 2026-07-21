@@ -144,9 +144,9 @@ def _update_uv_layers_active_idx(self, context):
             area = bpy.context.area
             if area:
                 if area.type == 'VIEW_3D':
-                    bpy.ops.mesh.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+                    bpy.ops.mesh.univ_seam_border_simple()  # noqa
                 else:
-                    bpy.ops.uv.univ_seam_border(selected=False, mtl=False, by_sharps=False)  # noqa
+                    bpy.ops.uv.univ_seam_border_simple()  # noqa
 
         from .operators.misc import UNIV_OT_UV_Layers_Manager
         UNIV_OT_UV_Layers_Manager.update_uv_layers_props()
@@ -592,7 +592,7 @@ Some operators, can interact with trims:
                                            default='UniV', update=update_panel)
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
-
+    seams_to_sharps: BoolProperty(name='Seams to Sharps', default=False)  # For Angle and Border operator.
     max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )

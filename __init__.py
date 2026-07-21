@@ -185,6 +185,8 @@ def load_register_types():
             operators.mark.UNIV_OT_Angle,
             operators.mark.UNIV_OT_SeamBorder,
             operators.mark.UNIV_OT_SeamBorder_VIEW3D,
+            operators.mark.UNIV_OT_SeamBorderSimple_VIEW2D,
+            operators.mark.UNIV_OT_SeamBorderSimple_VIEW3D,
             # Project
             operators.project.UNIV_OT_Normal,
             operators.project.UNIV_OT_ViewProject,
