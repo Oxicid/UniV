@@ -86,6 +86,9 @@ def add_keymaps():
     kmi.properties.select = False
     keys.append((km, kmi))
 
+    kmi = km.keymap_items.new("mesh.univ_local_invert_selection", "I", "PRESS", ctrl=True, shift=True)
+    keys.append((km, kmi))
+
     add_mesh_keymaps(km, univ_pro)
 
     # Window

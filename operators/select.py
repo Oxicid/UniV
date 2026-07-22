@@ -3275,6 +3275,7 @@ class UNIV_OT_SelectMode(Operator):
                 tool_settings.uv_sticky_select_mode = 'SHARED_LOCATION'
         return update
 
+
 class UNIV_OT_LocalInvertSelection(Operator):
     bl_idname = "uv.univ_local_invert_selection"
     bl_label = "L-Invert"
@@ -3345,6 +3346,109 @@ class UNIV_OT_LocalInvertSelection(Operator):
             else:
                 # TODO: Replace with utils.face_select_linked_full_func
                 utypes.AdvIsland(to_select, umesh).select = True
+
+        umeshes.update(info="Not found partial selected islands.")
+        return {"FINISHED"}
+
+
+
+class UNIV_OT_LocalInvertSelection_VIEW3D(Operator):
+    bl_idname = "mesh.univ_local_invert_selection"
+    bl_label = "L-Invert"
+    bl_description = "Invert Local Selection"
+    bl_options = {"REGISTER", "UNDO"}
+
+    # noinspection PyTypeHints
+    ignore_seams: BoolProperty(name="Ignore Seams", default=True)
+
+    def execute(self, context):
+        umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+        umeshes.sync_invalidate()
+        umeshes.set_sync(True)  # TODO: Add to set_sync refreshing elem mode from 3D.
+        elem_mode = utils.get_select_mode_mesh()
+        umeshes._elem_mode = elem_mode
+        for umesh in umeshes:
+            umesh.elem_mode = elem_mode
+
+        umeshes.filter_by_selected_uv_by_context()
+
+        for umesh in umeshes:
+            if self.ignore_seams:
+                mesh_islands = MeshIslands.calc_extended_by_context_without_ms(umesh)
+            else:
+                mesh_islands = MeshIslands.calc_extended_by_context(umesh)
+
+
+            to_select = []
+            full_selected_islands = []
+            partial_selected_islands = []
+
+            for isl in mesh_islands:
+                if isl.is_full_face_selected():
+                    if umeshes.elem_mode in ("VERT", "EDGE"):
+                        full_selected_islands.append(isl)
+                    continue
+
+                if umeshes.elem_mode == "VERT":
+                    if not self.ignore_seams:
+                        if not any(f.select for f in isl):
+                            selected_vertices = (v for f in isl for v in f.verts if v.select)
+                            for v in selected_vertices:
+                                if all(not l_f.select for l_f in v.link_faces if not l_f.hide):
+                                    break
+                            else:
+                                # Has accidentally border selection
+                                continue
+
+                    partial_selected_islands.append(isl)
+                    for f in isl:
+                        for v in f.verts:
+                            if not v.select:
+                                to_select.append(v)
+                elif umeshes.elem_mode == "EDGE":
+                    if not self.ignore_seams:
+                        if not any(f.select for f in isl):
+                            selected_edges = (e for f in isl for e in f.edges if e.select)
+                            for e in selected_edges:
+                                if all(not l_f.select for l_f in e.link_faces if not l_f.hide):
+                                    break
+                            else:
+                                # Has accidentally border selection
+                                continue
+
+                    partial_selected_islands.append(isl)
+                    for f in isl:
+                        for e in f.edges:
+                            if not e.select:
+                                to_select.append(e)
+                else:
+                    partial_selected_islands.append(isl)
+                    for f in isl:
+                        if not f.select:
+                            to_select.append(f)
+
+            if not to_select:
+                umesh.update_tag = False
+                continue
+
+            for isl in partial_selected_islands:
+                isl.select = False
+            umesh.bm.select_history.validate()  # Active elem validate
+
+            for isl in full_selected_islands:
+                isl.select = True
+
+            for elem in to_select:
+                elem.select = True
+
+            if umeshes.elem_mode == "VERT":
+                umesh.bm.select_flush(True)
+            elif umeshes.elem_mode == "EDGE":
+                for isl in partial_selected_islands:
+                    for f in isl:
+                        if not f.select:
+                            if all(e.select for e in f.edges):
+                                f.select = True
 
         umeshes.update(info="Not found partial selected islands.")
         return {"FINISHED"}

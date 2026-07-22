@@ -579,6 +579,8 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_select_grow', icon_value=icons.grow)
             row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
 
+            col_align.operator("mesh.univ_local_invert_selection", icon_value=icons.local_invert)
+
 
         # UV Maps
         if pref.uv_layers_show:

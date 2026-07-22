@@ -145,6 +145,7 @@ def load_register_types():
             operators.select.UNIV_OT_SelectByVertexCount_VIEW3D,
             operators.select.UNIV_OT_SelectMode,
             operators.select.UNIV_OT_LocalInvertSelection,
+            operators.select.UNIV_OT_LocalInvertSelection_VIEW3D,
             operators.select.UNIV_OT_Tests,
             # QuickSnap
             operators.quick_snap.UNIV_OT_QuickSnap,
