@@ -897,8 +897,8 @@ def has_visible_active_trim(report=None):
             report({'WARNING'}, 'Trims preset is empty')
         return False
 
-    idx = trim_slot.active_trim_index + 1
-    if len(trim_preset) >= idx:
+    idx = trim_slot.active_trim_index
+    if len(trim_preset) >= idx + 1:
         if trim_preset[idx].visible:
             return True
         if report:
