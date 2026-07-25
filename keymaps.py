@@ -266,9 +266,14 @@ def add_keymaps():
     kmi.properties.quick_start = False
     keys.append((km, kmi))
 
-    # Drag
+
     if univ_pro:
+        # Drag
         kmi = km.keymap_items.new('uv.univ_drag', 'LEFTMOUSE', 'ANY', alt=True)
+        keys.append((km, kmi))
+
+        # Isolate
+        kmi = km.keymap_items.new('uv.univ_isolate', 'I', "PRESS")
         keys.append((km, kmi))
 
     # Cut

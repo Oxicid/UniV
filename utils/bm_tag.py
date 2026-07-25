@@ -172,3 +172,29 @@ def is_invisible_func(sync: bool):
         return BMFace.hide.__get__
     else:
         return lambda f: not f.select
+
+
+def linked_hide_faces_for_3d(faces):
+    for f in faces:
+        f.hide_set(True)
+
+    # Hide linked verts/edges.
+    for f in faces:
+        for e in f.edges:
+            if all(ff.hide for ff in e.link_faces):
+                e.hide_set(True)
+            elif any(ff.select for ff in e.link_faces):  # Preserve edge     selection.
+                e.select = True
+        for v in f.verts:
+            if all(ff.hide for ff in v.link_faces):
+                v.hide_set(True)
+            elif any(ff.select for ff in v.link_faces):  # Preserve vertex selection.
+                v.select = True
+
+def unhide_faces_for_3d(faces):
+    for f in faces:
+        f.hide_set(False)
+        for e in f.edges:
+            e.hide_set(False)
+        for v in f.verts:
+            v.hide_set(False)

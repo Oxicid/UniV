@@ -555,17 +555,7 @@ class UNIV_OT_Hide(Operator):
             for umesh in self.umeshes:
                 unselected_faces = utils.calc_unselected_uv_faces(umesh)
                 if umesh.sync:
-                    for f in unselected_faces:
-                        f.hide = True
-
-                    # Hide linked verts/edges.
-                    for f in unselected_faces:
-                        for e in f.edges:
-                            if all(ff.hide for ff in e.link_faces):
-                                e.hide = True
-                        for v in f.verts:
-                            if all(ff.hide for ff in v.link_faces):
-                                v.hide = True
+                    utils.linked_hide_faces_for_3d(unselected_faces)
                 else:
                     for f in unselected_faces:
                         f.select = False

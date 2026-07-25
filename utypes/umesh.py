@@ -1134,6 +1134,27 @@ class UMeshes:
         u2.umeshes = visible
         return u1, u2
 
+    def filtered_by_selected_and_visible_and_hidden_uv_faces(self) -> tuple['UMeshes', 'UMeshes', 'UMeshes']:
+        selected = []
+        visible = []
+        hidden = []
+
+        for umesh in self:
+            if umesh.has_selected_uv_faces():
+                selected.append(umesh)
+            elif umesh.has_visible_uv_faces():
+                visible.append(umesh)
+            else:
+                hidden.append(umesh)
+
+        u1 = copy.copy(self)
+        u2 = copy.copy(self)
+        u3 = copy.copy(self)
+        u1.umeshes = selected
+        u2.umeshes = visible
+        u3.umeshes = hidden
+        return u1, u2, u3
+
     def filtered_by_selected_uv_faces(self):
         selected = []
         unselect_or_invisible = []

@@ -324,9 +324,6 @@ class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     size_y: EnumProperty(name='Y', default='2048', items=utils.resolutions, update=_update_size_y)
     lock_size: BoolProperty(name='Lock Size', default=True, update=_update_lock_size)
 
-    invert_toggle_logic: BoolProperty(name='Invert Toggle Logic', default=False,
-        description="When the selected elements contain both marked/unmarked or pinned/unpinned elements, "
-                    "enabling this option will set the boolean value to False.")
 
     # Checker Texture
     checker_toggle: EnumProperty(name='Toggle', default='TOGGLE', items=ENUM('TOGGLE', 'OVERWRITE'),
@@ -593,6 +590,14 @@ Some operators, can interact with trims:
     # enable_uv_name_controller: BoolProperty(name='Enable UV name controller', default=False)
     enable_uv_layers_sync_borders_seam: BoolProperty(name='Enable sync Border Seam', default=True)
     seams_to_sharps: BoolProperty(name='Seams to Sharps', default=False)  # For Angle and Border operator.
+
+    invert_toggle_logic: BoolProperty(name='Invert Toggle Logic', default=False,
+        description="When the selected elements contain both marked/unmarked or pinned/unpinned elements, "
+                    "enabling this option will set the boolean value to False.")
+    isolate_hide_full_unsel_first: BoolProperty(name='Hide Full Unselected Mesh First', default=True,
+            description="Isolation runs in two passes. Fully deselected meshes are hidden first. "
+                        "Running it again also hides deselected islands in meshes with selected faces.")
+
     max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
