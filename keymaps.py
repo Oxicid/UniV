@@ -273,7 +273,7 @@ def add_keymaps():
         keys.append((km, kmi))
 
         # Isolate
-        kmi = km.keymap_items.new('uv.univ_isolate', 'I', "PRESS")
+        kmi = km.keymap_items.new('uv.univ_isolate', 'NUMPAD_SLASH', "PRESS")
         keys.append((km, kmi))
 
     # Cut
