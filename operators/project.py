@@ -56,7 +56,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
         self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
         if self.umeshes.is_edit_mode:
@@ -283,7 +283,7 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
         self.umeshes.set_sync(True)
         if self.is_edit_mode:
             selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -491,7 +491,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         self.camera = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
 
@@ -765,7 +765,7 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
         }
         # TODO: Add normalize and correct aspect by modifier
         if context.mode == 'EDIT_MESH':
-            umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+            umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
             umeshes.fix_context()
             umeshes.set_sync()
             umeshes.sync_invalidate()
@@ -800,7 +800,7 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
 
 
             bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-            for umesh in utypes.UMeshes.calc(self.report, verify_uv=False):
+            for umesh in utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False):
                 umesh.check_uniform_scale(report=self.report)
 
             bpy.ops.mesh.reveal(select=True)
@@ -1391,7 +1391,7 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
         self.umeshes.fix_context()
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()

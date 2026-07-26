@@ -58,7 +58,7 @@ class UNIV_OT_RandomColor(Operator):
             umeshes = UMeshes(report=self.report)
             isl_type = utypes.Islands
         else:
-            umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+            umeshes = UMeshes.calc_with_no_uv_and_no_faces(report=self.report, verify_uv=False)
             isl_type = utypes.MeshIslands
         if not umeshes:
             return umeshes.update()

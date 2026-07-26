@@ -376,7 +376,7 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
             unwrap.MULTIPLAYER = 1
             unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
-        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()

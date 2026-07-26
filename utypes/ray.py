@@ -694,7 +694,7 @@ class CrnEdgeHit:
 
         return AdvIsland(list(island), self.umesh), island
 
-    def calc_mesh_island_with_seam(self) -> MeshIsland:
+    def calc_visible_mesh_island(self) -> tuple[MeshIsland, set[BMFace]]:
         assert self.crn, 'Not found picked corner'
         island: set[BMFace] = {self.crn.face}
         stack = []
@@ -712,7 +712,27 @@ class CrnEdgeHit:
             parts_of_island = stack
             stack = []
 
-        return MeshIsland(list(island), self.umesh)
+        return MeshIsland(list(island), self.umesh), island
+
+    def calc_visible_mesh_island_without_ms(self) -> tuple[MeshIsland, set[BMFace]]:
+        assert self.crn, 'Not found picked corner'
+        island: set[BMFace] = {self.crn.face}
+        stack = []
+        parts_of_island = [self.crn.face]
+        while parts_of_island:
+            for f in parts_of_island:
+                for crn in f.loops:
+                    pair_crn = crn.link_loop_radial_prev
+                    ff = pair_crn.face
+                    if ff in island or ff.hide:
+                        continue
+
+                    island.add(ff)
+                    stack.append(ff)
+            parts_of_island = stack
+            stack = []
+
+        return MeshIsland(list(island), self.umesh), island
 
     def __bool__(self):
         return bool(self.crn)

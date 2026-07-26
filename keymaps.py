@@ -59,6 +59,13 @@ def add_keymaps():
     kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
     keys.append((km, kmi))
 
+
+    if univ_pro:
+        kmi = km.keymap_items.new('object.univ_isolate', 'NUMPAD_SLASH', "PRESS")
+        keys.append((km, kmi))
+        kmi = km.keymap_items.new('object.univ_isolate', 'SLASH', "PRESS")
+        keys.append((km, kmi))
+
     # Pie Menu
     kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_PIE_univ_obj"
@@ -71,6 +78,12 @@ def add_keymaps():
     kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
     keys.append((km, kmi))
+
+    if univ_pro:
+        kmi = km.keymap_items.new('object.univ_isolate', 'NUMPAD_SLASH', "PRESS")
+        keys.append((km, kmi))
+        kmi = km.keymap_items.new('object.univ_isolate', 'SLASH', "PRESS")
+        keys.append((km, kmi))
 
     kmi = km.keymap_items.new('mesh.univ_select_linked_pick', 'WHEELUPMOUSE', 'PRESS', shift=True)
     keys.append((km, kmi))
@@ -88,6 +101,7 @@ def add_keymaps():
 
     kmi = km.keymap_items.new("mesh.univ_local_invert_selection", "I", "PRESS", ctrl=True, shift=True)
     keys.append((km, kmi))
+
 
     add_mesh_keymaps(km, univ_pro)
 
@@ -274,6 +288,8 @@ def add_keymaps():
 
         # Isolate
         kmi = km.keymap_items.new('uv.univ_isolate', 'NUMPAD_SLASH', "PRESS")
+        keys.append((km, kmi))
+        kmi = km.keymap_items.new('uv.univ_isolate', 'SLASH', "PRESS")
         keys.append((km, kmi))
 
     # Cut

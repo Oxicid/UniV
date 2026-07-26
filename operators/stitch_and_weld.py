@@ -1095,7 +1095,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
         self.update_seams = True
 
     def execute(self, context):
-        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
         for umesh in self.umeshes:
@@ -1320,7 +1320,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         Stitch.__init__(self)
 
     def execute(self, context):
-        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
         self.umeshes.update_tag = False

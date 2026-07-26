@@ -905,7 +905,7 @@ class UMeshes:
         return cls(bmeshes)
 
     @classmethod
-    def calc_all_objects(cls, verify_uv=True):
+    def calc_all_objects_in_file(cls, verify_uv=True):
         bmeshes = []
         for obj in bpy.data.objects:
             if obj.type == 'MESH':
@@ -919,7 +919,7 @@ class UMeshes:
         return cls(bmeshes)
 
     @classmethod
-    def calc(cls, report=None, verify_uv=True):
+    def calc_with_no_uv(cls, report=None, verify_uv=True):
         """ Get umeshes without uv but with faces"""
         bmeshes = []
         if bpy.context.mode == 'EDIT_MESH':
@@ -950,7 +950,7 @@ class UMeshes:
                 umesh.aspect = utils.get_aspect_ratio()
 
     @classmethod
-    def calc_any_unique(cls, report=None, verify_uv=True):
+    def calc_with_no_uv_and_no_faces(cls, report=None, verify_uv=True):
         """ Get unique umeshes without uv and without faces"""
         umeshes = []
         if bpy.context.mode == 'EDIT_MESH':

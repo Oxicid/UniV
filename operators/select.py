@@ -829,7 +829,7 @@ class UNIV_OT_SelectLinked_VIEW3D(Operator):
 
     def deselect(self):
         # TODO: Add support wire edge
-        umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
         umeshes.set_sync(True)
         umeshes.filter_by_partial_selected_uv_faces()
         umeshes.update_tag = False
@@ -1357,7 +1357,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                      "Has [Ctrl + Scroll Up/Down] keymap"
 
     def execute(self, context):
-        self.umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
 
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
@@ -1978,7 +1978,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                              description="Max select angle.")
 
     def execute(self, context):
-        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
 
         if self.umeshes.elem_mode not in ('VERT', 'EDGE'):
             return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
@@ -2886,7 +2886,7 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
     bl_idname = "mesh.univ_select_by_vertex_count"
 
     def execute(self, context):
-        umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
         umeshes.set_sync()
         for umesh in umeshes:
             umesh.sync_valid = False
@@ -3362,7 +3362,7 @@ class UNIV_OT_LocalInvertSelection_VIEW3D(Operator):
     ignore_seams: BoolProperty(name="Ignore Seams", default=True)
 
     def execute(self, context):
-        umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv_and_no_faces(report=self.report, verify_uv=False)
         umeshes.sync_invalidate()
         umeshes.set_sync(True)  # TODO: Add to set_sync refreshing elem mode from 3D.
         elem_mode = utils.get_select_mode_mesh()

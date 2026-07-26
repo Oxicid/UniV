@@ -390,7 +390,7 @@ Some operators, can interact with trims:
     overlay_3d_uv_edge_color: FloatVectorProperty(name="UV Select Edge", default=(0.82, 0.82, 0.82, 0.72),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
-    overlay_3d_uv_face_color: FloatVectorProperty(name="UV Select Face", default=(0.0, 0.196, 0.7, 0.45),
+    overlay_3d_uv_face_color: FloatVectorProperty(name="UV Select Face", default=(0.0, 0.196, 0.7, 0.25),
         min=0.0, max=1.0, size=4, subtype='COLOR', update=_update_overlay_3d_uv_face_color
     )
     overlay_toggle_xray: BoolProperty(name='Toggle X-Ray', default=True,
@@ -597,6 +597,7 @@ Some operators, can interact with trims:
     isolate_hide_full_unsel_first: BoolProperty(name='Hide Full Unselected Mesh First', default=True,
             description="Isolation runs in two passes. Fully deselected meshes are hidden first. "
                         "Running it again also hides deselected islands in meshes with selected faces.")
+    isolate_focus_in_3d: BoolProperty(name='Focus', default=False)
 
     max_pick_distance: IntProperty(name='Max Pick Distance', default=75, min=15, soft_max=100, subtype='PIXEL',
                                    description='Pick Distance for Pick Select, Quick Snap operators'

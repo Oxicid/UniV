@@ -109,7 +109,7 @@ class UNIV_OT_Mark_VIEW3D(Operator):
         if context.mode != 'EDIT_MESH':
             return UNIV_OT_Mark_VIEW2D.remove_seams_in_object_mode(self.report)
 
-        umeshes = UMeshes.calc_all_objects(verify_uv=False)
+        umeshes = UMeshes.calc_all_objects_in_file(verify_uv=False)
         umeshes.set_sync()
         umeshes.sync_invalidate()
         umeshes.update_tag = False
@@ -481,7 +481,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
         self.umeshes: UMeshes | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = UMeshes.calc(report=self.report, verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
         self.umeshes.set_sync()
         self.umeshes.sync_invalidate()
 
@@ -619,7 +619,7 @@ class UNIV_OT_Angle(Operator):
 
 
     def execute(self, context) -> set[str]:
-        umeshes = UMeshes.calc_any_unique(report=self.report, verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv_and_no_faces(report=self.report, verify_uv=False)
         if not umeshes:
             return umeshes.update()
 

@@ -662,7 +662,7 @@ class UNIV_OT_StretchUVToggle(Operator):
                 uv_editor.display_stretch_type = 'ANGLE'
                 LAST_STRETCH_TYPE = 'ANGLE'
 
-            umeshes = UMeshes.calc(verify_uv=False)
+            umeshes = UMeshes.calc_with_no_uv(verify_uv=False)
             count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
             umeshes.free()
 
@@ -703,7 +703,7 @@ class UNIV_OT_StretchUVToggle(Operator):
 
         uv_editor.display_stretch_type = LAST_STRETCH_TYPE
 
-        umeshes = UMeshes.calc(verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv(verify_uv=False)
         count_non_default_scale = sum(bool(umesh.check_uniform_scale()) for umesh in umeshes)
         umeshes.free()
 

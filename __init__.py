@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 6),
+    "version": (4, 0, 7, "experimental"),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -252,6 +252,7 @@ def load_register_types():
                 # Transform
                 univ_pro.drag.UNIV_OT_Drag,
                 # Isolate
+                univ_pro.isolate.UNIV_OT_Isolate_VIEW3D,
                 univ_pro.isolate.UNIV_OT_Isolate,
                 # Transfer
                 univ_pro.transfer.UNIV_OT_Transfer,

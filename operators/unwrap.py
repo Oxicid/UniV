@@ -894,7 +894,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         self.texture_size = -1
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc(self.report, verify_uv=False)
+        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
 
         self.umeshes.fix_context()
         self.umeshes.set_sync()
@@ -943,7 +943,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.value = umesh.check_uniform_scale(report=self.report)
         if umesh.has_uv:
             umesh.verify_uv()
-            mesh_island = hit.calc_mesh_island_with_seam()
+            mesh_island, _ = hit.calc_visible_mesh_island()
             adv_subislands = mesh_island.calc_adv_subislands_with_mark_seam()
             for isl in adv_subislands:
                 isl.select = True
@@ -976,7 +976,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                 f.hide = False
                 f.select = False
         else:
-            mesh_island = hit.calc_mesh_island_with_seam()
+            mesh_island, _ = hit.calc_visible_mesh_island()
             adv_island = mesh_island.to_adv_island()
             adv_island.select = True
 

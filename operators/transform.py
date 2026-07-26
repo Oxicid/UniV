@@ -2544,7 +2544,7 @@ class UNIV_OT_Home(Operator):
         if self.to_cursor:
             cursor_loc_delta = utils.get_tile_from_cursor()
 
-        self.umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
 
         mod_counter, attr_counter = self.remove_shift_md()  # remove_shift_md changes update tag
         changed_modifiers_count = self.uv_shift_reset_array_and_mirror_and_warp()
@@ -2727,7 +2727,7 @@ class UNIV_OT_Shift(Operator):
         self.umeshes: UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = UMeshes.calc_any_unique(verify_uv=False)
+        self.umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
         changed_modifiers = self.shift_array_and_mirror_and_warp()
 
         # TODO: Remove gn modifier when shift without modifier
@@ -3925,7 +3925,7 @@ class UNIV_OT_Pack(Operator):
             uvpm_settings.pixel_margin = settings.padding
 
             uvpm_settings.heuristic_enable = True
-            total_selected = sum(umesh.total_face_sel for umesh in UMeshes.calc(verify_uv=False))
+            total_selected = sum(umesh.total_face_sel for umesh in UMeshes.calc_with_no_uv(verify_uv=False))
             if total_selected > 50_000:
                 time_in_sec = 8
             elif total_selected > 10_000:
@@ -3955,7 +3955,7 @@ class UNIV_OT_Pack(Operator):
             return pack('INVOKE_REGION_WIN', mode_id="pack.single_tile", pack_op_type=self.pack_op_type)
 
     def pack_native(self):
-        umeshes = UMeshes.calc(verify_uv=False)
+        umeshes = UMeshes.calc_with_no_uv(verify_uv=False)
         umeshes.fix_context()
 
         settings = univ_settings()
