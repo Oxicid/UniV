@@ -20,7 +20,7 @@ from . import AdvIsland, Islands, MeshIsland, UnionIslands, LoopGroups
 from . import umesh as _umesh  # noqa: F401 # pylint:disable=unused-import
 from .umesh import UMesh, UMeshes
 from .. import utils
-from ..utils import closest_pt_to_line, point_inside_face
+from ..utils import point_inside_face, intersect_point_line_segment
 
 
 class KDData:
@@ -334,10 +334,10 @@ class TrimKDTree:
 class IslandHit:
     def __init__(self, pt, min_dist=1e200):
         self.island: AdvIsland | UnionIslands | None = None
-        self.point = pt
-        self.min_dist = min_dist
-        self.crn = None
-        self.face = None
+        self.point: Vector = pt
+        self.min_dist: float = min_dist
+        self.crn: BMLoop | None = None
+        self.face: BMFace | None = None
 
     def find_nearest_island(self, island: AdvIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
@@ -356,13 +356,11 @@ class IslandHit:
                     v_curr = crn[uv].uv
                     face_center += v_curr
 
-                    close_pt = closest_pt_to_line(pt, v_prev, v_curr)
-
-                    dist = (close_pt - pt).length
+                    close_pt, dist = intersect_point_line_segment(pt, v_prev, v_curr)
                     if isclose(dist, min_dist, abs_tol=1e-07):
                         if point_inside_face(pt, f, uv):
                             min_dist = dist
-                            # This is necessary for the inequality check to be successful
+                            # This is necessary for the inequality (in below) check to be successful.
                             self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
                     elif dist < min_dist:
                         min_dist = dist
@@ -400,14 +398,12 @@ class IslandHit:
                     v_curr = crn[uv].uv
                     face_center += v_curr
 
-                    close_pt = closest_pt_to_line(pt, v_prev, v_curr)
-
-                    dist = (close_pt - pt).length
+                    close_pt, dist = intersect_point_line_segment(pt, v_prev, v_curr)
                     if isclose(dist, min_dist, abs_tol=1e-07):
                         if point_inside_face(pt, f, uv):
                             min_dist = dist
                             min_face = f
-                            # This is necessary for the inequality check to be successful
+                            # This is necessary for the inequality check (in below) to be successful.
                             self.min_dist = math.nextafter(self.min_dist, self.min_dist+1.0)
                     elif dist < min_dist:
                         min_dist = dist
@@ -442,9 +438,7 @@ class IslandHit:
             for crn in corners:
                 v_curr = crn[uv].uv
 
-                close_pt = closest_pt_to_line(pt, v_prev, v_curr)
-
-                dist = (close_pt - pt).length
+                close_pt, dist = intersect_point_line_segment(pt, v_prev, v_curr)
                 if isclose(dist, min_dist, abs_tol=1e-07):
                     if point_inside_face(pt, f, uv):
                         min_dist = dist

@@ -754,9 +754,17 @@ class UNIV_OT_Select_Pick(Operator):
                     if isl.is_full_face_selected():
                         continue
                 else:  # Skip full deselected islands
-                    if isl.is_full_face_deselected():
-                        continue
-                hit.find_nearest_island(isl)
+                    if umesh.elem_mode not in ('VERT', 'EDGE'):
+                        if isl.is_full_face_deselected():
+                            continue
+                    else:
+                        if umesh.elem_mode == 'VERT':
+                            get_elem_select = utils.vert_select_get_func(umesh)
+                        else:
+                            get_elem_select = utils.edge_select_get_func(umesh)
+                        if not any(get_elem_select(crn) for crn in isl.corners_iter()):
+                            continue
+                hit.find_nearest_island_with_face(isl)
 
         if not hit or (self.max_distance < hit.min_dist):
             return {'CANCELLED'}
@@ -772,6 +780,21 @@ class UNIV_OT_Select_Pick(Operator):
             self.umeshes.elem_mode = 'FACE'
 
         hit.island.select = self.select
+        if self.select:
+            uv = hit.island.umesh.uv
+            if utils.get_select_mode_mesh() == 'VERT':
+                min_crn = min(hit.face.loops, key=lambda c: (hit.point - c[uv].uv).length)
+                umesh.bm.select_history.add(min_crn.vert)
+            elif utils.get_select_mode_mesh() == 'EDGE':
+                func = lambda c: utils.intersect_point_line_segment(hit.point, c[uv].uv, c.link_loop_next[uv].uv)[1]
+                min_crn = min(hit.face.loops, key=func)
+                umesh.bm.select_history.add(min_crn.edge)
+            else:
+                umesh.bm.select_history.add(hit.face)
+            umesh.bm.faces.active = hit.face
+        umesh.bm.select_history.validate()
+
+        bpy.context.view_layer.objects.active = umesh.obj
         umesh.update()
 
         return {'FINISHED'}

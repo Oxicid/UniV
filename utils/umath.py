@@ -213,6 +213,7 @@ def is_power_of_2(n: int) -> bool:
     return (n & (n - 1)) == 0
 
 
+# TODO: Delete ???
 def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
     near_pt, percent = intersect_point_line(pt, l_a, l_b)
     if percent < 0.0:
