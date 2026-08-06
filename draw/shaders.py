@@ -28,6 +28,8 @@ POLYLINE_UNIFORM_COLOR_3D = None  # DEPRECATE (used for 3.4 and less version)
 POINT_UNIFORM_COLOR_2D = None  # Edge Shader with width support
 POINT_UNIFORM_COLOR_3D = None  # DEPRECATE for 3.4 and less version
 
+IMG_SHADER_3D = None
+
 set_line_width = lambda width: None
 set_line_width_vk = lambda shader, width=2.0: None
 set_point_size = gpu.state.point_size_set
@@ -114,6 +116,9 @@ class Shaders:
         else:
             POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
 
+        global IMG_SHADER_3D
+        IMG_SHADER_3D = cls.create_img_shader()
+
     @classmethod
     def init_functions(cls):
         global VK_ENABLED
@@ -155,6 +160,34 @@ class Shaders:
 
         cls.init_flat_shading_uniform_color()
 
+    @staticmethod
+    def create_img_shader() -> tuple[gpu.types.GPUBatch, gpu.types.GPUShader]:
+        # Drawing the generated texture in 3D space
+        #############################################
+        vert_out = gpu.types.GPUStageInterfaceInfo("my_interface")
+        vert_out.smooth('VEC2', "uvInterp")
+        shader_info = gpu.types.GPUShaderCreateInfo()
+        shader_info.push_constant('MAT4', "viewProjectionMatrix")
+        # shader_info.push_constant('MAT4', "modelMatrix")
+        shader_info.sampler(0, 'FLOAT_2D', "image")
+        shader_info.vertex_in(0, 'VEC2', "position")
+        shader_info.vertex_in(1, 'VEC2', "uv")
+        shader_info.vertex_out(vert_out)
+        shader_info.fragment_out(0, 'VEC4', "FragColor")
+        shader_info.vertex_source(
+            "void main()"
+            "{"
+            "  uvInterp = uv;"
+            "  gl_Position = viewProjectionMatrix * vec4(position, 0.0, 1.0);"
+            "}"
+        )
+        shader_info.fragment_source(
+            "void main()"
+            "{"
+            "  FragColor = texture(image, uvInterp);"
+            "}"
+        )
+        return gpu.shader.create_from_info(shader_info)
 
     @staticmethod
     def get_round_shape_vertex():
