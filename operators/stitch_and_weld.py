@@ -729,7 +729,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         for umesh in umeshes:
             uv = umesh.uv
             update_tag = False
-            islands = Islands.calc_extended_any_edge_non_manifold_without_ms(umesh)
+            islands = Islands.calc_extended_any_edge_non_manifold(umesh, with_seams=False)
             if islands:
                 umesh.set_corners_tag(False)
                 islands.indexing()
@@ -846,9 +846,9 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
             all_linked_corners = set()
 
             if extended:
-                islands = Islands.calc_extended_any_vert_non_manifold_without_ms(umesh)
+                islands = Islands.calc_extended_any_vert_non_manifold(umesh, with_seams=False)
             else:
-                islands = Islands.calc_visible_non_manifold_without_ms(umesh)
+                islands = Islands.calc_visible_non_manifold(umesh, with_seams=False)
             islands.indexing()
 
             for idx, isl in enumerate(islands):

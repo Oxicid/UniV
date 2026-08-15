@@ -76,7 +76,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 else:
                     self.legacy_sync_relax_verts_or_edges(umeshes)
             else:
-                self.relax_non_sync(umeshes)
+                self.legacy_relax_non_sync(umeshes)
 
             for umesh in umeshes:
                 umesh.bm.select_flush_mode()
@@ -125,7 +125,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 selected_elem = utils.calc_selected_3d_edges(umesh)
 
             uv = umesh.uv
-            islands = Islands.calc_visible_without_ms(umesh)
+            islands = Islands.calc_visible(umesh, with_seams=False)
             for isl in islands:
                 isl.mark_seam()
 
@@ -228,7 +228,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
         relax_data: list[RelaxData] = []
         for umesh in umeshes:
             uv = umesh.uv
-            islands = Islands.calc_extended_without_ms(umesh)
+            islands = Islands.calc_extended(umesh, with_seams=False)
 
             for isl in islands:
                 isl.mark_seam()
@@ -308,7 +308,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             rd.remove_all_pins_from_umesh()
 
-    def relax_non_sync(self, umeshes: UMeshes):
+    def legacy_relax_non_sync(self, umeshes: UMeshes):
         from ..utils import linked_crn_uv_unordered, is_boundary_func, vert_select_get_func, is_visible_func
 
         relax_data: list[RelaxData] = []
@@ -317,7 +317,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             is_vert_select = vert_select_get_func(umesh)
             is_visible = is_visible_func(umesh.sync)
             uv = umesh.uv
-            islands = Islands.calc_extended_any_elem_without_ms(umesh)
+            islands = Islands.calc_extended_any_elem(umesh, with_seams=False)
 
             for isl in islands:
                 isl.mark_seam()

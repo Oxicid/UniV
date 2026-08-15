@@ -1640,11 +1640,11 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             if selected_umeshes:
                 self.calc_island_type = Islands.calc_extended
                 if self.mode == 'FLIPPED':
-                    self.calc_island_type = self.calc_selected_flipped_islands_with_mark_seam
+                    self.calc_island_type = self.calc_selected_flipped_islands
             else:
                 self.calc_island_type = Islands.calc_visible
                 if self.mode == 'FLIPPED':
-                    self.calc_island_type = self.calc_visible_flipped_islands_with_mark_seam
+                    self.calc_island_type = self.calc_visible_flipped_islands
 
             if not umeshes:
                 return umeshes.update()
@@ -1657,7 +1657,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             umeshes.ensure()
             self.calc_island_type = Islands.calc_with_hidden
             if self.mode == 'FLIPPED':
-                self.calc_island_type = self.calc_with_hidden_flipped_islands_with_mark_seam
+                self.calc_island_type = self.calc_with_hidden_flipped_islands
 
         match self.mode:
             case 'DEFAULT':
@@ -1718,7 +1718,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             self.report({'INFO'}, 'Flipped islands not found')
 
     @staticmethod
-    def calc_visible_flipped_islands_with_mark_seam(umesh):
+    def calc_visible_flipped_islands(umesh, *, with_seams=True):
         uv = umesh.uv
         Islands.tag_filter_visible(umesh)
 
@@ -1726,11 +1726,12 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             if f.tag:
                 f.tag = utils.is_flipped_uv(f, uv)
 
-        islands_ = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh)]
+        calc_iter_ex = Islands.calc_iter_ex if with_seams else Islands.calc_iter_without_ms_ex
+        islands_ = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return Islands(islands_, umesh)
 
     @staticmethod
-    def calc_selected_flipped_islands_with_mark_seam(umesh):
+    def calc_selected_flipped_islands(umesh, *, with_seams=True):
         uv = umesh.uv
         if umesh.is_full_face_deselected:
             return Islands()
@@ -1741,17 +1742,19 @@ class UNIV_OT_Flip_VIEW3D(Operator):
             if f.tag:
                 f.tag = utils.is_flipped_uv(f, uv)
 
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh) if
+        calc_iter_ex = Islands.calc_iter_ex if with_seams else Islands.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh) if
                    Islands.island_filter_is_any_face_selected(i, umesh)]
         return Islands(islands, umesh)
 
     @staticmethod
-    def calc_with_hidden_flipped_islands_with_mark_seam(umesh):
+    def calc_with_hidden_flipped_islands(umesh, *, with_seams=True):
         uv = umesh.uv
         for f in umesh.bm.faces:
             f.tag = utils.is_flipped_uv(f, uv)
 
-        islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_ex(umesh)]
+        calc_iter_ex = Islands.calc_iter_ex if with_seams else Islands.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return Islands(islands, umesh)
 
     def pick_flip(self, umeshes: UMeshes):
@@ -2440,12 +2443,12 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
             selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected_umeshes:
                 umeshes = selected_umeshes
-                self.islands_calc_type = Islands.calc_extended_without_ms
+                self.islands_calc_type = Islands.calc_extended
             else:
                 umeshes = unselected_umeshes
-                self.islands_calc_type = Islands.calc_visible_without_ms
+                self.islands_calc_type = Islands.calc_visible
         else:
-            self.islands_calc_type = Islands.calc_with_hidden_without_ms
+            self.islands_calc_type = Islands.calc_with_hidden
         if not umeshes:
             return umeshes.update()
 
@@ -2467,7 +2470,7 @@ class UNIV_OT_Break(Operator, utils.PaddingHelper):
             angle = min(self.angle, umesh.smooth_angle)
             umesh.value = angle  #  need for Islands.calc_all_ex
 
-            for isl in self.islands_calc_type(umesh):  # noqa
+            for isl in self.islands_calc_type(umesh, with_seam=False):  # noqa
                 if len(isl) < 2:
                     continue
 

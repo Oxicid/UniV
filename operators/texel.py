@@ -73,7 +73,7 @@ class UNIV_OT_ResetScale(Operator, utils.OverlapHelper):
             umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
             islands_calc_type = Islands.calc_extended if selected_umeshes else Islands.calc_visible
         else:
-            islands_calc_type = Islands.calc_with_hidden_without_ms
+            islands_calc_type = Islands.calc_with_hidden
             for umesh in umeshes:
                 umesh.ensure(face=True)
 
@@ -292,7 +292,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             # TODO: Islands with FLIPPED_3D
             islands_calc_type = Islands.calc_extended if selected_umeshes else Islands.calc_visible
         else:
-            islands_calc_type = Islands.calc_with_hidden_without_ms
+            islands_calc_type = Islands.calc_with_hidden
             for umesh in umeshes:
                 umesh.ensure(face=True)
 
@@ -722,7 +722,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         tot_area_uv = tot_area_3d = 0
         for umesh in umeshes:
             umesh.ensure()
-            adv_islands = Islands.calc_with_hidden_without_ms(umesh)
+            adv_islands = Islands.calc_with_hidden(umesh)
 
             assert adv_islands, f'Object "{umesh.obj.name}" not found islands'
 
@@ -1185,7 +1185,7 @@ class UNIV_OT_Calc_UV_Coverage(Operator):
         for umesh in umeshes:
             uv = umesh.uv
             if umeshes.is_edit_mode:
-                islands = Islands.calc_extended_or_visible_without_ms(umesh, extended=has_selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=has_selected)
                 islands.calc_tris()
                 tris_iter = (t for isl in islands for t in isl.tris)
             else:

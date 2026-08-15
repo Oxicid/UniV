@@ -23,12 +23,12 @@ class UNIV_OT_Normal(bpy.types.Operator):
     bl_description = "Projection by faces normal.\n\nShift - Individual"
     bl_options = {'REGISTER', 'UNDO'}
 
-    crop: bpy.props.BoolProperty(name='Crop', default=True,
+    crop: BoolProperty(name='Crop', default=True,
                                  description='Packs the islands into a base tile, for performance purposes, does so with uncritical inaccuracy')
-    orient: bpy.props.BoolProperty(name='Orient 2D', default=True)
-    individual: bpy.props.BoolProperty(name='Individual', default=False, description='Individual by Island Meshes')
-    mark_seam: bpy.props.BoolProperty(name='Mark Seam', default=True)
-    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
+    orient: BoolProperty(name='Orient 2D', default=True)
+    individual: BoolProperty(name='Individual', default=False, description='Individual by Island Meshes')
+    mark_seam: BoolProperty(name='Mark Seam', default=True)
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True,
                                                description='Gets Aspect Correct from the active image from the shader node editor')
 
     def draw(self, context):
@@ -190,7 +190,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
             else:
                 calc_mesh_isl_obj = MeshIslands.calc_visible
         else:
-            calc_mesh_isl_obj = MeshIslands.calc_all
+            calc_mesh_isl_obj = MeshIslands.calc_with_hidden
 
         for umesh in umeshes:
             _, r, s = umesh.obj.matrix_world.decompose()
@@ -256,13 +256,13 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
     bl_description = "Box Projection"
     bl_options = {'REGISTER', 'UNDO'}
 
-    scale: bpy.props.FloatProperty(name='Scale', default=1, soft_min=0.5, soft_max=2)
-    scale_individual: bpy.props.FloatVectorProperty(name='Scale Individual', default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2)
-    rotation: bpy.props.FloatVectorProperty(name='Rotate', subtype='EULER', soft_min=-pi, soft_max=pi)
-    move: bpy.props.FloatVectorProperty(name='Move', subtype='XYZ')
-    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True,
+    scale: FloatProperty(name='Scale', default=1, soft_min=0.5, soft_max=2)
+    scale_individual: FloatVectorProperty(name='Scale Individual', default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2)
+    rotation: FloatVectorProperty(name='Rotate', subtype='EULER', soft_min=-pi, soft_max=pi)
+    move: FloatVectorProperty(name='Move', subtype='XYZ')
+    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True,
                                                description='Gets Aspect Correct from the active image from the shader node editor')
-    avoid_flip: bpy.props.BoolProperty(name='Avoid Flip', default=True)
+    avoid_flip: BoolProperty(name='Avoid Flip', default=True)
 
     def draw(self, context):
         self.layout.prop(self, 'scale', slider=True)

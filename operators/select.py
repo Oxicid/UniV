@@ -11,7 +11,6 @@ from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
 from bmesh.types import BMLoop, BMFace
-from collections.abc import Callable
 
 from .. import utils
 from .. import utypes
@@ -883,10 +882,6 @@ class UNIV_OT_Select_Grow_Base(Operator):
     clamp_on_seam: BoolProperty(name='Clamp on Seam', default=True,
                                 description="Edge Grow clamp on edges with seam, but if the original edge has seam, this effect is ignored")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.calc_islands: Callable = Callable
-
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH'
@@ -1126,12 +1121,6 @@ else:
             umeshes = UMeshes()
             umeshes.filter_by_partial_selected_uv_elem_by_mode()
 
-            # TODO: Implement without island calc (use linked with pair iter and mark seam)
-            if self.clamp_on_seam:
-                self.calc_islands = Islands.calc_visible
-            else:
-                self.calc_islands = Islands.calc_visible_without_ms
-
             if self.grow:
                 return self.grow_select(umeshes)
             else:
@@ -1151,7 +1140,9 @@ else:
 
             for umesh in umeshes:
                 uv = umesh.uv
-                islands = self.calc_islands(umesh)
+                # TODO: Implement without island calc (use linked with pair iter and mark seam)
+                # Since the islands are filtered by partial selection, we use `visible` to speedup
+                islands = Islands.calc_visible(umesh, with_seams=self.clamp_on_seam)
                 islands.indexing()
                 to_select = []
                 if self.is_sticky_off_in_face_mode_non_sync(umeshes):
@@ -1227,7 +1218,7 @@ else:
 
             for umesh in umeshes:
                 uv = umesh.uv
-                islands = self.calc_islands(umesh)
+                islands = Islands.calc_visible(umesh, with_seams=self.clamp_on_seam)
                 islands.indexing()
                 to_deselect = []
                 to_deselect_append = to_deselect.append
@@ -1673,9 +1664,6 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                                     description='Gives 35% priority to an edge that has a Mark Sharp, works if there are more than 4 linked edges.')
     boundary_by_boundary: BoolProperty(name='Boundary by Boundary', default=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.calc_islands: Callable = Callable
 
     @classmethod
     def poll(cls, context):
@@ -1708,11 +1696,6 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             self.report({'INFO'}, f'Edge Grow not work in "{umeshes.elem_mode}" mode, run grow instead')
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
-        if self.clamp_on_seam:
-            self.calc_islands = Islands.calc_extended_any_edge
-        else:
-            self.calc_islands = Islands.calc_extended_any_edge_without_ms
-
         umeshes.filter_by_selected_uv_edges()
         umeshes.update_tag = False
 
@@ -1730,7 +1713,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         # TODO: Remove calc islands
         umeshes.update_tag = False
         for umesh in umeshes:
-            islands = self.calc_islands(umesh)
+            islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             islands.indexing()
             is_clamped = self.is_clamped_by_selected_and_seams_func(umesh)
             grew = []
@@ -1782,7 +1765,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
     def shrink_select(self, umeshes):
         for umesh in umeshes:
-            islands = self.calc_islands(umesh)
+            islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             islands.indexing()
 
             is_clamped = self.is_clamped_by_selected_and_seams_func(umesh)
@@ -1996,10 +1979,6 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
         umeshes.set_sync()
         umeshes.sync_invalidate()
-        if self.clamp_on_seam:
-            self.calc_islands = MeshIslands.calc_extended_any_edge_with_markseam
-        else:
-            self.calc_islands = MeshIslands.calc_extended_any_edge
 
         umeshes.update_tag = False
         if self.grow:
@@ -2013,7 +1992,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
     def grow_select(self, umeshes):
         for umesh in reversed(umeshes):
-            islands = self.calc_islands(umesh)
+            islands = MeshIslands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             if islands:
                 islands.indexing()
                 grew = []
@@ -2046,7 +2025,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
     def shrink_select(self, umeshes):
         for umesh in umeshes:
-            islands = self.calc_islands(umesh)
+            islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             if islands:
                 islands.indexing()
                 shrink = []
@@ -3384,17 +3363,11 @@ class UNIV_OT_LocalInvertSelection_VIEW3D(Operator):
         umeshes.filter_by_selected_uv_by_context()
 
         for umesh in umeshes:
-            if self.ignore_seams:
-                mesh_islands = MeshIslands.calc_extended_by_context_without_ms(umesh)
-            else:
-                mesh_islands = MeshIslands.calc_extended_by_context(umesh)
-
-
             to_select = []
             full_selected_islands = []
             partial_selected_islands = []
 
-            for isl in mesh_islands:
+            for isl in MeshIslands.calc_extended_by_context(umesh, with_seams=not self.ignore_seams):
                 if isl.is_full_face_selected():
                     if umeshes.elem_mode in ("VERT", "EDGE"):
                         full_selected_islands.append(isl)

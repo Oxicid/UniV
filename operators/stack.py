@@ -378,8 +378,9 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         self.targets: list[StackIsland] = []
         self.transfer: list[StackIsland] = []
         self.counter: int = 0
-        self.calc_selected: Callable = Islands.calc_selected_without_ms
-        self.calc_non_selected: Callable = Islands.calc_non_selected_without_ms
+        self.ignore_mark_seam = False
+        self.calc_selected: Callable = Islands.calc_selected
+        self.calc_non_selected: Callable = Islands.calc_non_selected
 
     def execute(self, context) -> set[str]:
         self.counter = 0
@@ -424,7 +425,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def islands_preprocessing_selected_between(self, umeshes, stack_type: typing.Type[T]) -> list[list[T]]:
         for umesh in reversed(umeshes):
-            selected = self.calc_selected(umesh)
+            selected = self.calc_selected(umesh, with_seams = not self.ignore_mark_seam)
             if not selected:
                 umeshes.umeshes.remove(umesh)
                 continue
@@ -474,8 +475,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         for umesh in reversed(umeshes):
             # TODO: With expanded selection, you can calculate islands via calc_visible
             #  and add them to selected and non_selected. This does not work with calc_selected.
-            selected = self.calc_selected(umesh)
-            non_selected = self.calc_non_selected(umesh)
+            selected = self.calc_selected(umesh, with_seams = not self.ignore_mark_seam)
+            non_selected = self.calc_non_selected(umesh, with_seams = not self.ignore_mark_seam)
 
             if not selected and not non_selected:
                 umeshes.umeshes.remove(umesh)

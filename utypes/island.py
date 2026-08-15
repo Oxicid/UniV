@@ -1376,6 +1376,39 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
             island = []
 
     @staticmethod
+    def calc_iter_non_manifold_ex(umesh: _umesh.UMesh):
+        uv = umesh.uv
+        island: list[BMFace] = []
+
+        for face in umesh.bm.faces:
+            if not face.tag:  # Skip unselected and appended faces
+                continue
+            face.tag = False  # Tag first element in island (don't add again)
+
+            parts_of_island = [face]  # Container collector of island elements
+            temp = []  # Container for get elements from loop from parts_of_island
+
+            while parts_of_island:  # Blank list == all faces of the island taken
+                for f in parts_of_island:
+                    for l in f.loops:  # Running through all the neighboring faces
+                        shared_crn = l.link_loop_radial_prev
+                        ff = shared_crn.face
+                        if not ff.tag:
+                            continue
+                        if l.edge.seam:  # Skip if seam
+                            continue
+                        if l[uv].uv == shared_crn.link_loop_next[uv].uv or l.link_loop_next[uv].uv == shared_crn[uv].uv:
+                            temp.append(ff)
+                            ff.tag = False
+
+                island.extend(parts_of_island)
+                parts_of_island = temp
+                temp = []
+
+            yield island
+            island = []
+
+    @staticmethod
     def calc_iter_non_manifold_without_ms_ex(umesh: _umesh.UMesh):
         uv = umesh.uv
         island: list[BMFace] = []
@@ -1519,60 +1552,36 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
     ########################################
 
     @classmethod
-    def calc_selected_without_ms(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-        cls.tag_filter_selected(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_non_selected_without_ms(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            return cls()
-
-        cls.tag_filter_non_selected(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_non_selected(cls, umesh: _umesh.UMesh):
+    def calc_non_selected(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """NOTE: Used in Stack"""
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
             return cls()
 
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
         cls.tag_filter_non_selected(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_visible(cls, umesh: _umesh.UMesh):
+    def calc_visible(cls, umesh: _umesh.UMesh, *, with_seams=True):
         cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_selected(cls, umesh: _umesh.UMesh):
+    def calc_selected(cls, umesh: _umesh.UMesh, *, with_seams=True):
         if umesh.is_full_face_deselected:
             return cls()
         cls.tag_filter_selected(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-        cls.tag_filter_visible(umesh)
-        if umesh.sync and umesh.is_full_face_deselected:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
-        else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
-                       if cls.island_filter_is_any_face_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_partial_selected_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_partial_selected(cls, umesh: _umesh.UMesh, *, with_seams=True):
         if umesh.is_full_face_deselected:
             return cls()
 
@@ -1580,25 +1589,14 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
             return cls()
 
         cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(
-            umesh) if cls.island_filter_is_partial_face_selected(i, umesh)]
-        return cls(islands, umesh)
 
-    @classmethod
-    def calc_partial_selected(cls, umesh: _umesh.UMesh):
-        if umesh.is_full_face_deselected:
-            return cls()
-
-        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            return cls()
-
-        cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                    if cls.island_filter_is_partial_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_partial_selected_by_context(cls, umesh: _umesh.UMesh):
+    def calc_partial_selected_by_context(cls, umesh: _umesh.UMesh, *, with_seams=True):
         if not umesh.sync:
             if umesh.is_full_face_deselected:
                 return cls()
@@ -1619,49 +1617,27 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
 
         cls.tag_filter_visible(umesh)
 
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                    if isl_filter(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_extended(cls, umesh: _umesh.UMesh, *, with_seams=True):
         if umesh.is_full_face_deselected:
             return cls()
         cls.tag_filter_visible(umesh)
 
-        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        if umesh.sync and umesh.is_full_face_deselected:
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                        if cls.island_filter_is_any_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_any_elem_without_ms(cls, umesh: _umesh.UMesh):
-        if not umesh.sync:
-            if umesh.is_full_face_deselected:
-                return cls()
-        else:
-            if umesh.elem_mode == 'FACE':
-                if umesh.is_full_face_deselected:
-                    return cls()
-            elif umesh.elem_mode == 'VERT':
-                if umesh.is_full_vert_deselected:
-                    return cls()
-            else:
-                if umesh.is_full_edge_deselected:
-                    return cls()
-
-        cls.tag_filter_visible(umesh)
-        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)
-                       if cls.island_filter_is_any_vert_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_any_elem(cls, umesh: _umesh.UMesh):
+    def calc_extended_any_elem(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """Get islands with vertex select."""
         if umesh.sync:
             if umesh.elem_mode in ('FACE', 'ISLAND'):
@@ -1678,19 +1654,21 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
             if umesh.elem_mode in ('FACE', 'ISLAND'):
-                islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                            if cls.island_filter_is_any_face_selected(i, umesh)]
             else:
-                islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                            if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_by_context(cls, umesh: _umesh.UMesh):
+    def calc_extended_by_context(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """Get islands with vertex select."""
         if umesh.sync:
             if umesh.elem_mode in ('FACE', 'ISLAND'):
@@ -1707,22 +1685,24 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
             if umesh.elem_mode in ('FACE', 'ISLAND'):
-                islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                            if cls.island_filter_is_any_face_selected(i, umesh)]
             elif umesh.elem_mode == 'EDGE':
-                islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                            if cls.island_filter_is_any_edge_selected(i, umesh)]
             else:
-                islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+                islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                            if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_any_vert_non_manifold_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_extended_any_vert_non_manifold(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """Calc any verts selected islands"""
         if umesh.sync:
             if umesh.elem_mode == 'FACE':
@@ -1739,15 +1719,17 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
+
+        calc_iter_ex = cls.calc_iter_non_manifold_ex if with_seams else cls.calc_iter_non_manifold_without_ms_ex
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_non_manifold_without_ms_ex(umesh)]
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_non_manifold_without_ms_ex(umesh)
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                        if cls.island_filter_is_any_vert_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_any_edge_non_manifold_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_extended_any_edge_non_manifold(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """Calc any edges selected islands"""
         if umesh.sync:
             if umesh.elem_mode == 'FACE':
@@ -1764,37 +1746,16 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
+        calc_iter_ex = cls.calc_iter_non_manifold_ex if with_seams else cls.calc_iter_non_manifold_without_ms_ex
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_non_manifold_without_ms_ex(umesh)]
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_non_manifold_without_ms_ex(umesh)
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                        if cls.island_filter_is_any_edge_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_any_edge_without_ms(cls, umesh: _umesh.UMesh):
-        """Calc any edges selected islands"""
-        if umesh.sync:
-            if umesh.elem_mode == 'FACE':
-                if umesh.is_full_face_deselected:
-                    return cls()
-            else:
-                if umesh.is_full_edge_deselected:
-                    return cls()
-        else:
-            if umesh.is_full_face_deselected:
-                return cls()
-
-        cls.tag_filter_visible(umesh)
-        if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)
-                       if cls.island_filter_is_any_edge_selected(i, umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_any_edge(cls, umesh: _umesh.UMesh):
+    def calc_extended_any_edge(cls, umesh: _umesh.UMesh, *, with_seams=True):
         """Calc any edges selected islands, with markseam"""
         if umesh.sync:
             if umesh.elem_mode == 'FACE':
@@ -1808,27 +1769,25 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_ex
         if umesh.is_full_face_selected_for_avoid_force_explicit_check:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         else:
-            islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+            islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                        if cls.island_filter_is_any_edge_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_visible_non_manifold_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_visible_non_manifold(cls, umesh: _umesh.UMesh, with_seams=True):
         cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_non_manifold_without_ms_ex(umesh)]
+
+        calc_iter_ex = cls.calc_iter_non_manifold_ex if with_seams else cls.calc_iter_non_manifold_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_visible_without_ms(cls, umesh: _umesh.UMesh):
-        cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_non_full_selected(cls, umesh: _umesh.UMesh):
+    def calc_non_full_selected(cls, umesh: _umesh.UMesh, *, with_seams=True):
         if umesh.sync:
             if umesh.is_full_face_selected_for_avoid_force_explicit_check:
                 return cls()
@@ -1837,39 +1796,32 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
                 return cls()
 
         cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)
+
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)
                    if not cls.island_filter_is_all_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_non_selected_extended_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_non_selected_extended(cls, umesh: _umesh.UMesh, *, with_seams=True):
         cls.tag_filter_visible(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(
             umesh) if not cls.island_filter_is_any_face_selected(i, umesh)]
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended_or_visible_without_ms(cls, umesh: _umesh.UMesh, *, extended) -> 'typing.Self':
+    def calc_extended_or_visible(cls, umesh: _umesh.UMesh, *, extended, with_seams: bool = True) -> 'typing.Self':
         if extended:
-            return cls.calc_extended_without_ms(umesh)
-        return cls.calc_visible_without_ms(umesh)
+            return cls.calc_extended(umesh, with_seams=with_seams)
+        return cls.calc_visible(umesh, with_seams=with_seams)
 
     @classmethod
-    def calc_extended_or_visible(cls, umesh: _umesh.UMesh, *, extended) -> 'typing.Self':
-        if extended:
-            return cls.calc_extended(umesh)
-        return cls.calc_visible(umesh)
-
-    @classmethod
-    def calc_with_hidden_without_ms(cls, umesh: _umesh.UMesh):
+    def calc_with_hidden(cls, umesh: _umesh.UMesh, *, with_seams=True) -> 'typing.Self':
         cls.tag_filter_all(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_without_ms_ex(umesh)]
-        return cls(islands, umesh)
 
-    @classmethod
-    def calc_with_hidden(cls, umesh: _umesh.UMesh) -> 'typing.Self':
-        cls.tag_filter_all(umesh)
-        islands = [AdvIsland(i, umesh) for i in cls.calc_iter_ex(umesh)]
+        calc_iter_ex = cls.calc_iter_ex if with_seams else cls.calc_iter_without_ms_ex
+        islands = [AdvIsland(i, umesh) for i in calc_iter_ex(umesh)]
         return cls(islands, umesh)
 
 
