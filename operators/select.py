@@ -1448,7 +1448,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                                          if ee.is_wire and not ee.select and not ee.hide)
                     else:
                         selection_states_from_linked_faces = [f.select for v in e.verts for f in v.link_faces]
-                        if all(selection_states_from_linked_faces):
+                        if all(selection_states_from_linked_faces): # Skip full selected linked faces.
                             continue
                         elif any(selection_states_from_linked_faces):
                             all_linked_faces_with_select = []
@@ -1491,7 +1491,6 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                 if to_select:
                     has_updates = True
                     umesh.sync_valid = False
-                    umesh.bm.select_flush(True)
                     umesh.update()
         else:
             umeshes.filter_by_selected_mesh_faces()
