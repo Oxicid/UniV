@@ -2962,6 +2962,7 @@ class UNIV_OT_SelectByVertexCount_VIEW3D(UNIV_OT_SelectByVertexCount_Base):
             umesh.check_faces_exist(self.report)
         return {'FINISHED'}
 
+
 class UNIV_OT_SelectMode(Operator):
     bl_idname = "uv.univ_select_mode"
     bl_label = 'Select Mode'
@@ -3339,7 +3340,6 @@ class UNIV_OT_LocalInvertSelection(Operator):
 
         umeshes.update(info="Not found partial selected islands.")
         return {"FINISHED"}
-
 
 
 class UNIV_OT_LocalInvertSelection_VIEW3D(Operator):

@@ -200,17 +200,17 @@ def event_to_string(event, text=''):
         text += 'Alt + '
     return f'{text} Left Mouse '
 
-
-def true_groupby(seq):
+T = typing.TypeVar('T')
+def true_groupby(seq: list[T]) -> list[list[T]]:
     """Groups and returns only identical elements"""
     seq = seq.copy()
-    sorted_groups = []
+    sorted_groups: list[list[T]] = []
     while True:
         if len(seq) <= 1:
             break
 
         tar_val = seq.pop()
-        groups = []
+        groups: list[T] = []
         for i in range(len(seq) - 1, -1, -1):
             v = seq[i]
             if v == tar_val:

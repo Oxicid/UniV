@@ -215,35 +215,35 @@ class StackIsland:  # TODO: Split for target and target islands
                 face_start_pattern_crn.rotate(1)
 
 
-    def calc_transfer_stack_island_fw(self, transfer: 'StackIsland'):
-        for transfer_pattern in self.compared_matching_first_pattern(transfer):  # Iterate across all unique faces
+    def calc_transfer_stack_island_fw(self, trans: 'StackIsland'):
+        for trans_pattern in self.compared_matching_first_pattern(trans):  # Iterate across all unique faces
             # Container collector of island transfer patterns by generation step
             transfer_island_walked: list[list[FacePattern]] = []
-            transfer.island.set_tag(True)  # TODO: Tagging transfer_island_walked
+            trans.island.set_tag(True)  # TODO: Tagging transfer_island_walked
 
-            start_crn = transfer_pattern[0]
-            init_face_pattern = FacePattern(start_crn.face, start_crn, transfer_pattern)
+            start_crn = trans_pattern[0]
+            init_face_pattern = FacePattern(start_crn.face, start_crn, trans_pattern)
             init_face_pattern.face.tag = False
 
             face_idx = init_face_pattern.face.index
 
-            current_transfer_faces: list[FacePattern] = [init_face_pattern]
-            next_transfer_faces = []
+            current_trans_faces: list[FacePattern] = [init_face_pattern]
+            next_trans_faces = []
 
             failed = False
             for generation_step_of_shared_face in self.walked_island_from_init_face:
-                for target_face, transfer_face in zip(generation_step_of_shared_face, current_transfer_faces):
-                    if len(target_face.ordered_corners) != len(transfer_face.ordered_corners):
+                for target_face, trans_face in zip(generation_step_of_shared_face, current_trans_faces):
+                    if len(target_face.ordered_corners) != len(trans_face.ordered_corners):
                         failed = True
                         break
 
-                    for tar_face_sides, transfer_crn in zip(target_face.ordered_corners_pair_crn_face_sides, transfer_face.ordered_corners):
-                        shared_crn = transfer_crn.link_loop_radial_prev
+                    for tar_face_sides, trans_crn in zip(target_face.ordered_corners_pair_crn_face_sides, trans_face.ordered_corners):
+                        shared_crn = trans_crn.link_loop_radial_prev
                         shared_crn_face = shared_crn.face
 
                         # Skip boundary edges.
                         if tar_face_sides == 0:
-                            if shared_crn == transfer_crn or (not shared_crn_face.tag) or (shared_crn_face.index != face_idx):
+                            if shared_crn == trans_crn or (not shared_crn_face.tag) or (shared_crn_face.index != face_idx):
                                 continue
                             else:
                                 # Transfer corner has valid pair corner, stop the walking.
@@ -251,7 +251,7 @@ class StackIsland:  # TODO: Split for target and target islands
                                 break
 
                         # Expect pair crn, break.
-                        if shared_crn == transfer_crn:
+                        if shared_crn == trans_crn:
                             failed = True
                             break
 
@@ -266,13 +266,13 @@ class StackIsland:  # TODO: Split for target and target islands
 
                         # TODO: Restore tags after failed from contained faces.
                         shared_crn_face.tag = False
-                        next_transfer_faces.append(FacePattern.calc_fw(shared_crn_face, shared_crn))
+                        next_trans_faces.append(FacePattern.calc_fw(shared_crn_face, shared_crn))
                     if failed:
                         break
 
-                transfer_island_walked.append(current_transfer_faces)
-                current_transfer_faces = next_transfer_faces
-                next_transfer_faces = []
+                transfer_island_walked.append(current_trans_faces)
+                current_trans_faces = next_trans_faces
+                next_trans_faces = []
                 if failed:
                     # NOTE: Only one failing pattern is stopped, while iteration continues over all unique faces.
                     break
@@ -375,8 +375,6 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.targets: list[StackIsland] = []
-        self.transfer: list[StackIsland] = []
         self.counter: int = 0
         self.ignore_mark_seam = False
         self.calc_selected: Callable = Islands.calc_selected
@@ -400,8 +398,6 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     # Between Selected
     def stack_selected_between(self, umeshes):
-        self.targets: list[StackIsland] = []
-
         for sort_stack_islands in self.islands_preprocessing_selected_between(umeshes, StackIsland):
             for target in sort_stack_islands:
                 if target.island.tag:
@@ -409,21 +405,22 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                     if not any(i.island.tag for i in sort_stack_islands):
                         break
                     target.calc_walked_reference_island_fw_and_for_bw()
-                    for transfer in sort_stack_islands:
-                        if transfer.island.tag:
-                            res = target.calc_transfer_stack_island_fw(transfer)
+                    for trans in sort_stack_islands:
+                        if trans.island.tag:
+                            res = target.calc_transfer_stack_island_fw(trans)
                             if res:
-                                target.transfer_co_to(res, transfer.island.umesh.uv)
+                                target.transfer_co_to(res, trans.island.umesh.uv)
 
-                                transfer.island.mark_seam()
-                                transfer.island.umesh.update_tag = True
-                                transfer.island.tag = False
+                                trans.island.mark_seam()
+                                trans.island.umesh.update_tag = True
+                                trans.island.tag = False
                                 self.counter += 1
-                            transfer.island.set_tag(False)  # TODO: Check when else
+                            trans.island.set_tag(False)  # TODO: Check when else
 
         umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
     def islands_preprocessing_selected_between(self, umeshes, stack_type: typing.Type[T]) -> list[list[T]]:
+        targets: list[StackIsland] = []
         for umesh in reversed(umeshes):
             selected = self.calc_selected(umesh, with_seams = not self.ignore_mark_seam)
             if not selected:
@@ -438,40 +435,40 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             for sel_isl in selected:
                 stack_isl = stack_type(sel_isl)
                 stack_isl.preprocessing()
-                self.targets.append(stack_isl)
+                targets.append(stack_isl)
 
-        if not self.targets:
+        if not targets:
             self.report({'WARNING'}, 'Not found selected islands')
             return []
 
-        sort_stack_islands_groups = utils.true_groupby(self.targets)
+        sort_stack_islands_groups = utils.true_groupby(targets)
         if not sort_stack_islands_groups:
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
             return []
         return sort_stack_islands_groups
 
     def stack_transfer_to_target(self, umeshes):
-        self.targets: list[StackIsland] = []
-        self.transfer: list[StackIsland] = []
-
         sorted_target_islands_with_transfer = self.islands_preprocessing_target_and_transfer(umeshes, StackIsland)
 
-        for target, stacks_transfer in sorted_target_islands_with_transfer:
-            for transfer in stacks_transfer:
-                if transfer.island.tag:
-                    res = target.calc_transfer_stack_island_fw(transfer)
+        for target, transfers in sorted_target_islands_with_transfer:
+            for trans in transfers:
+                if trans.island.tag:
+                    res = target.calc_transfer_stack_island_fw(trans)
                     if res:
-                        target.transfer_co_to(res, transfer.island.umesh.uv)
+                        target.transfer_co_to(res, trans.island.umesh.uv)
 
-                        transfer.island.mark_seam()
-                        transfer.island.umesh.update_tag = True
-                        transfer.island.tag = False
+                        trans.island.mark_seam()
+                        trans.island.umesh.update_tag = True
+                        trans.island.tag = False
                         self.counter += 1
-                    transfer.island.set_tag(False)
+                    trans.island.set_tag(False)
 
         umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
-    def islands_preprocessing_target_and_transfer(self, umeshes, stack_type):
+    def islands_preprocessing_target_and_transfer(self, umeshes, stack_type) -> list[tuple[StackIsland, list[StackIsland]]]:
+        targets: list[StackIsland] = []
+        transfers: list[StackIsland] = []
+
         for umesh in reversed(umeshes):
             # TODO: With expanded selection, you can calculate islands via calc_visible
             #  and add them to selected and non_selected. This does not work with calc_selected.
@@ -499,33 +496,34 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 stack_isl = stack_type(sel_isl)
                 stack_isl.preprocessing()
                 stack_isl.calc_walked_reference_island_fw_and_for_bw()
-                self.targets.append(stack_isl)
+                targets.append(stack_isl)
 
             for non_sel_isl in non_selected:
                 stack_isl = stack_type(non_sel_isl)
                 stack_isl.preprocessing()
-                self.transfer.append(stack_isl)
+                transfers.append(stack_isl)
 
-        if not self.targets:
+        if not targets:
             self.report({'WARNING'}, 'Not found target islands')
             return []
 
-        if not self.transfer:
-            self.report({'WARNING'}, 'Not found transfer islands')
+        if not transfers:
+            self.report({'WARNING'}, 'Not found transfers islands')
             return []
 
-        sort_stack_islands = self.sort_stack_islands_target_with_transfer()
+        sort_stack_islands = self.sort_stack_islands_target_with_transfer(targets, transfers)
         if not sort_stack_islands:
             self.report({'WARNING'}, 'Islands have different set and number of polygons')
         return sort_stack_islands
 
-    def sort_stack_islands_target_with_transfer(self):
+    @staticmethod
+    def sort_stack_islands_target_with_transfer(targets: list[StackIsland], transfers: list[StackIsland]):
         sorted_groups: list[tuple[StackIsland, list[StackIsland]]] = []
-        for tar in self.targets:
+        for tar in targets:
             group: list[StackIsland] = []
-            for transfer_isl in self.transfer:
-                if tar == transfer_isl:
-                    group.append(transfer_isl)
+            for trans in transfers:
+                if tar == trans:
+                    group.append(trans)
             if group:
                 sorted_groups.append((tar, group))
         return sorted_groups
