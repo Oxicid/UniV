@@ -212,17 +212,6 @@ def is_power_of_2(n: int) -> bool:
     assert (not n <= 0), 'Value error'
     return (n & (n - 1)) == 0
 
-
-# TODO: Delete ???
-def closest_pt_to_line(pt: Vector, l_a: Vector, l_b: Vector):
-    near_pt, percent = intersect_point_line(pt, l_a, l_b)
-    if percent < 0.0:
-        return l_a
-    elif percent > 1.0:
-        return l_b
-    return near_pt
-
-
 def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
     pt = Vector(mouse_pos)
     mat = umesh.obj.matrix_world
@@ -234,8 +223,7 @@ def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
         co_a = loc3d_to_reg2d_safe(region, rv3d, mat @ v_a.co)
         co_b = loc3d_to_reg2d_safe(region, rv3d, mat @ v_b.co)
 
-        close_pt = closest_pt_to_line(pt, co_a, co_b)
-        dist = (close_pt - pt).length
+        close_pt, dist = intersect_point_line_segment(pt, co_a, co_b)
         if dist < min_dist:
             min_edge = e
             min_dist = dist

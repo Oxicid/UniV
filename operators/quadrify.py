@@ -63,7 +63,6 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         self.shear = False
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
-        self.umeshes: utypes.UMeshes | None = None
         self.mouse_pos: Vector | None = None
         self.max_distance: float | None = None
 
@@ -72,23 +71,23 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             self.report({'WARNING'}, 'Active area must be UV')
             return {'CANCELLED'}
 
-        self.umeshes = utypes.UMeshes(report=self.report)
+        umeshes = utypes.UMeshes(report=self.report)
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
         if selected_umeshes:
-            self.umeshes = selected_umeshes
-            return self.quadrify_selected()
+            umeshes = selected_umeshes
+            return self.quadrify_selected(umeshes)
         elif unselected_umeshes and self.mouse_pos:
-            self.umeshes = unselected_umeshes
-            return self.quadrify_pick()
+            umeshes = unselected_umeshes
+            return self.quadrify_pick(umeshes)
         else:
             self.report({'WARNING'}, 'Islands not found')
             return {'CANCELLED'}
 
-    def quadrify_selected(self):
+    def quadrify_selected(self, umeshes):
         counter = 0
         selected_non_quads_counter = 0
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             umesh.update_tag = False
             dirt_islands = Islands.calc_extended(umesh)
             if dirt_islands:
@@ -133,9 +132,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         if selected_non_quads_counter:
             self.report({'WARNING'}, f"Ignored {selected_non_quads_counter} non-quad faces")
         elif not counter:
-            return self.umeshes.update()
+            return umeshes.update()
 
-        self.umeshes.silent_update()
+        umeshes.silent_update()
         return {'FINISHED'}
 
     @staticmethod
@@ -178,10 +177,10 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             tot_area_uv, tot_area_3d = UNIV_OT_Normalize_VIEW3D.avg_by_frequencies(self, quad_islands)  # noqa
             UNIV_OT_Normalize_VIEW3D.normalize(self, quad_islands, tot_area_uv, tot_area_3d)  # noqa
 
-    def quadrify_pick(self):
+    def quadrify_pick(self, umeshes):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
 
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             dirt_islands = Islands.calc_visible(umesh)
             if dirt_islands:
                 for d_island in dirt_islands:

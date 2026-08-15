@@ -510,7 +510,6 @@ class UNIV_OT_Hide(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
 
@@ -519,27 +518,27 @@ class UNIV_OT_Hide(Operator):
             self.report({'WARNING'}, 'Expect Edit Mode.')
             return {'CANCELLED'}
 
-        self.umeshes = UMeshes(report=self.report)
-        self.umeshes.fix_context()
+        umeshes = UMeshes(report=self.report)
+        umeshes.fix_context()
 
         # NOTE: Filter before changing mode.
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
+        selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
 
-        if not self.umeshes.sync:
+        if not umeshes.sync:
             # Fix incorrect for hide in non-sync mode
             if utils.get_select_mode_mesh() != 'FACE':
-                self.umeshes.sync = True
-                self.umeshes._elem_mode = ''  # noqa
-                self.umeshes.elem_mode = 'FACE'
+                umeshes.sync = True
+                umeshes._elem_mode = ''  # noqa
+                umeshes.elem_mode = 'FACE'
                 utils.update_area_by_type('VIEW_3D')
-            self.umeshes.sync = False
+            umeshes.sync = False
 
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
-        if not self.umeshes:
-            return self.umeshes.update()
+        if not umeshes:
+            return umeshes.update()
         if not selected_umeshes and self.mouse_pos:
-            return self.pick_hide()
+            return self.pick_hide(umeshes)
 
         if utils.USE_GENERIC_UV_SYNC:
             return bpy.ops.uv.hide(unselected=self.unselected)
@@ -551,8 +550,8 @@ class UNIV_OT_Hide(Operator):
 
         # Unselected
         if self.unselected:
-            self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
-            for umesh in self.umeshes:
+            umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
+            for umesh in umeshes:
                 unselected_faces = utils.calc_unselected_uv_faces(umesh)
                 if umesh.sync:
                     utils.linked_hide_faces_for_3d(unselected_faces)
@@ -562,29 +561,31 @@ class UNIV_OT_Hide(Operator):
 
                 umesh.update_tag = bool(unselected_faces)
                 if unselected_faces:
+                    umesh.bm.select_history.validate()
                     umesh.bm.select_flush(True)
-            self.umeshes.update(info='Not found unselected faces')
+            umeshes.update(info='Not found unselected faces')
             return {'FINISHED'}
         # Selected
-        if self.umeshes.sync:
-            if self.umeshes.elem_mode == 'FACE':
+        if umeshes.sync:
+            if umeshes.elem_mode == 'FACE':
                 return bpy.ops.uv.hide(unselected=False)
 
-            self.umeshes.filter_by_selected_mesh_faces()
-            if not self.umeshes:
+            umeshes.filter_by_selected_mesh_faces()
+            if not umeshes:
                 # TODO: Implement hide by view box
                 return bpy.ops.uv.hide(unselected=False)
 
-            if self.umeshes.elem_mode == 'VERT':
-                self.vert_hide_sync_preprocessing()
-            elif self.umeshes.elem_mode == 'EDGE':
-                self.edge_hide_sync_preprocessing()
+            if umeshes.elem_mode == 'VERT':
+                self.vert_hide_sync_preprocessing(umeshes)
+            elif umeshes.elem_mode == 'EDGE':
+                self.edge_hide_sync_preprocessing(umeshes)
 
             res = bpy.ops.uv.hide(unselected=False)
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 if umesh.sequence:
                     for f in umesh.sequence:
                         f.hide_set(False)
+                    umesh.bm.select_history.validate()
                     umesh.update()
                 if preferences.debug():
                     if umesh.total_face_sel or umesh.total_edge_sel or umesh.total_vert_sel:
@@ -594,20 +595,22 @@ class UNIV_OT_Hide(Operator):
         else:
             # bpy.ops.uv.hide sometimes works incorrectly in 'FACE' mode too,
             # maybe it's something to do with not updating bm.select_mode
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 uv = umesh.uv
                 update_tag = False
                 for f in utils.calc_visible_uv_faces(umesh):
                     if any(crn[uv].select for crn in f.loops):
                         f.select = False
                         update_tag = True
+                if update_tag:
+                    umesh.bm.select_history.validate()
                 umesh.update_tag = update_tag
-            return self.umeshes.update()
+            return umeshes.update()
 
-    def pick_hide(self):
+    def pick_hide(self, umeshes):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
         all_islands = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             for isl in utypes.Islands.calc_visible(umesh):
                 if self.unselected:
                     all_islands.append(isl)
@@ -628,13 +631,18 @@ class UNIV_OT_Hide(Operator):
                 if isl.tag:
                     isl.hide_first()
                     isl.umesh.update_tag = True
-            return self.umeshes.update()
+            for u in umeshes:
+                if u.update_tag:
+                    u.bm.select_history.validate()
+            return umeshes.update()
         else:
             hit.island.hide_first()
+            hit.island.umesh.bm.select_history.validate()
             hit.island.umesh.update()
         return {'FINISHED'}
 
-    def vert_hide_sync_preprocessing(self):
+    @staticmethod
+    def vert_hide_sync_preprocessing(umeshes):
         def is_hide_face():
             for crn in f.loops:
                 crn_vert = crn.vert
@@ -646,7 +654,7 @@ class UNIV_OT_Hide(Operator):
                             return True
             return False
 
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             uv = umesh.uv
             visible_faces = utils.calc_visible_uv_faces(umesh)
             for f in visible_faces:
@@ -656,7 +664,8 @@ class UNIV_OT_Hide(Operator):
                 if not is_hide_face():
                     umesh.sequence.append(f)
 
-    def edge_hide_sync_preprocessing(self):
+    @staticmethod
+    def edge_hide_sync_preprocessing(umeshes):
         def is_hide_face():
             for crn in f.loops:
                 if crn.edge.select:
@@ -674,7 +683,7 @@ class UNIV_OT_Hide(Operator):
                             return True
             return False
 
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             uv = umesh.uv
             visible_faces = utils.calc_visible_uv_faces(umesh)
             for f in visible_faces:

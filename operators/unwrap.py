@@ -68,39 +68,38 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.mouse_pos = Vector((0, 0))
         self.max_distance: float | None = None
-        self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes()
-        self.umeshes.fix_context()
+        umeshes = utypes.UMeshes()
+        umeshes.fix_context()
         if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
-        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
-        if not self.umeshes:
-            return self.umeshes.update()
+        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
+        umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not umeshes:
+            return umeshes.update()
 
         if not selected_umeshes and self.max_distance is not None and context.area.ui_type == 'UV':
-            return self.pick_unwrap()
+            return self.pick_unwrap(umeshes)
         else:
             if not selected_umeshes:
                 self.report({'WARNING'}, 'Need selected geometry')
                 return {'CANCELLED'}
 
-            if self.umeshes.sync:
-                if self.umeshes.elem_mode == 'FACE':
-                    self.unwrap_sync_faces()
+            if umeshes.sync:
+                if umeshes.elem_mode == 'FACE':
+                    self.unwrap_sync_faces(umeshes)
                 else:
-                    self.unwrap_sync_verts_or_edges()
+                    self.unwrap_sync_verts_or_edges(umeshes)
             else:
-                self.unwrap_non_sync()
-            return self.umeshes.update()
+                self.unwrap_non_sync(umeshes)
+            return umeshes.update()
 
-    def pick_unwrap(self, **unwrap_kwargs):
+    def pick_unwrap(self, umeshes, **unwrap_kwargs):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             for isl in utypes.Islands.calc_visible(umesh):
                 hit.find_nearest_island(isl)
 
@@ -209,7 +208,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return False
 
 
-    def unwrap_sync_verts_or_edges(self, **unwrap_kwargs):
+    def unwrap_sync_verts_or_edges(self, umeshes, **unwrap_kwargs):
         from importlib.util import find_spec
         found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
@@ -223,7 +222,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         all_pins = []
 
         # TODO: Add update tag
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             has_full_selected_uv_faces = umesh.has_full_selected_uv_faces()
             if has_full_selected_uv_faces:
                 full_selected_meshes.append(umesh)
@@ -423,7 +422,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                             crn_uv.pin_uv = True
                             unpin_uvs.add(crn_uv)
                 else:
-                    if self.umeshes.elem_mode == 'EDGE':
+                    if umeshes.elem_mode == 'EDGE':
                         to_restore_selection = {e for f in faces_to_select for e in f.edges if e.select}
                     else:
                         to_restore_selection = {v for f in faces_to_select for v in f.verts if v.select}
@@ -559,8 +558,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         isl.sequence = (unpinned, to_select)
 
 
-    def unwrap_sync_faces(self, **unwrap_kwargs):
-        assert self.umeshes.elem_mode == 'FACE'
+    def unwrap_sync_faces(self, umeshes, **unwrap_kwargs):
+        assert umeshes.elem_mode == 'FACE'
         from importlib.util import find_spec
         found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
@@ -568,7 +567,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         unique_number_for_multiply = 0
         hidden_constraints_islands: list[utypes.AdvIsland] = []
         all_transform_islands = []
-        for umesh in reversed(self.umeshes):
+        for umesh in reversed(umeshes):
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
@@ -659,7 +658,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
                                      f"Try again by setting at least one pin or by partially selecting the island.")
 
 
-    def unwrap_non_sync(self, **unwrap_kwargs):
+    def unwrap_non_sync(self, umeshes, **unwrap_kwargs):
         save_transform_islands = []
         hidden_constraints_islands = []
         failed_total = 0
@@ -670,7 +669,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         from importlib.util import find_spec
         found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
-        for umesh in reversed(self.umeshes):
+        for umesh in reversed(umeshes):
             uv = umesh.uv
             face_select_get = utils.face_select_get_func(umesh)
             crn_select_get = utils.vert_select_get_func(umesh)
@@ -889,53 +888,52 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         utypes.RayCast.__init__(self)
-        self.umeshes: utypes.UMeshes | None = None
         self.texel = -1
         self.texture_size = -1
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
+        umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
 
-        self.umeshes.fix_context()
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes.fix_context()
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
         from ..preferences import univ_settings
         self.texel = univ_settings().texel_density
         self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
 
         if self.use_correct_aspect:
-            self.umeshes.calc_aspect_ratio(from_mesh=True)
+            umeshes.calc_aspect_ratio(from_mesh=True)
 
         if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
-        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
-        if not self.umeshes:
-            return self.umeshes.update()
+        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
+        umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not umeshes:
+            return umeshes.update()
 
         if not selected_umeshes and self.mouse_pos_from_3d:
-            return self.pick_unwrap()
+            return self.pick_unwrap(umeshes)
         else:
             if not selected_umeshes:
                 self.report({'WARNING'}, 'Need selected geometry')
                 return {'CANCELLED'}
 
-            for u in reversed(self.umeshes):
+            for u in reversed(umeshes):
                 if not u.has_uv and not u.total_face_sel:
-                    self.umeshes.umeshes.remove(u)
-            if not self.umeshes:
+                    umeshes.umeshes.remove(u)
+            if not umeshes:
                 self.report({'WARNING'}, 'Need selected faces for objects without uv')
                 return {'CANCELLED'}
 
-            self.unwrap_selected()
-            self.umeshes.update()
+            self.unwrap_selected(umeshes)
+            umeshes.update()
             return {'FINISHED'}
 
-    def pick_unwrap(self, **unwrap_kwargs):
-        hit = self.ray_cast(prefs().max_pick_distance)
+    def pick_unwrap(self, umeshes, **unwrap_kwargs):
+        hit = self.ray_cast(umeshes, prefs().max_pick_distance)
         if not hit:
             return {'CANCELLED'}
 
@@ -1002,23 +1000,23 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.update()
         return {'FINISHED'}
 
-    def unwrap_selected(self, **unwrap_kwargs):
+    def unwrap_selected(self, umeshes, **unwrap_kwargs):
         meshes_with_uvs = []
         meshes_without_uvs = []
         unique_number = 0
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             umesh.value = umesh.check_uniform_scale(report=self.report)
             if not umesh.has_uv:
                 meshes_without_uvs.append(umesh)
             else:
                 umesh.verify_uv()
                 meshes_with_uvs.append(umesh)
-                if self.umeshes.elem_mode == 'VERT':
+                if umeshes.elem_mode == 'VERT':
                     if umesh.total_face_sel:
                         unique_number += self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
                     else:
                         unique_number += self.unwrap_selected_verts_preprocess(umesh)
-                elif self.umeshes.elem_mode == 'EDGE':
+                elif umeshes.elem_mode == 'EDGE':
                     if umesh.total_face_sel:
                         unique_number += self.unwrap_selected_faces_preprocess_vert_edge_mode(umesh)
                     else:
@@ -1035,10 +1033,11 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
         self.unwrap_without_uvs_postprocess(meshes_without_uvs)
 
-    def unwrap_selected_faces_preprocess_vert_edge_mode(self, umesh):
+    @staticmethod
+    def unwrap_selected_faces_preprocess_vert_edge_mode(umesh):
         assert umesh.total_face_sel
-        assert self.umeshes.elem_mode in ('VERT', 'EDGE')
-        mesh_islands = utypes.MeshIslands.calc_visible_with_mark_seam(umesh)
+        assert umesh.elem_mode in ('VERT', 'EDGE')
+        mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
         pinned = []
         to_select = []
@@ -1073,7 +1072,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
                     pinned.append(crn_uv)
 
         expected_total_selected_faces = umesh.total_face_sel + len(to_select)
-        if self.umeshes.elem_mode == 'VERT':
+        if umesh.elem_mode == 'VERT':
             to_deselect_elements = [v for f in to_select for v in f.verts if not v.select]
         else:
             to_deselect_elements = [e for f in to_select for e in f.edges if not e.select]
@@ -1095,10 +1094,11 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
         return unique_number
 
-    def unwrap_selected_verts_preprocess(self, umesh):
+    @staticmethod
+    def unwrap_selected_verts_preprocess(umesh):
         assert not umesh.total_face_sel
-        assert self.umeshes.elem_mode == 'VERT'
-        mesh_islands = utypes.MeshIslands.calc_visible_with_mark_seam(umesh)
+        assert umesh.elem_mode == 'VERT'
+        mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
         pinned = []
         to_select = []
@@ -1150,10 +1150,11 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
         umesh.other = UnwrapData(None, pinned, save_transform_islands, to_deselect_elements)
         return unique_number
 
-    def unwrap_selected_edges_preprocess(self, umesh):
+    @staticmethod
+    def unwrap_selected_edges_preprocess(umesh):
         assert not umesh.total_face_sel
-        assert self.umeshes.elem_mode == 'EDGE'
-        mesh_islands = utypes.MeshIslands.calc_visible_with_mark_seam(umesh)
+        assert umesh.elem_mode == 'EDGE'
+        mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
         pinned = []
         to_select = []
@@ -1227,7 +1228,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
     @staticmethod
     def unwrap_selected_faces_preprocess(umesh):
         assert umesh.total_face_sel
-        mesh_islands = utypes.MeshIslands.calc_extended_with_mark_seam(umesh)
+        mesh_islands = utypes.MeshIslands.calc_extended(umesh)
         unique_number = 0
         pinned = []
         to_select = []
@@ -1283,7 +1284,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
     def unwrap_without_uvs_postprocess(self, umeshes):
         for umesh in umeshes:
-            mesh_islands = utypes.MeshIslands.calc_extended_with_mark_seam(umesh)
+            mesh_islands = utypes.MeshIslands.calc_extended(umesh)
             umesh.verify_uv()
 
             adv_islands = mesh_islands.to_adv_islands()

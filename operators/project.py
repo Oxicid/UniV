@@ -9,7 +9,7 @@ from math import pi, cos, sin
 from bl_math import clamp
 from .. import utils
 from .. import utypes
-from ..utypes import BBox, MeshIsland, MeshIslands
+from ..utypes import BBox, MeshIsland, MeshIslands, UMeshes
 from bpy.props import *
 from collections.abc import Callable
 from mathutils import Vector, Euler, Matrix
@@ -53,46 +53,45 @@ class UNIV_OT_Normal(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
-        self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
-        if self.umeshes.is_edit_mode:
-            selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
+        if umeshes.is_edit_mode:
+            selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
-                self.umeshes = selected
+                umeshes = selected
                 self.has_selected = True
             elif unselected:
-                self.umeshes = unselected
+                umeshes = unselected
                 self.has_selected = False
         else:
-            self.umeshes.ensure(face=True)  # TODO: Delete ensure?1
+            umeshes.ensure(face=True)  # TODO: Delete ensure?1
 
-        if not self.umeshes:
-            return self.umeshes.update(info=self.info)
+        if not umeshes:
+            return umeshes.update(info=self.info)
 
-        self.umeshes.verify_uv()
+        umeshes.verify_uv()
 
         if self.use_correct_aspect:
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 umesh.aspect = utils.get_aspect_ratio(umesh)
 
         if self.individual:
-            self.xyz_to_uv_individual()
+            self.xyz_to_uv_individual(umeshes)
         else:
-            self.xyz_to_uv()
+            self.xyz_to_uv(umeshes)
 
-        if not self.umeshes.is_edit_mode:
-            ret = self.umeshes.update(info=self.info)
-            self.umeshes.free()
+        if not umeshes.is_edit_mode:
+            ret = umeshes.update(info=self.info)
+            umeshes.free()
             bpy.context.area.tag_redraw()
             return ret
-        return self.umeshes.update(info=self.info)
+        return umeshes.update(info=self.info)
 
-    def xyz_to_uv(self):
-        vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces()
+    def xyz_to_uv(self, umeshes: UMeshes):
+        vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces(umeshes)
         rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
 
         global_bbox = BBox()
@@ -105,11 +104,11 @@ class UNIV_OT_Normal(bpy.types.Operator):
 
         self.crop_islands(adv_islands_of_mesh, global_bbox)
 
-    def xyz_to_uv_individual(self):
+    def xyz_to_uv_individual(self, umeshes: UMeshes):
         global_bbox = BBox()
         adv_islands_of_mesh = []
 
-        for vector_nor, mesh_islands in self.avg_normal_and_calc_faces_individual():
+        for vector_nor, mesh_islands in self.avg_normal_and_calc_faces_individual(umeshes):
             adv_island = mesh_islands.to_adv_island()
             adv_islands_of_mesh.append(adv_island)
             rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
@@ -184,8 +183,8 @@ class UNIV_OT_Normal(bpy.types.Operator):
             scale, delta, pivot = utils.get_transform_from_box(src_bb, tar_bb, axis='XY', pad=pad, use_crop=True)
             island.umesh.update_tag |= island.scale_with_move(scale, delta, pivot)
 
-    def avg_normal_and_calc_faces_individual(self):
-        if self.umeshes.is_edit_mode:
+    def avg_normal_and_calc_faces_individual(self, umeshes: UMeshes):
+        if umeshes.is_edit_mode:
             if self.has_selected:
                 calc_mesh_isl_obj = MeshIslands.calc_selected
             else:
@@ -193,7 +192,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
         else:
             calc_mesh_isl_obj = MeshIslands.calc_all
 
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             _, r, s = umesh.obj.matrix_world.decompose()
             mtx = Matrix.LocRotScale(Vector(), r, s)
             for mesh_isl in calc_mesh_isl_obj(umesh):  # noqa
@@ -203,12 +202,12 @@ class UNIV_OT_Normal(bpy.types.Operator):
                 weight = mtx @ weight
                 yield weight, mesh_isl
 
-    def avg_normal_and_calc_faces(self):
+    def avg_normal_and_calc_faces(self, umeshes: UMeshes):
         tot_weight = Vector()
         islands_of_mesh: list[MeshIslands] = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             weight = Vector()
-            if not self.umeshes.is_edit_mode:
+            if not umeshes.is_edit_mode:
                 faces = umesh.bm.faces
             else:
                 if self.has_selected:
@@ -280,38 +279,37 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
         self.has_selected: bool = True
-        self.umeshes: utypes.UMeshes | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
-        self.umeshes.set_sync(True)
+        umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
+        umeshes.set_sync(True)
         if self.is_edit_mode:
-            selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+            selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
-                self.umeshes = selected
+                umeshes = selected
                 self.has_selected = True
             elif visible:
-                self.umeshes = visible
+                umeshes = visible
                 self.has_selected = False
             else:
                 self.report({'WARNING'}, 'Not found faces for manipulate')
                 return {'CANCELLED'}
-        self.umeshes.verify_uv()
+        umeshes.verify_uv()
 
-        self.box()
-        for u in self.umeshes:
+        self.box(umeshes)
+        for u in umeshes:
             u.check_uniform_scale(self.report)
 
         if not self.is_edit_mode:
-            self.umeshes.update('No faces for manipulate')
-            self.umeshes.free()
+            umeshes.update('No faces for manipulate')
+            umeshes.free()
             bpy.context.area.tag_redraw()
         else:
-            self.umeshes.update(info='Not selected face')
+            umeshes.update(info='Not selected face')
         return {'FINISHED'}
 
-    def box(self):
-        for umesh in self.umeshes:
+    def box(self, umeshes):
+        for umesh in umeshes:
 
             mtx_x, mtx_y, mtx_z, r = self.get_box_transforms(umesh)
             if self.is_edit_mode:
@@ -343,7 +341,7 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         return mtx_x, mtx_y, mtx_z, r
 
     def get_aspect_matrix(self, umesh):
-        aspect = (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)
+        aspect = (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)  # TODO: Compute aspects in execute
         if aspect >= 1.0:
             aspect_x_mtx = Matrix.Diagonal((1, 1 / aspect, 1))
             aspect_y_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
@@ -482,7 +480,6 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         super().__init__(*args, **kwargs)
         self.info = 'No found faces for manipulate'
         self.has_selected: bool = True
-        self.umeshes: utypes.UMeshes | None = None
         self.region = None
         self.area = None
         self.rv3d = None
@@ -491,9 +488,9 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         self.camera = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
         self.area = context.area
         if self.area.type != 'VIEW_3D':
@@ -507,47 +504,47 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         self.rv3d = self.region.data
         self.camera = utils.get_view3d_camera_data(self.v3d, self.rv3d)  # noqa
 
-        if self.umeshes.is_edit_mode:
-            selected, unselected = self.umeshes.filtered_by_selected_and_visible_uv_faces()
+        if umeshes.is_edit_mode:
+            selected, unselected = umeshes.filtered_by_selected_and_visible_uv_faces()
             if selected:
-                self.umeshes = selected
+                umeshes = selected
                 self.has_selected = True
                 self.faces_calc_type = utils.calc_selected_uv_faces
             elif unselected:
-                self.umeshes = unselected
+                umeshes = unselected
                 self.has_selected = False
                 self.faces_calc_type = utils.calc_visible_uv_faces
         else:
             self.faces_calc_type = lambda umesh_: umesh_.bm.faces
 
-        if not self.umeshes:
-            return self.umeshes.update(info=self.info)
+        if not umeshes:
+            return umeshes.update(info=self.info)
 
-        self.umeshes.verify_uv()
+        umeshes.verify_uv()
 
         if self.use_correct_aspect:
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 umesh.aspect = utils.get_aspect_ratio(umesh)
 
-        self.view_project()
+        self.view_project(umeshes)
 
-        if not self.umeshes.is_edit_mode:
-            ret = self.umeshes.update(info=self.info)
-            self.umeshes.free()
+        if not umeshes.is_edit_mode:
+            ret = umeshes.update(info=self.info)
+            umeshes.free()
             bpy.context.area.tag_redraw()
             return ret
-        return self.umeshes.update(info=self.info)
+        return umeshes.update(info=self.info)
 
-    def view_project(self):
+    def view_project(self, umeshes: UMeshes):
         # objects_pos_avg = Vector()
-        # for umesh in self.umeshes:
+        # for umesh in umeshes:
         #     loc, _, _ = umesh.obj.matrix_world.decompose()
         #     objects_pos_avg += loc
-        # objects_pos_offset = -(objects_pos_avg * (1 / len(self.umeshes)))
+        # objects_pos_offset = -(objects_pos_avg * (1 / len(umeshes)))
         # objects_pos_offset.resize(4)
         pointers_to_coords = []
         coords_append = pointers_to_coords.append
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             uv = umesh.uv
             aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             if self.use_orthographic:
@@ -860,33 +857,32 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: utypes.UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
         import bmesh
-        self.umeshes = utypes.UMeshes(report=self.report)
-        self.umeshes.fix_context()
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes = utypes.UMeshes(report=self.report)
+        umeshes.fix_context()
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
-        if not self.umeshes:
-            return self.umeshes.update()
+        if not umeshes:
+            return umeshes.update()
         if self.use_correct_aspect:
-            self.umeshes.calc_aspect_ratio(from_mesh=True)
+            umeshes.calc_aspect_ratio(from_mesh=True)
 
-        if self.umeshes.is_edit_mode:
-            selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_faces()
-            self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
-            if not self.umeshes:
-                return self.umeshes.update(info='Not found faces for manipulate')
+        if umeshes.is_edit_mode:
+            selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
+            umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+            if not umeshes:
+                return umeshes.update(info='Not found faces for manipulate')
 
-            if self.apply_gn():
+            if self.apply_gn(umeshes):
                 return {'FINISHED'}
 
             if selected_umeshes:
-                for umesh in self.umeshes:
+                for umesh in umeshes:
                     uv = umesh.uv
                     split_edges = set()
                     selected_faces = utils.calc_selected_uv_faces(umesh)
@@ -904,14 +900,14 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                     self.apply_coords(selected_faces, umesh)
                 if self.flatten_type == 'SHAPE_KEY':
                     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-                    for umesh in self.umeshes:
+                    for umesh in umeshes:
                         self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
                         umesh.obj.data.update_tag()
                     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
                     return {'FINISHED'}
 
             else:
-                for umesh in self.umeshes:
+                for umesh in umeshes:
                     uv = umesh.uv
                     split_edges = set()
                     visible_faces = utils.calc_visible_uv_faces(umesh)
@@ -926,15 +922,15 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
                 if self.flatten_type == 'SHAPE_KEY':
                     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-                    for umesh in self.umeshes:
+                    for umesh in umeshes:
                         self.apply_shape_keys((f for f in umesh.obj.data.polygons if not f.hide), umesh)
                         umesh.obj.data.update_tag()
                     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
         else:
-            if self.apply_gn():
+            if self.apply_gn(umeshes):
                 return {'FINISHED'}
 
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 uv = umesh.uv
                 split_edges = set()
                 for f in umesh.bm.faces:
@@ -954,8 +950,8 @@ class UNIV_OT_Flatten(bpy.types.Operator):
             if self.flatten_type == 'SHAPE_KEY':
                 return {'FINISHED'}
 
-        self.umeshes.silent_update()
-        self.umeshes.free()
+        umeshes.silent_update()
+        umeshes.free()
         return {'FINISHED'}
 
     def apply_coords(self, faces, umesh):
@@ -1024,23 +1020,23 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                 else:
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().xzy
 
-    def apply_gn(self):
+    def apply_gn(self, umeshes: UMeshes):
         if self.flatten_type == 'MODIFIER':
             if bpy.app.version < (4, 1, 0):
                 self.report({'WARNING'}, 'Modifier types is not supported in Blender versions below 4.1')
                 return True
             node_group = self.get_flatten_node_group()
-            self.create_gn_flatter_modifier(node_group)
+            self.create_gn_flatter_modifier(umeshes, node_group)
             utils.update_area_by_type('VIEW_3D')
             return True
         return False
 
-    def create_gn_flatter_modifier(self, node_group):
+    def create_gn_flatter_modifier(self, umeshes, node_group):
         if bpy.app.version >= (5, 2, 0):
             axis = {'z': 'Bottom', 'y': 'Front', 'x': 'Side'}
         else:
             axis = {'z': 2, 'y': 3, 'x': 4}
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             has_flatten_modifier = False
 
             for m in umesh.obj.modifiers:
@@ -1386,26 +1382,25 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: utypes.UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
-        self.umeshes.fix_context()
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes = utypes.UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
+        umeshes.fix_context()
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
         removed_sk_counter = 0
         removed_modifiers = 0
         removed_geometry_nodes = 0
-        if self.umeshes:
-            has_shape_keys = self.has_flatten_shape_keys()
+        if umeshes:
+            has_shape_keys = self.has_flatten_shape_keys(umeshes)
             if has_shape_keys:
-                if self.umeshes.is_edit_mode:
+                if umeshes.is_edit_mode:
                     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
 
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 # Remove shape keys
                 if umesh.obj.data.shape_keys and umesh.obj.data.shape_keys.key_blocks.get('uv'):
                     if len(umesh.obj.data.shape_keys.key_blocks) == 2:
@@ -1423,7 +1418,7 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
                         removed_modifiers += 1
 
                 umesh.obj.data.update_tag()
-                if self.umeshes.is_edit_mode:
+                if umeshes.is_edit_mode:
                     bpy.ops.object.mode_set(mode='EDIT', toggle=False)
 
         # Remove geometry nodes
@@ -1446,8 +1441,9 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
 
         return {'FINISHED'}
 
-    def has_flatten_shape_keys(self):
-        for umesh in self.umeshes:
+    @staticmethod
+    def has_flatten_shape_keys(umeshes: UMeshes):
+        for umesh in umeshes:
             if umesh.obj.data.shape_keys:
                 if umesh.obj.data.shape_keys.key_blocks.get('uv'):
                     return True

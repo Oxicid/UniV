@@ -375,7 +375,6 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
         self.targets: list[StackIsland] = []
         self.transfer: list[StackIsland] = []
         self.counter: int = 0
@@ -384,25 +383,25 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
 
     def execute(self, context) -> set[str]:
         self.counter = 0
-        self.umeshes = UMeshes(report=self.report)
-        self.umeshes.update_tag = False
-        if not self.umeshes.sync and context.area.ui_type != 'UV':
-            self.umeshes.set_sync(True)
+        umeshes: UMeshes = UMeshes(report=self.report)
+        umeshes.update_tag = False
+        if not umeshes.sync and context.area.ui_type != 'UV':
+            umeshes.set_sync(True)
 
         if self.between_selected:
-            self.stack_selected_between()
+            self.stack_selected_between(umeshes)
         else:
-            self.stack_transfer_to_target()
+            self.stack_transfer_to_target(umeshes)
         if self.counter:
             self.report({'INFO'}, f'Found {self.counter} islands for stacking')
 
         return {'FINISHED'}
 
     # Between Selected
-    def stack_selected_between(self):
+    def stack_selected_between(self, umeshes):
         self.targets: list[StackIsland] = []
 
-        for sort_stack_islands in self.islands_preprocessing_selected_between():
+        for sort_stack_islands in self.islands_preprocessing_selected_between(umeshes, StackIsland):
             for target in sort_stack_islands:
                 if target.island.tag:
                     target.island.tag = False
@@ -421,13 +420,13 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                                 self.counter += 1
                             transfer.island.set_tag(False)  # TODO: Check when else
 
-        self.umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
+        umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
-    def islands_preprocessing_selected_between(self, stack_type: typing.Type[T] = StackIsland) -> list[list[T]]:
-        for umesh in reversed(self.umeshes):
+    def islands_preprocessing_selected_between(self, umeshes, stack_type: typing.Type[T]) -> list[list[T]]:
+        for umesh in reversed(umeshes):
             selected = self.calc_selected(umesh)
             if not selected:
-                self.umeshes.umeshes.remove(umesh)
+                umeshes.umeshes.remove(umesh)
                 continue
 
             if isinstance(selected, utypes.MeshIslands):
@@ -450,11 +449,11 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
             return []
         return sort_stack_islands_groups
 
-    def stack_transfer_to_target(self):
+    def stack_transfer_to_target(self, umeshes):
         self.targets: list[StackIsland] = []
         self.transfer: list[StackIsland] = []
 
-        sorted_target_islands_with_transfer = self.islands_preprocessing_target_and_transfer()
+        sorted_target_islands_with_transfer = self.islands_preprocessing_target_and_transfer(umeshes, StackIsland)
 
         for target, stacks_transfer in sorted_target_islands_with_transfer:
             for transfer in stacks_transfer:
@@ -469,17 +468,17 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                         self.counter += 1
                     transfer.island.set_tag(False)
 
-        self.umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
+        umeshes.update(info_type={'WARNING'}, info='No found islands for stacking')
 
-    def islands_preprocessing_target_and_transfer(self, stack_type=StackIsland):
-        for umesh in reversed(self.umeshes):
+    def islands_preprocessing_target_and_transfer(self, umeshes, stack_type):
+        for umesh in reversed(umeshes):
             # TODO: With expanded selection, you can calculate islands via calc_visible
             #  and add them to selected and non_selected. This does not work with calc_selected.
             selected = self.calc_selected(umesh)
             non_selected = self.calc_non_selected(umesh)
 
             if not selected and not non_selected:
-                self.umeshes.umeshes.remove(umesh)
+                umeshes.umeshes.remove(umesh)
                 continue
 
             if isinstance(selected, utypes.MeshIslands):

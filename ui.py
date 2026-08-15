@@ -516,6 +516,22 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
 
 
+        # Misk
+        panel = draw_panel(layout, 'Misc')
+        if panel:
+            col_align = panel.column(align=True)
+
+            row = col_align.row(align=True)
+            row.operator('mesh.univ_weld', icon_value=icons.weld)
+            row.operator('mesh.univ_stitch', icon_value=icons.stitch)
+
+            row = col_align.row(align=True)
+            row.scale_y = 1.35
+            row.operator('mesh.univ_stack', icon_value=icons.stack)
+            if univ_pro_exist:
+                row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
+
+
         # Project
         panel = draw_panel(layout, 'Project')
         if panel:
@@ -538,22 +554,6 @@ class UNIV_PT_General_VIEW_3D(Panel):
             row = split.row(align=True)
             row.operator('mesh.univ_flatten', icon_value=icons.flatten)
             row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
-
-
-        # Misk
-        panel = draw_panel(layout, 'Misc')
-        if panel:
-            col_align = panel.column(align=True)
-
-            row = col_align.row(align=True)
-            row.operator('mesh.univ_weld', icon_value=icons.weld)
-            row.operator('mesh.univ_stitch', icon_value=icons.stitch)
-
-            row = col_align.row(align=True)
-            row.scale_y = 1.35
-            row.operator('mesh.univ_stack', icon_value=icons.stack)
-            if univ_pro_exist:
-                row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
 
 
         # Other

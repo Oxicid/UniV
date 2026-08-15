@@ -8,7 +8,7 @@ import bmesh
 from . import unwrap
 from .. import utypes
 from .. import utils
-from ..utypes import Islands
+from ..utypes import Islands, UMeshes
 from ..preferences import univ_settings
 
 
@@ -63,25 +63,25 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             self.unwrap = 'MINIMUM_STRETCH'
 
     def execute(self, context):
-        self.umeshes = utypes.UMeshes()
-        self.umeshes.fix_context()
+        umeshes = utypes.UMeshes()
+        umeshes.fix_context()
 
-        # self.umeshes.elem_mode
+        # umeshes.elem_mode
         # Legacy
         if not self.slim_support or self.legacy:
-            self.umeshes.filter_by_selected_uv_by_context()
-            if self.umeshes.sync:
-                if self.umeshes.elem_mode == 'FACE':
-                    self.legacy_sync_relax_faces()
+            umeshes.filter_by_selected_uv_by_context()
+            if umeshes.sync:
+                if umeshes.elem_mode == 'FACE':
+                    self.legacy_sync_relax_faces(umeshes)
                 else:
-                    self.legacy_sync_relax_verts_or_edges()
+                    self.legacy_sync_relax_verts_or_edges(umeshes)
             else:
-                self.relax_non_sync()
+                self.relax_non_sync(umeshes)
 
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 umesh.bm.select_flush_mode()
 
-            self.umeshes.update()
+            umeshes.update()
             # Always return FINISHED for legacy, to avoid not showed property.
             return {'FINISHED'}
 
@@ -91,35 +91,35 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 unwrap.MULTIPLAYER = 1
                 unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
-            selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
-            self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
-            if not self.umeshes:
-                return self.umeshes.update()
+            selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
+            umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+            if not umeshes:
+                return umeshes.update()
 
             if not selected_umeshes and self.max_distance is not None:
-                return self.pick_unwrap(no_flip=True, iterations=self.iterations)
+                return self.pick_unwrap(umeshes, no_flip=True, iterations=self.iterations)
 
             if not selected_umeshes:
                 self.report({'WARNING'}, 'Need selected geometry')
                 return {'CANCELLED'}
 
-            if self.umeshes.sync:
-                if self.umeshes.elem_mode == 'FACE':
-                    self.unwrap_sync_faces(no_flip=True, iterations=self.iterations)
+            if umeshes.sync:
+                if umeshes.elem_mode == 'FACE':
+                    self.unwrap_sync_faces(umeshes, no_flip=True, iterations=self.iterations)
                 else:
-                    self.unwrap_sync_verts_or_edges(no_flip=True, iterations=self.iterations)
+                    self.unwrap_sync_verts_or_edges(umeshes, no_flip=True, iterations=self.iterations)
             else:
-                self.unwrap_non_sync(no_flip=True, iterations=self.iterations)
+                self.unwrap_non_sync(umeshes, no_flip=True, iterations=self.iterations)
 
-        return self.umeshes.update()
+        return umeshes.update()
 
-    def legacy_sync_relax_verts_or_edges(self):
+    def legacy_sync_relax_verts_or_edges(self, umeshes: UMeshes):
         # TODO: Ignore relax if selected face exist
         crn: bmesh.types.BMLoop
         relax_data: list[RelaxData] = []
 
-        for umesh in self.umeshes:
-            if self.umeshes.elem_mode == 'VERT':
+        for umesh in umeshes:
+            if umeshes.elem_mode == 'VERT':
                 selected_elem = utils.calc_selected_verts(umesh)
             else:
                 selected_elem = utils.calc_selected_3d_edges(umesh)
@@ -166,7 +166,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             for v in verts_to_select:
                 v.select = True
 
-            if self.umeshes.elem_mode == 'EDGE':  # TODO: Check without this
+            if umeshes.elem_mode == 'EDGE':  # TODO: Check without this
                 for e in umesh.bm.edges:
                     e.select = sum(v.select for v in e.verts) == 2
 
@@ -221,12 +221,12 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                 for crn in f.loops:
                     crn[uv].pin_uv = False
 
-    def legacy_sync_relax_faces(self):
-        assert self.umeshes.elem_mode == 'FACE'
+    def legacy_sync_relax_faces(self, umeshes: UMeshes):
+        assert umeshes.elem_mode == 'FACE'
         from ..utils import linked_crn_uv_unordered_included, shared_is_linked
 
         relax_data: list[RelaxData] = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             uv = umesh.uv
             islands = Islands.calc_extended_without_ms(umesh)
 
@@ -308,11 +308,11 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             rd.remove_all_pins_from_umesh()
 
-    def relax_non_sync(self):
+    def relax_non_sync(self, umeshes: UMeshes):
         from ..utils import linked_crn_uv_unordered, is_boundary_func, vert_select_get_func, is_visible_func
 
         relax_data: list[RelaxData] = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             is_boundary = is_boundary_func(umesh)
             is_vert_select = vert_select_get_func(umesh)
             is_visible = is_visible_func(umesh.sync)
@@ -376,42 +376,42 @@ class UNIV_OT_Relax_VIEW3D(unwrap.UNIV_OT_Unwrap_VIEW3D):
             unwrap.MULTIPLAYER = 1
             unwrap.UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
-        self.umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
+        umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
 
-        self.umeshes.fix_context()
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes.fix_context()
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
         from ..preferences import univ_settings
         self.texel = univ_settings().texel_density
         self.texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
 
         if self.use_correct_aspect:
-            self.umeshes.calc_aspect_ratio(from_mesh=True)
+            umeshes.calc_aspect_ratio(from_mesh=True)
 
         if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
             self.report({'WARNING'}, 'Relax is not supported in Blender versions below 4.3')
             return {'CANCELLED'}
 
-        selected_umeshes, unselected_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_by_context()
-        self.umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
-        if not self.umeshes:
-            return self.umeshes.update()
+        selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
+        umeshes = selected_umeshes if selected_umeshes else unselected_umeshes
+        if not umeshes:
+            return umeshes.update()
 
         if not selected_umeshes and self.mouse_pos_from_3d:
-            return self.pick_unwrap(no_flip=True, iterations=self.iterations)
+            return self.pick_unwrap(umeshes, no_flip=True, iterations=self.iterations)
         else:
             if not selected_umeshes:
                 self.report({'WARNING'}, 'Need selected geometry')
                 return {'CANCELLED'}
 
-            for u in reversed(self.umeshes):
+            for u in reversed(umeshes):
                 if not u.has_uv and not u.total_face_sel:
-                    self.umeshes.umeshes.remove(u)
-            if not self.umeshes:
+                    umeshes.umeshes.remove(u)
+            if not umeshes:
                 self.report({'WARNING'}, 'Need selected faces for objects without uv')
                 return {'CANCELLED'}
 
-            self.unwrap_selected(no_flip=True, iterations=self.iterations)
-            self.umeshes.update()
+            self.unwrap_selected(umeshes, no_flip=True, iterations=self.iterations)
+            umeshes.update()
             return {'FINISHED'}

@@ -327,24 +327,32 @@ class MeshIslands(MeshIslandsBase):
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
 
     @classmethod
-    def calc_with_hidden(cls, umesh: UMesh):
-        umesh.set_face_tag()
-        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
-
-    @classmethod
-    def calc_visible(cls, umesh: UMesh):
-        cls.tag_filter_visible(umesh)
-        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
-
-    @classmethod
     def calc_selected(cls, umesh: UMesh):
+        if umesh.is_full_face_deselected:
+            return cls([], umesh)
+        cls.tag_filter_selected(umesh)
+        return cls([MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)], umesh)
+
+    @classmethod
+    def calc_selected_without_ms(cls, umesh: UMesh):
         if umesh.is_full_face_deselected:
             return cls([], umesh)
         cls.tag_filter_selected(umesh)
         return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
 
     @classmethod
-    def calc_non_selected(cls, umesh: _umesh.UMesh):
+    def calc_visible(cls, umesh: _umesh.UMesh):
+        cls.tag_filter_visible(umesh)
+        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
+        return cls(islands, umesh)
+
+    @classmethod
+    def calc_visible_without_ms(cls, umesh: UMesh):
+        cls.tag_filter_visible(umesh)
+        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
+
+    @classmethod
+    def calc_non_selected_without_ms(cls, umesh: _umesh.UMesh):
         if umesh.sync and umesh.is_full_face_selected:
             return cls([], umesh)
 
@@ -353,7 +361,7 @@ class MeshIslands(MeshIslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_non_selected_with_mark_seam(cls, umesh: _umesh.UMesh):
+    def calc_non_selected(cls, umesh: _umesh.UMesh):
         """NOTE: Used in Stack"""
         if umesh.sync and umesh.is_full_face_selected:
             return cls([], umesh)
@@ -363,20 +371,7 @@ class MeshIslands(MeshIslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_selected_with_mark_seam(cls, umesh: UMesh):
-        if umesh.is_full_face_deselected:
-            return cls([], umesh)
-        cls.tag_filter_selected(umesh)
-        return cls([MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)], umesh)
-
-    @classmethod
-    def calc_visible_with_mark_seam(cls, umesh: _umesh.UMesh):
-        cls.tag_filter_visible(umesh)
-        islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
-        return cls(islands, umesh)
-
-    @classmethod
-    def calc_extended_with_mark_seam(cls, umesh: _umesh.UMesh):
+    def calc_extended(cls, umesh: _umesh.UMesh):
         cls.tag_filter_visible(umesh)
         if umesh.is_full_face_selected:
             islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
@@ -444,10 +439,15 @@ class MeshIslands(MeshIslandsBase):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_with_hidden_with_mark_seam(cls, umesh: _umesh.UMesh) -> 'typing.Self':
+    def calc_with_hidden(cls, umesh: _umesh.UMesh) -> 'typing.Self':
         cls.tag_filter_all(umesh)
         islands = [MeshIsland(i, umesh) for i in cls.calc_with_markseam_iter_ex(umesh)]
         return cls(islands, umesh)
+
+    @classmethod
+    def calc_with_hidden_without_ms(cls, umesh: UMesh):
+        umesh.set_face_tag()
+        return cls([MeshIsland(i, umesh) for i in cls.calc_iter_ex(umesh)], umesh)
 
     @classmethod
     def calc_extended_any_edge(cls, umesh: _umesh.UMesh):

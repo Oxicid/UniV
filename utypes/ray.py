@@ -461,8 +461,9 @@ class IslandHit:
         min_dist = math.inf
         uv = island.umesh.uv
         for crn in island.calc_selected_edge_corners_iter():
-            closest_pt = utils.closest_pt_to_line(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
-            min_dist = min(min_dist, (closest_pt - pt).length_squared)
+            _, dist = utils.intersect_point_line_segment(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
+            if dist < min_dist:
+                min_dist = dist
 
         return min_dist
 
@@ -741,7 +742,6 @@ class RayCast:
         self.ray_origin = None
         self.ray_direction = None
         self.active_bmesh = None
-        self.umeshes = None
 
     def init_data_for_ray_cast(self, event):
         if bpy.context.area.type == 'VIEW_3D':
@@ -773,7 +773,7 @@ class RayCast:
         bvh = BVHTree.FromPolygons(flat_tris_coords, indices, all_triangles=True)
         return bvh, faces
 
-    def ray_cast_umeshes(self):
+    def ray_cast_umeshes(self, umeshes: "UMeshes"):
         ray_target = self.ray_origin + self.ray_direction
         # from .. import draw
         # draw.LinesDrawSimple3D.max_draw_time = 5
@@ -782,14 +782,14 @@ class RayCast:
         best_length_squared = float("inf")
         umesh: UMesh | None = None
         face_index: int = 0
-        for umesh_iter in self.umeshes:
+        for umesh_iter in umeshes:
             world_matrix = umesh_iter.obj.matrix_world
             matrix_inv = world_matrix.inverted()
             ray_origin_obj = matrix_inv @ self.ray_origin
             ray_target_obj = matrix_inv @ ray_target
             ray_direction_obj = ray_target_obj - ray_origin_obj
 
-            bvh = BVHTree.FromBMesh(umesh_iter.bm)
+            bvh: BVHTree = BVHTree.FromBMesh(umesh_iter.bm)
             hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj, max_dist)
 
             if not hit:
@@ -820,7 +820,7 @@ class RayCast:
 
         return umesh, face_index
 
-    def ray_cast(self, max_pick_radius):
+    def ray_cast(self, umeshes: "UMeshes", max_pick_radius: float):
         # TODO: Add raycast by radial patterns
         deps = bpy.context.view_layer.depsgraph
         result, loc, normal, face_index, obj, matrix = bpy.context.scene.ray_cast(
@@ -834,11 +834,11 @@ class RayCast:
         has_destructive_modifiers = len(obj.data.polygons) != len(eval_obj.data.polygons)
         if obj.mode != 'EDIT' or has_destructive_modifiers:
             # Raycast, ignoring objects that are not in Edit Mode
-            umesh, face_index = self.ray_cast_umeshes()
+            umesh, face_index = self.ray_cast_umeshes(umeshes)
             if not umesh:
                 return None
         else:
-            umesh: UMesh = next(u for u in self.umeshes if u.obj == obj)
+            umesh: UMesh = next(u for u in umeshes if u.obj == obj)
         umesh.ensure()
         umesh.bm = bmesh.from_edit_mesh(umesh.obj.data)
 

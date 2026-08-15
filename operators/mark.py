@@ -348,41 +348,40 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
 
     def execute(self, context) -> set[str]:
-        self.umeshes = UMeshes(report=self.report)
-        self.umeshes.fix_context()
+        umeshes = UMeshes(report=self.report)
+        umeshes.fix_context()
         if self.unwrap == 'MINIMUM_STRETCH' and bpy.app.version < (4, 3, 0):
             self.unwrap = 'ANGLE_BASED'
             self.report({'WARNING'}, 'Organic Mode is not supported in Blender versions below 4.3')
 
-        selected_umeshes, visible_umeshes = self.umeshes.filtered_by_selected_and_visible_uv_edges()
-        self.umeshes = selected_umeshes if selected_umeshes else visible_umeshes
+        selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_edges()
+        umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
-        if not self.umeshes:
-            return self.umeshes.update()
+        if not umeshes:
+            return umeshes.update()
         if not selected_umeshes and self.mouse_pos:
-            return self.pick_cut()
+            return self.pick_cut(umeshes)
 
-        self.cut_uv_space()
+        self.cut_uv_space(umeshes)
         if self.unwrap != 'NONE':
-            self.unwrap_after_cut()
-        self.umeshes.update()
+            self.unwrap_after_cut(umeshes)
+        umeshes.update()
 
         # Flush System
         from .. import draw
         if not draw.DrawCallSeams2D.is_enable():
             visible_umeshes.filter_by_visible_uv_faces()
-            self.umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
-            coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
+            umeshes.umeshes.extend(visible_umeshes.umeshes.copy())
+            coords = draw.mesh_extract.extract_seams_umeshes(umeshes)
             draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
         return {'FINISHED'}
 
-    def cut_uv_space(self):
-        for umesh in self.umeshes:
+    def cut_uv_space(self, umeshes: UMeshes):
+        for umesh in umeshes:
             uv = umesh.uv
             face_select_get = utils.face_select_get_func(umesh)
             for crn in utils.calc_selected_uv_edge_iter(umesh):
@@ -394,11 +393,11 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 elif not self.addition:
                     crn.edge.seam = False
 
-    def unwrap_after_cut(self):
+    def unwrap_after_cut(self, umeshes: UMeshes):
         assert self.unwrap != 'NONE'
 
         save_transform_islands = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands = Islands.calc_selected(umesh)
@@ -415,9 +414,9 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                 if isl.rotate:
                     utils.set_global_texel(isl.island)
 
-    def pick_cut(self):
+    def pick_cut(self, umeshes: UMeshes):
         hit = utypes.CrnEdgeHit(self.mouse_pos, self.max_distance)
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             hit.find_nearest_crn_by_visible_faces(umesh)
 
         if not hit:
@@ -432,7 +431,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
             from .. import draw
             if not draw.DrawCallSeams2D.is_enable():
-                coords = draw.mesh_extract.extract_seams_umeshes(self.umeshes)
+                coords = draw.mesh_extract.extract_seams_umeshes(umeshes)
                 draw.LinesDrawSimple.draw_register(coords, draw.DrawCallSeams2D.get_color())
                 if coords:
                     bpy.context.area.tag_redraw()
@@ -476,32 +475,28 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.umeshes: UMeshes | None = None
-
     def execute(self, context) -> set[str]:
-        self.umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
-        self.umeshes.set_sync()
-        self.umeshes.sync_invalidate()
+        umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
+        umeshes.set_sync()
+        umeshes.sync_invalidate()
 
-        selected, visible = self.umeshes.filtered_by_selected_and_visible_uv_edges()
-        self.umeshes = selected if selected else visible
+        selected, visible = umeshes.filtered_by_selected_and_visible_uv_edges()
+        umeshes = selected if selected else visible
 
-        if not self.umeshes:
-            return self.umeshes.update(info='No elements for manipulate')
+        if not umeshes:
+            return umeshes.update(info='No elements for manipulate')
 
         if not selected and self.mouse_pos_from_3d:
-            return self.pick_cut()
+            return self.pick_cut(umeshes)
         else:
-            self.cut_view_3d()
-            self.umeshes.update()
+            self.cut_view_3d(umeshes)
+            umeshes.update()
             return {'FINISHED'}
 
-    def cut_view_3d(self):
+    def cut_view_3d(self, umeshes: UMeshes):
         umeshes_without_uv = []
         save_transform_islands = []
-        for umesh in self.umeshes:
+        for umesh in umeshes:
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
             # TODO: Skip updates, if edges has seams
             for e in umesh.bm.edges:
@@ -525,7 +520,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
                 continue
 
             umesh.verify_uv()
-            islands = utypes.MeshIslands.calc_selected_with_mark_seam(umesh)
+            islands = utypes.MeshIslands.calc_selected(umesh)
             adv_islands = islands.to_adv_islands()
             for isl in adv_islands:
                 isl.apply_aspect_ratio()
@@ -535,7 +530,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
         if umeshes_without_uv or save_transform_islands:
             bpy.ops.uv.unwrap(method=self.unwrap, correct_aspect=False)
 
-            for umesh in self.umeshes:
+            for umesh in umeshes:
                 umesh.value = umesh.check_uniform_scale(report=self.report)
 
             for isl in save_transform_islands:
@@ -549,7 +544,7 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
 
             for umesh in umeshes_without_uv:
                 umesh.verify_uv()
-                mesh_islands = utypes.MeshIslands.calc_selected_with_mark_seam(umesh)
+                mesh_islands = utypes.MeshIslands.calc_selected(umesh)
                 adv_islands = mesh_islands.to_adv_islands()
                 adv_islands.calc_area_uv()
                 adv_islands.calc_area_3d(scale=umesh.value)
@@ -566,8 +561,8 @@ class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
 
                 umesh.update()
 
-    def pick_cut(self):
-        hit = self.ray_cast(prefs().max_pick_distance)
+    def pick_cut(self, umeshes: UMeshes):
+        hit = self.ray_cast(umeshes, prefs().max_pick_distance)
         if hit:
             if hit.crn.edge.seam:
                 return {'CANCELLED'}
