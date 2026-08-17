@@ -4,500 +4,327 @@
 import bpy
 from collections import defaultdict
 
+from importlib.util import find_spec
+univ_pro_exist = find_spec(f"{__package__}.univ_pro") is not None
+del find_spec
+
 keys = []
-keys_ws = []
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']  # TODO: Rename to spaces
 keys_areas_workspace = ['3D View Tool: Object, UniV', '3D View Tool: Edit Mesh, UniV']
 other_conflict_areas = ['Frames']  # NOTE: not actual after delete keymaps for align?
 
 
-def add_mesh_keymaps(km, univ_pro):
-    # Grow
-    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    # Edge grow
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    if univ_pro:
-        # Select loop
-        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
-        keys.append((km, kmi))
-
-
-def add_keymaps():
-    global keys
-
-    kc = bpy.context.window_manager.keyconfigs.addon
-    if not kc:
-        return  # Can be None in background mode.
-
-    try:
-        from . import univ_pro
-    except ImportError:
-        univ_pro = None
-
-    # Object Mode
-    km = kc.keymaps.new(name='Object Mode')
-    kmi = km.keymap_items.new('object.univ_join', 'J', 'PRESS', ctrl=True)
-    keys.append((km, kmi))
-
-
-    if univ_pro:
-        kmi = km.keymap_items.new('object.univ_isolate', 'NUMPAD_SLASH', "PRESS")
-        keys.append((km, kmi))
-        kmi = km.keymap_items.new('object.univ_isolate', 'SLASH', "PRESS")
-        keys.append((km, kmi))
-
-    # Pie Menu
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_PIE_univ_obj"
-    keys.append((km, kmi))
-
-    # Mesh
-    km = kc.keymaps.new(name='Mesh')
-
-    # Pie Menu
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_PIE_univ_edit"
-    keys.append((km, kmi))
-
-    if univ_pro:
-        kmi = km.keymap_items.new('object.univ_isolate', 'NUMPAD_SLASH', "PRESS")
-        keys.append((km, kmi))
-        kmi = km.keymap_items.new('object.univ_isolate', 'SLASH', "PRESS")
-        keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_linked_pick', 'WHEELUPMOUSE', 'PRESS', shift=True)
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_deselect_linked_pick', 'WHEELDOWNMOUSE', 'PRESS', shift=True)
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.select = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('mesh.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.select = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_local_invert_selection", "I", "PRESS", ctrl=True, shift=True)
-    keys.append((km, kmi))
-
-
-    add_mesh_keymaps(km, univ_pro)
-
-    # Window
-    km = kc.keymaps.new(name='Window')
-
-    kmi = km.keymap_items.new('wm.univ_split_uv_toggle', 'T', 'PRESS', shift=True)
-    kmi.properties.mode = 'SPLIT'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('wm.univ_toggle_panels_by_cursor', 'T', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    # UV Editor
-    km = kc.keymaps.new(name='UV Editor')
-
-    # Pie Menus
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'F1', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_inspect"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'ACCENT_GRAVE', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_edit"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'X', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_align"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_misc"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_favorites_edit"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'T', 'PRESS')
-    kmi.properties.name = "IMAGE_MT_PIE_univ_transform"
-    keys.append((km, kmi))
-
-    # Select
-    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELUPMOUSE', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.deselect = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, shift=True)
-    kmi.properties.deselect = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_pick', 'WHEELUPMOUSE', 'PRESS', shift=True)
-    kmi.properties.select = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_pick', 'WHEELDOWNMOUSE', 'PRESS', shift=True)
-    kmi.properties.select = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    # Edge Grow (Conflict)
-    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELUPMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_edge_grow', 'WHEELDOWNMOUSE', 'PRESS', ctrl=True, alt=True)
-    kmi.properties.grow = False
-    keys.append((km, kmi))
-
-    if univ_pro:
-        kmi = km.keymap_items.new('uv.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('uv.univ_select_similar', 'G', 'PRESS', shift=True)
-        keys.append((km, kmi))
-
-    # Flip
-    kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
-    keys.append((km, kmi))
-
-    # Select
-    kmi = km.keymap_items.new('uv.univ_select_mode', 'ONE', 'PRESS')
-    kmi.properties.type = 'VERTEX'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_mode', 'TWO', 'PRESS')
-    kmi.properties.type = 'EDGE'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_mode', 'THREE', 'PRESS')
-    kmi.properties.type = 'FACE'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_select_mode', 'FOUR', 'PRESS')
-    kmi.properties.type = 'ISLAND'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("uv.univ_local_invert_selection", "I", "PRESS", ctrl=True, shift=True)
-    keys.append((km, kmi))
-
-    # Rotate
-    # Default. CW.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS')
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'DEFAULT'
-    keys.append((km, kmi))
-
-    # Default. CCW.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', alt=True)
-    kmi.properties.rot_dir = 'CCW'
-    kmi.properties.mode = 'DEFAULT'
-    keys.append((km, kmi))
-
-    # Default. CW. Individual.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True)
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'INDIVIDUAL'
-    keys.append((km, kmi))
-
-    # Default. CCW. Individual.
-    kmi = km.keymap_items.new('uv.univ_rotate', 'FIVE', 'PRESS', shift=True, alt=True)
-    kmi.properties.rot_dir = 'CCW'
-    kmi.properties.mode = 'INDIVIDUAL'
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'A', 'PRESS', shift=True)
-    kmi.properties.name = "IMAGE_MT_PIE_univ_texel"
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_home', 'G', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    # Relax
-    kmi = km.keymap_items.new('uv.univ_relax', 'R', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    # Unwrap
-    kmi = km.keymap_items.new('uv.univ_unwrap', 'U', 'PRESS')
-    if univ_pro:
-        kmi.properties.unwrap_along = 'UV'
-    keys.append((km, kmi))
-
-    # Pin
-    kmi = km.keymap_items.new('uv.univ_pin', 'P', 'PRESS')
-    keys.append((km, kmi))
-
-    # Quadrify
-    kmi = km.keymap_items.new('uv.univ_quadrify', 'E', 'PRESS')
-    keys.append((km, kmi))
-
-    # Straight
-    kmi = km.keymap_items.new('uv.univ_straight', 'E', 'PRESS', shift=True)
-    keys.append((km, kmi))
-
-    # Weld
-    kmi = km.keymap_items.new('uv.univ_weld', 'W', 'PRESS')
-    kmi.properties.use_by_distance = False
-    keys.append((km, kmi))
-
-    # Stitch
-    kmi = km.keymap_items.new('uv.univ_stitch', 'W', 'PRESS', shift=True)
-    keys.append((km, kmi))
-
-    # Quick Snap
-    kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS')
-    kmi.properties.quick_start = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_quick_snap', 'V', 'PRESS', alt=True)
-    kmi.properties.quick_start = False
-    keys.append((km, kmi))
-
-
-    if univ_pro:
-        # Drag
-        kmi = km.keymap_items.new('uv.univ_drag', 'LEFTMOUSE', 'ANY', alt=True)
-        keys.append((km, kmi))
-
-        # Isolate
-        kmi = km.keymap_items.new('uv.univ_isolate', 'NUMPAD_SLASH', "PRESS")
-        keys.append((km, kmi))
-        kmi = km.keymap_items.new('uv.univ_isolate', 'SLASH', "PRESS")
-        keys.append((km, kmi))
-
-    # Cut
-    kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS')
-    kmi.properties.addition = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_cut', 'C', 'PRESS', shift=True)
-    kmi.properties.addition = True
-    keys.append((km, kmi))
-
-    # Stack
-    kmi = km.keymap_items.new('uv.univ_stack', 'S', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_symmetrize', 'X', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    # Orient
-    kmi = km.keymap_items.new('uv.univ_orient', 'O', 'PRESS')
-    kmi.properties.edge_dir = 'BOTH'
-    keys.append((km, kmi))
-
-    # Stretch Toggle
-    kmi = km.keymap_items.new('uv.univ_stretch_uv_toggle', 'Z', 'DOUBLE_CLICK')
-    kmi.properties.swap = True
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_stretch_uv_toggle', 'Z', 'CLICK')
-    kmi.properties.swap = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_show_modified_uv_edges_toggle', 'Z', 'PRESS', alt=True)
-    keys.append((km, kmi))
-
-    # Hide
-    kmi = km.keymap_items.new('uv.univ_hide', 'H', 'PRESS')
-    kmi.properties.unselected = False
-    keys.append((km, kmi))
-
-    kmi = km.keymap_items.new('uv.univ_hide', 'H', 'PRESS', shift=True)
-    kmi.properties.unselected = True
-    keys.append((km, kmi))
-
-    # Set Cursor 2D
-    kmi = km.keymap_items.new('uv.univ_set_cursor_2d', 'MIDDLEMOUSE', 'PRESS', ctrl=True, shift=True)
-    keys.append((km, kmi))
-
-    # Focus
-    kmi = km.keymap_items.new('uv.univ_focus', 'NUMPAD_PERIOD', 'PRESS')
-    keys.append((km, kmi))
-
-    for _, kmi in keys:
-        kmi.active = False
-
-
-def add_keymaps_ws():
-    global keys_ws
-    kc = bpy.context.window_manager.keyconfigs.addon
-    if not kc:
-        return  # Can be None in background mode.
-
-    try:
-        from . import univ_pro
-    except ImportError:
-        univ_pro = None
-
-    # Workspace keymaps
-    def workspace_duplicates(km_ws):
-        kmi_ws = km_ws.keymap_items.new("mesh.univ_gravity", 'O', 'PRESS')
-        keys_ws.append((km_ws, kmi_ws))
-
-        kmi_ws = km_ws.keymap_items.new("wm.call_menu_pie", 'A', 'PRESS', shift=True)
-        kmi_ws.properties.name = "VIEW3D_MT_PIE_univ_texel"
-        keys_ws.append((km_ws, kmi_ws))
-
-        kmi_ws = km_ws.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS', shift=True)
-        kmi_ws.properties.name = "VIEW3D_MT_PIE_univ_projection"
-        keys_ws.append((km_ws, kmi_ws))
-
-    # Edit Mode
-    km = kc.keymaps.new(name='3D View Tool: Edit Mesh, UniV', space_type='VIEW_3D', tool=True)
-
-    ## Rotate
-    kmi = km.keymap_items.new('mesh.univ_rotate', 'FIVE', 'PRESS')
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'DEFAULT'
-    keys_ws.append((km, kmi))
-
-    # Default. CW. Individual.
-    kmi = km.keymap_items.new('mesh.univ_rotate', 'FIVE', 'PRESS', shift=True)
-    kmi.properties.rot_dir = 'CW'
-    kmi.properties.mode = 'INDIVIDUAL'
-    keys_ws.append((km, kmi))
-
-    # kmi = km.keymap_items.new('uv.univ_flip', 'F', 'PRESS')
-    # keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'D', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_PIE_univ_misc"
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("wm.call_menu_pie", 'Q', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_PIE_univ_favorites_edit"
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
-    kmi.properties.mode = 'ADD'
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
-    kmi.properties.mode = 'SUB'
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS')
-    kmi.properties.addition = False
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_cut", 'C', 'PRESS', shift=True)
-    kmi.properties.addition = True
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_weld", 'W', 'PRESS')
-    kmi.properties.use_by_distance = False
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_stitch", 'W', 'PRESS', shift=True)
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_relax", 'R', 'PRESS', alt=True)
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_unwrap", 'U', 'PRESS')
-    # if univ_pro:
-    #     kmi.properties.unwrap_along = 'UV'
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_stack", 'S', 'PRESS', alt=True)
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_seam_border", 'B', 'PRESS', alt=True)
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("mesh.univ_angle", 'A', 'PRESS', ctrl=True)
-    keys_ws.append((km, kmi))
-
-    if univ_pro:
-        kmi = km.keymap_items.new('mesh.univ_select_similar', 'G', 'PRESS', shift=True)
-        keys.append((km, kmi))
-
-        # Select loop
-        kmi = km.keymap_items.new('mesh.univ_select_loop', 'WHEELUPMOUSE', 'PRESS', alt=True)
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
-        keys.append((km, kmi))
-
-        kmi = km.keymap_items.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
-        keys.append((km, kmi))
-
-    workspace_duplicates(km)
-
-    # Object Mode
-    km = kc.keymaps.new(name='3D View Tool: Object, UniV', space_type='VIEW_3D', tool=True)
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True)
-    kmi.properties.mode = 'ADD'
-    keys_ws.append((km, kmi))
-
-    kmi = km.keymap_items.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True)
-    kmi.properties.mode = 'SUB'
-    keys_ws.append((km, kmi))
-
-    workspace_duplicates(km)
-
-
-def remove_keymaps():
-    global keys
-    import traceback
-    from .preferences import debug
-
-    for km, kmi in keys:
-        try:
-            km.keymap_items.remove(kmi)
-        except RuntimeError:
-            if debug():
+class UKeymap:
+    class UKeymapPropertyController:
+        def __init__(self, keymap):
+            object.__setattr__(self, "_ZGenerator", keymap)
+
+        def __setattr__(self, name, value):
+            if name.startswith("_ZGenerator"):
+                object.__setattr__(self, name, value)
+                return
+            _, kmi = self._ZGenerator.items[-1]  # noqa
+            setattr(kmi.properties, name, value)
+
+    def __init__(self):
+        self.km = None
+        self.items = []
+        self.prop = self.UKeymapPropertyController(self)
+
+    def new(self, idname: str, type: str, value: str="PRESS", **kw):  # noqa
+        expected = {"any", "shift", "ctrl", "alt", "oskey" "key_modifier", "direction", "repeat", "head"}
+        for key in kw:
+            if key not in expected:
+                raise ValueError(f"Expected {expected!r} keywords, given {key!r}")
+
+        kmi = self.km.keymap_items.new(idname, type, value, **kw)
+        self.items.append((self.km, kmi))
+        return self
+
+    def new_keymaps(self, kc, name):
+        self.km = kc.keymaps.new(name=name)
+
+
+    @classmethod
+    def add_keymaps(cls):
+        kc = bpy.context.window_manager.keyconfigs.addon
+        if not kc:
+            return  # Can be None in background mode.
+
+        km = cls()
+
+        ##################################################
+        # Object Mode
+        ##################################################
+        km.new_keymaps(kc, 'Object Mode')
+        km.new('object.univ_join', 'J', ctrl=True)
+        if univ_pro_exist:
+            km.new('object.univ_isolate', 'NUMPAD_SLASH')
+            km.new('object.univ_isolate', 'SLASH')
+        # Pie Menu
+        km.new("wm.call_menu_pie", 'ACCENT_GRAVE').prop.name = "VIEW3D_MT_PIE_univ_obj"
+
+        ##################################################
+        # Mesh
+        ##################################################
+        km.new_keymaps(kc, name='Mesh')
+
+        # Pie Menu
+        km.new("wm.call_menu_pie", 'ACCENT_GRAVE').prop.name = "VIEW3D_MT_PIE_univ_edit"
+
+        if univ_pro_exist:
+            km.new('object.univ_isolate', 'NUMPAD_SLASH')
+            km.new('object.univ_isolate', 'SLASH')
+
+        ## Selection
+        # Select Linked
+        km.new('mesh.univ_select_linked_pick', 'WHEELUPMOUSE', shift=True)
+        km.new('mesh.univ_deselect_linked_pick', 'WHEELDOWNMOUSE', shift=True)
+        km.new('mesh.univ_select_linked', 'WHEELUPMOUSE', ctrl=True, shift=True).prop.select = True
+        km.new('mesh.univ_select_linked', 'WHEELDOWNMOUSE', ctrl=True, shift=True).prop.select = False
+
+        km.new("mesh.univ_local_invert_selection", "I", ctrl=True, shift=True)
+
+        cls._add_mesh_keymaps(km)
+
+        ##################################################
+        # Window
+        ##################################################
+        km.new_keymaps(kc, name='Window')
+        km.new('wm.univ_split_uv_toggle', 'T', shift=True).prop.mode = 'SPLIT'
+        km.new('wm.univ_toggle_panels_by_cursor', 'T', alt=True)
+
+        ##################################################
+        # UV Editor
+        ##################################################
+        km.new_keymaps(kc, name='UV Editor')
+
+        # Pie Menus
+        km.new("wm.call_menu_pie", 'F1').prop.name = "IMAGE_MT_PIE_univ_inspect"
+        km.new("wm.call_menu_pie", 'ACCENT_GRAVE').prop.name = "IMAGE_MT_PIE_univ_edit"
+        km.new("wm.call_menu_pie", 'X').prop.name = "IMAGE_MT_PIE_univ_align"
+        km.new("wm.call_menu_pie", 'D').prop.name = "IMAGE_MT_PIE_univ_misc"
+        km.new("wm.call_menu_pie", 'Q').prop.name = "IMAGE_MT_PIE_univ_favorites_edit"
+        km.new("wm.call_menu_pie", 'T').prop.name = "IMAGE_MT_PIE_univ_transform"
+        km.new("wm.call_menu_pie", 'A', shift=True).prop.name = "IMAGE_MT_PIE_univ_texel"
+
+        # Select
+        km.new('uv.univ_select_linked', 'WHEELUPMOUSE', ctrl=True, shift=True).prop.deselect = False
+        km.new('uv.univ_select_linked', 'WHEELDOWNMOUSE', ctrl=True, shift=True).prop.deselect = True
+        km.new('uv.univ_select_pick', 'WHEELUPMOUSE', shift=True).prop.select = True
+        km.new('uv.univ_select_pick', 'WHEELDOWNMOUSE', shift=True).prop.select = False
+        km.new('uv.univ_select_grow', 'WHEELUPMOUSE', ctrl=True).prop.grow = True
+        km.new('uv.univ_select_grow', 'WHEELDOWNMOUSE', ctrl=True).prop.grow = False
+
+        # Edge Grow (Conflict)
+        km.new('uv.univ_select_edge_grow', 'WHEELUPMOUSE', ctrl=True, alt=True).prop.grow = True
+        km.new('uv.univ_select_edge_grow', 'WHEELDOWNMOUSE', ctrl=True, alt=True).prop.grow = False
+
+        if univ_pro_exist:
+            km.new('uv.univ_select_loop', 'WHEELUPMOUSE', alt=True)
+            km.new('uv.univ_select_similar', 'G', shift=True)
+
+        # Select Mode.
+        km.new('uv.univ_select_mode', 'ONE').prop.type = 'VERTEX'
+        km.new('uv.univ_select_mode', 'TWO').prop.type = 'EDGE'
+        km.new('uv.univ_select_mode', 'THREE').prop.type = 'FACE'
+        km.new('uv.univ_select_mode', 'FOUR').prop.type = 'ISLAND'
+
+        km.new("uv.univ_local_invert_selection", "I", ctrl=True, shift=True)
+
+        # Transform.
+        km.new('uv.univ_orient', 'O').prop.edge_dir = 'BOTH'
+        km.new('uv.univ_flip', 'F')
+        km.new('uv.univ_home', 'G', alt=True)
+
+        kmi = km.new('uv.univ_rotate', 'FIVE')
+        kmi.prop.rot_dir = 'CW'
+        kmi.prop.mode = 'DEFAULT'
+
+        kmi = km.new('uv.univ_rotate', 'FIVE', alt=True)
+        kmi.prop.rot_dir = 'CCW'
+        kmi.prop.mode = 'DEFAULT'
+
+        kmi = km.new('uv.univ_rotate', 'FIVE', shift=True)
+        kmi.prop.rot_dir = 'CW'
+        kmi.prop.mode = 'INDIVIDUAL'
+
+        kmi = km.new('uv.univ_rotate', 'FIVE', shift=True, alt=True)
+        kmi.prop.rot_dir = 'CCW'
+        kmi.prop.mode = 'INDIVIDUAL'
+
+        # Unfold
+        km.new('uv.univ_quadrify', 'E')
+        km.new('uv.univ_straight', 'E', shift=True)
+        km.new('uv.univ_relax', 'R', alt=True)
+        km.new('uv.univ_unwrap', 'U')
+        if univ_pro_exist:
+            kmi.prop.unwrap_along = 'UV'
+
+        # Misc
+        km.new('uv.univ_weld', 'W').prop.use_by_distance = False
+        km.new('uv.univ_stitch', 'W', shift=True)
+        km.new('uv.univ_stack', 'S', alt=True)
+        km.new('uv.univ_symmetrize', 'X', alt=True)
+
+        # Quick Snap
+        km.new('uv.univ_quick_snap', 'V').prop.quick_start = True
+        km.new('uv.univ_quick_snap', 'V', alt=True).prop.quick_start = False
+        if univ_pro_exist:
+            # Drag
+            km.new('uv.univ_drag', 'LEFTMOUSE', 'ANY', alt=True)
+            # Isolate
+            km.new('uv.univ_isolate', 'NUMPAD_SLASH')
+            km.new('uv.univ_isolate', 'SLASH')
+
+        # Mark
+        km.new('uv.univ_cut', 'C').prop.addition = False
+        km.new('uv.univ_cut', 'C', shift=True).prop.addition = True
+        km.new('uv.univ_pin', 'P')
+
+        # Stretch Toggle
+        km.new('uv.univ_stretch_uv_toggle', 'Z', 'DOUBLE_CLICK').prop.swap = True
+        km.new('uv.univ_stretch_uv_toggle', 'Z', 'CLICK').prop.swap = False
+        km.new('uv.univ_show_modified_uv_edges_toggle', 'Z', alt=True)
+
+        # Other Misc.
+        km.new('uv.univ_hide', 'H').prop.unselected = False
+        km.new('uv.univ_hide', 'H', shift=True).prop.unselected = True
+        km.new('uv.univ_set_cursor_2d', 'MIDDLEMOUSE', ctrl=True, shift=True)
+        km.new('uv.univ_focus', 'NUMPAD_PERIOD')
+
+        global keys
+        keys.clear()
+        keys = km.items
+
+        for _, kmi in keys:
+            kmi.active = False
+
+    @staticmethod
+    def _add_mesh_keymaps(km):
+        # Grow
+        km.new('mesh.univ_select_grow', 'WHEELUPMOUSE', ctrl=True).prop.grow = True
+        km.new('mesh.univ_select_grow', 'WHEELDOWNMOUSE', ctrl=True).prop.grow = False
+        # Edge grow
+        km.new('mesh.univ_select_edge_grow', 'WHEELUPMOUSE', ctrl=True, alt=True).prop.grow = True
+        km.new('mesh.univ_select_edge_grow', 'WHEELDOWNMOUSE', ctrl=True, alt=True).prop.grow = False
+
+        if univ_pro_exist:
+            # Select loop
+            km.new('mesh.univ_select_loop', 'WHEELUPMOUSE', alt=True)
+            km.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
+            km.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
+
+    @staticmethod
+    def remove_keymaps():
+        global keys
+        import traceback
+
+        for km, kmi in reversed(keys):
+            try:
+                km.keymap_items.remove(kmi)
+            except (RuntimeError, UnicodeDecodeError):
                 traceback.print_exc()
-    keys.clear()
+        keys.clear()
 
+class WSKeymapGenerator:
+    class WSKeymapPropertyController:
+        def __init__(self, ws_keymap):
+            object.__setattr__(self, "_ZGenerator", ws_keymap)
 
-def remove_keymaps_ws():
-    global keys_ws
-    import traceback
-    from .preferences import debug
+        def __setattr__(self, key, value):
+            if key.startswith("_ZGenerator"):
+                object.__setattr__(self, key, value)
+                return
 
-    for km, kmi in keys_ws:
+            last_kmi = self._ZGenerator.items[-1]  # noqa
+            misc_attr: dict = last_kmi[2]
+            misc_attr.setdefault("properties", []).append((key, value))
+
+    def __init__(self):
+        self.items = []
+        self.prop = self.WSKeymapPropertyController(self)
+
+    def new(self, idname: str, type: str, value: str = "PRESS", **kw):  # noqa
+        expected = {"any", "shift", "ctrl", "alt", "oskey" "key_modifier", "direction", "repeat", "head"}
+        for key in kw:
+            if key not in expected:
+                raise ValueError(f"Expected {expected!r} keywords, given {key!r}")
+
+        self.items.append([idname, {"type": type, "value": value, **kw}, dict()])
+        return self
+
+    def to_tuple_ws(self):
+        return tuple(tuple(kmi) for kmi in self.items)
+
+    @classmethod
+    def add_keymaps_ws_edit(cls):
         try:
-            km.keymap_items.remove(kmi)
-        except RuntimeError:
-            if debug():
-                traceback.print_exc()
-    keys_ws.clear()
+            from . import univ_pro
+        except ImportError:
+            univ_pro = None
+
+        # Edit Mode
+        km = WSKeymapGenerator()
+
+        ## Rotate
+        kmi = km.new('mesh.univ_rotate', 'FIVE')
+        kmi.prop.rot_dir = 'CW'
+        kmi.prop.mode = 'DEFAULT'
+
+        # Default. CW. Individual.
+        kmi = km.new('mesh.univ_rotate', 'FIVE', shift=True)
+        kmi.prop.rot_dir = 'CW'
+        kmi.prop.mode = 'INDIVIDUAL'
+
+        # kmi = km.new('uv.univ_flip', 'F')
+        # keys_ws.append((km, kmi))
+
+        km.new("wm.call_menu_pie", 'D').prop.name = "VIEW3D_MT_PIE_univ_misc"
+        km.new("wm.call_menu_pie", 'Q').prop.name = "VIEW3D_MT_PIE_univ_favorites_edit"
+
+        km.new("mesh.univ_cut", 'C').prop.addition = False
+        km.new("mesh.univ_cut", 'C', shift=True).prop.addition = True
+
+        # Unfold
+        km.new("mesh.univ_relax", 'R', alt=True)
+        km.new("mesh.univ_unwrap", 'U')
+        # Misc
+        km.new("mesh.univ_weld", 'W').prop.use_by_distance = False
+        km.new("mesh.univ_stitch", 'W', shift=True)
+        km.new("mesh.univ_stack", 'S', alt=True)
+        # Mark
+        km.new("mesh.univ_seam_border", 'B', alt=True)
+        km.new("mesh.univ_angle", 'A', ctrl=True)
+
+        if univ_pro:
+            km.new('mesh.univ_select_similar', 'G', shift=True)
+            # Select loop
+            km.new('mesh.univ_select_loop', 'WHEELUPMOUSE', alt=True)
+            km.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK')
+            km.new('mesh.univ_select_loop_pick', 'LEFTMOUSE', 'DOUBLE_CLICK', shift=True)
+
+        cls._workspace_duplicates(km)
+        return km.to_tuple_ws()
+
+
+    @classmethod
+    def add_keymaps_ws_object(cls):
+        # Object Mode
+        km = WSKeymapGenerator()
+        cls._workspace_duplicates(km)
+        return km.to_tuple_ws()
+
+    @staticmethod
+    def _workspace_duplicates(km: "WSKeymapGenerator"):
+        km.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG')
+        km.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', shift=True).prop.mode = 'ADD'
+        km.new("view3d.select_box", 'LEFTMOUSE', 'CLICK_DRAG', ctrl=True).prop.mode = 'SUB'
+
+        km.new("mesh.univ_gravity", 'O')
+        km.new("wm.call_menu_pie", 'A', shift=True).prop.name = "VIEW3D_MT_PIE_univ_texel"
+        km.new("wm.call_menu_pie", 'Q', shift=True).prop.name = "VIEW3D_MT_PIE_univ_projection"
+
 
 
 _EVENT_TYPES = set()

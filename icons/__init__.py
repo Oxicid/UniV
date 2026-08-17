@@ -150,7 +150,23 @@ class icons:
 
     @staticmethod
     def register_ws_icons_():
-        from .. import ui
+        from .. import classes_workspace
+        expected_path = icons.get_expected_filepath_for_dat_()
+        # Skip updating if every workspace already uses the expected icon
+        if any(Path(panel.bl_icon) != expected_path for panel in classes_workspace):
+            for panel in reversed(classes_workspace):
+                try:
+                    bpy.utils.unregister_tool(panel)
+                    panel.bl_icon = str(expected_path)
+                    bpy.utils.register_tool(panel)
+                except Exception:  # noqa
+                    print(f"UniV: Failed to update workspace icon for {panel.__name__}")
+                    traceback.print_exc()
+            return True
+        return False
+
+    @staticmethod
+    def get_expected_filepath_for_dat_():
         from .. import utils
         from ..preferences import prefs
 
@@ -166,22 +182,7 @@ class icons:
             extension_icon = Path(extension_icons) / f"{expected_icon}.dat"
             if extension_icon.exists():
                 expected_path = extension_icon.with_suffix("")
-
-        # Skip updating if every workspace already uses the expected icon
-        panels = (ui.UNIV_WT_edit_VIEW3D, ui.UNIV_WT_object_VIEW3D)
-        if any(Path(panel.bl_icon) != expected_path for panel in panels):
-            from .. import keymaps
-            keymaps.remove_keymaps_ws()
-
-            for panel in panels:
-                try:
-                    bpy.utils.unregister_tool(panel)
-                    panel.bl_icon = str(expected_path)
-                    bpy.utils.register_tool(panel)
-                except Exception:  # noqa
-                    print(f"UniV: Failed to update workspace icon for {panel.__name__}")
-                    traceback.print_exc()
-            keymaps.add_keymaps_ws()
+        return expected_path
 
     @classmethod
     def reset_icon_value_(cls):

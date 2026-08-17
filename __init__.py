@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 7, "experimental"),
+    "version": (4, 0, 8, "experimental"),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -362,12 +362,20 @@ def register():
             print(f"UniV: Failed to register a class {c.__name__}")
             traceback.print_exc()
 
+    edit_ws = classes_workspace[0]
+    object_ws = classes_workspace[1]
+    edit_ws.bl_keymap = keymaps.WSKeymapGenerator.add_keymaps_ws_edit()
+    object_ws.bl_keymap = keymaps.WSKeymapGenerator.add_keymaps_ws_object()
+    edit_ws.bl_icon = str(icons.icons.get_expected_filepath_for_dat_())
+    object_ws.bl_icon = str(icons.icons.get_expected_filepath_for_dat_())
+
     for c in classes_workspace:
         try:
             bpy.utils.register_tool(c)
         except Exception:  # noqa
             print(f"UniV: Failed to register a class {c.__name__}")
             traceback.print_exc()
+
 
     # Icons register.
     try:
@@ -408,8 +416,7 @@ def register():
                 #     traceback.print_exc()
 
     try:
-        keymaps.add_keymaps()
-        keymaps.add_keymaps_ws()
+        keymaps.UKeymap.add_keymaps()
     except AttributeError:
         traceback.print_exc()
 
@@ -426,8 +433,7 @@ def unregister():
     from . import icons
     from . import keymaps
 
-    keymaps.remove_keymaps()
-    keymaps.remove_keymaps_ws()
+    keymaps.UKeymap.remove_keymaps()
     icons.icons.unregister_icons_()
     # icons.icons.unregister_ws_icons_()
 

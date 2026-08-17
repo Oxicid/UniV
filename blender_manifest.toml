@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 id = "univ"
 name = "UniV"
-version = "4.0.7-experimental"
+version = "4.0.8-experimental"
 tagline = "Smart UV Tools"
 maintainer = "Oxicid <oxicid2019@gmail.com>"
 type = "add-on"
@@ -12,3 +12,16 @@ website = "https://github.com/Oxicid/UniV"
 copyright = ["2026 Oxicid"]
 [permissions]
 files = "Creates and updates icon files in the add-on directory"
+
+#[build]
+#paths_exclude_pattern = [
+#  "__pycache__/",
+#  "*.pyc",
+#  "*.git",
+#  "*.idea",
+#  "/.*",
+#  "*.so",
+#  "*.dll",
+#  "/textures",
+#  "/univ_pro",
+#]
