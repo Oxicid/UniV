@@ -4,6 +4,7 @@
 
 import bpy
 import gpu
+import math
 import bmesh
 import contextlib
 
@@ -187,45 +188,86 @@ class DrawCallSeams2D:
         pref = prefs()
         res = min(int(pref.size_x), int(pref.size_y))
 
-        if res <= 512:
-            import numpy as np
-            cell: float | int = 1.0 / res  # Set int in annotation for pycharm, for avoid warnings.
+        if res > 512:
+            return data
 
-            if isinstance(data, np.ndarray):
-                arr = np.ascontiguousarray(data, dtype=np.float32)
-            else:
-                # TODO: Add fast Vectors to numpy func.
-                arr = np.array([v.to_tuple() for v in data], dtype=np.float32)
 
-            arr = arr.reshape(-1, 2, 2)
+        import numpy as np
+        from .. import utils
 
-            # Start and end points of every segment.
-            a = arr[:, 0]
-            b = arr[:, 1]
-            vec_dir = b - a
+        cell = np.float32(1.0 / res)
 
-            dx = np.abs(vec_dir[:, 0])
-            dy = np.abs(vec_dir[:, 1])
+        if isinstance(data, np.ndarray):
+            arr = np.ascontiguousarray(data, dtype=np.float32)
+        else:
+            arr = np.array([v.to_tuple() for v in data], dtype=np.float32)
 
-            max_delta = np.maximum(dx, dy)
-            steps = np.maximum(1, (max_delta / cell).astype(np.int64))
+        arr = arr.reshape(-1, 2, 2)
 
-            segments = []
-            for i in range(arr.shape[0]):
-                num_steps = steps[i]
-                if num_steps <= 1:
-                    segments.append(np.stack((np.round(a[i] * res) * cell, np.round(b[i] * res) * cell)))
-                else:
-                    t = (np.arange(num_steps + 1, dtype=np.float32) * (1.0 / num_steps))[:, None]
-                    pts = a[i] + t * vec_dir[i]
-                    pts = np.round(pts * res) * cell
-                    seg = np.empty((num_steps * 2, 2), np.float32)
-                    seg[0::2] = pts[:-1]
-                    seg[1::2] = pts[1:]
-                    segments.append(seg)
+        # Start and end points of every segment.
+        a = arr[:, 0]
+        b = arr[:, 1]
+        vec = b - a
 
-            data = np.concatenate(segments) if segments else np.empty((0, 2), np.float32)
-        return data
+        dx = np.abs(vec[:, 0])
+        dy = np.abs(vec[:, 1])
+
+        min_delta = np.minimum(dx, dy)
+        max_delta = np.maximum(dx, dy)
+        steps = np.maximum(1, (max_delta * res).astype(np.int64))
+
+        # Optimize segments by cardinal and diagonal angles.
+        ANGLES_BY_SIZE = {128: 0.1, 256: 0.05, 512: 0.025}
+        ANGLE = math.radians(ANGLES_BY_SIZE.get(res, 0.025))
+        AXIS_TOL = np.float32(math.tan(ANGLE))
+        DIAGONAL_TOL = np.float32(math.tan(math.radians(20.0)))
+
+        axis_aligned = min_delta <= max_delta * AXIS_TOL
+        diagonal = min_delta >= max_delta * DIAGONAL_TOL
+        optimized = axis_aligned | diagonal
+
+        # Optimize segments by large length.
+        length_sq = utils.np_vec_dot(vec, vec)
+        optimized |= length_sq > 4.0
+
+        # Optimize single steps.
+        optimized |= steps <= 1
+
+        # Pixelize endpoints for cardinal segments.
+        pixel_a = np.round(a * res) * cell
+        pixel_b = np.round(b * res) * cell
+
+        segments = []
+
+        # Cardinal, diagonal, large, and small segments don't need intermediate points.
+        if np.any(optimized):
+            cardinal_a = pixel_a[optimized]
+            cardinal_b = pixel_b[optimized]
+
+            seg = np.empty((len(cardinal_a) * 2, 2), dtype=np.float32)
+            seg[0::2] = cardinal_a
+            seg[1::2] = cardinal_b
+
+            segments.append(seg)
+
+        for i in np.flatnonzero(~optimized):
+            num_steps = steps[i]
+            t = (np.arange(num_steps + 1, dtype=np.float32) / num_steps)[:, None]
+
+            pts = a[i] + t * vec[i]
+            pts = np.round(pts * res) * cell
+
+            seg = np.empty((num_steps * 2, 2), dtype=np.float32)
+            seg[0::2] = pts[:-1]
+            seg[1::2] = pts[1:]
+
+            segments.append(seg)
+
+        if segments:
+            return np.concatenate(segments)
+        else:
+            return np.empty((0, 2), dtype=np.float32)
+
 
 class DrawCallConstraints2D:
     def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None):
