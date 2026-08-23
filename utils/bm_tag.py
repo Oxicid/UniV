@@ -106,7 +106,7 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_c
     """
     with_seam - check seams
 
-    with_flipped_check - if True, non-manifolds edges returns True (this is not flipped correction check)
+    with_flipped_check - non-manifolds edges always returns True (this is not flipped correction check)
 
     invisible_check - hidden shared face return True
     """
@@ -157,6 +157,60 @@ def is_boundary_func(umesh, with_seam=True, with_flipped_check=True, invisible_c
                         crn.link_loop_next[uv].uv.to_tuple() != pair[uv].uv.to_tuple())
 
             return catcher(umesh.uv, is_boundary_no_invisible_check)
+
+
+def is_boundary_3d_func(_, with_seam=True, with_flipped_check=True, invisible_check=True) -> typing.Callable[[BMLoop], bool]:
+    """
+    with_seam - check seams
+
+    with_flipped_check - non-manifolds edges always returns True (this is not flipped correction check)
+
+    invisible_check - hidden shared face return True
+    """
+    if with_seam:
+        if invisible_check:
+            if with_flipped_check:
+                def is_boundary(crn: BMLoop):
+                    e = crn.edge
+                    if not e.is_contiguous or e.seam:
+                        return True
+                    return crn.link_loop_radial_prev.face.hide
+            else:
+                def is_boundary(crn: BMLoop):
+                    e = crn.edge
+                    if e.is_boundary or e.seam:
+                        return True
+                    return crn.link_loop_radial_prev.face.hide
+        else:
+            if with_flipped_check:
+                def is_boundary(crn: BMLoop):
+                    e = crn.edge
+                    return not e.is_contiguous or e.seam
+            else:
+                def is_boundary(crn: BMLoop):
+                    e = crn.edge
+                    return e.is_boundary or e.seam
+        return is_boundary
+
+    # Without seam.
+    if invisible_check:
+        if with_flipped_check:
+            def is_boundary(crn: BMLoop):
+                if not crn.edge.is_contiguous:
+                    return True
+                return crn.link_loop_radial_prev.face.hide
+        else:
+            def is_boundary(crn: BMLoop):
+                return crn.edge.is_boundary or crn.link_loop_radial_prev.face.hide
+    else:
+        if with_flipped_check:
+            def is_boundary(crn: BMLoop):
+                return not crn.edge.is_contiguous
+        else:
+            def is_boundary(crn: BMLoop):
+                return crn.edge.is_boundary
+    return is_boundary
+
 
 
 def is_visible_func(sync: bool):

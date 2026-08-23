@@ -1940,8 +1940,7 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
     bl_description = \
         "Default - Sort islands\n" \
         "Shift - Lock Overlaps.\n" \
-        "Ctrl - Start sort position to Cursor\n" \
-        "Alt - Disable orient"
+        "Ctrl - Start sort position to Cursor"
     bl_options = {'REGISTER', 'UNDO'}
 
     axis: EnumProperty(name='Axis', default='AUTO', items=(('AUTO', 'Auto', ''), ('X', 'X', ''), ('Y', 'Y', '')))
@@ -1980,7 +1979,6 @@ class UNIV_OT_Sort(Operator, utils.OverlapHelper, utils.PaddingHelper):
             return self.execute(context)
         self.to_cursor = event.ctrl
         self.lock_overlap = event.shift
-        self.orient = not event.alt
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):

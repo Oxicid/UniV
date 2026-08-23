@@ -674,7 +674,7 @@ class UMeshes:
             if self.sync:
                 utils.set_select_mode_mesh(mode)  # noqa
                 for umesh in self:
-                    umesh.bm.select_mode = {mode}
+                    umesh.bm.select_mode = {mode}  # TODO: Check without this.
             else:
                 utils.set_select_mode_uv(mode)
             for umesh in self.umeshes:

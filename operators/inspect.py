@@ -63,7 +63,7 @@ class Inspect(enum.IntFlag):
 
     @classmethod
     def default_value_for_settings(cls):
-        return cls.Overlap | cls.Zero | cls.Flipped | cls.Over | cls.NonSplitted | cls.Other
+        return cls.Overlap | cls.Zero | cls.Flipped | cls.NonSplitted | cls.Other
 
 
 class UNIV_OT_Check_Zero(Operator):
