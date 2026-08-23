@@ -343,20 +343,21 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     # noinspection PyTypeHints
-    between_selected: bpy.props.BoolProperty(name='Between Selected', default=False)
+    target_and_ref_ordering: bpy.props.EnumProperty(name='Target Ordering',
+                                                    items=utils.ENUM("TO_SELECTED", "TO_UNSELECTED", "BETWEEN_SELECTED"))
 
     @classmethod
     def poll(cls, context):
         return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
-        self.layout.prop(self, 'between_selected', toggle=True)
+        self.layout.prop(self, 'target_and_ref_ordering', expand=True)
 
     def invoke(self, context, event):
-        if not self.between_selected:
+        if self.target_and_ref_ordering != "BETWEEN_SELECTED":
             operators = context.window_manager.operators
             if operators and operators[-1].bl_idname.endswith('_OT_univ_select_similar'):
-                self.between_selected = True
+                self.target_and_ref_ordering = "BETWEEN_SELECTED"
 
                 from .. import draw
                 if not self.bl_idname.startswith('UV'):
@@ -376,7 +377,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.counter: int = 0
-        self.ignore_mark_seam = False
+        self.ignore_seams = False
         self.calc_selected: Callable = Islands.calc_selected
         self.calc_non_selected: Callable = Islands.calc_non_selected
 
@@ -387,7 +388,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         if not umeshes.sync and context.area.ui_type != 'UV':
             umeshes.set_sync(True)
 
-        if self.between_selected:
+        if self.target_and_ref_ordering == "BETWEEN_SELECTED":
             self.stack_selected_between(umeshes)
         else:
             self.stack_transfer_to_target(umeshes)
@@ -422,7 +423,7 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
     def islands_preprocessing_selected_between(self, umeshes, stack_type: typing.Type[T]) -> list[list[T]]:
         targets: list[StackIsland] = []
         for umesh in reversed(umeshes):
-            selected = self.calc_selected(umesh, with_seams = not self.ignore_mark_seam)
+            selected = self.calc_selected(umesh, with_seams = not self.ignore_seams)
             if not selected:
                 umeshes.umeshes.remove(umesh)
                 continue
@@ -472,8 +473,8 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
         for umesh in reversed(umeshes):
             # TODO: With expanded selection, you can calculate islands via calc_visible
             #  and add them to selected and non_selected. This does not work with calc_selected.
-            selected = self.calc_selected(umesh, with_seams = not self.ignore_mark_seam)
-            non_selected = self.calc_non_selected(umesh, with_seams = not self.ignore_mark_seam)
+            selected = self.calc_selected(umesh, with_seams = not self.ignore_seams)
+            non_selected = self.calc_non_selected(umesh, with_seams = not self.ignore_seams)
 
             if not selected and not non_selected:
                 umeshes.umeshes.remove(umesh)
@@ -491,6 +492,9 @@ class UNIV_OT_Stack_VIEW3D(bpy.types.Operator):
                 proxi = Islands(non_selected.islands + selected.islands, umesh)
 
             proxi.indexing()
+
+            if self.target_and_ref_ordering == "TO_UNSELECTED":
+                selected, non_selected = non_selected, selected
 
             for sel_isl in selected:
                 stack_isl = stack_type(sel_isl)
