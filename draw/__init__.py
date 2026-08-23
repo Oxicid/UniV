@@ -162,6 +162,10 @@ class DrawCallSeams2D:
             data = fastapi.ExtractData.extract_seams_data(umesh)
         else:
             data = mesh_extract.extract_seams_umesh(umesh)
+
+        if prefs().overlay_2d_uv_seam_edge_pixelize:
+            data = cls.pixelize_seams(data)
+
         if len(data):
             return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": data}))
         return None
@@ -178,6 +182,50 @@ class DrawCallSeams2D:
         except ImportError:
             return False
 
+    @staticmethod
+    def pixelize_seams(data):
+        pref = prefs()
+        res = min(int(pref.size_x), int(pref.size_y))
+
+        if res <= 512:
+            import numpy as np
+            cell: float | int = 1.0 / res  # Set int in annotation for pycharm, for avoid warnings.
+
+            if isinstance(data, np.ndarray):
+                arr = np.ascontiguousarray(data, dtype=np.float32)
+            else:
+                # TODO: Add fast Vectors to numpy func.
+                arr = np.array([v.to_tuple() for v in data], dtype=np.float32)
+
+            arr = arr.reshape(-1, 2, 2)
+
+            # Start and end points of every segment.
+            a = arr[:, 0]
+            b = arr[:, 1]
+            vec_dir = b - a
+
+            dx = np.abs(vec_dir[:, 0])
+            dy = np.abs(vec_dir[:, 1])
+
+            max_delta = np.maximum(dx, dy)
+            steps = np.maximum(1, (max_delta / cell).astype(np.int64))
+
+            segments = []
+            for i in range(arr.shape[0]):
+                num_steps = steps[i]
+                if num_steps <= 1:
+                    segments.append(np.stack((np.round(a[i] * res) * cell, np.round(b[i] * res) * cell)))
+                else:
+                    t = (np.arange(num_steps + 1, dtype=np.float32) * (1.0 / num_steps))[:, None]
+                    pts = a[i] + t * vec_dir[i]
+                    pts = np.round(pts * res) * cell
+                    seg = np.empty((num_steps * 2, 2), np.float32)
+                    seg[0::2] = pts[:-1]
+                    seg[1::2] = pts[1:]
+                    segments.append(seg)
+
+            data = np.concatenate(segments) if segments else np.empty((0, 2), np.float32)
+        return data
 
 class DrawCallConstraints2D:
     def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None):

@@ -47,20 +47,26 @@ def _update_fastapi(_self, _context):
     else:
         fastapi.FastAPI.close()
 
-def _update_size_x(_self, _context):
-    if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
-        univ_settings().size_y = univ_settings().size_x
+def _update_size_x(self, context):
+    pref = univ_settings()
+    if pref.lock_size and pref.size_y != pref.size_x:
+        pref.size_y = pref.size_x
+        if pref.overlay_2d_uv_seam_edge_pixelize:
+            _update_drawer_2d_enable(self, context)
 
+def _update_size_y(self, context):
+    pref = univ_settings()
+    if pref.lock_size and pref.size_x != pref.size_y:
+        pref.size_x = pref.size_y
+        if pref.overlay_2d_uv_seam_edge_pixelize:
+            _update_drawer_2d_enable(self, context)
 
-def _update_size_y(_self, _context):
-    if univ_settings().lock_size and univ_settings().size_x != univ_settings().size_y:
-        univ_settings().size_x = univ_settings().size_y
-
-
-def _update_lock_size(_self, _context):
-    if univ_settings().lock_size and univ_settings().size_y != univ_settings().size_x:
-        univ_settings().size_y = univ_settings().size_x
-
+def _update_lock_size(self, context):
+    pref = univ_settings()
+    if pref.lock_size and pref.size_y != pref.size_x:
+        pref.size_y = pref.size_x
+        if pref.overlay_2d_uv_seam_edge_pixelize:
+            _update_drawer_2d_enable(self, context)
 
 def update_panel(_self, _context):
     from .ui import UNIV_PT_General_VIEW_3D as Panel
@@ -382,6 +388,10 @@ Some operators, can interact with trims:
     overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.0, 0.0, 0.25),
         min=0.0, max=1.0, size=4, subtype='COLOR'
     )
+
+    overlay_2d_uv_seam_edge_pixelize: BoolProperty(name="Pixelate Edge Seam", default=False, update=_update_drawer_2d_enable,
+        description="Render UV seams lines as aliased, so only perfectly axis-aligned edges stay crisp. "
+                    "It works when Global Size is <= 512.")
 
     # Colors 3D
     overlay_3d_uv_vert_color: FloatVectorProperty(name="UV Select Vert", default=(1.0, 1.0, 1.0, 0.28),

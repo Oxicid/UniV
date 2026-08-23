@@ -638,6 +638,9 @@ class UNIV_PT_GlobalSettings(Panel):
                 col.prop(pref, 'overlay_2d_uv_edge_h_constraints_color')
                 col.prop(pref, 'overlay_2d_uv_edge_v_constraints_color')
 
+                col.separator()
+                col.prop(pref, 'overlay_2d_uv_seam_edge_pixelize')
+
             panel = draw_panel_with_pref_checkbox(layout, 'overlay_3d_enable')
             if panel:
                 split = panel.split(factor=indent)
