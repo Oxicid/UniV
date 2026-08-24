@@ -592,15 +592,19 @@ class DrawerSubscribeRNA:
             if handler.__name__ == cls.univ_drawer_load_handler.__name__:
                 bpy.app.handlers.load_post.remove(handler)
 
-def has_crash_modal_running():
-    """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
-    if bpy.app.version >= (4, 2, 0):
+
+if bpy.app.version >= (4, 2, 0):
+    def has_crash_modal_running():
+        """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
         for window in bpy.context.window_manager.windows:
             for op in window.modal_operators:
-                if not op.bl_idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
-                    return True
-        return False
-    else:
+                idname = op.bl_idname
+                if not idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
+                    if idname not in (prop.idname for prop in prefs().excluded_operators_for_overlay):
+                        return op
+        return None
+else:
+    def has_crash_modal_running():
         # In older versions, modal operators cannot be selectively excluded,
         # so any modal operator interrupts drawing.
         from .. import utypes

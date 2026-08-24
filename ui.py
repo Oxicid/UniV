@@ -627,6 +627,15 @@ class UNIV_PT_GlobalSettings(Panel):
 
         pref = prefs()
         if univ_pro_exist:
+            if bpy.app.version >= (4, 2, 0):
+                from .draw import has_crash_modal_running
+                modal_ot = has_crash_modal_running()
+                if modal_ot:
+                    layout.label(text=f"Operator {modal_ot.bl_idname} prevents overlays.", icon="ERROR")
+                    ot = layout.operator("scene.univ_excluded_operators_for_overlay_processing", text=f"Exclude {modal_ot.bl_idname!r}")
+                    ot.operation_type = "ADD"
+                    ot.idname = modal_ot.bl_idname
+
             panel = draw_panel_with_pref_checkbox(layout, 'overlay_2d_enable')
             if panel:
                 split = panel.split(factor=indent)

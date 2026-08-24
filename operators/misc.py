@@ -1642,6 +1642,45 @@ class UNIV_OT_SetActiveRender(Operator):
                     uv_layers[self.idx].active_render = True
         return {'FINISHED'}
 
+class UNIV_OT_ExcludedOperatorsForOverlayProcessing(bpy.types.Operator):
+    bl_idname = "scene.univ_excluded_operators_for_overlay_processing"
+    bl_label = "Exclude Operators Processing"
+    # noinspection PyTypeHints
+    operation_type: bpy.props.EnumProperty(default='ADD', options={"HIDDEN"},
+                                 items=(('ADD', 'Add', ''),
+                                        ('REMOVE', 'Remove', ''))
+                                 )
+    # noinspection PyTypeHints
+    idname: bpy.props.StringProperty(options={"HIDDEN"})
+
+    def execute(self, _context):
+        excluded_operators = prefs().excluded_operators_for_overlay
+        if self.operation_type == 'ADD':
+            prop = excluded_operators.add()
+            prop.idname = self.idname
+        else:
+            if not excluded_operators:
+                self.report({'WARNING'}, "Not found presets for remove.")
+                return {'CANCELLED'}
+            else:
+                has_removed = False
+                for i, idname in enumerate(excluded_operators):
+                    if idname == self.idname:
+                        excluded_operators.remove(i)
+                        has_removed = True
+                        break
+                if not has_removed:
+                    self.report({'WARNING'}, f"Can not remove {self.idname} preset.")
+                    return {'CANCELLED'}
+
+
+        from .. import utils
+        for a in utils.get_areas_by_type('VIEW_3D'):
+            a.tag_redraw()
+        for a in utils.get_areas_by_type('IMAGE_EDITOR'):
+            a.tag_redraw()
+
+        return {'FINISHED'}
 
 class UNIV_OT_FixUVs(Operator):
     bl_idname = "mesh.univ_fix_uvs"

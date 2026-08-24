@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 0, 10, "experimental"),
+    "version": (4, 0, 11, "experimental"),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -41,6 +41,7 @@ def load_register_types():
             preferences.UNIV_TrimPreset,
             preferences.UNIV_TrimPresetsSlot,
             preferences.UNIV_TexelPreset,
+            preferences.ExcludedOperator,
             preferences.UNIV_AddonPreferences,
             preferences.UNIV_OT_ShowAddonPreferences,
             keymaps.UNIV_RestoreKeymaps,
@@ -210,6 +211,7 @@ def load_register_types():
             operators.misc.UNIV_OT_MoveDown,
             operators.misc.UNIV_OT_CopyToLayer,
             operators.misc.UNIV_OT_SetActiveRender,
+            operators.misc.UNIV_OT_ExcludedOperatorsForOverlayProcessing,
             operators.misc.UNIV_OT_SmartScaleApply,
             operators.misc.UNIV_OT_AlignBorderVerts,
         ])

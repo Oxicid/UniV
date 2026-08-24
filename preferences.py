@@ -319,6 +319,10 @@ class UNIV_UV_Layers(bpy.types.PropertyGroup):
     flag: IntProperty(name='Flag', default=0, min=0, max=3)
 
 # noinspection PyTypeHints
+class ExcludedOperator(bpy.types.PropertyGroup):
+    idname: StringProperty()
+
+# noinspection PyTypeHints
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -613,6 +617,9 @@ Some operators, can interact with trims:
                                    description='Pick Distance for Pick Select, Quick Snap operators'
                                    )
 
+    excluded_operators_for_overlay: CollectionProperty(name="Excluder Operators for Overlay", type=ExcludedOperator)
+
+
     @property
     def glob_size(self) -> tuple[int, int]:
         return int(prefs().size_x), int(prefs().size_y)
@@ -730,6 +737,18 @@ Some operators, can interact with trims:
 
             from . import ui
             ui.UNIV_PT_GlobalSettings.draw_ui_settings(layout)
+
+            if self.excluded_operators_for_overlay:
+                box = layout.box()
+                box.label(text="Excluded Operators for Overlay")
+                col = box.column(align=True)
+                for prop in self.excluded_operators_for_overlay:
+                    row = col.row(align=True)
+                    row.label(text=prop.idname)
+                    ot = row.operator("scene.univ_excluded_operators_for_overlay_processing", text="", icon="PANEL_CLOSE")
+                    ot.operation_type = "REMOVE"
+                    ot.idname = prop.idname
+
         elif self.tab == 'KEYMAPS':
             from .ui import draw_panel
             if "NOT_BL_EXT":
