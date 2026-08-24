@@ -220,7 +220,7 @@ class DrawCallSeams2D:
         ANGLES_BY_SIZE = {128: 0.1, 256: 0.05, 512: 0.025}
         ANGLE = math.radians(ANGLES_BY_SIZE.get(res, 0.025))
         AXIS_TOL = np.float32(math.tan(ANGLE))
-        DIAGONAL_TOL = np.float32(math.tan(math.radians(20.0)))
+        DIAGONAL_TOL = np.float32(math.tan(math.radians(15.0)))
 
         axis_aligned = min_delta <= max_delta * AXIS_TOL
         diagonal = min_delta >= max_delta * DIAGONAL_TOL

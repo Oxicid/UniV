@@ -986,6 +986,7 @@ class UNIV_OT_BatchInspect(Operator):
         return context.mode == 'EDIT_MESH'
 
     def draw(self, context):
+        from .. import icons
         layout = self.layout
         col = layout.column()
         if 'Hidden' in INSPECT_INFO:
@@ -993,13 +994,19 @@ class UNIV_OT_BatchInspect(Operator):
             box.label(text='Hidden faces found — the result may be incorrect', icon='INFO')
             col.separator()
 
-        for inspect_flag in ('Overlap', 'Zero', 'Flipped', 'Over', 'Non-Splitted'):
+        for inspect_flag, ot in (('Overlap', UNIV_OT_Check_Overlap),
+                             ('Zero', UNIV_OT_Check_Zero),
+                             ('Flipped', UNIV_OT_Check_Flipped),
+                             ('Over', UNIV_OT_Check_Over),
+                             ('Non-Splitted', UNIV_OT_Check_Non_Splitted)):
             info = INSPECT_INFO.get(inspect_flag)
             if info:
                 box = col.box()
                 wrapped_lines = textwrap.wrap(inspect_flag + ': ' + info, width=72)
                 for line in wrapped_lines:
                     box.label(text=line)
+                if len(INSPECT_INFO) != 1:
+                    box.operator(ot.bl_idname, icon_value=icons.icons.arrow)
 
         info_list = INSPECT_INFO.get('Other')
         if info_list:
