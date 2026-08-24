@@ -1645,6 +1645,10 @@ class UNIV_OT_SetActiveRender(Operator):
 class UNIV_OT_ExcludedOperatorsForOverlayProcessing(bpy.types.Operator):
     bl_idname = "scene.univ_excluded_operators_for_overlay_processing"
     bl_label = "Exclude Operators Processing"
+    bl_description = ("Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed.\n"
+                      "Other add-ons are interfering with its display because the add-on has a safeguard against using stale data in memory. \n"
+                      "The safeguard is a bit aggressive, but without it Blender starts crashing.\n\n"
+                      "NOTE: Add modal operators to the exclusion list with caution.")
     # noinspection PyTypeHints
     operation_type: bpy.props.EnumProperty(default='ADD', options={"HIDDEN"},
                                  items=(('ADD', 'Add', ''),
@@ -1664,8 +1668,8 @@ class UNIV_OT_ExcludedOperatorsForOverlayProcessing(bpy.types.Operator):
                 return {'CANCELLED'}
             else:
                 has_removed = False
-                for i, idname in enumerate(excluded_operators):
-                    if idname == self.idname:
+                for i, prop in enumerate(excluded_operators):
+                    if prop.idname == self.idname:
                         excluded_operators.remove(i)
                         has_removed = True
                         break
