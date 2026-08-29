@@ -596,7 +596,7 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
     bl_idname = 'wm.univ_keymaps_config'
     bl_label = 'Keymaps Config'
     bl_description = 'Keymaps Config\n\n' \
-                     'Restore - Resets properties and assigned keys, enable keymaps (doesn`t restore deleted keymaps)\n' \
+                     'Restore - Resets properties and assigned keys, for enabled keymaps (doesn`t restore deleted and user defined keymaps)\n' \
                      'Off/On - Enable/disable keymaps\n' \
                      'Delete User - Remove manually installed UniV keymaps\n' \
                      'Resolve Conflicts - Resolve all conflicts with UniV keymaps (except in cases where the UniV keymap is disabled)'
@@ -665,24 +665,13 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                             kmi_.active = False
             message = f'Disabled {counter} keymaps' if counter else 'Not found keymaps with conflicts'
 
-        # elif self.mode == 'RESTORE':
-        #     pass
-            # for km, kmi in keymap_items():
-            #     if not kmi.is_user_defined:
-            #         km.keymap_items.remove(kmi)
-
-            # global keys
-            # kc = bpy.context.window_manager.keyconfigs.addon
-            # new_keys = []
-            # for addon_km, addon_kmi in keys:
-            #     user_km = kc.keymaps[addon_km.name]
-            #     key = user_km, user_km.keymap_items.new_from_item(addon_kmi)
-            #     new_keys.append(key)
-            #     print(key[1])
-            # remove_keymaps()
-            # keys.extend(new_keys)
-            # remove_keymaps()
-            # add_keymaps()
+        elif self.mode == 'RESTORE':
+            for km, kmi in keys:
+                if (not kmi.is_user_defined) and kmi.is_user_modified:
+                    if kmi.active:
+                        km.restore_item_to_default(kmi)
+                        counter += 1
+            message = f'Restored {counter} keymaps' if counter else 'Not found enabled keymaps for restore.'
 
         elif self.mode == 'DELETE_USER':
             for km, kmi in keymap_items():
