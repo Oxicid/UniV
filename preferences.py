@@ -591,10 +591,10 @@ Some operators, can interact with trims:
 
     # ----------
 
-    keymap_conflict_filter: BoolProperty(name='Show Only Error', default=False)
+    km_show_only_error: BoolProperty(name='Show Only Error', default=False)
 
-    keymap_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
-    keymap_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
+    km_name_filter: StringProperty(name="Search by Name", default='', options={'TEXTEDIT_UPDATE'})
+    km_key_filter: StringProperty(name="Search by Key-Binding", default='', options={'TEXTEDIT_UPDATE'})
 
     split_toggle_uv_by_cursor: BoolProperty(name='Split ToggleUV by Mouse Cursor', default=False)
     show_split_toggle_uv_button: BoolProperty(name='Show Split ToggleUV Button', default=False)
@@ -761,46 +761,31 @@ Some operators, can interact with trims:
             col = layout.column(align=True)
 
             split = col.split(factor=0.25, align=True)
-            split.prop(self, 'keymap_conflict_filter', toggle=True)
+            split.prop(self, 'km_show_only_error', toggle=True)
 
             sub_row = split.row(align=True)
             if bpy.app.version >= (4, 0, 0):
-                sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
-                sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
+                sub_row.prop(self, "km_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
+                sub_row.prop(self, "km_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
             else:
-                sub_row.prop(self, "keymap_name_filter", text="", icon='SORTALPHA')
-                sub_row.prop(self, "keymap_key_filter", text="", icon='KEYINGSET')
+                sub_row.prop(self, "km_name_filter", text="", icon='SORTALPHA')
+                sub_row.prop(self, "km_key_filter", text="", icon='KEYINGSET')
 
             # Draw Keymaps
-            it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude(keymaps.keys_areas)
+            it = keymaps.KeymapFilter.get_conflict_filtered_keymaps(keymaps.keys_areas)
             for area, kc, km, filtered_keymaps in it:
                 panel = draw_panel(layout, area)
                 if panel:
                     col = panel.column(align=True)
 
-                    for config_filtered in filtered_keymaps.values():
-                        box = None
+                    sorted_keymaps = keymaps.KeymapFilter.get_sorted(km, filtered_keymaps, self.km_show_only_error)
 
+                    # layout.context_pointer_set("keymap", km)  # Need for avoid poll in restore/remove keymap.
+
+                    for config_filtered in sorted_keymaps:
+                        box = col.box()
+                        box.context_pointer_set("keymap", km)  # Need for avoid poll in restore/remove keymap.
                         for univ_kmi in config_filtered.univ_keys:
-                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
-
-                            conflict_state_default_keys = 'NONE'
-                            if config_filtered.default_keys:
-                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys):
-                                    conflict_state_default_keys = 'ERROR'
-
-                            conflict_state_user_defined = 'NONE'
-                            if config_filtered.default_keys:
-                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
-                                    conflict_state_user_defined = 'ERROR'
-
-                            if self.keymap_conflict_filter:
-                                if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
-                                    continue
-
-                            if not box:
-                                box = col.box()
-
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
                             # Skip showing errors when univ keymap disabled.
                             if univ_kmi.active:
@@ -808,42 +793,20 @@ Some operators, can interact with trims:
 
 
             # Workspace Tool.
-            it = keymaps.ConflictFilter.get_conflict_filtered_keymaps_with_exclude_ws(keymaps.keys_areas_workspace)
+            it = keymaps.KeymapFilter.get_conflict_filtered_keymaps(keymaps.keys_areas_workspace, is_ws=True)
             for area, kc, km, filtered_keymaps in it:
                 subpanel = draw_panel(layout, "Workspace Tool: " + area)
                 if subpanel:
                     col = subpanel.column(align=True)
 
-                    for config_filtered in filtered_keymaps.values():
-                        box = None
 
+
+                    sorted_keymaps = keymaps.KeymapFilter.get_sorted(km, filtered_keymaps, self.km_show_only_error, ws_ignore_kmi='view3d.select_box')
+                    for config_filtered in sorted_keymaps:
+                        box = col.box()
+                        box.context_pointer_set("keymap", km)  # Need for avoid poll in restore/remove keymap.
                         for univ_kmi in config_filtered.univ_keys:
-                            any_active = any(univ_kmi.active for univ_kmi in config_filtered.univ_keys)
-
-                            conflict_state_default_keys = 'NONE'
-                            if config_filtered.default_keys:
-                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.default_keys):
-                                    conflict_state_default_keys = 'ERROR'
-
-                            conflict_state_user_defined = 'NONE'
-                            if config_filtered.default_keys:
-                                if any_active and any(kmi_.active for (_, kmi_) in config_filtered.user_defined):
-                                    conflict_state_user_defined = 'ERROR'
-
-                            if self.keymap_conflict_filter:
-                                if 'ERROR' not in (conflict_state_default_keys, conflict_state_user_defined):
-                                    continue
-                                if univ_kmi.idname == 'view3d.select_box':
-                                    continue
-
-                            if not box:
-                                box = col.box()
-
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
-                            if univ_kmi.idname == 'view3d.select_box':
-                                continue
-
-                            # Skip showing errors when univ keymap disabled.
                             if univ_kmi.active:
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
 
@@ -948,16 +911,10 @@ Some operators, can interact with trims:
 
     @staticmethod
     def draw_conflict_keymaps(box, config_filtered, kc):
-        if config_filtered.default_keys:
-            for (default_km, default_kmi) in config_filtered.default_keys:
-                box_split = box.split(align=True, factor=0.5)
-                box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
-                rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
-        if config_filtered.user_defined:
-            for (user_km, user_kmi) in config_filtered.user_defined:
-                box_split = box.split(align=True, factor=0.5)
-                box_split.label(text=' ', icon='ERROR' if user_kmi.active else 'BLANK1')
-                rna_keymap_ui.draw_kmi([], kc, user_km, user_kmi, box_split, 0)
+        for (default_km, default_kmi) in config_filtered.conflict_keys:
+            box_split = box.split(align=True, factor=0.5)
+            box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
+            rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
 
     def get_active_trim_slot(self) -> "UNIV_TrimPresetsSlot":
         try:

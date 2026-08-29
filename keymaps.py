@@ -332,158 +332,141 @@ _EVENT_TYPE_MAP = {}
 _EVENT_TYPE_MAP_EXTRA = {}
 
 
-class ConflictFilter:
+class KeymapFilter:
     def __init__(self):
-        self.univ_keys = []
-        self.default_keys = []
-        self.user_defined = []
+        self.univ_keys: "list[bpy.types.KeyMapItem]" = []
+        self.conflict_keys = []
 
     def __str__(self):
-        key_name = self.univ_keys[0].to_string()
-        return f'{key_name: <30}: UniV - {len(self.univ_keys)}, Blender - {len(self.default_keys)}, User - {len(self.user_defined)}'
-
-    @staticmethod
-    def get_conflict_filtered_keymaps(keys_areas_):
-        kc = bpy.context.window_manager.keyconfigs.user
-
-        for area in keys_areas_:
-            km = kc.keymaps[area]
-
-            conflict_filter = defaultdict(ConflictFilter)
-            for kmi in km.keymap_items:
-                if ('.univ_' in kmi.idname or
-                        'wm.call_menu_pie' == kmi.idname and kmi.name == 'UniV Pie'):
-                    keymap_name = kmi.to_string()
-                    conflict_filter[keymap_name].univ_keys.append(kmi)
-
-            if not conflict_filter:
-                continue
-
-            if area == 'Window':
-                areas_ = (area, *other_conflict_areas, '3D View')
-            else:
-                areas_ = (area, *other_conflict_areas)
-            for area1 in areas_:
-                km = kc.keymaps[area1]
-                for kmi in km.keymap_items:
-                    keymap_name = kmi.to_string()
-                    if keymap_name in conflict_filter and '.univ_' not in kmi.idname and kmi.name != 'UniV Pie':
-                        if kmi.is_user_defined:
-                            conflict_filter[keymap_name].user_defined.append((km, kmi))
-                        else:
-                            conflict_filter[keymap_name].default_keys.append((km, kmi))
-            yield area, kc, km, conflict_filter
+        key_name = self.univ_keys[0].to_string()  # noqa
+        return f'{key_name: <30}: UniV - {len(self.univ_keys)}, Blender - {len(self.conflict_keys)}'
 
     @classmethod
-    def get_conflict_filtered_keymaps_with_exclude(cls, keys_areas_):
-        from .preferences import prefs
-        keymap_name_filter = prefs().keymap_name_filter.strip().lower()
-        filter_name_fn = cls.filter_by_name
+    def get_sorted(cls, km, keyconfigs, show_only_error, ws_ignore_kmi=""):
+        individual_keys: list[KeymapFilter] = []
 
-        keymap_key_filter = prefs().keymap_key_filter.strip().lower()
-        if keymap_key_filter:
-            filter_key_fn = cls.filter_by_key(keymap_key_filter)
-        else:
-            def filter_key_fn(a): return a  # pycharm warning
-
-        kc = bpy.context.window_manager.keyconfigs.user
-
-        for area in keys_areas_:
-            km = kc.keymaps[area]
-
-            conflict_filter = defaultdict(ConflictFilter)
-            for kmi in km.keymap_items:
-                if ('.univ_' in kmi.idname or
-                        'wm.call_menu_pie' == kmi.idname and kmi.name == 'UniV Pie'):
-                    # Filter by name and by key
-                    if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
-                        continue
-                    if keymap_key_filter and not filter_key_fn(kmi):
-                        continue
-
-                    keymap_name = kmi.to_string()
-                    conflict_filter[keymap_name].univ_keys.append(kmi)
-
-            if not conflict_filter:
-                continue
-
-            # Check for potential keymap conflicts with addon in other spaces
-            if area == 'Window':
-                areas_ = (area, *other_conflict_areas, '3D View')
+        for conf_filter in keyconfigs.values():
+            if len(conf_filter.univ_keys) == 1:
+                individual_keys.append(conf_filter)
             else:
-                areas_ = (area, *other_conflict_areas)
-            for area1 in areas_:
-                km = kc.keymaps[area1]
-                for kmi in km.keymap_items:
-                    keymap_name = kmi.to_string()
-                    if keymap_name in conflict_filter and '.univ_' not in kmi.idname and kmi.name != 'UniV Pie':
-                        # Filter by name and by key
-                        if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
-                            continue
-                        if keymap_key_filter and not filter_key_fn(kmi):
-                            continue
+                for keys_ in conf_filter.univ_keys:
+                    new_conf_filter = cls()
+                    new_conf_filter.univ_keys = [keys_]
+                    new_conf_filter.conflict_keys = conf_filter.conflict_keys.copy()
+                    new_conf_filter.conflict_keys.extend((km, keys_sub) for keys_sub in conf_filter.univ_keys if keys_sub is not keys_)
+                    individual_keys.append(new_conf_filter)
 
-                        if kmi.is_user_defined:
-                            conflict_filter[keymap_name].user_defined.append((km, kmi))
-                        else:
-                            conflict_filter[keymap_name].default_keys.append((km, kmi))
-            yield area, kc, km, conflict_filter
+        if show_only_error:
+            only_conflict_keys = []
+            for filtered in individual_keys:
+                univ_kmi = filtered.univ_keys[0]
+                if univ_kmi.active:
+                    if univ_kmi.idname != ws_ignore_kmi:
+                        if any(kmi.active for kmi in filtered.conflict_keys):
+                            only_conflict_keys.append(filtered)
+            individual_keys = only_conflict_keys
+
+        individual_keys.sort(key=lambda cf: cf.univ_keys[0].name)
+        return individual_keys
+
 
     @classmethod
-    def get_conflict_filtered_keymaps_with_exclude_ws(cls, keys_areas_):
-        from .preferences import prefs
-        keymap_name_filter = prefs().keymap_name_filter.strip().lower()
-        filter_name_fn = cls.filter_by_name
-
-        keymap_key_filter = prefs().keymap_key_filter.strip().lower()
-        if keymap_key_filter:
-            filter_key_fn = cls.filter_by_key(keymap_key_filter)
+    def get_conflict_filtered_keymaps(cls, keys_areas_, *, use_filter=True, is_ws=False):
+        if is_ws:
+            def is_univ_keymap_item():
+                return True
         else:
-            def filter_key_fn(a): return a  # pycharm warning
+            def is_univ_keymap_item():
+                return (
+                        '.univ_' in kmi.idname or
+                        (kmi.idname == 'wm.call_menu_pie' and kmi.name == 'UniV Pie')
+                )
 
         kc = bpy.context.window_manager.keyconfigs.user
+        is_unmatch_kmi = cls.is_unmatched_kmi_for_filter_fn(use_filter)
 
         for area in keys_areas_:
             km = kc.keymaps[area]
+            addon_kmi = defaultdict(KeymapFilter)
 
-            conflict_filter = defaultdict(ConflictFilter)
+            # Collect UniV keymap items.
             for kmi in km.keymap_items:
-                # Filter by name and by key
-                if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
+                if not is_univ_keymap_item():
                     continue
-                if keymap_key_filter and not filter_key_fn(kmi):
+                if is_unmatch_kmi(kmi):
                     continue
 
                 keymap_name = kmi.to_string()
-                conflict_filter[keymap_name].univ_keys.append(kmi)
+                addon_kmi[keymap_name].univ_keys.append(kmi)
 
-            if not conflict_filter:
-                continue
-            if area == 'Window':
-                areas_ = (area, *other_conflict_areas, '3D View')
+            addon_kmi_and_conflict_kmi = addon_kmi
+
+            if addon_kmi_and_conflict_kmi:
+                # Check for potential keymap conflicts with the addon in other spaces.
+                if area == 'Window':
+                    all_areas_with_potential_conflicts = (area, *other_conflict_areas, '3D View')
+                else:
+                    all_areas_with_potential_conflicts = (area, *other_conflict_areas)
+
+
+                for area_with_potential_conflicts in all_areas_with_potential_conflicts:
+                    km_with_potential_conflicts = kc.keymaps[area_with_potential_conflicts]
+
+                    for kmi in km_with_potential_conflicts.keymap_items:
+                        keymap_name = kmi.to_string()
+
+                        if keymap_name in addon_kmi_and_conflict_kmi:
+                            if is_univ_keymap_item():
+                                continue
+
+                            if is_unmatch_kmi(kmi):
+                                continue
+
+                            addon_kmi_and_conflict_kmi[keymap_name].conflict_keys.append((km_with_potential_conflicts, kmi))
+
+            yield area, kc, km, addon_kmi_and_conflict_kmi
+
+    @classmethod
+    def is_unmatched_kmi_for_filter_fn(cls, use_filter):
+
+        def catcher(name_filter, key_filter, filter_key_fn):
+            if name_filter and key_filter:
+                def filtered(kmi):
+                    if (name_filter in kmi.idname.lower() or name_filter in kmi.name.lower()) and filter_key_fn(kmi):
+                        return False
+                    return True
+
+            elif name_filter:
+                def filtered(kmi):
+                    if name_filter in kmi.idname.lower() or name_filter in kmi.name.lower():
+                        return False
+                    return True
+            elif key_filter:
+                def filtered(kmi):
+                    if filter_key_fn(kmi):
+                        return False
+                    return True
             else:
-                areas_ = (area, *other_conflict_areas)
-            for area1 in areas_:
-                km = kc.keymaps[area1]
-                for kmi in km.keymap_items:
-                    keymap_name = kmi.to_string()
-                    if keymap_name in conflict_filter and '.univ_' not in kmi.idname and kmi.name != 'UniV Pie':
-                        # Filter by name and by key
-                        if keymap_name_filter and not filter_name_fn(kmi, keymap_name_filter):
-                            continue
-                        if keymap_key_filter and not filter_key_fn(kmi):
-                            continue
+                def filtered(_):
+                    return False
+            return filtered
 
-                        if kmi.is_user_defined:
-                            conflict_filter[keymap_name].user_defined.append((km, kmi))
-                        else:
-                            conflict_filter[keymap_name].default_keys.append((km, kmi))
-            yield area, kc, km, conflict_filter
 
-    @staticmethod
-    def filter_by_name(kmi, filter_text):
-        return (filter_text in kmi.idname.lower() or
-                filter_text in kmi.name.lower())
+        km_name_filter = ''
+        km_key_filter = ''
+
+        if use_filter:
+            from .preferences import prefs
+            pref = prefs()
+            km_name_filter = pref.km_name_filter.strip().lower()
+            km_key_filter = pref.km_key_filter.strip().lower()
+
+        if km_key_filter:
+            filter_key_fn_ = cls.filter_by_key(km_key_filter)
+        else:
+            def filter_key_fn_(a): return a  # pycharm warning
+
+        return catcher(km_name_filter, km_key_filter, filter_key_fn_)
 
     # rna_keymap_ui.py
     @staticmethod
@@ -616,13 +599,18 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
         counter = 0
 
         def keymap_items():
-            for _area in keys_areas + keys_areas_workspace:
+            for _area in keys_areas:
                 _km = kc.keymaps[_area]
                 for _kmi in _km.keymap_items:
                     if '.univ_' in _kmi.idname:
                         yield _km, _kmi
                     elif 'wm.call_menu_pie' == _kmi.idname and _kmi.name == 'UniV Pie':
                         yield _km, _kmi
+
+            for _area in keys_areas_workspace:
+                _km = kc.keymaps[_area]
+                for _kmi in _km.keymap_items:
+                    yield _km, _kmi
 
         if self.mode == 'DEFAULT':
             for km, kmi in keymap_items():
@@ -650,16 +638,12 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
             message = f'Reset to default {counter} addon keymaps' if counter else 'All addon keymaps is default'
         elif self.mode == 'RESOLVE_ALL':
 
-            for area, kc, km, filtered_keymaps in ConflictFilter.get_conflict_filtered_keymaps(
-                    keys_areas + keys_areas_workspace):
+            for area, kc, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(
+                    keys_areas + keys_areas_workspace, use_filter=False):
                 for config_filtered in filtered_keymaps.values():
                     if not any(univ_kmi.active for univ_kmi in config_filtered.univ_keys):
                         continue
-                    for (_, kmi_) in config_filtered.default_keys:
-                        if kmi_.active:
-                            counter += 1
-                            kmi_.active = False
-                    for (_, kmi_) in config_filtered.user_defined:
+                    for (_, kmi_) in config_filtered.conflict_keys:
                         if kmi_.active:
                             counter += 1
                             kmi_.active = False

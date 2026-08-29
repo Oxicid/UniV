@@ -1065,6 +1065,24 @@ class PChart:
             context.matrix_add(row, 2 * v2.id+1, -w)
             row += 1
 
+        # TODO: Need break diagonal segments by pins
+        # TODO: Need two pass
+        # TODO: Need separate weight factor
+        # for edge in self.constr_h:
+        #     angle = pi / 4
+        #     v1 = edge.vert
+        #     v2 = edge.next.vert
+        #
+        #     s = math.sin(angle)
+        #     c = math.cos(angle)
+        #
+        #     context.matrix_add(row, 2 * v1.id, s * (w*0.02))
+        #     context.matrix_add(row, 2 * v2.id, -s * (w*0.02))
+        #     context.matrix_add(row, 2 * v1.id + 1, -c * (w*0.02))
+        #     context.matrix_add(row, 2 * v2.id + 1, c * (w*0.02))
+        #
+        #     row += 1
+
 
         if context.solve():
             for v in self.verts:
