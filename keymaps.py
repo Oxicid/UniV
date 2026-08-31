@@ -8,11 +8,14 @@ from importlib.util import find_spec
 univ_pro_exist = find_spec(f"{__package__}.univ_pro") is not None
 del find_spec
 
-keys = []
+backup_keys: "dict[bpy.types.KeyMap, list[bpy.types.KeyMapItem]]" = {}
+backup_keys_restored: "dict[bpy.types.KeyMap, list[bpy.types.KeyMapItem]]" = {}
 keys_areas = ['UV Editor', 'Window', 'Object Mode', 'Mesh']  # TODO: Rename to spaces
 keys_areas_workspace = ['3D View Tool: Object, UniV', '3D View Tool: Edit Mesh, UniV']
 other_conflict_areas = ['Frames']  # NOTE: not actual after delete keymaps for align?
 
+KMI_INACTIVE = (1 << 0)
+SKIP_KEYMAPS_INACTIVATING = False
 
 class UKeymap:
     class UKeymapPropertyController:
@@ -23,12 +26,12 @@ class UKeymap:
             if name.startswith("_ZGenerator"):
                 object.__setattr__(self, name, value)
                 return
-            _, kmi = self._ZGenerator.items[-1]  # noqa
+            kmi = self._ZGenerator.items[self._ZGenerator.km][-1]  # noqa
             setattr(kmi.properties, name, value)
 
     def __init__(self):
         self.km = None
-        self.items = []
+        self.items = {}
         self.prop = self.UKeymapPropertyController(self)
 
     def new(self, idname: str, type: str, value: str="PRESS", **kw):  # noqa
@@ -37,8 +40,31 @@ class UKeymap:
             if key not in expected:
                 raise ValueError(f"Expected {expected!r} keywords, given {key!r}")
 
-        kmi = self.km.keymap_items.new(idname, type, value, **kw)
-        self.items.append((self.km, kmi))
+        backup_kmi = self.km.keymap_items.new(idname, type, value, **kw)
+
+        # Disable key items by default.
+        from . import utypes
+        c_kmi = utypes.wmKeyMapItem(backup_kmi)
+
+
+        global SKIP_KEYMAPS_INACTIVATING
+        if not SKIP_KEYMAPS_INACTIVATING:
+            # Inactivate across ctypes, for avoid `KMI_USER_MODIFIED`
+            if c_kmi.id == backup_kmi.id: # Preserve for struct changes
+                if backup_kmi.active:
+                    if (c_kmi.flag & KMI_INACTIVE) != 0:  # noqa # pycharm moment
+                        c_kmi.flag &= KMI_INACTIVE
+                else:
+                    SKIP_KEYMAPS_INACTIVATING = True
+                    print("UniV: Keymaps: Inactive by default is set for:", backup_kmi.idname)
+            else:
+                SKIP_KEYMAPS_INACTIVATING = True
+                print("UniV: Keymaps: diff data")
+
+        # Force disable, for skip inactivating case. When deactivation succeeds, KMI_USER_MODIFIED is not set.
+        backup_kmi.active = False
+
+        self.items.setdefault(self.km, []).append(backup_kmi)
         return self
 
     def new_keymaps(self, kc, name):
@@ -193,12 +219,8 @@ class UKeymap:
         km.new('uv.univ_set_cursor_2d', 'MIDDLEMOUSE', ctrl=True, shift=True)
         km.new('uv.univ_focus', 'NUMPAD_PERIOD')
 
-        global keys
-        keys.clear()
-        keys = km.items
-
-        for _, kmi in keys:
-            kmi.active = False
+        global backup_keys
+        backup_keys = km.items
 
     @staticmethod
     def _add_mesh_keymaps(km):
@@ -217,15 +239,17 @@ class UKeymap:
 
     @staticmethod
     def remove_keymaps():
-        global keys
+        global backup_keys
         import traceback
 
-        for km, kmi in reversed(keys):
-            try:
-                km.keymap_items.remove(kmi)
-            except (RuntimeError, UnicodeDecodeError):
-                traceback.print_exc()
-        keys.clear()
+        for km, kmi_items in backup_keys.items():
+            for kmi in reversed(kmi_items):
+                try:
+                    km.keymap_items.remove(kmi)
+                except (RuntimeError, UnicodeDecodeError):
+                    traceback.print_exc()
+        backup_keys.clear()
+        backup_keys_restored.clear()
 
 class WSKeymapGenerator:
     class WSKeymapPropertyController:
@@ -341,6 +365,11 @@ class KeymapFilter:
         key_name = self.univ_keys[0].to_string()  # noqa
         return f'{key_name: <30}: UniV - {len(self.univ_keys)}, Blender - {len(self.conflict_keys)}'
 
+    @property
+    def kmi(self) -> "bpy.types.KeyMapItem":
+        return self.univ_keys[0]
+
+
     @classmethod
     def get_sorted(cls, km, keyconfigs, show_only_error, ws_ignore_kmi=""):
         individual_keys: list[KeymapFilter] = []
@@ -377,10 +406,7 @@ class KeymapFilter:
                 return True
         else:
             def is_univ_keymap_item():
-                return (
-                        '.univ_' in kmi.idname or
-                        (kmi.idname == 'wm.call_menu_pie' and kmi.name == 'UniV Pie')
-                )
+                return '.univ_' in kmi.idname or (kmi.idname == 'wm.call_menu_pie' and kmi.name == 'UniV Pie')
 
         kc = bpy.context.window_manager.keyconfigs.user
         is_unmatch_kmi = cls.is_unmatched_kmi_for_filter_fn(use_filter)
@@ -579,10 +605,10 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
     bl_idname = 'wm.univ_keymaps_config'
     bl_label = 'Keymaps Config'
     bl_description = 'Keymaps Config\n\n' \
-                     'Restore - Resets properties and assigned keys, for enabled keymaps (doesn`t restore deleted and user defined keymaps)\n' \
+                     'Restore - Resets properties, assigned keys and restore deleted\n' \
                      'Off/On - Enable/disable keymaps\n' \
                      'Delete User - Remove manually installed UniV keymaps\n' \
-                     'Resolve Conflicts - Resolve all conflicts with UniV keymaps (except in cases where the UniV keymap is disabled)'
+                     'Resolve Conflicts - Resolve all conflicts with UniV keymaps (except in cases where the UniV keymap is disabled and between addon keymaps)'
 
     # noinspection PyTypeHints
     mode: bpy.props.EnumProperty(name='Mode', default='RESTORE',
@@ -595,49 +621,9 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                                  ))
 
     def execute(self, context):
-        kc = context.window_manager.keyconfigs.user
         counter = 0
 
-        def keymap_items():
-            for _area in keys_areas:
-                _km = kc.keymaps[_area]
-                for _kmi in _km.keymap_items:
-                    if '.univ_' in _kmi.idname:
-                        yield _km, _kmi
-                    elif 'wm.call_menu_pie' == _kmi.idname and _kmi.name == 'UniV Pie':
-                        yield _km, _kmi
-
-            for _area in keys_areas_workspace:
-                _km = kc.keymaps[_area]
-                for _kmi in _km.keymap_items:
-                    yield _km, _kmi
-
-        if self.mode == 'DEFAULT':
-            for km, kmi in keymap_items():
-                if not kmi.is_user_defined:
-                    activ_before = kmi.active
-                    to_str_before = kmi.to_string()
-                    properties_before = [getattr(kmi.properties, str_props)
-                                         for str_props in dir(kmi.properties) if not str_props.startswith('__')]
-
-                    km.restore_item_to_default(kmi)
-
-                    if not activ_before:
-                        kmi.active = True
-                        counter += 1
-                        continue
-                    else:
-                        kmi.active = True
-
-                    if to_str_before != kmi.to_string():
-                        counter += 1
-                        continue
-                    if properties_before != [getattr(kmi.properties, str_props) for str_props in dir(kmi.properties) if not str_props.startswith('__')]:
-                        counter += 1
-
-            message = f'Reset to default {counter} addon keymaps' if counter else 'All addon keymaps is default'
-        elif self.mode == 'RESOLVE_ALL':
-
+        if self.mode == 'RESOLVE_ALL':
             for area, kc, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(
                     keys_areas + keys_areas_workspace, use_filter=False):
                 for config_filtered in filtered_keymaps.values():
@@ -650,40 +636,128 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
             message = f'Disabled {counter} keymaps' if counter else 'Not found keymaps with conflicts'
 
         elif self.mode == 'RESTORE':
-            for km, kmi in keys:
-                if (not kmi.is_user_defined) and kmi.is_user_modified:
-                    if kmi.active:
-                        km.restore_item_to_default(kmi)
-                        counter += 1
-            message = f'Restored {counter} keymaps' if counter else 'Not found enabled keymaps for restore.'
+            message = self.restore()
 
         elif self.mode == 'DELETE_USER':
-            for km, kmi in keymap_items():
-                if kmi.is_user_defined:
-                    counter += 1
-                    km.keymap_items.remove(kmi)
+            for _, _, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(keys_areas + keys_areas_workspace, use_filter=False):
+                sorted_keymaps = KeymapFilter.get_sorted(km, filtered_keymaps, False)
+                for fk in sorted_keymaps:
+                    if fk.kmi.is_user_defined:
+                        km.keymap_items.remove(fk.kmi)
+                        counter += 1
+
             message = f'Deleted {counter} user keymaps' if counter else 'Not found user keymaps'
-        else:
+        else:  # TOGGLE
             active_states = set()
-            for _, kmi in keymap_items():
-                active_states.add(kmi.active)
+            for _, _, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(keys_areas + keys_areas_workspace, use_filter=False):
+                sorted_keymaps = KeymapFilter.get_sorted(km, filtered_keymaps, False)
+                for fk in sorted_keymaps:
+                    active_states.add(fk.kmi.active)
 
             state = False if (len(active_states) == 2) else (False in active_states)
 
-            if state:
-                for _, kmi in keymap_items():
-                    if not kmi.active:
-                        kmi.active = True
-                        counter += 1
-                message = f'Enabled {counter} keymaps' if counter else 'Not found keymaps'
-            else:
-                for _, kmi in keymap_items():
-                    if kmi.active:
-                        kmi.active = False
+            for _, _, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(keys_areas + keys_areas_workspace, use_filter=False):
+                sorted_keymaps = KeymapFilter.get_sorted(km, filtered_keymaps, False)
+                for fk in sorted_keymaps:
+                    if fk.kmi.active != state:
+                        fk.kmi.active = state
                         counter += 1
 
-                message = f'Disable {counter} keymaps' if counter else 'Not found keymaps'
+            message = 'Not found keymaps'
+            if counter:
+                message = f'Enabled {counter} keymaps' if state else f'Disable {counter} keymaps'
 
         bpy.context.preferences.is_dirty = True
         self.report({'INFO'}, message)
         return {'FINISHED'}
+
+    @staticmethod
+    def restore():
+        counter = 0
+        total_changed = 0
+        backup_keys_temp = {km.name: kmi_items for km, kmi_items in backup_keys.items()}
+        for area, _, km, filtered_keymaps in KeymapFilter.get_conflict_filtered_keymaps(keys_areas, use_filter=False):
+            backup_kmi_items = backup_keys_temp[area]
+
+            buckup_ids_with_kmi = {}
+
+            for backup_kmi in backup_kmi_items:
+                assert not backup_kmi.is_user_defined
+                assert not backup_kmi.is_user_modified
+                kmi_unique_data = (backup_kmi.name, backup_kmi.idname, backup_kmi.to_string(), properties_to_string(backup_kmi.properties))
+                assert kmi_unique_data not in buckup_ids_with_kmi
+                buckup_ids_with_kmi[kmi_unique_data] = backup_kmi
+
+            sorted_keymaps = KeymapFilter.get_sorted(km, filtered_keymaps, False)
+            for fk in sorted_keymaps:
+                if fk.kmi.is_user_defined:
+                    continue
+                if fk.kmi.is_user_modified:
+                    total_changed += 1
+                    km.restore_item_to_default(fk.kmi)
+
+                kmi_unique_data = (fk.kmi.name, fk.kmi.idname, fk.kmi.to_string(), properties_to_string(fk.kmi.properties))
+                buckup_ids_with_kmi.pop(kmi_unique_data, None)
+
+
+            for backup_kmi in buckup_ids_with_kmi.values():
+
+                # get_km_addon_from_kmi = (addon_km for addon_km, backup_kmi_items in backup_keys.items() for b_kmi in backup_kmi_items if b_kmi is backup_kmi)
+                # for addon_km in get_km_addon_from_kmi:
+                new_kmi = km.keymap_items.new_from_item(backup_kmi)
+                # new_kmi = addon_km.keymap_items.new_from_item(backup_kmi)
+
+                if new_kmi:
+                    # backup_keys_restored.setdefault(addon_km, []).append(new_kmi) # Store for possible incref ???
+                    # double_new_kmi = km.keymap_items.new_from_item(backup_kmi)
+                    counter += 1
+                    if not SKIP_KEYMAPS_INACTIVATING:
+                        from . import utypes
+                        c_kmi = utypes.wmKeyMapItem(new_kmi)
+                        c_kmi.flag |= KMI_INACTIVE
+
+                        # if double_new_kmi:
+                        #     c_kmi = utypes.wmKeyMapItem(double_new_kmi)
+                        #     c_kmi.flag |= KMI_INACTIVE
+
+                    new_kmi.active = False
+                    # if double_new_kmi:
+                    #     backup_keys_restored.setdefault(addon_km, []).append(new_kmi)
+                    #     double_new_kmi.active = False
+                    # else:
+                    #     print(f"UniV: Keymaps: Can't restore for save {backup_kmi.name}")
+                    break
+                else:
+                    print(f"UniV: Keymaps: Can't restore the {new_kmi.name} key")
+
+        kc = bpy.context.window_manager.keyconfigs.user
+        for a in keys_areas_workspace:
+            kc.keymaps[a].restore_to_default()
+
+        message = ""
+        if counter:
+            message = f'Restored {counter!r} removed keymaps. '
+
+        if total_changed:
+            message += f'Total changes {total_changed!r} (properties, binding keys and other). '
+
+        if not message:
+            message = 'Not found enabled keymaps for restore.'
+        return message
+
+def properties_to_string(properties):
+    pretty_props = {}
+    if hasattr(properties.bl_rna, "properties"):
+        for prop in properties.bl_rna.properties:
+            if prop.identifier != "rna_type":
+                val = getattr(properties, prop.identifier)
+                if not isinstance(val, bpy.types.bpy_struct):
+                    pretty_props[prop.identifier] = getattr(properties, prop.identifier)
+                else:
+                    if hasattr(val, "bl_rna"):
+                        pretty_props[prop.identifier] = properties_to_string(val)
+                    else:
+                        print(f"UniV: Keymaps: Properties to String: Unresolved type {val}")
+    else:
+        print(f"UniV: Keymaps: Not found properties in {properties}, skipped.")
+    return str(sorted(pretty_props.items()))

@@ -15,6 +15,7 @@ from ctypes import (
     c_float,
     c_short,
     c_int,
+    c_int8,
     c_uint8,
     c_uint,
     c_long,
@@ -792,6 +793,48 @@ class wmEventHandler_Op(StructBase):
     op: c_void_p  # wmOperator
     is_file_select: c_bool
     context: context
+
+# noinspection PyTypeHints
+class wmKeyMapItem(StructBase):
+    next: lambda: POINTER(wmKeyMapItem)
+    prev: lambda: POINTER(wmKeyMapItem)
+
+    idname: c_char * 64
+    properties: c_void_p
+    propvalue_str: c_char * 64
+    propvalue: c_short
+    type: c_short
+    val: c_int8
+    direction: c_int8
+
+    if bpy.app.version < (4, 5, 0):
+        shift: c_short
+        ctrl: c_short
+        alt: c_short
+        oskey: c_short
+    else:
+        shift: c_int8
+        ctrl: c_int8
+        alt: c_int8
+        oskey: c_int8
+        hyper: c_int8
+
+        _pad0: c_char * 7
+
+    keymodifier: c_short
+
+    if bpy.app.version < (4, 5, 0):
+        flag: c_short
+        maptype: c_short
+    else:
+        flag: c_uint8
+        maptype: c_uint8
+
+    # Unique identifier. Positive for kmi that override builtins, negative otherwise.
+    id: c_short
+    if bpy.app.version < (4, 5, 0):
+        _pad0: c_char * 2
+    ptr: c_void_p
 
 
 # noinspection PyTypeHints
