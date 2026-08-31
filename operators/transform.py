@@ -1128,22 +1128,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     umeshes = selected if selected else visible
 
                 if selected:
-                    self.individual_scale_zero(umeshes, )
+                    self.individual_scale_zero(umeshes)
                 else:
-                    if self.direction not in {'CENTER', 'HORIZONTAL', 'VERTICAL'}:
-                        self.align_ex(umeshes, selected=bool(selected))
-                    else:
-                        move_value = Vector(self.get_move_value(self.direction))
-                        for umesh in umeshes:
-                            uv = umesh.uv
-                            if umeshes.is_edit_mode:
-                                for crn in utils.calc_visible_uv_corners(umesh):
-                                    crn[uv].uv += move_value
-                            else:
-                                for f in umesh.bm.faces:
-                                    for crn in f.loops:
-                                        crn[uv].uv += move_value
-                            umesh.update_tag = True
+                    self.align_ex(umeshes, selected=False)
             case _:
                 raise NotImplementedError(self.mode)
 
