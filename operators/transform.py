@@ -46,6 +46,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
     to_cursor: BoolProperty(name='To Cursor', default=False)
     individual: BoolProperty(name='Individual', default=False)
     inplace: BoolProperty(name='Inplace', default=False)
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False, description="Seams do not split islands at connected edges.")
 
     def draw(self, context):
         layout = self.layout
@@ -67,7 +68,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
         layout.prop(self, 'individual')
         if not self.to_cursor:
             layout.prop(self, 'inplace')
-
+        layout.prop(self, "ignore_seams")
         self.draw_padding()
 
         if utils.is_pro_version_support():
@@ -162,7 +163,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             case _:
                 raise NotImplementedError(self.mode)
 
-        ot_name_to_report_name = 'cropped' if self.use_crop == 'Crop' else 'filled'
+        ot_name_to_report_name = 'fitted' if self.use_crop == 'Crop' else 'filled'
         umeshes.update(info=f"All islands {ot_name_to_report_name}")
 
         if not umeshes.is_edit_mode:
@@ -174,7 +175,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
 
         general_bbox = BBox()
         for umesh in umeshes:
-            islands = self.calc_island_method(umesh)
+            islands = self.calc_island_method(umesh, with_seams=not self.ignore_seams)
             general_bbox.union(islands.calc_bbox())
             islands_of_mesh.append(islands)
 
@@ -188,7 +189,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
 
     def crop_individual(self, umeshes, inplace, offset=Vector((0, 0))):
         for umesh in umeshes:
-            for island in self.calc_island_method(umesh):
+            for island in self.calc_island_method(umesh, with_seams=not self.ignore_seams):
                 cur_bbox = island.calc_bbox()
                 if inplace:
                     tar_box = BBox.from_center(cur_bbox.center)
@@ -201,7 +202,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
     def crop_inplace(self, umeshes: UMeshes):
         islands_of_tile: dict[int, list[tuple[AdvIsland, BBox]]] = {}
         for umesh in umeshes:
-            for island in self.calc_island_method(umesh):
+            for island in self.calc_island_method(umesh, with_seams=not self.ignore_seams):
                 bbox = island.calc_bbox()
                 islands_of_tile.setdefault(bbox.get_tile_start_pos_from_center(), []).append((island, bbox))
 
@@ -275,7 +276,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 general_bbox = BBox()
                 islands = []
                 for umesh in umeshes:
-                    for isl in self.calc_island_method(umesh):  # noqa # pycharm moment
+                    for isl in self.calc_island_method(umesh, with_seams=not self.ignore_seams):  # noqa # pycharm moment
                         if selected_umeshes or active_trim_bbox.isect_island(isl):
                             found_in_active_trim = True
                             general_bbox.union(isl.bbox)
@@ -285,7 +286,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             case 'INDIVIDUAL':
                 active_trim_bbox = utils.get_active_trim().to_bbox()
                 for umesh in umeshes:
-                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                    for isl in self.calc_island_method(umesh, with_seams=not self.ignore_seams):  # noqa  # pycharm moment
                         if selected_umeshes or active_trim_bbox.isect_island(isl):
                             found_in_active_trim = True
                             self.crop_ex(isl.bbox, active_trim_bbox, (isl,))
@@ -293,7 +294,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             case 'INDIVIDUAL_INPLACE':
                 bboxes = utils.get_trim_bboxes()
                 for umesh in umeshes:
-                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                    for isl in self.calc_island_method(umesh, with_seams=not self.ignore_seams):  # noqa  # pycharm moment
                         idx = utils.get_inplace_trim_by_isl(bboxes, isl)
                         if idx == -1:
                             skipped_counter += 1
@@ -307,7 +308,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
                 islands_of_tile: dict[BBox, list[AdvIsland]] = {}
 
                 for umesh in umeshes:
-                    for isl in self.calc_island_method(umesh):  # noqa  # pycharm moment
+                    for isl in self.calc_island_method(umesh, with_seams=not self.ignore_seams):  # noqa  # pycharm moment
                         idx = utils.get_inplace_trim_by_isl(bboxes, isl)
                         if idx == -1:
                             skipped_counter += 1
@@ -327,7 +328,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
         if not selected_umeshes and not found_in_active_trim and self.mode in ('DEFAULT', 'INDIVIDUAL'):
             self.report({'WARNING'}, 'Not found islands in active trim')
         else:
-            ot_name_to_report_name = 'cropped' if self.use_crop else 'filled'
+            ot_name_to_report_name = 'fitted' if self.use_crop else 'filled'
             umeshes.update(info=f"All islands {ot_name_to_report_name}")
 
         if skipped_counter:
@@ -362,6 +363,10 @@ class UNIV_OT_SnapToPixels(Operator):
     bl_description = 'Snap island by boundary box to pixels'
     bl_options = {'REGISTER', 'UNDO'}
 
+    # noinspection PyTypeHints
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
+
     def draw(self, context):
         pref = prefs()
         row = self.layout.row(align=True, heading='Global Size')
@@ -369,6 +374,7 @@ class UNIV_OT_SnapToPixels(Operator):
         row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
         row.prop(pref, 'size_y', text='')
 
+        self.layout.prop(self, "ignore_seams")
 
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
@@ -393,7 +399,7 @@ class UNIV_OT_SnapToPixels(Operator):
         y_step = 1.0 / int(prefs().size_y)
 
         for umesh in umeshes:
-            for isl in calc_island_method(umesh):
+            for isl in calc_island_method(umesh, with_seams=not self.ignore_seams):
                 cur_bbox = isl.calc_bbox()
                 xmin = utils.round_threshold(cur_bbox.xmin, x_step)
                 xmax = utils.round_threshold(cur_bbox.xmax, x_step)
@@ -424,9 +430,9 @@ class Align_by_Angle:
     angle: FloatProperty(name='Angle', default=to_rad(5), min=to_rad(
         2), max=to_rad(40), soft_min=to_rad(5), subtype='ANGLE')
 
-    def align_edge_by_angle(self, is_x_axis):
-        umeshes: UMeshes = umeshes  # noqa
-        if umeshes.is_edit_mode: # noqa
+    def align_edge_by_angle(self, is_x_axis, with_seams):
+        umeshes: UMeshes = UMeshes()
+        if umeshes.is_edit_mode:
             selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_edges()
             umeshes: UMeshes = selected_umeshes if selected_umeshes else visible_umeshes
             umeshes.fix_context()
@@ -442,7 +448,7 @@ class Align_by_Angle:
 
         has_segments = False
         for umesh in umeshes:
-            for segments in self.get_segments_by_angle(umesh, self.angle, is_x_axis, bool(selected_umeshes)):
+            for segments in self.get_segments_by_angle(umesh, self.angle, is_x_axis, bool(selected_umeshes), with_seams=with_seams):
                 self.align_by_angle_ex(segments, is_x_axis)
                 has_segments = True
 
@@ -458,13 +464,13 @@ class Align_by_Angle:
         return {'FINISHED'}
 
     @classmethod
-    def get_segments_by_angle(cls, umesh, angle, is_x_axis, has_selected_umeshes):
+    def get_segments_by_angle(cls, umesh, angle, is_x_axis, has_selected_umeshes, with_seams: bool):
 
         uv = umesh.uv
         edge_orient = Vector((not is_x_axis, is_x_axis))
         negative_ange = math.pi - angle
 
-        is_boundary = utils.is_boundary_func(umesh, with_seam=False)
+        is_boundary = utils.is_boundary_func(umesh, with_seam=with_seams)
         get_face_select = utils.face_select_get_func(umesh)
         get_edge_select = utils.edge_select_get_func(umesh)
 
@@ -482,9 +488,9 @@ class Align_by_Angle:
 
 
         if umesh.is_edit_bm:
-            islands = Islands.calc_visible(umesh)
+            islands = Islands.calc_visible(umesh, with_seams=with_seams)
         else:
-            islands = Islands.calc_with_hidden(umesh)
+            islands = Islands.calc_with_hidden(umesh, with_seams=with_seams)
 
         for isl in islands:
             isl.apply_aspect_ratio()
@@ -764,7 +770,7 @@ class Align_by_Angle:
 
 
 class Collect(utils.OverlapHelper):
-    def collect_islands(self):
+    def collect_islands(self, with_seams: bool):
         padding = bl_math.clamp(utils.get_pad(), 0.001, float('inf'))
         padding *= 2
 
@@ -789,7 +795,7 @@ class Collect(utils.OverlapHelper):
         all_islands = []
         for umesh in umeshes:
             view_box_sync_block.skip_from_param(umesh, select=bool(selected_umeshes))
-            adv_islands = islands_calc_type(umesh)
+            adv_islands = islands_calc_type(umesh, with_seams=with_seams)
             view_box_sync_block.filter_by_isect_islands(adv_islands)
 
             if adv_islands:
@@ -988,7 +994,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
     # noinspection PyTypeHints
     direction: EnumProperty(name="Direction", default='UPPER', items=align_align_direction_items)
-
+    # noinspection PyTypeHints
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
     # TODO: Add support Trim System: Move (Move by Trims)
 
     def draw(self, context):
@@ -1008,10 +1016,13 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     self.layout.separator()
 
         self.layout.prop(self, 'direction')
+        if not (self.mode == 'MOVE_ANGLE_COLLECT' and self.direction in ('HORIZONTAL', 'VERTICAL')):
+            self.layout.prop(self, 'ignore_seams')
 
         if not is_trim:
             if context.mode == 'EDIT_MESH' and self.mode != 'MOVE_ANGLE_COLLECT':
                 row = self.layout.row(align=True)
+                # TODO: Draw individual enums, with replace text by context.
                 row.prop(pref, 'align_island_mode', expand=True)
 
             self.layout.column(align=True).prop(pref, 'align_mode', expand=True)
@@ -1090,9 +1101,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 # NOTE: Collect and Align by Axis processes errors and updates meshes.
                 # To avoid repeated updates and duplicate reports, the result is returned immediately from the function.
                 if self.direction == 'CENTER':
-                    return self.collect_islands()
+                    return self.collect_islands(with_seams=not self.ignore_seams)
                 elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                    return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL')
+                    return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL', with_seams=True)
                 else:
                     if umeshes.is_edit_mode:
                         selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
@@ -1144,19 +1155,16 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         return {'FINISHED'}
 
     def align_by_trim(self, umeshes: UMeshes):
-        match self.mode:
-            # case 'ALIGN':
-            case _:
-                if umeshes.is_edit_mode:
-                    if self.is_island_mode:
-                        selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
-                    else:
-                        selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
-                    umeshes = selected if selected else visible
-                else:
-                    selected = []
+        if umeshes.is_edit_mode:
+            if self.is_island_mode:
+                selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
+            else:
+                selected, visible = umeshes.filtered_by_selected_and_visible_uv_by_context()
+            umeshes = selected if selected else visible
+        else:
+            selected = []
 
-                self.align_by_trim_ex(umeshes, selected=bool(selected))
+        self.align_by_trim_ex(umeshes, selected=bool(selected))
 
         umeshes.update()
         if not umeshes.is_edit_mode:
@@ -1170,9 +1178,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
         for umesh in umeshes:
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected, with_seams=not self.ignore_seams)
             else:
-                islands = Islands.calc_with_hidden(umesh)
+                islands = Islands.calc_with_hidden(umesh, with_seams=not self.ignore_seams)
 
             if selected:
                 umesh.update_tag = bool(islands)
@@ -1196,9 +1204,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             for umesh in umeshes:
                 view_box_sync_block.skip_from_param(umesh, selected)
                 if umesh.is_edit_bm:
-                    islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                    islands = Islands.calc_extended_or_visible(umesh, extended=selected, with_seams=not self.ignore_seams)
                 else:
-                    islands = Islands.calc_with_hidden(umesh)
+                    islands = Islands.calc_with_hidden(umesh, with_seams=not self.ignore_seams)
                 view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
 
@@ -1243,9 +1251,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         for umesh in umeshes:
             view_box_sync_block.skip_from_param(umesh, selected)
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected, with_seams=not self.ignore_seams)
             else:
-                islands = Islands.calc_with_hidden(umesh)
+                islands = Islands.calc_with_hidden(umesh, with_seams=not self.ignore_seams)
             view_box_sync_block.filter_by_isect_islands(islands)
             umesh.update_tag = bool(islands)
 
@@ -1294,10 +1302,10 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 view_box_sync_block.skip_from_param(umesh, selected)
 
                 if umesh.is_edit_bm:
-                    islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                    islands = Islands.calc_extended_or_visible(umesh, extended=selected, with_seams=not self.ignore_seams)
                     view_box_sync_block.filter_by_isect_islands(islands)
                 else:
-                    islands = Islands.calc_with_hidden(umesh)
+                    islands = Islands.calc_with_hidden(umesh, with_seams=not self.ignore_seams)
 
                 umesh.update_tag = bool(islands)
                 for island in islands:
@@ -1348,9 +1356,9 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         for umesh in umeshes:
             view_box_sync_block.skip_from_param(umesh, selected)
             if umesh.is_edit_bm:
-                islands = Islands.calc_extended_or_visible(umesh, extended=selected)
+                islands = Islands.calc_extended_or_visible(umesh, extended=selected, with_seams=not self.ignore_seams)
             else:
-                islands = Islands.calc_with_hidden(umesh)
+                islands = Islands.calc_with_hidden(umesh, with_seams=not self.ignore_seams)
             view_box_sync_block.filter_by_isect_islands(islands)
 
             umesh.update_tag = bool(islands)
@@ -1367,7 +1375,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         if umeshes.elem_mode == 'FACE':
             for umesh in umeshes:
                 view_box_sync_block.skip_from_param(umesh, select=True)
-                islands = Islands.calc_selected(umesh)
+                islands = Islands.calc_selected(umesh, with_seams=not self.ignore_seams)
                 view_box_sync_block.filter_by_isect_islands(islands)
                 umesh.update_tag = bool(islands)
                 for isl in islands:
@@ -1593,10 +1601,14 @@ class UNIV_OT_Flip_VIEW3D(Operator):
     ))
     # noinspection PyTypeHints
     axis: EnumProperty(name='Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', '')))
+    # noinspection PyTypeHints
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
 
     def draw(self, context):
         self.layout.row(align=True).prop(self, 'axis', expand=True)
         self.layout.column(align=True).prop(self, 'mode', expand=True)
+        self.layout.prop(self, 'ignore_seams')
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1623,7 +1635,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         self.scale = Vector()
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
-        self.calc_island_type = Islands
+        self.calc_island_type: typing.Callable = Islands.calc_extended
 
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
@@ -1681,7 +1693,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
@@ -1693,14 +1705,14 @@ class UNIV_OT_Flip_VIEW3D(Operator):
 
     def flip_by_cursor(self, umeshes: UMeshes, cursor):
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 islands.scale(scale=self.scale, pivot=cursor)
             umesh.update_tag = bool(islands)
 
     def flip_individual(self, umeshes: UMeshes):
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
@@ -1708,7 +1720,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
 
     def flip_flipped(self, umeshes: UMeshes):
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 for island in islands:
                     island.scale(scale=self.scale, pivot=island.calc_bbox().center)
@@ -1804,12 +1816,15 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
     rot_dir: EnumProperty(name='Direction of rotation', default='CW', items=(('CW', 'CW', ''), ('CCW', 'CCW', '')))
     user_angle: FloatProperty(name='Angle', default=pi*0.5, min=0, max=pi, soft_min=math.radians(5.0), subtype='ANGLE')
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
 
     def draw(self, context):
         self.layout.prop(self, 'user_angle', slider=True)
-        self.layout.prop(self, 'use_correct_aspect', toggle=1)
         self.layout.row(align=True).prop(self, 'rot_dir', expand=True)
         self.layout.row(align=True).prop(self, 'mode', expand=True)
+        self.layout.prop(self, 'ignore_seams')
+        self.layout.prop(self, 'use_correct_aspect')
 
     def invoke(self, context, event):
         if event.value == 'PRESS':
@@ -1833,7 +1848,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
         self.angle = 0.0
         self.max_distance: float = 0.0
         self.mouse_pos: Vector | None = None
-        self.calc_island_type = Islands
+        self.calc_island_type = Islands.calc_extended
 
     def execute(self, context):
         self.angle = (-self.user_angle) if self.rot_dir == 'CCW' else self.user_angle
@@ -1887,7 +1902,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
         islands_of_mesh = []
         general_bbox = BBox()
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 general_bbox.union(islands.calc_bbox())
                 islands_of_mesh.append(islands)
@@ -1900,14 +1915,14 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
     def rotate_by_cursor(self, umeshes: UMeshes):
         cursor = utils.get_cursor_location()
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 islands.rotate(self.angle, pivot=cursor, aspect=umesh.aspect)
             umesh.update_tag = bool(islands)
 
     def rotate_individual(self, umeshes: UMeshes):
         for umesh in umeshes:
-            islands = self.calc_island_type(umesh)
+            islands = self.calc_island_type(umesh, with_seams=not self.ignore_seams)
             if islands:
                 for island in islands:
                     island.rotate(self.angle, pivot=island.calc_bbox().center, aspect=island.umesh.aspect)
@@ -2192,6 +2207,8 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
                         description='Distribution of islands at equal distances')
     to_cursor: BoolProperty(name='To Cursor', default=False)
     use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
 
     def draw(self, context):
         self.layout.row().prop(self, 'space', expand=True)
@@ -2199,6 +2216,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         self.layout.prop(self, 'to_cursor')
         self.layout.row().prop(self, 'axis', expand=True)
         self.layout.row().prop(self, 'use_correct_aspect')
+        self.layout.prop(self, 'ignore_seams')
         self.draw_padding()
 
     def invoke(self, context, event):
@@ -2366,7 +2384,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
         all_islands: list[AdvIsland] = []
         general_bbox = BBox()
         for umesh in umeshes:
-            adv_islands = self.islands_calc_type(umesh)
+            adv_islands = self.islands_calc_type(umesh, with_seams=not self.ignore_seams)
             if adv_islands:
                 general_bbox.union(adv_islands.calc_bbox())
                 all_islands.extend(adv_islands)
@@ -2375,7 +2393,7 @@ class UNIV_OT_Distribute(Operator, utils.OverlapHelper, utils.PaddingHelper):
     def distribute_preprocessing_overlap(self, umeshes: UMeshes):
         all_islands: list[AdvIsland] = []
         for umesh in umeshes:
-            adv_islands = self.islands_calc_type(umesh)
+            adv_islands = self.islands_calc_type(umesh, with_seams=not self.ignore_seams)
             if adv_islands:
                 adv_islands.calc_tris()
                 adv_islands.calc_flat_coords()
@@ -2709,16 +2727,12 @@ class UNIV_OT_Shift(Operator):
         layout.row().prop(self, 'lock_overlap_mode', expand=True)
         if self.with_modifier:
             row = layout.row(align=True)
-            row.prop(self, 'gn_shift', toggle=1)
-            row.prop(self, 'array_shift', toggle=1)
-            row.prop(self, 'mirror_shift', toggle=1)
-            row.prop(self, 'warp_shift', toggle=1)
-        layout.prop(self, 'with_modifier', toggle=1)
+            row.prop(self, 'gn_shift')
+            row.prop(self, 'array_shift')
+            row.prop(self, 'mirror_shift')
+            row.prop(self, 'warp_shift')
+        layout.prop(self, 'with_modifier')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.has_selected = True
-        self.islands_calc_type: Callable = Callable
 
     def execute(self, context):
         umeshes = UMeshes.calc_with_no_uv_and_no_faces(verify_uv=False)
@@ -2737,14 +2751,11 @@ class UNIV_OT_Shift(Operator):
             unselected_umeshes = []
 
         if selected_umeshes:
-            self.has_selected = True
             umeshes = selected_umeshes
-
-            self.islands_calc_type = Islands.calc_extended
+            islands_calc_type = Islands.calc_extended
         elif unselected_umeshes:
-            self.has_selected = False
             umeshes = unselected_umeshes
-            self.islands_calc_type = Islands.calc_visible
+            islands_calc_type = Islands.calc_visible
         else:
             if changed_modifiers:
                 self.report({'INFO'}, f"Changed {changed_modifiers} modifiers")
@@ -2754,7 +2765,7 @@ class UNIV_OT_Shift(Operator):
                 return {'CANCELLED'}
 
         if not umeshes.is_edit_mode:
-            self.islands_calc_type = Islands.calc_with_hidden
+            islands_calc_type = Islands.calc_with_hidden
 
         umeshes_without_attributes = []
         if self.with_modifier and self.gn_shift:
@@ -2767,7 +2778,7 @@ class UNIV_OT_Shift(Operator):
         umeshes.update_tag = False
 
         for umesh in umeshes:
-            adv_islands = self.islands_calc_type(umesh)  # noqa
+            adv_islands = islands_calc_type(umesh)
             for isl in reversed(adv_islands):
                 if isl.has_flip_with_noflip():
                     adv_islands.islands.remove(isl)

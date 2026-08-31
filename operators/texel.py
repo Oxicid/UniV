@@ -801,6 +801,9 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
     lock_overlap_mode: bpy.props.EnumProperty(name='Lock Overlaps Mode', default='ANY',
                                               items=(('ANY', 'Any', ''), ('EXACT', 'Exact', '')))
     threshold: bpy.props.FloatProperty(name='Distance', default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
+    ignore_seams: BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
+
     td_preset_idx: IntProperty(name='TD Preset Index', default=-1, options={'HIDDEN'})
 
     def invoke(self, context, event):
@@ -819,13 +822,14 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
                 layout.prop(self, 'threshold', slider=True)
             layout.row().prop(self, 'lock_overlap_mode', expand=True)
         layout.row(align=True).prop(self, 'grouping_type', expand=True)
+        layout.prop(self, "ignore_seams")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.texel: float = 1.0
         self.texture_size: float = 2048.0
         self.has_selected = True
-        self.islands_calc_type: Callable = Callable
+        self.islands_calc_type: Callable = Islands.calc_extended
 
     def execute(self, context):
         self.texel = univ_settings().texel_density
@@ -877,7 +881,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
         umeshes.update_tag = False
 
         for umesh in umeshes:
-            adv_islands = self.islands_calc_type(umesh)
+            adv_islands = self.islands_calc_type(umesh, with_seams=not self.ignore_seams)
             if adv_islands:
                 umesh.value = umesh.check_uniform_scale(report=self.report)
 
@@ -926,7 +930,7 @@ class UNIV_OT_TexelDensitySet_VIEW3D(Operator):
             if umeshes.is_edit_mode:
                 need_validation = False
                 if utils.USE_GENERIC_UV_SYNC:
-                    if utils.sync() and utils.get_select_mode_mesh() in ('VERT', 'EDGE'):
+                    if umeshes.sync and utils.get_select_mode_mesh() in ('VERT', 'EDGE'):
                         need_validation = True
 
                 for islands in selected_islands_of_mesh:
