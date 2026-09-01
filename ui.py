@@ -1219,29 +1219,71 @@ class IMAGE_MT_PIE_univ_align(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'EXEC_DEFAULT'
+        pref = prefs()
+
+        from . import utils
+        is_trim_used = utils.is_pro_version_support() and pref.use_trims
+        is_active_center = True
+        is_active_hv = True
+        is_active_arrows = True
+
+        if not is_trim_used:
+            if pref.align_mode == "COLLECT":
+                is_active_center = False
+                is_active_hv = False
+                is_active_arrows = False
+            elif pref.align_mode == "ALIGN_BY_ANGLE":
+                is_active_center = False
+                is_active_arrows = False
+            elif pref.align_mode == "MOVE":
+                is_active_hv = False
+                is_active_center = False
+
 
         pie = layout.menu_pie()
+        if is_active_arrows:
+            pie.operator('uv.univ_align_pie', text='Left', icon_value=icons.arrow_left).direction = 'LEFT'
+            pie.operator('uv.univ_align_pie', text='Right', icon_value=icons.arrow_right).direction = 'RIGHT'
+            pie.operator('uv.univ_align_pie', text='Bottom', icon_value=icons.arrow_bottom).direction = 'BOTTOM'
+            pie.operator('uv.univ_align_pie', text='Upper', icon_value=icons.arrow_top).direction = 'UPPER'
+        else:
+            pie.split()
+            pie.split()
+            pie.split()
+            pie.split()
 
-        pie.operator('uv.univ_align_pie', text='Left', icon_value=icons.arrow_left).direction = 'LEFT'
-        pie.operator('uv.univ_align_pie', text='Right', icon_value=icons.arrow_right).direction = 'RIGHT'
-        pie.operator('uv.univ_align_pie', text='Bottom', icon_value=icons.arrow_bottom).direction = 'BOTTOM'
-        pie.operator('uv.univ_align_pie', text='Upper', icon_value=icons.arrow_top).direction = 'UPPER'
+        if is_trim_used:
+            pie.prop(pref, 'use_trims', expand=True, icon="EVENT_T")
+        else:
+            col = pie.column()
+            col.scale_x = 1.2
+            col.scale_y = 1.2
+            row = col.row(align=True)
+            row.prop(pref, 'align_mode', expand=True, icon_only=True)
 
-        col = pie.column()
-        col.scale_x = 1.2
-        col.scale_y = 1.2
-        row = col.row(align=True)
-        row.alignment = 'CENTER'
-        row.prop(univ_settings(), 'align_island_mode', expand=True, icon_only=True)
-        row.active = context.mode == 'EDIT_MESH' and univ_settings().align_mode != 'MOVE_ANGLE_COLLECT'
+            if context.mode == 'EDIT_MESH' and pref.align_mode not in ("COLLECT", "ALIGN_BY_ANGLE", "MOVE"):
+                col.separator(factor=0.2)
+                row = col.row(align=True)
+                row.alignment = 'CENTER'
 
-        col.separator(factor=0.2)
-        row = col.row(align=True)
-        row.prop(univ_settings(), 'align_mode', expand=True, icon_only=True)
+                row.prop(pref, 'align_island_mode', expand=True, icon_only=True)
+                if utils.is_pro_version_support():
+                    row.separator()
+                    row.prop(pref, 'use_trims', expand=True, icon="EVENT_T", icon_only=True)
 
-        pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
-        pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
-        pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
+
+        if is_active_center:
+            pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
+        else:
+            pie.split()
+
+
+        if is_active_hv:
+            pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
+            pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
+        else:
+            pie.split()
+            pie.split()
 
 
 class IMAGE_MT_PIE_univ_misc(Menu):

@@ -782,7 +782,7 @@ class Collect(utils.OverlapHelper):
             umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if selected_umeshes:
-                islands_calc_type = Islands.calc_selected
+                islands_calc_type = Islands.calc_extended
             else:
                 islands_calc_type = Islands.calc_visible
         else:
@@ -946,45 +946,14 @@ align_align_direction_items = (
     ('BOTTOM', 'Bottom', ''),
     ('LEFT', 'Left', ''),
     ('RIGHT', 'Right', ''),
-    ('CENTER', 'Center', ''),
-    ('HORIZONTAL', 'Horizontal', ''),
-    ('VERTICAL', 'Vertical', ''),
     ('LEFT_UPPER', 'Left upper', ''),
     ('RIGHT_UPPER', 'Right upper', ''),
     ('LEFT_BOTTOM', 'Left bottom', ''),
     ('RIGHT_BOTTOM', 'Right bottom', ''),
+    ('CENTER', 'Center', ''),
+    ('HORIZONTAL', 'Horizontal', ''),
+    ('VERTICAL', 'Vertical', ''),
 )
-
-
-def draw(self, context):
-    pref = prefs()
-    is_pro = utils.is_pro_version_support()
-    is_trim = is_pro and pref.use_trims
-
-    if not is_trim:
-        if self.mode == 'MOVE_ANGLE_COLLECT':
-            if self.direction == 'CENTER':
-                self.layout.label(text='Collect')
-                self.draw_overlap()
-                self.layout.separator()
-            elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                self.layout.label(text='Align by Angle')
-                self.layout.prop(self, 'angle', slider=True)
-                self.layout.separator()
-
-    self.layout.prop(self, 'direction')
-
-    if not is_trim:
-        if context.mode == 'EDIT_MESH' and self.mode != 'MOVE_ANGLE_COLLECT':
-            row = self.layout.row(align=True)
-            row.prop(pref, 'align_island_mode', expand=True)
-
-        self.layout.column(align=True).prop(self, 'mode', expand=True)
-
-    if is_pro:
-        self.layout.separator()
-        self.layout.prop(pref, 'use_trims')
-
 
 class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     bl_idname = 'uv.univ_align_pie'
@@ -1005,31 +974,74 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         is_trim = is_pro and pref.use_trims
 
         if not is_trim:
-            if self.mode == 'MOVE_ANGLE_COLLECT':
-                if self.direction == 'CENTER':
-                    self.layout.label(text='Collect')
-                    self.draw_overlap()
-                    self.layout.separator()
-                elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                    self.layout.label(text='Align by Angle')
-                    self.layout.prop(self, 'angle', slider=True)
-                    self.layout.separator()
+            if self.mode == 'COLLECT':
+                self.draw_overlap()
+                self.layout.separator()
+            elif self.mode == 'ALIGN_BY_ANGLE':
+                self.layout.prop(self, 'angle', slider=True)
+                self.layout.separator()
 
-        self.layout.prop(self, 'direction')
-        if not (self.mode == 'MOVE_ANGLE_COLLECT' and self.direction in ('HORIZONTAL', 'VERTICAL')):
-            self.layout.prop(self, 'ignore_seams')
+        if self.mode != 'COLLECT':
+            if self.mode == 'ALIGN_BY_ANGLE' and not is_trim:
+                row = self.layout.row(align=True)
+                row.prop_enum(self, "direction", 'HORIZONTAL')
+                row.prop_enum(self, "direction", 'VERTICAL')
+            else:
+                self.draw_align_buttons(self.layout)
+
 
         if not is_trim:
-            if context.mode == 'EDIT_MESH' and self.mode != 'MOVE_ANGLE_COLLECT':
+            if context.mode == 'EDIT_MESH' and self.mode not in ("COLLECT", "ALIGN_BY_ANGLE", "MOVE"):
+                self.layout.separator()
                 row = self.layout.row(align=True)
-                # TODO: Draw individual enums, with replace text by context.
                 row.prop(pref, 'align_island_mode', expand=True)
 
+            self.layout.separator()
             self.layout.column(align=True).prop(pref, 'align_mode', expand=True)
 
-        if is_pro:
+        if self.mode != 'ALIGN_BY_ANGLE':
             self.layout.separator()
+            self.layout.prop(self, 'ignore_seams')
+
+        if is_pro:
+            if self.mode == 'ALIGN_BY_ANGLE':
+                self.layout.separator()
             self.layout.prop(pref, 'use_trims')
+
+    def draw_align_buttons(self, where):
+        def ly_wide_icon_op(layer, direct, icon):
+            row = layer.row(align=True)
+            row.ui_units_x = 3
+            row.scale_x = 2.1
+            row.prop_enum(self, "direction", direct, text=icon)
+
+        def ly_mid_mid_op(layer, direct, icon):
+            row = layer.row(align=True)
+            row.prop_enum(self, "direction", direct, text=icon)
+            row.scale_x = 2
+
+        col_main = where.column(align=True)
+        row_top = col_main.row(align=True)
+
+        ly_wide_icon_op(row_top, 'LEFT_UPPER', "↖")  # arrow_top_left
+        ly_wide_icon_op(row_top.row(), 'UPPER', "↑")  # arrow_top
+        ly_wide_icon_op(row_top, 'RIGHT_UPPER', "↗")  # arrow_top_right
+
+        row_middle = col_main.row().row(align=True)
+        ly_wide_icon_op(row_middle, 'LEFT', "← ")  # arrow_left
+
+        row_mid_middle = row_middle.row().row(align=True)
+        if self.mode == "MOVE":
+            row_mid_middle.active = False
+        ly_mid_mid_op(row_mid_middle, 'HORIZONTAL', "—")  # horizontal_c
+        ly_mid_mid_op(row_mid_middle.row(), 'CENTER', "+")  # center
+        ly_mid_mid_op(row_mid_middle.row(), 'VERTICAL', "|")  # vertical_b
+        ly_wide_icon_op(row_middle, 'RIGHT', "→")  # arrow_right
+
+        row_bottom = col_main.row(align=True)
+        ly_wide_icon_op(row_bottom, 'LEFT_BOTTOM', "↙")  # arrow_bottom_left
+        ly_wide_icon_op(row_bottom.row(), 'BOTTOM', "↓")  # arrow_bottom
+        ly_wide_icon_op(row_bottom, 'RIGHT_BOTTOM', "↘")  # arrow_bottom_right
 
 
     def __init__(self, *args, **kwargs):
@@ -1038,26 +1050,18 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
-        settings = univ_settings()
-        self.mode = settings.align_mode  # noqa
-        if settings.align_island_mode == 'FOLLOW':
-            self.is_island_mode = self.get_is_island_mode()
+        self.mode = prefs().align_mode  # noqa
+        self.is_island_mode = self.get_is_island_mode()
+
+        if utils.is_pro_version_support() and prefs().use_trims:
+            if self.mode != "ALIGN":
+                self.mode = "ALIGN"  # noqa
+                prefs().align_mode = "ALIGN"
+            if not utils.has_visible_active_trim(report=self.report):
+                return {'FINISHED'}
+            return self.align_by_trim(umeshes)
         else:
-            self.is_island_mode = settings.align_island_mode == 'ISLAND'
-
-        if context.mode != 'EDIT_MESH':
-            self.is_island_mode = True
-
-        if utils.is_pro_version_support():
-            if prefs().use_trims:
-                self.is_island_mode = True
-
-                if not utils.has_visible_active_trim(report=self.report):
-                    return {'FINISHED'}
-
-                return self.align_by_trim(umeshes)
-
-        return self.align(umeshes)
+            return self.align(umeshes)
 
     def align(self, umeshes: UMeshes):
         match self.mode:
@@ -1097,27 +1101,29 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
                 self.move_to_cursor_union_ex(umeshes, cursor_loc, selected=bool(selected))
 
-            case 'MOVE_ANGLE_COLLECT':
+            case 'ALIGN_BY_ANGLE':
+                if self.direction not in ('VERTICAL', "HORIZONTAL"):
+                    self.direction = "HORIZONTAL"
+                return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL', with_seams=True)
+            case 'COLLECT':
                 # NOTE: Collect and Align by Axis processes errors and updates meshes.
                 # To avoid repeated updates and duplicate reports, the result is returned immediately from the function.
-                if self.direction == 'CENTER':
-                    return self.collect_islands(with_seams=not self.ignore_seams)
-                elif self.direction in ('HORIZONTAL', 'VERTICAL'):
-                    return self.align_edge_by_angle(is_x_axis=self.direction == 'VERTICAL', with_seams=True)
+                return self.collect_islands(with_seams=not self.ignore_seams)
+            case 'MOVE':
+                if self.direction in ("CENTER", "VERTICAL", "HORIZONTAL"):
+                    self.direction = "RIGHT"
+                if umeshes.is_edit_mode:
+                    selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
+                    umeshes = selected if selected else visible
+                    self.move_islands_ex(umeshes, selected=bool(selected))
                 else:
-                    if umeshes.is_edit_mode:
-                        selected, visible = umeshes.filtered_by_selected_and_visible_uv_faces()
-                        umeshes = selected if selected else visible
-                        self.move_islands_ex(umeshes, selected=bool(selected))
-                    else:
-                        move_value = Vector(self.get_move_value(self.direction))
-                        for umesh in umeshes:
-                            uv = umesh.uv
-                            for f in umesh.bm.faces:
-                                for crn in f.loops:
-                                    crn[uv].uv += move_value
-                            umesh.update_tag = True
-
+                    move_value = Vector(self.get_move_value(self.direction))
+                    for umesh in umeshes:
+                        uv = umesh.uv
+                        for f in umesh.bm.faces:
+                            for crn in f.loops:
+                                crn[uv].uv += move_value
+                        umesh.update_tag = True
             case 'INDIVIDUAL':
                 selected = []
                 if umeshes.is_edit_mode:
@@ -1465,11 +1471,23 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
     @staticmethod
     def get_is_island_mode():
-        ts = bpy.context.scene.tool_settings
-        if ts.use_uv_select_sync:
-            return ts.mesh_select_mode[:] == (False, False, True)
-        return ts.uv_select_mode in ('FACE', 'ISLAND')
+        is_island_mode = True
 
+        if bpy.context.mode == 'EDIT_MESH':
+            settings = univ_settings()
+            if settings.align_island_mode == 'FOLLOW':
+                ts = bpy.context.scene.tool_settings
+                if ts.use_uv_select_sync:
+                    is_island_mode =  ts.mesh_select_mode[:] == (False, False, True)
+                else:
+                    is_island_mode = ts.uv_select_mode in ('FACE', 'ISLAND')
+            else:
+                is_island_mode = settings.align_island_mode == 'ISLAND'
+
+        if utils.is_pro_version_support():
+            if prefs().use_trims:
+                is_island_mode = True
+        return is_island_mode
 
     @staticmethod
     def get_move_value(direction):
@@ -1511,13 +1529,16 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
     bl_idname = 'uv.univ_align'
     bl_description = "Align verts, edges, faces, islands and cursor \n\n" + align_event_info_ex
 
-    mode: EnumProperty(name="Mode", default='ALIGN', items=(
-        ('ALIGN', 'Align', ''),
-        ('MOVE_ANGLE_COLLECT', 'Move | Align by Angle | Collect', ''),
-        ('ALIGN_TO_CURSOR', 'Align to cursor', ''),
-        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', ''),
-        ('INDIVIDUAL', 'Individual', ''),
-        # ('MOVE_COLLISION', 'Collision move', '')
+    mode: EnumProperty(name="Align Mode", default='ALIGN', items=(
+        ('ALIGN', 'Align', 'Align', 'EMPTY_SINGLE_ARROW', 0),
+        None,
+        ('ALIGN_TO_CURSOR', 'Align to cursor', 'Align to cursor', 'ORIENTATION_CURSOR', 2),
+        ('ALIGN_TO_CURSOR_UNION', 'Align to cursor union', 'Align to cursor union', 'EVENT_U', 3),
+        ('INDIVIDUAL', 'Individual', 'Individual Align', 'PIVOT_INDIVIDUAL', 4),
+        None,
+        ('MOVE', 'Move ', 'Move in Island Mode.', 'ORIENTATION_VIEW', 5),
+        ('ALIGN_BY_ANGLE', 'Align by Angle', 'HV applies align by edge angle in Island mode.', 'GIZMO', 6),
+        ('COLLECT', 'Collect', 'Collect in Island mode when press Center.', 'CURSOR', 7),
     ))
 
 
@@ -1533,7 +1554,12 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
             case True, True, True:
                 prefs().align_mode = 'ALIGN_TO_CURSOR_UNION'
             case False, True, False:
-                prefs().align_mode = 'MOVE_ANGLE_COLLECT'
+                if self.direction == "CENTER":
+                    prefs().align_mode = 'COLLECT'
+                elif self.direction in ("HORIZONTAL", "VERTICAL"):
+                    prefs().align_mode = 'ALIGN_BY_ANGLE'
+                else:
+                    prefs().align_mode = 'MOVE'
             case False, False, True:
                 prefs().align_mode = 'INDIVIDUAL'
             case _:
@@ -1545,27 +1571,18 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
         settings = univ_settings()
-        if settings.align_island_mode == 'FOLLOW':
-            self.is_island_mode = self.get_is_island_mode()
-        else:
-            self.is_island_mode = settings.align_island_mode == 'ISLAND'
+        self.is_island_mode = self.get_is_island_mode()
 
         self.mode = settings.align_mode
-
-        if context.mode != 'EDIT_MESH':
-            self.is_island_mode = True
-
-        if utils.is_pro_version_support():
-            if prefs().use_trims:
-                self.is_island_mode = True
-
-                # if self.mode in ('DEFAULT', 'INDIVIDUAL'):
-                if not utils.has_visible_active_trim(report=self.report):
-                    return {'FINISHED'}
-
-                return self.align_by_trim(umeshes)
-
-        return self.align(umeshes)
+        if utils.is_pro_version_support() and prefs().use_trims:
+            if self.mode != "ALIGN":
+                self.mode = "ALIGN"
+                prefs().align_mode = "ALIGN"
+            if not utils.has_visible_active_trim(report=self.report):
+                return {'FINISHED'}
+            return self.align_by_trim(umeshes)
+        else:
+            return self.align(umeshes)
 
 
 class UNIV_OT_Flip_VIEW3D(Operator):
