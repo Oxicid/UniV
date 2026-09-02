@@ -32,6 +32,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
     unlink: bpy.props.BoolProperty(name='Unlink', default=False)
     xy_scale: bpy.props.BoolProperty(name='Scale Independently', default=True,
                                      description='Scale U and V independently')
+    ignore_seams: bpy.props.BoolProperty(name='Ignore Seams', default=False,
+                               description="Seams do not split islands at connected edges.")
     use_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
 
     @classmethod
@@ -56,6 +58,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             layout.prop(self, 'use_aspect')
         layout.prop(self, 'xy_scale')
 
+        layout.prop(self, 'ignore_seams')
         layout.prop(univ_settings(), 'use_texel')
 
     def __init__(self, *args, **kwargs):
@@ -89,12 +92,13 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         selected_non_quads_counter = 0
         for umesh in umeshes:
             umesh.update_tag = False
-            dirt_islands = Islands.calc_extended(umesh)
+            dirt_islands = Islands.calc_extended(umesh, with_seams=not self.ignore_seams)
             if dirt_islands:
                 uv = umesh.uv
-                is_boundary = utils.is_boundary_func(umesh)
+
                 umesh.value = umesh.check_uniform_scale(report=self.report)
                 umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
+
                 edge_lengths = []
                 for d_island in dirt_islands:
                     links_static_with_quads, static_faces, non_quad_selected, quad_islands = (
@@ -103,18 +107,20 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     selected_non_quads_counter += len(non_quad_selected)
                     for isl in quad_islands:
                         utils.set_faces_tag(isl, True)
-                        self.set_corner_tag_by_border_and_by_tag(isl)
+                        self.set_corner_tag_by_border_and_by_tag(isl, ignore_seams=self.ignore_seams)
 
                         if not edge_lengths:
                             edge_lengths = self.init_edge_sequence_from_umesh(umesh)
 
-                        self.quad(isl, edge_lengths)
+                        self.quadrify_ex(isl, edge_lengths)
                         counter += 1
                         umesh.update_tag = True
 
+                    # Normalize.
                     if self.xy_scale:
                         self.quad_normalize(quad_islands, umesh)
 
+                    # Set Texel.
                     for isl in quad_islands:
                         utils.set_global_texel(isl)
 
@@ -125,8 +131,10 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                             static_co[:] = min_dist_quad_crn[uv].uv
 
                     # Set seams.
-                    for crn in d_island.corners_iter():
-                        crn.edge.seam = is_boundary(crn)
+                    if not self.ignore_seams:
+                        is_boundary = utils.is_boundary_func(umesh)
+                        for crn in d_island.corners_iter():
+                            crn.edge.seam = is_boundary(crn)
 
 
         if selected_non_quads_counter:
@@ -179,12 +187,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
     def quadrify_pick(self, umeshes):
         hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
-
         for umesh in umeshes:
-            dirt_islands = Islands.calc_visible(umesh)
-            if dirt_islands:
-                for d_island in dirt_islands:
-                    hit.find_nearest_island_by_crn(d_island)
+            for isl in Islands.calc_visible(umesh, with_seams=not self.ignore_seams):
+                hit.find_nearest_island_by_crn(isl)
         if not hit:
             self.report({'WARNING'}, "Islands not found")
             return {'CANCELLED'}
@@ -197,9 +202,9 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
         for isl in quad_islands:
             utils.set_faces_tag(isl, True)
-            self.set_corner_tag_by_border_and_by_tag(isl)
+            self.set_corner_tag_by_border_and_by_tag(isl, ignore_seams=self.ignore_seams)
             edge_lengths = self.init_edge_sequence_from_island(isl)
-            self.quad(isl, edge_lengths)
+            self.quadrify_ex(isl, edge_lengths)
 
         umesh = hit.island.umesh
         uv = umesh.uv
@@ -218,10 +223,11 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
             static_co[:] = min_dist_quad_crn[uv].uv
 
         # Set seams.
-        is_boundary = utils.is_boundary_func(umesh)
-        for isl in quad_islands:
-            for crn in isl.corners_iter():
-                crn.edge.seam = is_boundary(crn)
+        if not self.ignore_seams:
+            is_boundary = utils.is_boundary_func(umesh)
+            for isl in quad_islands:
+                for crn in isl.corners_iter():
+                    crn.edge.seam = is_boundary(crn)
 
         hit.island.umesh.update()
         if static_faces:
@@ -254,6 +260,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         links_static_with_quads = self.store_links_static_with_quads(chain(static_faces, selected_non_quads), uv)
         fake_umesh = umesh.fake_umesh(quad_faces)
         # Calc sub-islands
+        # TODO: Check with seams
         islands = [AdvIsland(i, umesh) for i in Islands.calc_iter_without_ms_ex(fake_umesh)]
         return links_static_with_quads, static_faces, selected_non_quads, islands
 
@@ -290,7 +297,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
                     links_static_with_quads.append((crn, linked_corners))
         return links_static_with_quads
 
-    def quad(self, island: AdvIsland, edge_lengths):
+    def quadrify_ex(self, island: AdvIsland, edge_lengths):
         uv = island.umesh.uv
         max_quad_uv_face_area = self.get_face_score_fn(uv)
 
@@ -443,8 +450,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return catcher(uv_)
 
     @staticmethod
-    def set_corner_tag_by_border_and_by_tag(island: AdvIsland):
-        is_boundary = utils.is_boundary_func(island.umesh, invisible_check=False)
+    def set_corner_tag_by_border_and_by_tag(island: AdvIsland, ignore_seams: bool=False):
+        is_boundary = utils.is_boundary_func(island.umesh, with_seam=not ignore_seams, invisible_check=False)
         for crn in island.corners_iter():
             if not crn.link_loop_radial_prev.face.tag:
                 crn.tag = False

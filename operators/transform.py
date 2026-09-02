@@ -994,6 +994,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
             if context.mode == 'EDIT_MESH' and self.mode not in ("COLLECT", "ALIGN_BY_ANGLE", "MOVE"):
                 self.layout.separator()
                 row = self.layout.row(align=True)
+                # TODO: Add support Individual and Union for trims
                 row.prop(pref, 'align_island_mode', expand=True)
 
             self.layout.separator()
