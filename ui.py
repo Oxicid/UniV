@@ -920,10 +920,6 @@ class UNIV_UL_TrimSlotsManager(bpy.types.UIList):
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         # TODO: Redraw if undo???
-        settings = univ_settings()
-        if index >= settings.uv_layers_size:
-            return
-
         flag = item.flag  # noqa
         if flag:
             if flag == 2:
@@ -931,15 +927,12 @@ class UNIV_UL_UV_LayersManager(bpy.types.UIList):
             else:
                 layout.active = False
         layout.prop(item, 'name', text='', emboss=False, icon='GROUP_UVS')  # noqa
-        icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
+        icon = 'RESTRICT_RENDER_OFF' if prefs().uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
         layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
 
 
 class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
-        settings = univ_settings()
-        if index >= settings.uv_layers_size:
-            return
         flag = item.flag  # noqa
         if flag:
             if flag == 2:
@@ -947,7 +940,7 @@ class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
             else:
                 layout.active = False
         layout.prop(item, 'name', text='', emboss=False)  # noqa
-        icon = 'RESTRICT_RENDER_OFF' if settings.uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
+        icon = 'RESTRICT_RENDER_OFF' if prefs().uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
         layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
 
 

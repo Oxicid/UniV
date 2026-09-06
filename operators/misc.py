@@ -1028,77 +1028,67 @@ class UNIV_OT_UV_Layers_Manager(Operator):
         context = bpy.context
         active_obj = context.active_object
 
+        uv_presets = settings.uv_layers_presets
+        had_uv_presets = len(uv_presets)
+
+        if not active_obj or active_obj.type != 'MESH':
+            if had_uv_presets:
+                uv_presets.clear()
+                utils.update_univ_panels()
+            return
+
         if context.mode == 'EDIT_MESH':
-            if not active_obj or active_obj.type != 'MESH':
-                if settings.uv_layers_size:
-                    settings.uv_layers_size = 0
-                    utils.update_univ_panels()
-                return
             selected_objects = context.objects_in_mode_unique_data
         else:
-
-            if not active_obj or active_obj.type != 'MESH':
-                if settings.uv_layers_size:
-                    settings.uv_layers_size = 0
-                    utils.update_univ_panels()
-                return
             selected_objects = (obj_ for obj_ in context.selected_objects if obj_.type == 'MESH')
 
-        act_obj_uv_layers = active_obj.data.uv_layers
+        ALERT = 2
+        uv_presets.clear()
 
-        uv_presets = settings.uv_layers_presets
-        UNIV_OT_UV_Layers_Manager.sanitize_size(uv_presets)
+        active_layers = active_obj.data.uv_layers
+        if active_layers:
+            active_layers_size = min(len(active_layers), 8)
 
-        if act_obj_uv_layers:
-            act_obj_uv_layers_size = len(act_obj_uv_layers)
-            if act_obj_uv_layers_size > 8:
-                for preset, uv in zip(uv_presets, act_obj_uv_layers):
-                    preset.name = uv.name
-                    preset.flag = 2
-                settings.uv_layers_size = 8
-                utils.update_univ_panels()
-                return
+            # Get active and render index.
             act_obj_uv_idx = 0
             act_obj_uv_render_idx = 0
-            for idx, uv in enumerate(act_obj_uv_layers):
+            for idx, uv in enumerate(active_layers):
                 if uv.active:
                     act_obj_uv_idx = idx
                 if uv.active_render:
                     act_obj_uv_render_idx = idx
 
-            act_obj_uv_names = tuple(uv.name for uv in act_obj_uv_layers)
-            act_obj_uv_names_tags = [True for _ in act_obj_uv_names]
+            act_obj_uv_names = [uv.name for uv in active_layers]
+            act_obj_uv_names_tags = (1 << active_layers_size) - 1
             for obj in selected_objects:
                 uv_layers = obj.data.uv_layers
                 uv_layers_size = len(uv_layers)
                 # Frequent case
-                if uv_layers_size == act_obj_uv_layers_size:
-                    for idx, uv in enumerate(uv_layers):
+                if uv_layers_size == active_layers_size:
+                    if act_obj_uv_names_tags:
+                        for idx, uv in enumerate(uv_layers):
+                            bit = 1 << idx
+                            if act_obj_uv_names_tags & bit:
+                                if (act_obj_uv_names[idx] != uv.name
+                                    or uv.active and act_obj_uv_idx != idx
+                                    or uv.active_render and act_obj_uv_render_idx != idx):
+                                    act_obj_uv_names_tags &= ~bit
 
-                        if act_obj_uv_names_tags[idx]:
-                            if act_obj_uv_names[idx] != uv.name:
-                                act_obj_uv_names_tags[idx] = False
+                elif uv_layers_size > active_layers_size:
+                    # There may be objects with a higher number of UVs, but one alert is sufficient, so the function terminates immediately.
+                    for uv, idx in zip(uv_layers, range(8)):
 
-                        if uv.active:
-                            if act_obj_uv_idx != idx:
-                                act_obj_uv_names_tags[idx] = False
+                        if len(uv_presets) < idx+1:
+                            preset = uv_presets.add()
+                        else:
+                            preset = uv_presets[idx]
 
-                        if uv.active_render:
-                            if act_obj_uv_render_idx != idx:
-                                act_obj_uv_names_tags[idx] = False
-
-                elif uv_layers_size > act_obj_uv_layers_size:
-                    settings.uv_layers_size = uv_layers_size
-                    for idx, uv in enumerate(uv_layers):
-                        if idx == 8:
-                            break
-                        preset = uv_presets[idx]
-                        if idx < act_obj_uv_layers_size:
+                        if idx < active_layers_size:
                             preset.name = act_obj_uv_names[idx]
-                            preset.flag = not act_obj_uv_names_tags[idx]
+                            preset.flag = not (act_obj_uv_names_tags & (1 << idx))
                         else:
                             preset.name = uv.name
-                            preset.flag = 2
+                            preset.flag = ALERT
 
                     if settings.uv_layers_active_idx >= uv_layers_size - 1:
                         settings.uv_layers_active_idx = uv_layers_size - 1  # clamp
@@ -1106,74 +1096,70 @@ class UNIV_OT_UV_Layers_Manager(Operator):
                     utils.update_univ_panels()
                     return
 
-                else:  # uv_layers_size < act_obj_uv_layers_size:
-                    settings.uv_layers_size = act_obj_uv_layers_size
-                    if not uv_layers_size:
-                        for idx in range(act_obj_uv_layers_size):
-                            preset = uv_presets[idx]
+                else:  # uv_layers_size < active_layers_size:
+                    # Terminates immediately, see above.
+                    if uv_layers_size:
+                        for idx in range(active_layers_size):
+                            if len(uv_presets) < idx + 1:
+                                preset = uv_presets.add()
+                            else:
+                                preset = uv_presets[idx]
+                            if idx < uv_layers_size:
+                                preset.name = act_obj_uv_names[idx]
+                                preset.flag = not (act_obj_uv_names_tags & (1 << idx))
+                            else:
+                                preset.name = act_obj_uv_names[idx]
+                                preset.flag = ALERT
+
+                        settings.uv_layers_active_render_idx = -1
+                        if settings.uv_layers_active_idx > active_layers_size - 1:
+                            settings.uv_layers_active_idx = active_layers_size - 1
+                        utils.update_univ_panels()
+                        return
+                    else:
+                        for idx in range(active_layers_size):
+                            if len(uv_presets) < idx + 1:
+                                preset = uv_presets.add()
+                            else:
+                                preset = uv_presets[idx]
                             preset.name = act_obj_uv_names[idx]
-                            preset.flag = 2
+                            preset.flag = ALERT
 
                         settings.uv_layers_active_idx = act_obj_uv_idx
                         settings.uv_layers_active_render_idx = -1
                         utils.update_univ_panels()
                         return
 
-                    for idx in range(act_obj_uv_layers_size):
-                        preset = uv_presets[idx]
-                        if idx < uv_layers_size:
-                            preset.name = act_obj_uv_names[idx]
-                            preset.flag = not act_obj_uv_names_tags[idx]
-                        else:
-                            preset.name = act_obj_uv_names[idx]
-                            preset.flag = 2
-
-                    settings.uv_layers_active_render_idx = -1
-                    if settings.uv_layers_active_idx > act_obj_uv_layers_size - 1:
-                        settings.uv_layers_active_idx = act_obj_uv_layers_size - 1
-                    utils.update_univ_panels()
-                    return
-
-            for idx in range(act_obj_uv_layers_size):
-                preset = uv_presets[idx]
+            for idx in range(active_layers_size):
+                if len(uv_presets) < idx + 1:
+                    preset = uv_presets.add()
+                else:
+                    preset = uv_presets[idx]
                 preset.name = act_obj_uv_names[idx]
-                preset.flag = not act_obj_uv_names_tags[idx]
+                preset.flag = not (act_obj_uv_names_tags & (1 << idx))
 
-            settings.uv_layers_size = act_obj_uv_layers_size
             settings.uv_layers_active_idx = act_obj_uv_idx
             settings.uv_layers_active_render_idx = act_obj_uv_render_idx
-        elif selected_objects:
-            obj_with_max_uv = max(selected_objects, key=lambda ob: len(ob.data.uv_layers))
-            uv_layers = obj_with_max_uv.data.uv_layers
-            uv_layers_size = len(uv_layers)
-
-            settings.uv_layers_size = uv_layers_size
-
-            for preset, uv in zip(uv_presets, uv_layers):
-                preset.name = uv.name
-                preset.flag = 2
-
-            settings.uv_layers_active_idx = 0
-            settings.uv_layers_active_render_idx = -1
         else:
-            if settings.uv_layers_size:
-                settings.uv_layers_size = 0
-                utils.update_univ_panels()
-            return
+            obj_with_max_uv = max(selected_objects, key=lambda ob: len(ob.data.uv_layers), default=None)
+            if obj_with_max_uv:
+                # Invalidate all, when active object hasn't uv layers.
+                uv_layers = obj_with_max_uv.data.uv_layers
+
+                for uv, _ in zip(uv_layers, range(8)):
+                    preset = uv_presets.add()
+                    preset.name = uv.name
+                    preset.flag = ALERT
+
+                settings.uv_layers_active_idx = 0
+                settings.uv_layers_active_render_idx = -1
+            else:
+                if had_uv_presets:
+                    utils.update_univ_panels()
+                return
+        assert len(uv_presets) <= 8
         utils.update_univ_panels()
 
-    @staticmethod
-    def sanitize_size(presets):
-        size = len(presets)
-        if size == 8:
-            return
-
-        if size < 8:
-            for _ in range(8-size):
-                presets.add()
-        else:
-            for i in range(len(presets), 8, -1):
-                presets.remove(i-1)
 
     @staticmethod
     @bpy.app.handlers.persistent
@@ -1203,7 +1189,8 @@ class UNIV_OT_MoveUpDownBase(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.with_names = not event.alt
+
+        self.with_names = not (event.ctrl or event.shift or event.alt)
         return self.execute(context)
 
     @classmethod
@@ -1288,7 +1275,7 @@ class UNIV_OT_MoveUp(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_up'
     bl_label = 'Up'
     bl_description = ("Move Up UV Layer \n"
-                      "Alt+Click - Moves only the UV layer, keeping name in place.")
+                      "Ctrl | Shift | Alt - Moves only the UV layer, keeping name in place.")
 
     def execute(self, context):
         settings = univ_settings()
@@ -1319,15 +1306,22 @@ class UNIV_OT_MoveDown(UNIV_OT_MoveUpDownBase):
     bl_idname = 'mesh.univ_move_down'
     bl_label = 'Down'
     bl_description = ("Move Down UV Layer \n"
-                      "Alt+Click - Moves only the UV layer, keeping name in place.")
+                      "Ctrl | Shift | Alt - Moves only the UV layer, keeping name in place.")
 
     def execute(self, context):
         settings = univ_settings()
-        if settings.uv_layers_size == settings.uv_layers_active_idx + 1:
+        selected_objects = utils.calc_any_unique_obj()
+        obj_with_max_uv = max(len(obj_.data.uv_layers) for obj_ in selected_objects)
+
+        if not obj_with_max_uv:
+            self.report({'WARNING'}, 'UV layers not found.')
+            return {'CANCELLED'}
+
+        if obj_with_max_uv == settings.uv_layers_active_idx + 1:
             self.report({'WARNING'}, 'Cannot move down')
             return {'CANCELLED'}
 
-        selected_objects = utils.calc_any_unique_obj()
+
         if not selected_objects:
             self.report({'WARNING'}, "Not found uvs or selected mesh objects.")
             return {'CANCELLED'}
@@ -1352,7 +1346,7 @@ class UNIV_OT_Add(Operator):
     bl_label = 'Add'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = ("Add UV Layer \n"
-                      "Alt+Click - Add missed UV layers.")
+                      "Ctrl | Shift | Alt - Add missed UV layers.")
     # noinspection PyTypeHints
     add_missed: BoolProperty(name='Add with Missed', default=False)
 
@@ -1360,7 +1354,7 @@ class UNIV_OT_Add(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.add_missed = event.alt
+        self.add_missed = (event.ctrl or event.shift or event.alt)
         return self.execute(context)
 
     def execute(self, context):
@@ -1431,7 +1425,7 @@ class UNIV_OT_Remove(Operator):
     bl_label = 'Remove'
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = ("Remove UV Layer \n"
-                      "Alt+Click - Remove all UV layers.")
+                      "Ctrl | Shift | Alt - Remove all UV layers.")
     # noinspection PyTypeHints
     remove_all: BoolProperty(name='Remove All', default=False)
 
@@ -1439,7 +1433,7 @@ class UNIV_OT_Remove(Operator):
     def invoke(self, context, event):
         if event.value == 'PRESS':
             return self.execute(context)
-        self.remove_all = event.alt
+        self.remove_all = (event.ctrl or event.shift or event.alt)
         return self.execute(context)
 
     def execute(self, context):

@@ -413,7 +413,6 @@ Some operators, can interact with trims:
     # UV Layer
     uv_layers_show: BoolProperty(name='Show UV Layers in Panel', default=True, update=_update_uv_layers_show)
 
-    uv_layers_size: IntProperty(name='Size', min=0, max=8, default=0, options={'SKIP_SAVE'})
     uv_layers_active_idx: IntProperty(name='Active UV index', min=0, max=7, default=0,
                                       update=_update_uv_layers_active_idx, options={'SKIP_SAVE'})
     uv_layers_active_render_idx: IntProperty(name='Active uv render index',
