@@ -959,17 +959,21 @@ class Drawer3D:
 
     @staticmethod
     def univ_drawer_3d_callback():
-        if bpy.context.tool_settings.use_uv_select_sync:
+        ctx = bpy.context
+        if ctx.tool_settings.use_uv_select_sync:
             Drawer3D.dirt = True
             Drawer3D.draw_objects.clear()
             return
 
         if not any(area.ui_type == 'UV'
-                   for win in bpy.context.window_manager.windows
+                   for win in ctx.window_manager.windows
                    for area in win.screen.areas):
             Drawer3D.dirt = True
             Drawer3D.draw_objects.clear()
             return
+
+        if not ctx.space_data.overlay.show_overlays:
+            return 
 
         Drawer3D.update()
 
