@@ -40,7 +40,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
     mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Self Borders', default=True,
                                     description='Marking seams where there are split edges within the same island.')
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
-    constraints_weight: bpy.props.FloatProperty(name='Constraints Weight', default=0, min=0, max=0, options={'HIDDEN'})
+    constr_weight: bpy.props.FloatProperty(name='Constraints Weight', default=0, min=0, max=0, options={'HIDDEN'})
 
     @classmethod
     def poll(cls, context):
@@ -110,7 +110,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         from importlib.util import find_spec
         found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
-        if found_univ_pro and self.bl_label == 'Unwrap' and self.constraints_weight and isl.has_constraints_edge():
+        if found_univ_pro and self.bl_label == 'Unwrap' and self.constr_weight and isl.has_constraints_edge():
             self.pick_unwrap_by_constraints(isl)
             return {'FINISHED'}
         ##################################################
@@ -247,7 +247,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 # Constraints system
                 ##################################################
                 if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constraints_weight and isl.has_constraints_edge(selected=True)):
+                        self.constr_weight and isl.has_constraints_edge(selected=True)):
                     isl.tag = False  # Non-native unwrap.
                     to_lock_constraints_islands.append(isl)
 
@@ -283,12 +283,13 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                     isl.apply_aspect_ratio()
                     with utils.uv_parametrizer.unwrap_time_report(self.report):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
-                                                                            unwrap_along=self.unwrap_along,  # noqa
+                                                                            unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
-                                                                            constraints_factor=self.constraints_weight * 100)
+                                                                            constraints_factor=self.constr_weight * 100,
+                                                                            constr_correction_weight=getattr(self, "constr_correction_weight", 1.0))
                     isl.reset_aspect_ratio()
                     if not is_static:
                         utils.set_global_texel(isl)
@@ -577,7 +578,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 # Constraints system
                 ##################################################
                 if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constraints_weight and isl.has_constraints_edge()):
+                        self.constr_weight and isl.has_constraints_edge()):
                     uv = isl.umesh.uv
                     sync = isl.umesh.sync
                     for f in isl:
@@ -595,12 +596,13 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                     is_static = self.is_static_island_for_non_native_unwrap_by_tag(isl)
                     with utils.uv_parametrizer.unwrap_time_report(self.report):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
-                                                                            unwrap_along=self.unwrap_along,  # noqa
+                                                                            unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
-                                                                            constraints_factor=self.constraints_weight * 100)
+                                                                            constraints_factor=self.constr_weight * 100,
+                                                                            constr_correction_weight=getattr(self, "constr_correction_weight", 1.0))
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
 
@@ -684,7 +686,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 # Constraints system
                 ##################################################
                 if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constraints_weight and isl.has_constraints_edge()):
+                        self.constr_weight and isl.has_constraints_edge()):
                     uv = isl.umesh.uv
                     sync = isl.umesh.sync
                     for f in isl:
@@ -703,12 +705,13 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
                     with utils.uv_parametrizer.unwrap_time_report(self.report):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
-                                                                            unwrap_along=self.unwrap_along,  # noqa
+                                                                            unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
                                                                             topology_from_uvs=self.mark_seam_inner_island,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
-                                                                            constraints_factor=self.constraints_weight * 100)
+                                                                            constraints_factor=self.constr_weight * 100,
+                                                                            constr_correction_weight=getattr(self, "constr_correction_weight", 1.0))
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
 

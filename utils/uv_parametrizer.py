@@ -61,6 +61,11 @@ class UnwrapOptions:
 
     blend: float = 1
     constraints_factor: float = 100
+
+    # Prioritizes faces where no more than two vertical or two horizontal constraints are present on the wheel edges.
+    # This is necessary to prevent strong stretching in areas where the faces meet the constraints,
+    # which would otherwise result in reduced TD along the constrained edges.
+    constr_correction_weight: float = 1.0
     method: int = 0
     use_slim: bool = False
     use_abf: bool = False
@@ -73,11 +78,12 @@ class UnwrapOptions:
 
 def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
                       unwrap_along: typing.Literal['UV', 'U', 'V'],
+                      constr_correction_weight,
                       use_abf=True,
                       topology_from_uvs=True,
                       blend_factor=1.0,
                       fill_holes=True,
-                      constraints_factor=100.0
+                      constraints_factor=100.0,
                       ):
     """NOTE: Need indexing for constraints for segments and tagging for pinning (False = Pin)"""
 
@@ -102,6 +108,7 @@ def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
     options.fill_holes = fill_holes
     options.blend = blend_factor
     options.constraints_factor = constraints_factor
+    options.constr_correction_weight = constr_correction_weight
     options.use_abf = use_abf
     options.unwrap_along = unwrap_along
 
@@ -414,6 +421,25 @@ class PVert:
     def is_interior(self):
         return bool(self.edge.pair)
 
+
+    def is_endpoint_constr(self):
+        e = self.edge
+        count_u = 0
+        count_v = 0
+        while True:
+            if e.flag & PEDGE_H_CONSTRAIN:
+                 count_u += 1
+            if e.flag & PEDGE_V_CONSTRAIN:
+                count_v += 1
+            if e.next.next.flag & PEDGE_H_CONSTRAIN:
+                 count_u += 1
+            if e.next.next.flag & PEDGE_V_CONSTRAIN:
+                count_v += 1
+
+            e = e.wheel_edge_next
+            if not e or e == self.edge:
+                break
+        return count_u <= 1 and count_v <= 1
 
 class PEdge:
     def __init__(self):
@@ -753,8 +779,8 @@ class PChart:
         self.n_faces: int = 0
         self.n_boundaries: int = 0
 
-        self.constr_h = []
-        self.constr_v = []
+        self.constr_h: list[PEdge] = []
+        self.constr_v: list[PEdge] = []
 
         self.area_uv: float = 0.0
         self.area_3d: float = 0.0
@@ -979,9 +1005,56 @@ class PChart:
 
         self.get_ls()
 
-    def get_ls(self):
-        n_constr = len(self.constr_v) + len(self.constr_h)
-        self.context = LinearSolver.new(2 * self.n_faces + n_constr, 2 * self.n_verts, least_squares=True)
+    def get_ls(self, with_scale_correction=False):
+        n_axis_constr  = len(self.constr_v) + len(self.constr_h)
+        n_scale_constr = 0
+        if with_scale_correction:
+            n_scale_constr = n_axis_constr
+
+        self.context = LinearSolver.new(2 * self.n_faces + n_axis_constr + n_scale_constr,
+                                        2 * self.n_verts,
+                                        least_squares=True)
+
+    @staticmethod
+    def matrix_add_angles(ls, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int, w: float):
+        from math import sin, cos
+        v1_id *= 2
+        v2_id *= 2
+        v3_id *= 2
+
+        sina1: float = sin(a1)
+        sina2: float = sin(a2)
+        sina3: float = sin(a3)
+        sin_max: float = max(sina1, sina2, sina3)
+        # Shift vertices to find most stable order.
+        if sina3 != sin_max:
+            # shift right
+            v1_id, v2_id, v3_id = v3_id, v1_id, v2_id
+            a1, a2, a3 = a3, a1, a2
+            sina1, sina2, sina3 = sina3, sina1, sina2
+
+            if sina2 == sin_max:
+                # shift right
+                v1_id, v2_id, v3_id = v3_id, v1_id, v2_id
+                a1, a2, a3 = a3, a1, a2
+                sina1, sina2, sina3 = sina3, sina1, sina2
+        # Angle based lscm formulation.
+        ratio: float = sina2 / sina3 if sina3 else 1.0  # safe divide
+        cosine: float = cos(a1) * ratio
+        sine: float = sina1 * ratio
+
+        ls.matrix_add(row, v1_id, (cosine - 1.0) * w)
+        ls.matrix_add(row, v1_id + 1, -sine * w)
+        ls.matrix_add(row, v2_id, -cosine * w)
+        ls.matrix_add(row, v2_id + 1, sine * w)
+        ls.matrix_add(row, v3_id, 1.0 * w)
+
+        row += 1
+        ls.matrix_add(row, v1_id, sine * w)
+        ls.matrix_add(row, v1_id + 1, (cosine - 1.0) * w)
+        ls.matrix_add(row, v2_id, -sine * w)
+        ls.matrix_add(row, v2_id + 1, -cosine * w)
+        ls.matrix_add(row, v3_id + 1, 1.0 * w)
 
     def lscm_solve(self, ls: LinearSolver) -> bool:
 
@@ -1031,6 +1104,8 @@ class PChart:
 
 
         row: int = 0
+        constr_correction_weight = UnwrapOptions.constr_correction_weight
+        # half_edges_without_constr = self.get_constraint_endpoints()
         for f, (a1, a2, a3) in zip(self.faces, angles):
             e1: PEdge = f.edge
             e2: PEdge = e1.next
@@ -1045,7 +1120,11 @@ class PChart:
                 # e2, e3 = e3, e2
                 v2, v3 = v3, v2
 
-            ls.matrix_add_angles(row, a1, a2, a3, v1.id, v2.id, v3.id)
+            ww = constr_correction_weight
+            if not (v1.is_endpoint_constr() and v2.is_endpoint_constr() and v3.is_endpoint_constr()):
+                ww = 1.0
+
+            self.matrix_add_angles(ls, row, a1, a2, a3, v1.id, v2.id, v3.id, ww)
             row += 2
 
         #########
