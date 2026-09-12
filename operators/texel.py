@@ -316,10 +316,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                isl.value = self.individual_scale(isl)
+                isl.value = self.individual_scale(isl, xy_scale=self.xy_scale, shear=self.shear)
 
-        tot_area_uv, tot_area_3d = self.avg_by_frequencies(all_islands)
-        if self.normalize(all_islands, tot_area_uv, tot_area_3d):
+        tot_area_uv, tot_area_3d = self.avg_by_frequencies(all_islands, is_uv_space=self.bl_idname.startswith('UV'))
+        if self.normalize(all_islands, tot_area_uv, tot_area_3d, xy_scale=self.xy_scale, shear=self.shear, report=self.report):
             umeshes.update(info='All islands were normalized')
             if not umeshes.is_edit_mode:
                 umeshes.free()
@@ -328,8 +328,9 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             umeshes.silent_update()  # In normalize() has reports.
         return {'FINISHED'}
 
-    def individual_scale(self, isl: AdvIsland, threshold=1e-8):
-        if not self.shear and not self.xy_scale:
+    @staticmethod
+    def individual_scale(isl: AdvIsland, xy_scale: bool, shear: bool, threshold=1e-8):
+        if not any((xy_scale, shear)):
             return isl.value
 
         if isinstance(isl.value, Vector):
@@ -377,7 +378,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             scale_cou: float = np.sum(utils.np_vec_normalized(cou, keepdims=False) * w)
             scale_cov: float = np.sum(utils.np_vec_normalized(cov, keepdims=False) * w)
             scale_cross = 0.0
-            if self.shear:
+            if shear:
                 cou_n = cou / utils.np_vec_normalized(cou)
                 cov_n = cov / utils.np_vec_normalized(cov)
                 scale_cross = np.sum(utils.np_vec_dot(cou_n, cov_n) * w)
@@ -385,10 +386,10 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             if scale_cou * scale_cov < 1e-10:
                 break
 
-            scale_factor_u = sqrt(scale_cou / scale_cov / aspect) if self.xy_scale else 1.0
+            scale_factor_u = sqrt(scale_cou / scale_cov / aspect) if xy_scale else 1.0
 
             tolerance = 1e-5  # Trade accuracy for performance.
-            if self.shear:
+            if shear:
                 t = Matrix.Identity(2)
                 t[0][0] = scale_factor_u
                 t[1][0] = clamp((scale_cross / isl.area_3d) * aspect, -0.5 * aspect, 0.5 * aspect)
@@ -409,7 +410,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 scale_acc *= scale
                 flat_uv_coords *= np.array(scale, dtype=np.float32)
 
-        if self.shear:
+        if shear:
             if transform_acc != Matrix.Identity(2):
                 isl.umesh.update_tag = True
                 for uv_coord in isl.flat_unique_uv_coords:
@@ -423,20 +424,21 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 new_center *= scale_acc
         return new_center
 
-    def normalize(self, islands: list[AdvIsland], tot_area_uv, tot_area_3d):
+    @staticmethod
+    def normalize(islands: list[AdvIsland] | Islands, tot_area_uv: float, tot_area_3d: float, xy_scale: bool, shear: bool, report):
         """ NOTE: The pivot stored in saved in 'AdvIsland.value' is taken into account when 'scale' is enabled."""
         error = False
-        if (not self.xy_scale and not self.shear) and len(islands) <= 1:
+        if (not xy_scale and not shear) and len(islands) <= 1:
             error = True
-            self.report({'WARNING'}, f"Islands should be more than 1, given {len(islands)} islands")
+            report({'WARNING'}, f"Islands should be more than 1, given {len(islands)} islands")
         elif tot_area_3d == 0.0 or tot_area_uv == 0.0:
             error = True
             # Prevent divide by zero.
-            self.report({'WARNING'}, f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
+            report({'WARNING'}, f"Cannot normalize islands, total {'UV-area' if tot_area_3d else '3D-area'} of faces is zero")
 
         if error:
             # Apply transforms after xy_scale and shear.
-            if self.xy_scale or self.shear:
+            if xy_scale or shear:
                 for isl in islands:
                     old_pivot = isl.bbox.center
                     new_pivot = isl.value
@@ -454,7 +456,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             fac = isl.area_3d / isl.area_uv
             scale = math.sqrt(fac / tot_fac)
 
-            if self.xy_scale or self.shear:
+            if xy_scale or shear:
                 old_pivot = isl.bbox.center
                 new_pivot = isl.value
                 new_pivot_with_scale = new_pivot * scale
@@ -493,10 +495,11 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
                 isl.select = True
                 isl.umesh.update_tag = True
 
-            self.report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
+            report({'WARNING'}, f"Found {len(zero_area_islands)} islands with zero area")
         return True
 
-    def avg_by_frequencies(self, all_islands: list[AdvIsland]):
+    @staticmethod
+    def avg_by_frequencies(all_islands: list[AdvIsland] | Islands, is_uv_space: bool):
         areas_uv = np.empty(len(all_islands), dtype=float)
         areas_3d = np.empty(len(all_islands), dtype=float)
 
@@ -504,7 +507,7 @@ class UNIV_OT_Normalize_VIEW3D(Operator, utils.OverlapHelper):
             areas_uv[idx] = isl.calc_area_uv()
             areas_3d[idx] = isl.area_3d
 
-        areas = areas_uv if self.bl_idname.startswith('UV') else areas_3d
+        areas = areas_uv if is_uv_space else areas_3d
         median: float = np.median(areas)  # noqa
         min_area: float = np.amin(areas)
         max_area: float = np.amax(areas)
@@ -609,7 +612,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                isl.value = self.individual_scale(isl)
+                isl.value = self.individual_scale(isl, xy_scale=self.xy_scale, shear=self.shear)
 
         self.normalize_and_show_adjust_result_info_edit(umeshes,
             all_islands, tot_area_3d, tot_area_uv, sel='picked', unsel='unpicked')
@@ -674,7 +677,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                isl.value = self.individual_scale(isl)
+                isl.value = self.individual_scale(isl, xy_scale=self.xy_scale, shear=self.shear)
 
         self.normalize_and_show_adjust_result_info_edit(umeshes, all_islands, tot_area_3d, tot_area_uv)
         return {'FINISHED'}
@@ -691,7 +694,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
                         isl.set_position(first_pivot, current_pivot)
                 self.report({'INFO'}, f'{unsel.capitalize()} islands not found, but {sel} was adjusted')
         else:
-            if self.normalize(all_islands, tot_area_uv, tot_area_3d) or umeshes.update_tag:
+            if self.normalize(all_islands, tot_area_uv, tot_area_3d, xy_scale=self.xy_scale, shear=self.shear, report=self.report) or umeshes.update_tag:
                 umeshes.update(info=info)
             else:
                 umeshes.silent_update()  # In normalize() has reports.
@@ -747,7 +750,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
         if self.xy_scale or self.shear:
             for isl in all_islands:
                 isl.value = isl.bbox.center  # isl.value == pivot
-                isl.value = self.individual_scale(isl)
+                isl.value = self.individual_scale(isl, xy_scale=self.xy_scale, shear=self.shear)
 
 
         if not unselected_umeshes:
@@ -769,7 +772,7 @@ class UNIV_OT_AdjustScale_VIEW3D(UNIV_OT_Normalize_VIEW3D):
             return {'FINISHED'}
         else:
             # Normalize tagged update_tag, so we use the latest tag
-            if self.normalize(all_islands, tot_area_uv, tot_area_3d):
+            if self.normalize(all_islands, tot_area_uv, tot_area_3d, xy_scale=self.xy_scale, shear=self.shear, report=self.report):
                 if umeshes.update_tag:
                     umeshes.update(info='All target islands were adjusted')
                 else:

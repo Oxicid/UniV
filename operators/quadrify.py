@@ -23,7 +23,7 @@ QUAD_SIZE = 4
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Quadrify(bpy.types.Operator):
+class UNIV_OT_Quadrify(utypes.RayCastAndPick):
     bl_idname = "uv.univ_quadrify"
     bl_label = "Quadrify"
     bl_description = "Align selected UV to rectangular distribution"
@@ -41,14 +41,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         return context.mode == 'EDIT_MESH'
 
     def invoke(self, context, event):
-        from ..preferences import prefs
-        self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-        self.mouse_pos = None
-        if event.value == 'PRESS':
-            if context.area.ui_type == 'UV':
-                self.mouse_pos = utils.get_mouse_pos(context, event)
-            return self.execute(context)
-
+        self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event)
         return self.execute(context)
 
     def draw(self, context):
@@ -63,11 +56,8 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.shear = False
         self.has_selected = True
         self.islands_calc_type: Callable = Callable
-        self.mouse_pos: Vector | None = None
-        self.max_distance: float | None = None
 
     def execute(self, context):
         if context.area.ui_type != 'UV':
@@ -80,7 +70,7 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         if selected_umeshes:
             umeshes = selected_umeshes
             return self.quadrify_selected(umeshes)
-        elif unselected_umeshes and self.mouse_pos:
+        elif unselected_umeshes and self.mouse_position:
             umeshes = unselected_umeshes
             return self.quadrify_pick(umeshes)
         else:
@@ -177,16 +167,16 @@ class UNIV_OT_Quadrify(bpy.types.Operator):
         for isl in quad_islands:
             old_center = isl.bbox.center
             isl.value = old_center
-            new_center = UNIV_OT_Normalize_VIEW3D.individual_scale(self, isl)  # noqa
+            new_center = UNIV_OT_Normalize_VIEW3D.individual_scale(isl, xy_scale=self.xy_scale, shear=False)
             isl.value = new_center
             if len(quad_islands) == 1:
                 isl.set_position(old_center, new_center)
         if len(quad_islands) > 1:
-            tot_area_uv, tot_area_3d = UNIV_OT_Normalize_VIEW3D.avg_by_frequencies(self, quad_islands)  # noqa
-            UNIV_OT_Normalize_VIEW3D.normalize(self, quad_islands, tot_area_uv, tot_area_3d)  # noqa
+            tot_area_uv, tot_area_3d = UNIV_OT_Normalize_VIEW3D.avg_by_frequencies(quad_islands, is_uv_space=self.bl_idname.startswith('UV'))
+            UNIV_OT_Normalize_VIEW3D.normalize(quad_islands, tot_area_uv, tot_area_3d, xy_scale=self.xy_scale, shear=False, report=self.report)
 
     def quadrify_pick(self, umeshes):
-        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_position, self.max_distance)
         for umesh in umeshes:
             for isl in Islands.calc_visible(umesh, with_seams=not self.ignore_seams):
                 hit.find_nearest_island_by_crn(isl)

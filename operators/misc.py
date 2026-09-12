@@ -489,7 +489,7 @@ class UNIV_OT_Join(Operator):
         return counter
 
 
-class UNIV_OT_Hide(Operator):
+class UNIV_OT_Hide(utypes.RayCastAndPick):
     bl_idname = "uv.univ_hide"
     bl_label = 'Hide'
     bl_options = {'REGISTER', 'UNDO'}
@@ -502,16 +502,8 @@ class UNIV_OT_Hide(Operator):
             self.report({'WARNING'}, 'Active area must be UV type')
             return {'CANCELLED'}
 
-        if event.value == 'PRESS':
-            self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-            self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
-            return self.execute(context)
+        self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event)
         return self.execute(context)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_distance: float = 0.0
-        self.mouse_pos: Vector | None = None
 
     def execute(self, context):
         if bpy.context.mode != 'EDIT_MESH':
@@ -537,7 +529,7 @@ class UNIV_OT_Hide(Operator):
 
         if not umeshes:
             return umeshes.update()
-        if not selected_umeshes and self.mouse_pos:
+        if not selected_umeshes and self.mouse_position:
             return self.pick_hide(umeshes)
 
         if utils.USE_GENERIC_UV_SYNC:
@@ -608,7 +600,7 @@ class UNIV_OT_Hide(Operator):
             return umeshes.update()
 
     def pick_hide(self, umeshes):
-        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_position, self.max_distance)
         all_islands = []
         for umesh in umeshes:
             for isl in utypes.Islands.calc_visible(umesh):

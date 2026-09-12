@@ -977,11 +977,13 @@ class PChart:
         for idx, v in enumerate(self.verts):
             v.id = idx
 
+        self.get_ls()
+
+    def get_ls(self):
         n_constr = len(self.constr_v) + len(self.constr_h)
         self.context = LinearSolver.new(2 * self.n_faces + n_constr, 2 * self.n_verts, least_squares=True)
 
-    def lscm_solve(self) -> bool:
-        context: LinearSolver = self.context
+    def lscm_solve(self, ls: LinearSolver) -> bool:
 
         # for v in self.verts:
         #     if v.flag & PVERT_PIN:
@@ -996,25 +998,25 @@ class PChart:
         if self.pin1:
             pin1: PVert = self.pin1
             pin2: PVert = self.pin2
-            context.lock_variable(2 * pin1.id, pin1.uv[0])
-            context.lock_variable(2 * pin1.id + 1, pin1.uv[1])
-            context.lock_variable(2 * pin2.id, pin2.uv[0])
-            context.lock_variable(2 * pin2.id + 1, pin2.uv[1])
+            ls.lock_variable(2 * pin1.id, pin1.uv[0])
+            ls.lock_variable(2 * pin1.id + 1, pin1.uv[1])
+            ls.lock_variable(2 * pin2.id, pin2.uv[0])
+            ls.lock_variable(2 * pin2.id + 1, pin2.uv[1])
 
         else:
             # Set and lock the pins.
             for v in self.verts:
                 if v.flag & PVERT_PIN:
-                    context.lock_variable(2 * v.id, v.uv[0])
-                    context.lock_variable(2 * v.id + 1, v.uv[1])
+                    ls.lock_variable(2 * v.id, v.uv[0])
+                    ls.lock_variable(2 * v.id + 1, v.uv[1])
 
         # Lock axis
         if UnwrapOptions.unwrap_along == 'V':
             for v in self.verts:
-                context.lock_variable(2 * v.id, v.uv[0])
+                ls.lock_variable(2 * v.id, v.uv[0])
         elif UnwrapOptions.unwrap_along == 'U':
             for v in self.verts:
-                context.lock_variable(2 * v.id + 1, v.uv[1])
+                ls.lock_variable(2 * v.id + 1, v.uv[1])
 
         # Detect "up" direction based on pinned vertices.
         total_signed_area: float = sum(f.calc_signed_uv_area() for f in self.faces)
@@ -1043,7 +1045,7 @@ class PChart:
                 # e2, e3 = e3, e2
                 v2, v3 = v3, v2
 
-            context.matrix_add_angles(row, a1, a2, a3, v1.id, v2.id, v3.id)
+            ls.matrix_add_angles(row, a1, a2, a3, v1.id, v2.id, v3.id)
             row += 2
 
         #########
@@ -1053,16 +1055,16 @@ class PChart:
             v1 = edge.vert
             v2 = edge.next.vert
 
-            context.matrix_add(row, 2 * v1.id, w)
-            context.matrix_add(row, 2 * v2.id, -w)
+            ls.matrix_add(row, 2 * v1.id, w)
+            ls.matrix_add(row, 2 * v2.id, -w)
             row += 1
 
         for edge in self.constr_h:
             v1 = edge.vert
             v2 = edge.next.vert
 
-            context.matrix_add(row, 2 * v1.id+1, w)
-            context.matrix_add(row, 2 * v2.id+1, -w)
+            ls.matrix_add(row, 2 * v1.id+1, w)
+            ls.matrix_add(row, 2 * v2.id+1, -w)
             row += 1
 
         # TODO: Need break diagonal segments by pins
@@ -1084,10 +1086,10 @@ class PChart:
         #     row += 1
 
 
-        if context.solve():
+        if ls.solve():
             for v in self.verts:
-                v.uv[0] = context.variable_get(2 * v.id)
-                v.uv[1] = context.variable_get(2 * v.id + 1)
+                v.uv[0] = ls.variable_get(2 * v.id)
+                v.uv[1] = ls.variable_get(2 * v.id + 1)
             return True
         else:
             self.skip_flush = True
@@ -1832,6 +1834,11 @@ class PAbfSystem:
         # Compute the remaining derivative outside compute_grad_alpha, taking advantage of numpy speed advantages.
         deriv = (self.alpha - self.beta)
         deriv *= self.weight
+
+        # for e in chart.edges:
+        #     if e.flag & (PEDGE_V_CONSTRAIN | PEDGE_H_CONSTRAIN):
+        #         deriv[e.id] *= 1.5
+
         deriv += self.lambdaTriangle.repeat(3)  # noqa
         self.bAlpha += deriv # noqa
 
@@ -2300,11 +2307,11 @@ class ParamHandleConstruct:
                 for e in chart.edges:
                     if e.flag & PEDGE_V_CONSTRAIN:
                         con_v.append(e)
-                        e.flag &= ~PEDGE_V_CONSTRAIN
+                        # e.flag &= ~PEDGE_V_CONSTRAIN
 
                     elif e.flag & PEDGE_H_CONSTRAIN:
                         con_h.append(e)
-                        e.flag &= ~PEDGE_H_CONSTRAIN
+                        # e.flag &= ~PEDGE_H_CONSTRAIN
                 chart.constr_v = con_v
                 chart.constr_h = con_h
 
@@ -2649,7 +2656,7 @@ class ParamHandleSolve(ParamHandleConstruct):
             if not chart.context:
                 continue
 
-            if chart.lscm_solve():
+            if chart.lscm_solve(chart.context):
                 if not chart.has_pins:
                     old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
                     new_bbox = utypes.BBox.calc_bbox(e.vert.uv for e in chart.edges if not (e.flag & PEDGE_FILLED))

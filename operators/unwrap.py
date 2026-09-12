@@ -24,7 +24,7 @@ UNIQUE_NUMBER_FOR_MULTIPLY = -1
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Unwrap(bpy.types.Operator):
+class UNIV_OT_Unwrap(utypes.RayCastAndPick):
     bl_idname = "uv.univ_unwrap"
     bl_label = "Unwrap"
     bl_description = ("Inplace unwrap the mesh of object being edited\n\n "
@@ -56,18 +56,8 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
     def invoke(self, context, event):
-        if self.bl_idname.startswith('UV'):
-            if event.value == 'PRESS':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_pos = utils.get_mouse_pos(context, event)
-            else:
-                self.max_distance = None
+        self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event)
         return self.execute(context)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.mouse_pos = Vector((0, 0))
-        self.max_distance: float | None = None
 
     def execute(self, context):
         umeshes = utypes.UMeshes()
@@ -98,7 +88,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
             return umeshes.update()
 
     def pick_unwrap(self, umeshes, **unwrap_kwargs):
-        hit = utypes.IslandHit(self.mouse_pos, self.max_distance)
+        hit = utypes.IslandHit(self.mouse_position, self.max_distance)
         for umesh in umeshes:
             for isl in utypes.Islands.calc_visible(umesh):
                 hit.find_nearest_island(isl)
@@ -853,7 +843,7 @@ class UNIV_OT_Unwrap(bpy.types.Operator):
         return pinned
 
 # noinspection PyTypeHints
-class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
+class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     bl_idname = "mesh.univ_unwrap"
     bl_label = "Unwrap"
     bl_description = ("Inplace unwrap the mesh of object being edited\n\n "
@@ -887,7 +877,7 @@ class UNIV_OT_Unwrap_VIEW3D(bpy.types.Operator, utypes.RayCast):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        utypes.RayCast.__init__(self)
+        utypes.RayCastAndPick.__init__(self)
         self.texel = -1
         self.texture_size = -1
 

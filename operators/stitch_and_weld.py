@@ -27,8 +27,6 @@ from ..preferences import prefs, univ_settings
 
 class Stitch:
     def __init__(self):
-        self.max_distance: float = 0.0
-        self.mouse_position: Vector | None = None
         self.padding = 0.0
         self.zero_area_count = 0
         self.flipped_3d_count = 0
@@ -37,7 +35,7 @@ class Stitch:
         if not hasattr(self, 'between'):
             self.between = False
 
-    def stitch(self, umeshes):
+    def stitch(self, umeshes, mouse_position):
         self.zero_area_count = 0
         self.flipped_3d_count = 0
         for umesh in umeshes:
@@ -65,7 +63,7 @@ class Stitch:
                         isl for isl in islands if
                         utypes.IslandsBase.island_filter_is_any_face_selected(isl.faces, umesh)]
 
-            self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh)
+            self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh, mouse_position)
 
             if not target_islands:
                 continue
@@ -522,13 +520,14 @@ class Stitch:
             trans_lg.copy_coords_from_ref(ref_lg, self.update_seams)
 
 
-    def sort_by_dist_to_mouse_or_sel_edge_length(self, target_islands, umesh):
+    @staticmethod
+    def sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh, mouse_position):
 
         if not utils.USE_GENERIC_UV_SYNC:
-            if umesh.sync and self.mouse_position:
+            if umesh.sync and mouse_position:
                 if umesh.elem_mode in ('VERT', 'EDGE'):
                     if not umesh.has_selected_uv_faces():
-                        target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, self.mouse_position))
+                        target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, mouse_position))
                         return
 
         def calc_edge_length(isl: utypes.AdvIsland):
@@ -607,7 +606,7 @@ LAST_WELD_BY_DISTANCE_COUNTERS = (0, 0)
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Weld(bpy.types.Operator, Stitch):
+class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
     bl_description = "Weld selected UV vertices\n\n" \
@@ -646,14 +645,10 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         layout.prop(self, 'use_aspect')
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
-            if context.area.ui_type == 'UV':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_position = Vector(context.region.view2d.region_to_view(
-                    event.mouse_region_x, event.mouse_region_y))
+        if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
             return self.execute(context)
-        self.use_by_distance = event.alt
 
+        self.use_by_distance = event.alt
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
@@ -831,7 +826,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
             if umeshes.update_tag:
                 return
 
-        self.stitch(umeshes)
+        self.stitch(umeshes, self.mouse_position)
 
     def weld_by_distance_island(self, umeshes, extended):
         counter_seams = 0
@@ -1077,7 +1072,7 @@ class UNIV_OT_Weld(bpy.types.Operator, Stitch):
         return
 
 
-class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
+class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
     bl_idname = "mesh.univ_weld"
 
     def invoke(self, context, event):
@@ -1090,7 +1085,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Stitch.__init__(self)
-        utypes.RayCast.__init__(self)
+        utypes.RayCastAndPick.__init__(self)
         self.update_seams = True
 
     def execute(self, context):
@@ -1176,7 +1171,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld, utypes.RayCast):
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
+class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
     bl_idname = "uv.univ_stitch"
     bl_label = 'Stitch'
     bl_description = "Stitch selected UV vertices by proximity\n\n" \
@@ -1208,11 +1203,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
             self.draw_padding()
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
-            if context.area.ui_type == 'UV':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_position = Vector(context.region.view2d.region_to_view(
-                    event.mouse_region_x, event.mouse_region_y))
+        if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
             return self.execute(context)
         self.between = event.alt
         return self.execute(context)
@@ -1238,7 +1229,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
             umesh.sequence = draw.mesh_extract.extract_edges_with_seams(umesh)
 
         if self.between:
-            self.stitch(umeshes)
+            self.stitch(umeshes, self.mouse_position)
         else:
             if not umeshes:
                 return umeshes.update()
@@ -1258,7 +1249,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
                 bpy.context.area.tag_redraw()
                 return {'FINISHED'}
 
-            self.stitch(umeshes)
+            self.stitch(umeshes, self.mouse_position)
 
         self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
         bpy.context.area.tag_redraw()
@@ -1304,7 +1295,7 @@ class UNIV_OT_Stitch(bpy.types.Operator, Stitch, utils.PaddingHelper):
             hit.umesh.update()
 
 
-class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
+class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
     bl_idname = "mesh.univ_stitch"
 
     def invoke(self, context, event):
@@ -1344,7 +1335,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
         umeshes.filtered_by_selected_uv_faces()
         without_uv = umeshes.filtered_by_uv_exist()
         umeshes.verify_uv()
-        self.stitch(umeshes)
+        self.stitch(umeshes, self.mouse_position)
 
         self.clear_seams_from_selected_edges(without_uv)
         umeshes.umeshes.extend(without_uv.umeshes.copy())
@@ -1379,7 +1370,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch, utypes.RayCast):
 
         without_uv = umeshes.filtered_by_uv_exist()
         umeshes.verify_uv()
-        self.stitch(umeshes)
+        self.stitch(umeshes, self.mouse_position)
         self.clear_seams_from_selected_edges(without_uv)
         umeshes.umeshes.extend(without_uv.umeshes.copy())
         return None

@@ -733,15 +733,17 @@ class CrnEdgeHit:
         return bool(self.crn)
 
 
-class RayCast:
-    def __init__(self):
-        self.mouse_pos_from_3d = None
-        self.region = None
-        self.rv3d = None
-        self.region_data = None
-        self.ray_origin = None
-        self.ray_direction = None
-        self.active_bmesh = None
+class RayCastAndPick(bpy.types.Operator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mouse_pos_from_3d: tuple[int, int] | None = None
+        self.region: bpy.types.Region | None = None
+        self.rv3d: bpy.types.RegionView3D | None = None
+        self.ray_origin: Vector | None = None
+        self.ray_direction: Vector | None = None
+
+        self.max_distance: float = 0.0
+        self.mouse_position: Vector | None = None
 
     def init_data_for_ray_cast(self, event):
         if bpy.context.area.type == 'VIEW_3D':
@@ -853,3 +855,19 @@ class RayCast:
                     hit.face = crn.face  # incref
                     return hit
         return None
+
+    def store_mouse_pose_on_uv_and_max_distance_if_allowed(self, event):
+        if event.value == 'PRESS':
+            if self.bl_idname.startswith('UV'):
+                if bpy.context.area.ui_type == 'UV':
+                    from .. import preferences
+                    self.max_distance = utils.get_max_distance_from_px(
+                        preferences.prefs().max_pick_distance,
+                        bpy.context.region.view2d)
+                    self.mouse_position = Vector(
+                        bpy.context.region.view2d.region_to_view(
+                        event.mouse_region_x,
+                        event.mouse_region_y)
+                    )
+                    return True
+        return False

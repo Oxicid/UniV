@@ -166,7 +166,7 @@ class UNIV_OT_Mark_VIEW3D(Operator):
         return res
 
 
-class UNIV_OT_Pin(Operator):
+class UNIV_OT_Pin(utypes.RayCastAndPick):
     bl_idname = 'uv.univ_pin'
     bl_label = 'Pin'
     bl_options = {'REGISTER', 'UNDO'}
@@ -178,11 +178,7 @@ class UNIV_OT_Pin(Operator):
             self.layout.prop(prefs(), 'invert_toggle_logic')
 
     def invoke(self, context, event):
-        if context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV':
-            if event.value == 'PRESS':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
-                return self.execute(context)
+        self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event)
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
@@ -307,7 +303,7 @@ class UNIV_OT_Pin(Operator):
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Cut_VIEW2D(Operator):
+class UNIV_OT_Cut_VIEW2D(utypes.RayCastAndPick):
     bl_idname = "uv.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"
@@ -338,18 +334,12 @@ class UNIV_OT_Cut_VIEW2D(Operator):
             self.report({'WARNING'}, 'Active area must be UV type')
             return {'CANCELLED'}
 
-        if event.value == 'PRESS':
-            self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-            self.mouse_pos = Vector(context.region.view2d.region_to_view(event.mouse_region_x, event.mouse_region_y))
+        if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
             return self.execute(context)
 
         self.addition = event.shift
         return self.execute(context)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_distance: float = 0.0
-        self.mouse_pos: Vector | None = None
 
     def execute(self, context) -> set[str]:
         umeshes = UMeshes(report=self.report)
@@ -363,7 +353,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
         if not umeshes:
             return umeshes.update()
-        if not selected_umeshes and self.mouse_pos:
+        if not selected_umeshes and self.mouse_position:
             return self.pick_cut(umeshes)
 
         self.cut_uv_space(umeshes)
@@ -415,7 +405,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
                     utils.set_global_texel(isl.island)
 
     def pick_cut(self, umeshes: UMeshes):
-        hit = utypes.CrnEdgeHit(self.mouse_pos, self.max_distance)
+        hit = utypes.CrnEdgeHit(self.mouse_position, self.max_distance)
         for umesh in umeshes:
             hit.find_nearest_crn_by_visible_faces(umesh)
 
@@ -439,7 +429,7 @@ class UNIV_OT_Cut_VIEW2D(Operator):
 
 
 # noinspection PyTypeHints
-class UNIV_OT_Cut_VIEW3D(Operator, utypes.RayCast):
+class UNIV_OT_Cut_VIEW3D(utypes.RayCastAndPick):
     bl_idname = "mesh.univ_cut"
     bl_label = "Cut"
     bl_description = "Cut selected"

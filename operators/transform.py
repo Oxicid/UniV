@@ -20,6 +20,7 @@ from collections import defaultdict
 
 from .. import utils
 from .. import info
+from .. import utypes
 from ..utypes import (
     BBox,
     UMeshes,
@@ -1586,7 +1587,7 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
             return self.align(umeshes)
 
 
-class UNIV_OT_Flip_VIEW3D(Operator):
+class UNIV_OT_Flip_VIEW3D(utypes.RayCastAndPick):
     bl_idname = 'mesh.univ_flip'
     bl_label = 'Flip'
     bl_options = {'REGISTER', 'UNDO'}
@@ -1616,12 +1617,9 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         self.layout.prop(self, 'ignore_seams')
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
-            if context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_pos = Vector(context.region.view2d.region_to_view(
-                    event.mouse_region_x, event.mouse_region_y))
+        if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
             return self.execute(context)
+
         self.axis = 'Y' if event.alt else 'X'
         match event.ctrl, event.shift:
             case False, False:
@@ -1638,8 +1636,6 @@ class UNIV_OT_Flip_VIEW3D(Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scale = Vector()
-        self.max_distance: float = 0.0
-        self.mouse_pos: Vector | None = None
         self.calc_island_type: typing.Callable = Islands.calc_extended
 
     def execute(self, context):
@@ -1665,7 +1661,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
 
             if not umeshes:
                 return umeshes.update()
-            if not selected_umeshes and self.mouse_pos:
+            if not selected_umeshes and self.mouse_position:
                 return self.pick_flip(umeshes)
         else:
             if not umeshes:
@@ -1775,7 +1771,7 @@ class UNIV_OT_Flip_VIEW3D(Operator):
         return Islands(islands, umesh)
 
     def pick_flip(self, umeshes: UMeshes):
-        hit = IslandHit(self.mouse_pos, self.max_distance)
+        hit = IslandHit(self.mouse_position, self.max_distance)
 
         for umesh in umeshes:
             for isl in self.calc_island_type(umesh):
@@ -1800,7 +1796,7 @@ class UNIV_OT_Flip(UNIV_OT_Flip_VIEW3D):
     bl_description = UNIV_OT_Flip_VIEW3D.bl_description + "\n\nHas [F] keymap"
 
 # noinspection PyTypeHints
-class UNIV_OT_Rotate_VIEW3D(Operator):
+class UNIV_OT_Rotate_VIEW3D(utypes.RayCastAndPick):
     bl_idname = 'mesh.univ_rotate'
     bl_label = 'Rotate'
     bl_options = {'REGISTER', 'UNDO'}
@@ -1832,11 +1828,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
         self.layout.prop(self, 'use_correct_aspect')
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
-            if context.area.type == 'IMAGE_EDITOR' and context.area.ui_type == 'UV':
-                self.max_distance = utils.get_max_distance_from_px(prefs().max_pick_distance, context.region.view2d)
-                self.mouse_pos = Vector(context.region.view2d.region_to_view(
-                    event.mouse_region_x, event.mouse_region_y))
+        if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
             return self.execute(context)
 
         self.rot_dir = 'CCW' if event.alt else 'CW'
@@ -1851,8 +1843,6 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.angle = 0.0
-        self.max_distance: float = 0.0
-        self.mouse_pos: Vector | None = None
         self.calc_island_type = Islands.calc_extended
 
     def execute(self, context):
@@ -1879,7 +1869,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
 
             if not umeshes:
                 return umeshes.update()
-            if not selected_umeshes and self.mouse_pos:
+            if not selected_umeshes and self.mouse_position:
                 return self.pick_rotate(umeshes)
         else:
             if not umeshes:
@@ -1934,7 +1924,7 @@ class UNIV_OT_Rotate_VIEW3D(Operator):
             umesh.update_tag = bool(islands)
 
     def pick_rotate(self, umeshes: UMeshes):
-        hit = IslandHit(self.mouse_pos, self.max_distance)
+        hit = IslandHit(self.mouse_position, self.max_distance)
         for umesh in umeshes:
             for isl in Islands.calc_visible(umesh):
                 hit.find_nearest_island_by_crn(isl)
