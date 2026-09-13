@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import math
-import heapq
 import typing
 import contextlib
 import numpy as np
@@ -151,6 +150,7 @@ PVERT_SELECT = 2
 PVERT_INTERIOR = 4
 PVERT_COLLAPSE = 8
 PVERT_SPLIT = 16
+PVERT_CONSTRAINT_NO_ENDPOINT = 32
 
 
 # PEdgeFlag
@@ -160,8 +160,8 @@ PEDGE_PIN = 4
 PEDGE_SELECT = 8
 PEDGE_DONE = 16
 PEDGE_FILLED = 32
-PEDGE_V_CONSTRAIN = 64
-PEDGE_H_CONSTRAIN = 128
+PEDGE_V_CONSTRAINT = 64
+PEDGE_H_CONSTRAINT = 128
 PEDGE_TAG = 256
 
 # for flipping faces
@@ -422,24 +422,34 @@ class PVert:
         return bool(self.edge.pair)
 
 
-    def is_endpoint_constr(self):
+    def has_inbetween_constr(self):
         e = self.edge
-        count_u = 0
-        count_v = 0
+        has_constr_u = False
+        has_constr_v = False
         while True:
-            if e.flag & PEDGE_H_CONSTRAIN:
-                 count_u += 1
-            if e.flag & PEDGE_V_CONSTRAIN:
-                count_v += 1
-            if e.next.next.flag & PEDGE_H_CONSTRAIN:
-                 count_u += 1
-            if e.next.next.flag & PEDGE_V_CONSTRAIN:
-                count_v += 1
+            if e.flag & PEDGE_H_CONSTRAINT:
+                if has_constr_u:
+                    return True
+                has_constr_u = True
+            if e.flag & PEDGE_V_CONSTRAINT:
+                if has_constr_v:
+                    return True
+                has_constr_v = True
+
+            pref_edge_flag = e.next.next.flag
+            if pref_edge_flag & PEDGE_H_CONSTRAINT:
+                if has_constr_u:
+                    return True
+                has_constr_u = True
+            if pref_edge_flag & PEDGE_V_CONSTRAINT:
+                if has_constr_v:
+                    return True
+                has_constr_v = True
 
             e = e.wheel_edge_next
             if not e or e == self.edge:
                 break
-        return count_u <= 1 and count_v <= 1
+        return False
 
 class PEdge:
     def __init__(self):
@@ -1005,13 +1015,10 @@ class PChart:
 
         self.get_ls()
 
-    def get_ls(self, with_scale_correction=False):
+    def get_ls(self):
         n_axis_constr  = len(self.constr_v) + len(self.constr_h)
-        n_scale_constr = 0
-        if with_scale_correction:
-            n_scale_constr = n_axis_constr
 
-        self.context = LinearSolver.new(2 * self.n_faces + n_axis_constr + n_scale_constr,
+        self.context = LinearSolver.new(2 * self.n_faces + n_axis_constr,
                                         2 * self.n_verts,
                                         least_squares=True)
 
@@ -1120,9 +1127,12 @@ class PChart:
                 # e2, e3 = e3, e2
                 v2, v3 = v3, v2
 
-            ww = constr_correction_weight
-            if not (v1.is_endpoint_constr() and v2.is_endpoint_constr() and v3.is_endpoint_constr()):
-                ww = 1.0
+
+            ww = 1.0
+            has_not_constraints_influence = (not v1.has_inbetween_constr() and not v2.has_inbetween_constr() and not v3.has_inbetween_constr())
+            if has_not_constraints_influence:
+                # Blow faces without constraints influence
+                ww = constr_correction_weight
 
             self.matrix_add_angles(ls, row, a1, a2, a3, v1.id, v2.id, v3.id, ww)
             row += 2
@@ -1620,105 +1630,106 @@ class PChart:
 
     def fill_boundaries(self, outer: PEdge):
         for e in self.edges:
-            # e_next = e.nextlink - as yet unused
 
             if e.pair or (e.flag & PEDGE_FILLED):
                 continue
 
+            coords_3d = []
+            border_edges = []
             n_edges: int = 0
             be: PEdge = e
             while True:
+                coords_3d.append(be.vert.co)
+                border_edges.append(be)
+
                 be.flag |= PEDGE_FILLED
                 be = be.next.vert.edge
                 n_edges += 1
                 if be == e:
                     break
 
+
             if e != outer:
-                self.fill_boundary(e, n_edges)
+                # Isolated seam case (2 edges)
+                if n_edges == 2:
+                    curr_edge = e.next.vert.edge
+                    curr_edge.pair = e
+                    e.pair = curr_edge
+                    continue
 
-    def fill_boundary(self, be: PEdge, n_edges: int):
-        heap = []
+                # In Blender, if you don’t save the keys, the program freezes.
+                # Although this effect isn’t clearly visible in Blender, it may cause problems in the future.
+                stored_keys = []
+                for i, fill_edge in enumerate(border_edges):
+                    stored_keys.append(fill_edge.vert.key)
+                    fill_edge.vert.key = i
 
-        # Initial insertion of all boundary edges
-        curr_edge: PEdge = be
-        while True:
-            angle = curr_edge.boundary_angle()
-            item = HeapItem(angle, curr_edge)
-            curr_edge.heaplink = item
-            heapq.heappush(heap, item)
+                self.fill_boundary(border_edges, coords_3d, n_edges)
 
-            curr_edge = curr_edge.boundary_edge_next
-            if curr_edge == be:
-                break
+                for key, fill_edge in zip(stored_keys, border_edges):
+                    fill_edge.vert.key = key
 
-        # Isolated seam case (2 edges)
-        if n_edges == 2:
-            curr_edge = be.next.vert.edge
-
-            curr_edge.pair = be
-            be.pair = curr_edge
-
-            # lazily mark elements as deleted
-            curr_edge.heaplink.removed = True
-            be.heaplink.removed = True
-            return
+    def fill_boundary(self, border_edges: list[PEdge], coords: list[Vector], n_edges: int):
+        tris_indices = polyfill_beautify(coords)
+        total_tris = len(tris_indices)
+        filled_indices = [False] * total_tris
 
         # General case: fill boundary
         while n_edges > 2:
             # pop with lazy deletion
-            while True:
-                item = heapq.heappop(heap)
-                if not item.removed:
+            for tris_idx in range(total_tris):
+                if filled_indices[tris_idx]:
+                    continue
+
+
+                i1, i2, i3 = tris_indices[tris_idx]
+
+                for _ in range(3):
+                    inner_edge = border_edges[i2]
+
+                    prev_bound_edge = inner_edge.boundary_edge_prev
+                    next_next_edge = inner_edge.boundary_edge_next
+
+                    if prev_bound_edge.vert.key != i1 or next_next_edge.vert.key != i3:
+                        # Rotate
+                        i1, i2, i3 = (i2, i3, i1)
+                        continue
+
+
+                    inner_edge.flag |= PEDGE_FILLED
+                    prev_bound_edge.flag |= PEDGE_FILLED
+
+                    f = PFace.add_fill(self, inner_edge.vert, prev_bound_edge.vert, next_next_edge.vert)
+                    f.flag |= PFACE_FILLED
+
+                    # new edges
+                    new_inner_edge = f.edge.next.next
+                    new_next_edge = f.edge
+                    new_prev_edge = f.edge.next
+
+                    new_inner_edge.flag = new_next_edge.flag = new_prev_edge.flag = PEDGE_FILLED
+
+                    inner_edge.pair = new_inner_edge
+                    new_inner_edge.pair = inner_edge
+                    prev_bound_edge.pair = new_next_edge
+                    new_next_edge.pair = prev_bound_edge
+
+                    new_inner_edge.vert = next_next_edge.vert
+                    new_next_edge.vert = inner_edge.vert
+                    new_prev_edge.vert = prev_bound_edge.vert
+
+                    if n_edges == 3:
+                        next_next_edge.pair = new_prev_edge
+                        new_prev_edge.pair = next_next_edge
+                    else:
+                        filled_indices[tris_idx] = True
+                        new_prev_edge.vert.edge = new_prev_edge
+
+                        border_edges[new_prev_edge.vert.key] = new_prev_edge
+                        border_edges[next_next_edge.vert.key] = next_next_edge
+
+                    n_edges -= 1
                     break
-            curr_edge = item.edge
-
-            prev_wheel_edge = curr_edge.boundary_edge_prev
-            next_wheel_edge = curr_edge.boundary_edge_next
-
-            # remove e1 and e2
-            prev_wheel_edge.heaplink.removed = True
-            next_wheel_edge.heaplink.removed = True
-
-            curr_edge.flag |= PEDGE_FILLED
-            prev_wheel_edge.flag |= PEDGE_FILLED
-
-            f = PFace.add_fill(self, curr_edge.vert, prev_wheel_edge.vert, next_wheel_edge.vert)
-            f.flag |= PFACE_FILLED
-
-            # new edges
-            new_curr_edge = f.edge.next.next
-            new_next_edge = f.edge
-            new_prev_edge = f.edge.next
-
-            new_curr_edge.flag = new_next_edge.flag = new_prev_edge.flag = PEDGE_FILLED
-
-            curr_edge.pair = new_curr_edge
-            new_curr_edge.pair = curr_edge
-            prev_wheel_edge.pair = new_next_edge
-            new_next_edge.pair = prev_wheel_edge
-
-            new_curr_edge.vert = next_wheel_edge.vert
-            new_next_edge.vert = curr_edge.vert
-            new_prev_edge.vert = prev_wheel_edge.vert
-
-            if n_edges == 3:
-                next_wheel_edge.pair = new_prev_edge
-                new_prev_edge.pair = next_wheel_edge
-            else:
-                new_prev_edge.vert.edge = new_prev_edge
-
-                # put `new_prev_edge` and `next_wheel_edge` back into the heap
-                it1 = HeapItem(new_prev_edge.boundary_angle(), new_prev_edge)
-                it2 = HeapItem(next_wheel_edge.boundary_angle(), next_wheel_edge)
-
-                new_prev_edge.heaplink = it1
-                next_wheel_edge.heaplink = it2
-
-                heapq.heappush(heap, it1)
-                heapq.heappush(heap, it2)
-
-            n_edges -= 1
 
 
 class PAbfSystem:
@@ -2329,10 +2340,10 @@ class ParamHandleConstruct:
                             shift = i * 2
                             bits = (edge_bits >> shift) & 3
                             if bits == 2:  # vertical
-                                e.flag |= PEDGE_V_CONSTRAIN
+                                e.flag |= PEDGE_V_CONSTRAINT
                                 v_corners.append(crn)
                             elif bits == 3:  # horizontal
-                                e.flag |= PEDGE_H_CONSTRAIN
+                                e.flag |= PEDGE_H_CONSTRAINT
                                 h_corners.append(crn)
                             break
                 # else: raise
@@ -2384,11 +2395,11 @@ class ParamHandleConstruct:
                 con_v = []
                 con_h = []
                 for e in chart.edges:
-                    if e.flag & PEDGE_V_CONSTRAIN:
+                    if e.flag & PEDGE_V_CONSTRAINT:
                         con_v.append(e)
                         # e.flag &= ~PEDGE_V_CONSTRAIN
 
-                    elif e.flag & PEDGE_H_CONSTRAIN:
+                    elif e.flag & PEDGE_H_CONSTRAINT:
                         con_h.append(e)
                         # e.flag &= ~PEDGE_H_CONSTRAIN
                 chart.constr_v = con_v
@@ -2736,6 +2747,7 @@ class ParamHandleSolve(ParamHandleConstruct):
                 continue
 
             if chart.lscm_solve(chart.context):
+                # TODO: Add TD correction iterations `s=(area_uv / area_3d)`
                 if not chart.has_pins:
                     old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
                     new_bbox = utypes.BBox.calc_bbox(e.vert.uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
