@@ -1364,7 +1364,7 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        pie.split()
+        pie.operator("wm.univ_toggle_pivot", icon='PIVOT_ACTIVE')
 
         # Left Upper
         pie.split()
@@ -1409,6 +1409,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         else:
             row.operator('mesh.loop_multi_select', text='Ring').ring = True
         row.operator('mesh.loop_to_region', text='Inner')
+        row.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
 
         row = col.row(align=True)
         row.scale_y = 1.35
@@ -1419,7 +1420,8 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
 
         # Upper
-        pie.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
+        pie.operator("wm.univ_toggle_pivot", icon='PIVOT_ACTIVE')
+
 
         # Left Upper
         pie.operator("mesh.select_nth", icon_value=icons.checker).offset = 1

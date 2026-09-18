@@ -119,6 +119,7 @@ class UKeymap:
         km.new_keymaps(kc, name='Window')
         km.new('wm.univ_split_uv_toggle', 'T', shift=True).prop.mode = 'SPLIT'
         km.new('wm.univ_toggle_panels_by_cursor', 'T', alt=True)
+        km.new("wm.univ_set_cursor_3d", 'MIDDLEMOUSE', ctrl=True, shift=True)
 
         ##################################################
         # UV Editor

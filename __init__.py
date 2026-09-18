@@ -117,6 +117,7 @@ def load_register_types():
             # Toggles
             operators.toggle.UNIV_OT_SplitUVToggle,
             operators.toggle.UNIV_OT_TogglePivot,
+            operators.toggle.UNIV_OT_TogglePivot_VIEW3D,
             operators.toggle.UNIV_OT_TogglePanelsByCursor,
             operators.toggle.UNIV_OT_SyncUVToggle,
             operators.toggle.UNIV_OT_StretchUVToggle,
@@ -202,6 +203,7 @@ def load_register_types():
             operators.misc.UNIV_OT_Hide,
             operators.misc.UNIV_OT_Focus,
             operators.misc.UNIV_OT_SetCursor2D,
+            operators.misc.UNIV_OT_SetCursor_VIEW3D,
             operators.misc.UNIV_OT_TD_PresetsProcessing,
             operators.misc.UNIV_OT_FixUVs,
             operators.misc.UNIV_OT_Join,

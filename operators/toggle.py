@@ -387,6 +387,7 @@ class UNIV_OT_TogglePanelsByCursor(Operator):
 
 
 PREV_PIVOT = ''
+PREV_PIVOT_3D = ''
 PREV_PIVOT_TIME = 0.0
 
 
@@ -421,17 +422,7 @@ class UNIV_OT_TogglePivot(Operator):
                          MEDIAN_POINT: 'Median'
                          }
 
-        if (curr_time - PREV_PIVOT_TIME) > draw_time:
-            if PREV_PIVOT == '' or PREV_PIVOT == curr_pivot:
-                if curr_pivot == BBOX:
-                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
-                else:
-                    context.space_data.pivot_point = BBOX
-            else:
-                draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}', 24)
-                context.space_data.pivot_point = PREV_PIVOT
-
-        else:
+        if (curr_time - PREV_PIVOT_TIME) <= draw_time:
             # Get third pivot.
             if PREV_PIVOT == BBOX and curr_pivot == 'INDIVIDUAL_ORIGINS':
                 context.space_data.pivot_point = 'CURSOR'
@@ -451,10 +442,99 @@ class UNIV_OT_TogglePivot(Operator):
                 else:
                     context.space_data.pivot_point = BBOX
 
-
             draw.TextDraw.draw(f'Switch to {readable_text[context.space_data.pivot_point]!r}', 24)
 
+        else:
+            if PREV_PIVOT == '' or PREV_PIVOT == curr_pivot:
+                if curr_pivot == BBOX:
+                    context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+                else:
+                    context.space_data.pivot_point = BBOX
+            else:
+                draw.TextDraw.draw(f'Toggle: {readable_text[context.space_data.pivot_point]!r} ➔ {readable_text[PREV_PIVOT]!r}', 24)
+                context.space_data.pivot_point = PREV_PIVOT
+
         PREV_PIVOT = curr_pivot
+        PREV_PIVOT_TIME = curr_time
+        return {'FINISHED'}
+
+
+class UNIV_OT_TogglePivot_VIEW3D(Operator):
+    bl_idname = "wm.univ_toggle_pivot"
+    bl_label = 'Toggle Pivot'
+    bl_options = {'UNDO'}
+    bl_description = ('Toggles the pivot inbetween. \n'
+                      'If toggled again within 1.8 seconds, it switches to next unique pivot.')
+
+    def execute(self, context):
+        from time import perf_counter
+        from .. import draw
+        global PREV_PIVOT_3D
+        global PREV_PIVOT_TIME
+        curr_time = perf_counter()
+
+        tool_settings = context.scene.tool_settings
+        curr_pivot = tool_settings.transform_pivot_point
+
+        ACTIVE = "ACTIVE_ELEMENT"
+        MEDIAN = "MEDIAN_POINT"
+        INDIVIDUAL = "INDIVIDUAL_ORIGINS"
+        CURSOR = "CURSOR"
+        BBOX = "BOUNDING_BOX_CENTER"
+
+        draw_time = 1.8
+        draw.TextDraw.max_draw_time = draw_time
+
+
+        readable_text = {
+            ACTIVE: "Active",
+            INDIVIDUAL: "Individual",
+            CURSOR: "Cursor",
+            BBOX: "Boundary Box",
+            MEDIAN: "Median"
+                         }
+
+        mode_and_idx = {
+            ACTIVE: 0,
+            INDIVIDUAL: 1,
+            CURSOR: 2,
+            BBOX: 3,
+            MEDIAN: 4
+        }
+
+
+        if (curr_time - PREV_PIVOT_TIME) <= draw_time:
+            # Get third pivot.
+            if PREV_PIVOT_3D == '':
+                if curr_pivot in (MEDIAN, BBOX):
+                    tool_settings.transform_pivot_point = ACTIVE
+                else:
+                    tool_settings.transform_pivot_point = MEDIAN
+            else:
+                get_key_by_value = lambda idx_: list(mode_and_idx.keys())[list(mode_and_idx.values()).index(idx_)]
+                idx = (mode_and_idx[curr_pivot] + 1) % 5
+                new_next_pivot = get_key_by_value(idx)
+
+                if new_next_pivot == PREV_PIVOT_3D: # Get new pivot again, for avoid toggling between prev and curr.
+                    idx = (mode_and_idx[new_next_pivot] + 1) % 5
+                    new_next_pivot = get_key_by_value(idx)
+                tool_settings.transform_pivot_point = new_next_pivot
+
+            draw.TextDraw.target_area = 'VIEW_3D'
+            draw.TextDraw.draw(f'Switch to {readable_text[tool_settings.transform_pivot_point]!r}', 24)
+
+        else:
+            if PREV_PIVOT_3D in ('', curr_pivot):
+                if curr_pivot in (MEDIAN, BBOX):
+                    tool_settings.transform_pivot_point = ACTIVE
+                else:
+                    tool_settings.transform_pivot_point = MEDIAN
+            else:
+                draw.TextDraw.target_area = 'VIEW_3D'
+                draw.TextDraw.draw(f'Toggle: {readable_text[tool_settings.transform_pivot_point]!r} ➔ {readable_text[PREV_PIVOT_3D]!r}', 24)
+                tool_settings.transform_pivot_point = PREV_PIVOT_3D
+
+        PREV_PIVOT_3D = curr_pivot
         PREV_PIVOT_TIME = curr_time
         return {'FINISHED'}
 

@@ -883,6 +883,33 @@ class UNIV_OT_SetCursor2D(Operator):
             if idx != -1:
                 slot.active_trim_index = idx
 
+class UNIV_OT_SetCursor_VIEW3D(Operator):
+    bl_idname = "wm.univ_set_cursor_3d"
+    bl_label = 'Set Cursor 3D'
+
+    # TODO: Implement snapping
+
+    def invoke(self, context, event):
+        if context.area.type != "VIEW_3D":  #  and context.area.ui_type == 'WINDOWS'
+            self.report({'WARNING'}, 'Active area must be 3D View')
+            return {'CANCELLED'}
+
+        tool_settings = context.scene.tool_settings
+
+        if tool_settings.transform_pivot_point != 'CURSOR':
+            from . import toggle
+            from .. import draw
+            toggle.PREV_PIVOT_3D = tool_settings.transform_pivot_point
+            tool_settings.transform_pivot_point = 'CURSOR'
+
+            draw.TextDraw.target_area = "VIEW_3D"
+            draw.TextDraw.max_draw_time = 1.8
+            draw.TextDraw.draw(f"Switch Pivot to 'Cursor'")
+
+        bpy.ops.view3d.cursor3d("INVOKE_DEFAULT")
+        # start the modal function
+        return {'FINISHED'}
+
 
 class UNIV_OT_Focus(Operator):
     bl_idname = "uv.univ_focus"
