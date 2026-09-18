@@ -987,7 +987,9 @@ class PChart:
 
             if len(pins) <= 1:
                 if constraints_segments:
-                    res = self.extrema_verts_from_constr_segments(constraints_segments)
+                    res = None
+                    if self.constr_h or self.constr_v:
+                        res = self.extrema_verts_from_constr_segments(constraints_segments)
                     if res:
                         self.pin1, self.pin2 = res
                     else:
@@ -2334,6 +2336,7 @@ class ParamHandleConstruct:
                 if e:
                     for i, crn_l in enumerate(crn_e.link_loops):
                         if crn == crn_l:
+
                             if i == 16:
                                 break
 
@@ -2346,6 +2349,7 @@ class ParamHandleConstruct:
                                 e.flag |= PEDGE_H_CONSTRAINT
                                 h_corners.append(crn)
                             break
+
                 # else: raise
 
         segments: list[utypes.Segment] = []
