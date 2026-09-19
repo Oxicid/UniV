@@ -131,6 +131,8 @@ class UKeymap:
         km.new("wm.call_menu_pie", 'ACCENT_GRAVE').prop.name = "IMAGE_MT_PIE_univ_edit"
         km.new("wm.call_menu_pie", 'X').prop.name = "IMAGE_MT_PIE_univ_align"
         km.new("wm.call_menu_pie", 'D').prop.name = "IMAGE_MT_PIE_univ_misc"
+        if univ_pro_exist:
+            km.new("wm.call_menu_pie", 'D', shift=True).prop.name = "IMAGE_MT_PIE_constraints"
         km.new("wm.call_menu_pie", 'Q').prop.name = "IMAGE_MT_PIE_univ_favorites_edit"
         km.new("wm.call_menu_pie", 'T').prop.name = "IMAGE_MT_PIE_univ_transform"
         km.new("wm.call_menu_pie", 'A', shift=True).prop.name = "IMAGE_MT_PIE_univ_texel"

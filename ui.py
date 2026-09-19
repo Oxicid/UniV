@@ -1718,6 +1718,51 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
 
+class IMAGE_MT_PIE_constraints(Menu):
+    bl_label = 'UniV Pie'
+
+    def draw(self, _context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_DEFAULT'
+
+        pie = layout.menu_pie()
+
+        # Left
+        pie.operator('uv.univ_constraint', text='H-Constr', icon_value=icons.horizontal_c).vertical = False
+
+        # Right
+        pie.operator('uv.univ_constraint', text='V-Constr', icon_value=icons.vertical_b).vertical = True
+
+        # Bottom
+        split = pie.split()
+        col = split.column()
+        # col.scale_x = 0.8
+        col.separator(factor=24)
+
+        row = col.row(align=True)
+        row.operator('uv.univ_select_constraints', text='H-Constr', icon_value=icons.arrow).constraint_type = "HORIZONTAL"
+        row.operator('uv.univ_select_constraints', text='V-Constr', icon_value=icons.arrow).constraint_type = "VERTICAL"
+
+        row = col.row(align=True)
+        row.operator('uv.univ_constraint_by_angle', text='H-Constr', icon='EVENT_A').vertical = False
+        row.operator('uv.univ_constraint_by_angle', text='V-Constr', icon='EVENT_A').vertical = True
+
+        # Upper
+        pie.operator("uv.univ_straight", icon_value=icons.straight)
+        # Left Upper
+        pie.split()
+        # pie.operator('uv.univ_check_over', icon_value=icons.over)
+        # Right Upper
+        pie.split()
+        # pie.operator("uv.univ_check_other", icon_value=icons.random)
+        # Left Bottom
+        pie.split()
+        # pie.operator("uv.univ_check_zero", icon_value=icons.zero)
+        # Right Bottom
+        # pie.split()
+        # pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
+
+
 class UNIV_WT_object_VIEW3D(WorkSpaceTool):
     bl_space_type = 'VIEW_3D'
     bl_context_mode = 'OBJECT'
