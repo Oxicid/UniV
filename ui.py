@@ -315,10 +315,11 @@ class UNIV_PT_General(Panel):
             if univ_pro_exist:
                 row = col_align.row(align=True)
                 row.scale_y = 1.35
-                row.operator('uv.univ_constraint_by_angle', text='', icon='EVENT_A').vertical = False
-                row.operator('uv.univ_constraint', text='H-Constr', icon_value=icons.horizontal_c).vertical = False
-                row.operator('uv.univ_constraint_by_angle', text='', icon='EVENT_A').vertical = True
-                row.operator('uv.univ_constraint', text='V-Constr', icon_value=icons.vertical_b).vertical = True
+                row.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
+                row.menu(UNIV_PT_ConstraintsH.__name__, icon="DOWNARROW_HLT")
+
+                row.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
+                row.menu(UNIV_PT_ConstraintsV.__name__, icon="DOWNARROW_HLT")
 
             row = col_align.row(align=True)
             row.operator('uv.univ_mark')
@@ -422,6 +423,7 @@ class UNIV_PT_General(Panel):
             panel = draw_trim_panel(layout, 'Trims')
             if panel:
                 self.draw_trims(panel)
+
 
 class UNIV_PT_General_VIEW_3D(Panel):
     bl_label = ''
@@ -845,6 +847,7 @@ class UNIV_PT_BatchInspectSettings(Panel):
         row.operator('uv.univ_check_other', icon_value=icons.random)
         draw_tag_button(Inspect.Other)
 
+
 class UNIV_PT_CheckerSettings(Panel):
     bl_idname = 'UNIV_PT_CheckerSettings'
     bl_label = 'Checker Settings'
@@ -862,6 +865,7 @@ class UNIV_PT_CheckerSettings(Panel):
         layout.operator('scene.univ_checker_show_folder', icon='FILE_FOLDER')
 
         # layout.operator('wm.univ_checker_generator')  # TODO: Improve
+
 
 class UNIV_PT_CheckerTextures(Panel):
     bl_idname = 'UNIV_PT_CheckerTextures'
@@ -902,6 +906,7 @@ class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'texel', text='TD', emboss=False)
 
+
 class UNIV_UL_TrimPresetsManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         split = layout.split(factor=0.11, align=True)
@@ -912,10 +917,12 @@ class UNIV_UL_TrimPresetsManager(bpy.types.UIList):
         row.prop(item, 'name', text='', emboss=False)
         row.prop(item, 'visible', text='')
 
+
 class UNIV_UL_TrimSlotsManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
         layout.prop(item, 'name', text='', emboss=False)
         # row.prop(item, 'visible', text='')
+
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
@@ -1718,6 +1725,35 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
 
+class UNIV_PT_ConstraintsH(bpy.types.Menu):
+    bl_label = ""
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
+    bl_category = "UniV"
+
+    def draw(self, context):
+        self.draw_constraints_hv(False)
+
+    def draw_constraints_hv(self, is_vertical: bool):
+        layout = self.layout
+        if is_vertical:
+            text = "H-Constr"
+            constraint_type = "VERTICAL"
+        else:
+            text = "V-Constr"
+            constraint_type = "HORIZONTAL"
+
+        layout.operator("uv.univ_select_constraints", text=text, icon_value=icons.arrow).constraint_type = constraint_type
+        layout.operator("uv.univ_mark_constraints_by_angle", text=text, icon="EVENT_A").is_vertical = is_vertical
+        layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").is_vertical = is_vertical
+
+
+class UNIV_PT_ConstraintsV(UNIV_PT_ConstraintsH):
+
+    def draw(self, context):
+        self.draw_constraints_hv(True)
+
+
 class IMAGE_MT_PIE_constraints(Menu):
     bl_label = 'UniV Pie'
 
@@ -1728,10 +1764,10 @@ class IMAGE_MT_PIE_constraints(Menu):
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('uv.univ_constraint', text='H-Constr', icon_value=icons.horizontal_c).vertical = False
+        pie.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
 
         # Right
-        pie.operator('uv.univ_constraint', text='V-Constr', icon_value=icons.vertical_b).vertical = True
+        pie.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
 
         # Bottom
         split = pie.split()
@@ -1744,8 +1780,12 @@ class IMAGE_MT_PIE_constraints(Menu):
         row.operator('uv.univ_select_constraints', text='V-Constr', icon_value=icons.arrow).constraint_type = "VERTICAL"
 
         row = col.row(align=True)
-        row.operator('uv.univ_constraint_by_angle', text='H-Constr', icon='EVENT_A').vertical = False
-        row.operator('uv.univ_constraint_by_angle', text='V-Constr', icon='EVENT_A').vertical = True
+        row.operator('uv.univ_mark_constraints_by_angle', text='H-Constr', icon='EVENT_A').is_vertical = False
+        row.operator('uv.univ_mark_constraints_by_angle', text='V-Constr', icon='EVENT_A').is_vertical = True
+
+        row = col.row(align=True)
+        row.operator('uv.univ_clear_constraints', text='H-Constr', icon='PANEL_CLOSE').is_vertical = False
+        row.operator('uv.univ_clear_constraints', text='V-Constr', icon='PANEL_CLOSE').is_vertical = True
 
         # Upper
         pie.operator("uv.univ_straight", icon_value=icons.straight)

@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 1, 0, "experimental"),
+    "version": (4, 1, 1, "experimental"),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view"
@@ -227,6 +227,8 @@ def load_register_types():
                 ui.UNIV_PT_TrimManager,
                 ui.UNIV_PT_CheckerSettings,
                 ui.UNIV_PT_CheckerTextures,
+                ui.UNIV_PT_ConstraintsV,
+                ui.UNIV_PT_ConstraintsH,
                 ui.IMAGE_MT_PIE_constraints,
 
                 # Checker System
@@ -263,8 +265,9 @@ def load_register_types():
                 # Transfer
                 univ_pro.transfer.UNIV_OT_Transfer,
                 # Mark
-                univ_pro.mark.UNIV_OT_Constraint,
-                univ_pro.mark.UNIV_OT_ConstraintByAngle,
+                univ_pro.mark.UNIV_OT_MarkConstraints,
+                univ_pro.mark.UNIV_OT_ClearConstraints,
+                univ_pro.mark.UNIV_OT_MarkConstraintsByAngle,
                 # Misc
                 univ_pro.misc.UNIV_OT_TexelDensityFromTexture,
                 univ_pro.rectify.UNIV_OT_Rectify,

@@ -322,6 +322,10 @@ class UNIV_UV_Layers(bpy.types.PropertyGroup):
 class ExcludedOperator(bpy.types.PropertyGroup):
     idname: StringProperty()
 
+# class UNIV_OperatorsSettings(bpy.types.PropertyGroup):
+#     pass
+
+
 # noinspection PyTypeHints
 class UNIV_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
@@ -488,31 +492,9 @@ Some operators, can interact with trims:
 
     # ================================================================================
 
-    tab: EnumProperty(
-        items=(
-            ('GENERAL', 'General', ''),
-            ('UI', 'UI', ''),
-            ('KEYMAPS', 'Keymaps', ''),
-            ('INFO', 'Info', ''),
-        ),
-        default='KEYMAPS')
-    # default='INFO')  # noqa
-
-    debug: EnumProperty(name='Debug',
-                        items=(
-                            ('DISABLED', 'Disabled', ''),
-                            ('ENABLED', 'Enabled', ''),
-                            ('FORCE', 'Force', ''),
-                        ),
-                        default='DISABLED')
-
-    mode: EnumProperty(name='Mode',
-                       items=(
-                           ('STABLE', 'Stable', ''),
-                           ('EXTENDED', 'Extended', ''),
-                           ('EXPERIMENTAL', 'Experimental', ''),
-                       ),
-                       default='EXTENDED')
+    tab: EnumProperty(items=ENUM("GENERAL", ("UI", "UI"), "KEYMAPS", "INFO"),default='KEYMAPS')
+    debug: EnumProperty(name='Debug', items=ENUM("DISABLED", "ENABLED", "FORCE"), default='DISABLED')
+    mode: EnumProperty(name='Mode', items=ENUM("STABLE", "EXTENDED", "EXPERIMENTAL"), default='EXTENDED')
 
     if "NOT_BL_EXT":
         use_fastapi: BoolProperty(
@@ -542,17 +524,15 @@ Some operators, can interact with trims:
 
     # ----------
     color_mode: EnumProperty(name='Color Mode',
-                             items=(('COLOR', 'Color', ''), ('MONO', 'Monochrome', '')),
+                             items=ENUM("COLOR", ("MONO", "Monochrome")),
                              default='COLOR',
                              update=_update_color_mode)
 
     icon_scale: FloatProperty(name='Icon Scale', default=1.0, min=1.0, soft_max=1.25, max=2.0)
 
-    icon_size: EnumProperty(name='Icon Size',
-                            items=(('32', '32', ''), ('64', '64', ''), ('128', '128', ''), ('256', '256', '')),
-                            default='32')
+    icon_size: EnumProperty(name='Icon Size', items=ENUM('32', '64', '128', '256'), default='32')
     icon_antialiasing: EnumProperty(name='Anti-Aliasing',
-                                    items=(('1', 'x1', ''), ('2', 'x2', ''), ('4', 'x4', ''), ('8', 'x8', '')),
+                                    items=ENUM(('1', 'x1'), ('2', 'x2'), ('4', 'x4'), ('8', 'x8')),
                                     default='4')
 
     # NOTE: The prefixes "icon + [mono | colored | common]" must be used to specify whether,

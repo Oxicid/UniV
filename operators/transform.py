@@ -465,10 +465,10 @@ class Align_by_Angle:
         return {'FINISHED'}
 
     @classmethod
-    def get_segments_by_angle(cls, umesh, angle, is_x_axis, has_selected_umeshes, with_seams: bool):
+    def get_segments_by_angle(cls, umesh, angle, is_y_axis, has_selected_umeshes, with_seams: bool):
 
         uv = umesh.uv
-        edge_orient = Vector((not is_x_axis, is_x_axis))
+        edge_orient = Vector((not is_y_axis, is_y_axis))
         negative_ange = math.pi - angle
 
         is_boundary = utils.is_boundary_func(umesh, with_seam=with_seams)
