@@ -227,8 +227,8 @@ def load_register_types():
                 ui.UNIV_PT_TrimManager,
                 ui.UNIV_PT_CheckerSettings,
                 ui.UNIV_PT_CheckerTextures,
-                ui.UNIV_PT_ConstraintsV,
-                ui.UNIV_PT_ConstraintsH,
+                ui.UNIV_MT_ConstraintsV,
+                ui.UNIV_MT_ConstraintsH,
                 ui.IMAGE_MT_PIE_constraints,
 
                 # Checker System

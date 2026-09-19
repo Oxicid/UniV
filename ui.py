@@ -312,19 +312,18 @@ class UNIV_PT_General(Panel):
             row.operator('uv.univ_cut', icon_value=icons.cut)
             row.operator('uv.univ_seam_border', icon_value=icons.border_seam)
 
-            if univ_pro_exist:
-                row = col_align.row(align=True)
-                row.scale_y = 1.35
-                row.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
-                row.menu(UNIV_PT_ConstraintsH.__name__, icon="DOWNARROW_HLT")
-
-                row.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
-                row.menu(UNIV_PT_ConstraintsV.__name__, icon="DOWNARROW_HLT")
-
             row = col_align.row(align=True)
             row.operator('uv.univ_mark')
             row.operator('uv.univ_pin', icon_value=icons.pin)
 
+            if univ_pro_exist:
+                row = col_align.row(align=True)
+                row.scale_y = 1.35
+                row.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
+                row.menu(UNIV_MT_ConstraintsH.__name__, icon="DOWNARROW_HLT")
+
+                row.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
+                row.menu(UNIV_MT_ConstraintsV.__name__, icon="DOWNARROW_HLT")
 
         # Misc
         panel = draw_panel(layout, 'Misc')
@@ -1725,7 +1724,7 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
 
-class UNIV_PT_ConstraintsH(bpy.types.Menu):
+class UNIV_MT_ConstraintsH(bpy.types.Menu):
     bl_label = ""
     bl_space_type = "IMAGE_EDITOR"
     bl_region_type = "UI"
@@ -1748,7 +1747,7 @@ class UNIV_PT_ConstraintsH(bpy.types.Menu):
         layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").is_vertical = is_vertical
 
 
-class UNIV_PT_ConstraintsV(UNIV_PT_ConstraintsH):
+class UNIV_MT_ConstraintsV(UNIV_MT_ConstraintsH):
 
     def draw(self, context):
         self.draw_constraints_hv(True)
