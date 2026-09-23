@@ -65,6 +65,7 @@ class UnwrapOptions:
     # This is necessary to prevent strong stretching in areas where the faces meet the constraints,
     # which would otherwise result in reduced TD along the constrained edges.
     constr_correction_weight: float = 1.0
+    constr_edge_weight: float = 0.0
     method: int = 0
     use_slim: bool = False
     use_abf: bool = False
@@ -83,6 +84,7 @@ def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
                       blend_factor=1.0,
                       fill_holes=True,
                       constraints_factor=100.0,
+                      constr_edge_weight=0.0
                       ):
     """NOTE: Need indexing for constraints for segments and tagging for pinning (False = Pin)"""
 
@@ -108,6 +110,7 @@ def unwrap_isl_by_tag(isl: 'utypes.AdvIsland',
     options.blend = blend_factor
     options.constraints_factor = constraints_factor
     options.constr_correction_weight = constr_correction_weight
+    options.constr_edge_weight = constr_edge_weight
     options.use_abf = use_abf
     options.unwrap_along = unwrap_along
 
@@ -160,8 +163,8 @@ PEDGE_PIN = 4
 PEDGE_SELECT = 8
 PEDGE_DONE = 16
 PEDGE_FILLED = 32
-PEDGE_V_CONSTRAINT = 64
-PEDGE_H_CONSTRAINT = 128
+PEDGE_V_CONSTR = 64
+PEDGE_H_CONSTR = 128
 PEDGE_TAG = 256
 
 # for flipping faces
@@ -427,21 +430,21 @@ class PVert:
         has_constr_u = False
         has_constr_v = False
         while True:
-            if e.flag & PEDGE_H_CONSTRAINT:
+            if e.flag & PEDGE_H_CONSTR:
                 if has_constr_u:
                     return True
                 has_constr_u = True
-            if e.flag & PEDGE_V_CONSTRAINT:
+            if e.flag & PEDGE_V_CONSTR:
                 if has_constr_v:
                     return True
                 has_constr_v = True
 
             pref_edge_flag = e.next.next.flag
-            if pref_edge_flag & PEDGE_H_CONSTRAINT:
+            if pref_edge_flag & PEDGE_H_CONSTR:
                 if has_constr_u:
                     return True
                 has_constr_u = True
-            if pref_edge_flag & PEDGE_V_CONSTRAINT:
+            if pref_edge_flag & PEDGE_V_CONSTR:
                 if has_constr_v:
                     return True
                 has_constr_v = True
@@ -485,6 +488,9 @@ class PEdge:
     def key(self, v):
         self.id = v
 
+    @property
+    def length_uv(self):
+        return (self.vert.uv - self.next.vert.uv).length
 
     @property
     def length_3d(self):
@@ -1015,11 +1021,12 @@ class PChart:
         for idx, v in enumerate(self.verts):
             v.id = idx
 
-        self.get_ls()
+        self.get_ls(with_scale_correction=UnwrapOptions.constr_edge_weight != 0.0)
 
-    def get_ls(self):
+    def get_ls(self, with_scale_correction=False):
         n_axis_constr  = len(self.constr_v) + len(self.constr_h)
-
+        if with_scale_correction:
+            n_axis_constr *= 2
         self.context = LinearSolver.new(2 * self.n_faces + n_axis_constr,
                                         2 * self.n_verts,
                                         least_squares=True)
@@ -1111,7 +1118,6 @@ class PChart:
             # Use abf angles if present.
             angles = self.abf_alpha.reshape(-1, 3)
 
-
         row: int = 0
         constr_correction_weight = UnwrapOptions.constr_correction_weight
         # half_edges_without_constr = self.get_constraint_endpoints()
@@ -1131,7 +1137,9 @@ class PChart:
 
 
             ww = 1.0
-            has_not_constraints_influence = (not v1.has_inbetween_constr() and not v2.has_inbetween_constr() and not v3.has_inbetween_constr())
+            has_not_constraints_influence = (not v1.has_inbetween_constr()
+                                             and not v2.has_inbetween_constr()
+                                             and not v3.has_inbetween_constr())
             if has_not_constraints_influence:
                 # Blow faces without constraints influence
                 ww = constr_correction_weight
@@ -1177,10 +1185,42 @@ class PChart:
         #     row += 1
 
 
+        if UnwrapOptions.constr_edge_weight != 0.0:
+            scale_weight = UnwrapOptions.constr_edge_weight#+1.0
+            ref_scale = self.calc_reference_uv_scale()
+            if ref_scale != -1.0:
+                for edge in self.constr_v:
+                    if self.matrix_add_edge_length_constraint(ls, row, edge, ref_scale, scale_weight):
+                        row += 1
+
+                for edge in self.constr_h:
+                    if self.matrix_add_edge_length_constraint(ls, row, edge, ref_scale, scale_weight):
+                        row += 1
+
         if ls.solve():
             for v in self.verts:
                 v.uv[0] = ls.variable_get(2 * v.id)
                 v.uv[1] = ls.variable_get(2 * v.id + 1)
+
+
+            # from ..draw import LinesDrawSimple
+            # for f in self.faces:
+            #     e1: PEdge = f.edge
+            #     e2: PEdge = e1.next
+            #     e3: PEdge = e2.next
+            #     v1: PVert = e1.vert
+            #     v2: PVert = e2.vert
+            #     v3: PVert = e3.vert
+            #
+            #     has_not_constraints_influence = (not v1.has_inbetween_constr()
+            #                                      and not v2.has_inbetween_constr()
+            #                                      and not v3.has_inbetween_constr())
+            #     if has_not_constraints_influence:
+            #         e = f.edge
+            #         for _ in range(3):
+            #             data.extend((e.vert.uv, e.next.vert.uv))
+            #             e = e.next
+            # LinesDrawSimple.draw_register(data)
             return True
         else:
             self.skip_flush = True
@@ -1188,6 +1228,69 @@ class PChart:
             # for v in self.verts:
             #     v.uv.xy = (0.0, 0.0)
             return False
+
+
+
+
+    @staticmethod
+    def matrix_add_edge_length_constraint(
+            ls: LinearSolver,
+            row: int,
+            edge: PEdge,
+            target_scale: float,
+            weight: float,
+    ):
+        v1 = edge.vert
+        v2 = edge.next.vert
+
+        diff = v2.uv - v1.uv
+
+        length_uv = diff.length
+
+        if length_uv < 1e-12:
+            return False
+
+        ux, uy = (diff / length_uv)
+
+        mesh_length = edge.length_3d
+        if mesh_length < 1e-12:
+            return False
+
+        cur_scale = length_uv / mesh_length
+
+        # if (cur_scale > target_scale * 0.8) and (cur_scale < target_scale * 1.2):
+        #     return False
+
+        if cur_scale * 0.9 > target_scale:  # TODO: Check and improve that
+            return False
+
+        target_length = mesh_length * target_scale
+
+        ls.matrix_add(row, 2 * v1.id, -ux * weight)
+        ls.matrix_add(row, 2 * v1.id + 1, -uy * weight)
+
+        ls.matrix_add(row, 2 * v2.id, ux * weight)
+        ls.matrix_add(row, 2 * v2.id + 1, uy * weight)
+
+        ls.right_hand_side_add(row, target_length * weight)
+
+        return True
+
+    def calc_reference_uv_scale(self) -> float:
+        scales = []
+
+        for edge in self.edges:
+            if edge.flag & (PEDGE_V_CONSTR | PEDGE_H_CONSTR):
+                continue
+
+            mesh_len = edge.length_3d
+            if mesh_len > 1e-12:
+                scales.append(edge.length_uv / mesh_len)
+
+        if not scales:
+            return -1.0
+
+        return float(np.median(scales))
 
     def abf_solve(self) -> bool:
         from math import pi
@@ -1571,7 +1674,7 @@ class PChart:
                 # from ..draw import lines
                 # lines.LinesDrawSimple.draw_register([pin1.uv.copy(), pin2.uv.copy()], (1,0,0,1))
 
-            found_unique_pins = pin1 and pin2 and (pin1 != pin2)
+            found_unique_pins = bool((pin1 and pin2) and (pin1 != pin2))
             if not found_unique_pins:
                 print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
 
@@ -2343,10 +2446,10 @@ class ParamHandleConstruct:
                             shift = i * 2
                             bits = (edge_bits >> shift) & 3
                             if bits == 2:  # vertical
-                                e.flag |= PEDGE_V_CONSTRAINT
+                                e.flag |= PEDGE_V_CONSTR
                                 v_corners.append(crn)
                             elif bits == 3:  # horizontal
-                                e.flag |= PEDGE_H_CONSTRAINT
+                                e.flag |= PEDGE_H_CONSTR
                                 h_corners.append(crn)
                             break
 
@@ -2399,11 +2502,11 @@ class ParamHandleConstruct:
                 con_v = []
                 con_h = []
                 for e in chart.edges:
-                    if e.flag & PEDGE_V_CONSTRAINT:
+                    if e.flag & PEDGE_V_CONSTR:
                         con_v.append(e)
                         # e.flag &= ~PEDGE_V_CONSTRAIN
 
-                    elif e.flag & PEDGE_H_CONSTRAINT:
+                    elif e.flag & PEDGE_H_CONSTR:
                         con_h.append(e)
                         # e.flag &= ~PEDGE_H_CONSTRAIN
                 chart.constr_v = con_v
@@ -2746,12 +2849,16 @@ class ParamHandleSolve(ParamHandleConstruct):
 
         assert self.state == self.PHANDLE_STATE_LSCM
         count_failed = 0
+        # TODO: Show warnings, if islands splitted to 2 and more charts
+        # print(f"{len(self.charts) = }")
         for chart in self.charts:
             if not chart.context:
                 continue
 
             if chart.lscm_solve(chart.context):
-                # TODO: Add TD correction iterations `s=(area_uv / area_3d)`
+                # TODO: Add TD correction iterations if segments has`s=(area_uv / area_3d)`
+
+
                 if not chart.has_pins:
                     old_bbox = utypes.BBox.calc_bbox(e.orig_uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
                     new_bbox = utypes.BBox.calc_bbox(e.vert.uv for e in chart.edges if not (e.flag & PEDGE_FILLED))
@@ -2759,6 +2866,11 @@ class ParamHandleSolve(ParamHandleConstruct):
                     delta = old_bbox.center - new_bbox.center
                     for v in chart.verts:
                         v.uv.xy += delta
+
+                    # Draw pin extrema.
+                    if chart.pin1:
+                        from ..draw import DotLinesDrawSimple
+                        DotLinesDrawSimple.draw_register([chart.pin1.uv, chart.pin2.uv], color=(0.2,1,0,0.15))
 
                 elif chart.single_pin:
                     delta = chart.origin - chart.single_pin.uv
