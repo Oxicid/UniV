@@ -176,7 +176,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         offset_lines = self.uv_crn_groups_to_lines_with_offset(groups, uv, exact=exact)
         color = color_for_groups(groups)
-        self.calc_text_data_from_lines(offset_lines)
+        self.mid_points, self.texts = self.calc_text_data_from_lines(offset_lines)
 
         self.batch_smooth_color = batch_for_shader(
             self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
@@ -202,7 +202,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         offset_lines = self.uv_segments_to_lines_with_offset(groups)
         color = color_for_groups(groups)
-        self.calc_text_data_from_lines(offset_lines)
+        self.mid_points, self.texts = self.calc_text_data_from_lines(offset_lines)
 
         self.batch_smooth_color = batch_for_shader(
             self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
@@ -352,7 +352,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         return edges
 
-    def calc_text_data_from_lines(self, edges: typing.Sequence | typing.Any, scale=0.000015):
+    @staticmethod
+    def calc_text_data_from_lines(edges: typing.Sequence | typing.Any, scale=0.000015):
         # import blf
         import numpy as np
         size = len(edges) // 2
@@ -382,9 +383,8 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         shifted_midpoints[0] = (0.0, 0.0)
         edges_midpoints -= shifted_midpoints
 
-        self.mid_points = edges_midpoints
+        return edges_midpoints, texts
 
-        self.texts = texts
 
     def exit(self):
         if not (self.handler is None):

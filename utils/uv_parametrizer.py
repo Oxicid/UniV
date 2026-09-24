@@ -4,6 +4,7 @@
 import math
 import typing
 import contextlib
+
 import numpy as np
 import numpy.typing as npt
 from bmesh.types import BMFace
@@ -13,7 +14,6 @@ from math import pi
 from bl_math import clamp
 
 from .ubm import polyfill_beautify
-from . import bm_select
 from .. import utypes
 from .solver import LinearSolver
 
@@ -471,6 +471,10 @@ class PEdge:
         self.flag: int = 0
 
     @property
+    def prev(self):
+        return self.next.next
+
+    @property
     def heaplink(self):
         """Edge collapsing."""
         return self.id
@@ -518,7 +522,89 @@ class PEdge:
 
     @property
     def wheel_edge_prev(self) -> 'PEdge | None':
+        #                  o
+        #                * * *
+        #              *   *   *
+        #            *     *     *
+        #          *    /\ *       *
+        #        * self || * || pair *
+        #      *           * \/        *
+        #    *             *             *
+        #  o   *  *  *  *  o  *  *  *  *   o
+        #                         =>
+        #                        prev
+
         return self.pair.next if self.pair else None
+
+    def get_linked(self) -> "list[PEdge]":
+        linked = [self]
+        we = self.wheel_edge_next
+        while True:
+            if not we:
+                break
+            if we == self:
+                return linked
+            linked.append(we)
+            we = we.wheel_edge_next
+
+        we = self.wheel_edge_prev
+        while True:
+            if not we or we == self:
+                break
+            linked.append(we)
+            we = we.wheel_edge_prev
+        return linked
+
+    def get_linked2(self) -> "list[PEdge]":
+        linked = []
+        we = self.wheel_edge_next
+        while True:
+            if not we:
+                break
+            if we == self:
+                return linked
+            linked.append(we)
+            we = we.wheel_edge_next
+        #
+        we = self.wheel_edge_prev
+        while True:
+            if not we or we == self:
+                break
+            linked.append(we)
+            we = we.wheel_edge_prev
+        return linked
+
+    def get_linked_p(self) -> "list[PEdge]":
+        linked = [self, self.prev]
+        we = self.wheel_edge_next
+        def unique(lll):
+            new_lll = []
+
+            for l in lll:
+                if l.pair in new_lll or l in new_lll:
+                    continue
+                new_lll.append(l)
+            return new_lll
+
+
+
+        while True:
+            if not we:
+                break
+            if we == self:
+                return unique(linked)
+            linked.append(we)
+            linked.append(we.prev)
+            we = we.wheel_edge_next
+
+        we = self.wheel_edge_prev
+        while True:
+            if not we or we == self:
+                break
+            linked.append(we)
+            linked.append(we.prev)
+            we = we.wheel_edge_prev
+        return unique(linked)
 
     @property
     def boundary_edge_next(self: 'PEdge') -> 'PEdge':
@@ -784,6 +870,297 @@ class PFace:
         return f
 
 
+class AdvPEdge:
+    def __init__(self, e, invert=False):  # noqa
+        self.e: PEdge = e
+        self.invert = invert
+        self._is_pair = None
+
+    @property
+    def is_pair(self):
+        if self._is_pair is None:
+            if self.invert:
+                self._is_pair = bool(self.e.prev.pair)
+            else:
+                self._is_pair = bool(self.e.pair)
+        return self._is_pair
+
+    @is_pair.setter
+    def is_pair(self, v: bool):
+        self._is_pair = v
+
+    @property
+    def length_uv(self):
+        if self.invert:
+            return self.e.prev.length_uv
+        return self.e.length_uv
+
+    @property
+    def curr_pt(self):
+        return self.e.vert.uv
+
+    @property
+    def next_pt(self):
+        if self.invert:
+            return self.e.prev.vert.uv
+        else:
+            return self.e.next.vert.uv
+
+    def __hash__(self):
+        return hash(self.e)
+
+    def __eq__(self, other):
+        return self.e == other.e and self.invert == other.invert
+
+
+class PSegment:
+    def __init__(self, seg, is_vertical: bool):
+        self.seg: list[AdvPEdge] = seg
+        self.is_vertical: bool = is_vertical
+        self._length_uv: float = -1.0
+        self.value = 0
+
+    @property
+    def start_vert(self):
+        return self.seg[0].e.vert
+
+    @property
+    def end_vert(self):
+        adv_crn = self.seg[-1]
+        if adv_crn.invert:
+            return adv_crn.e.prev.vert
+        else:
+            return adv_crn.e.next.vert
+
+    @property
+    def start_co(self) -> Vector:
+        adv_crn = self.seg[0]
+        return adv_crn.e.vert.uv
+
+    @property
+    def end_co(self) -> Vector:
+        adv_crn = self.seg[-1]
+        if adv_crn.invert:
+            return adv_crn.e.prev.vert.uv
+        else:
+            return adv_crn.e.next.vert.uv
+
+    @property
+    def is_circular(self):
+        return self.start_vert == self.end_vert and self.start_co == self.end_co
+
+    @property
+    def length_uv(self):
+        if self._length_uv == -1.0:
+            self._length_uv = sum(e.length_uv for e in self)
+        return self._length_uv
+
+    @classmethod
+    def from_bm_corners(cls, handle, segment, is_vertical: bool):
+        p_segments = []
+
+        uv = segment.umesh.uv
+        seg = []
+
+
+        for adv_crn in segment:
+            if adv_crn.invert:
+                crn = adv_crn.crn
+            else:
+                crn = adv_crn.crn
+
+            e: PEdge = handle.edge_lookup_exact(
+                handle.uv_find_pin_index(crn.vert.index, crn[uv].uv),
+                handle.uv_find_pin_index(crn.link_loop_next.vert.index, crn.link_loop_next[uv].uv)
+            )
+
+            if e:
+                # assert e.flag & (PEDGE_V_CONSTR | PEDGE_H_CONSTR)
+                if adv_crn.invert:
+                    seg.append(AdvPEdge(e))
+                else:
+                    seg.append(AdvPEdge(e))
+            else:
+                crn = adv_crn.crn.link_loop_next
+                e: PEdge = handle.edge_lookup_exact(
+                    handle.uv_find_pin_index(crn.vert.index, crn[uv].uv),
+                    handle.uv_find_pin_index(crn.link_loop_next.vert.index, crn.link_loop_next[uv].uv)
+                )
+                if e:
+                    if e.flag & (PEDGE_V_CONSTR | PEDGE_H_CONSTR):
+                        if adv_crn.invert:
+                            seg.append(AdvPEdge(e, invert=True))
+                        else:
+                            seg.append(AdvPEdge(e))
+
+        if seg:
+            ps = PSegment(seg, is_vertical=is_vertical)
+            ps._length_uv = segment.length_uv
+            p_segments.append(ps)
+
+        return p_segments
+
+    @classmethod
+    def from_halfedges(cls, corners: list[PEdge], is_vertical: bool):
+        # NOTE: Need indexing islands and tagged corners
+        from collections import deque
+
+        appended = set()
+        segments = []
+
+        corners = set(corners)
+        if is_vertical:
+            ordered = sorted(corners, key=lambda e: e.vert.uv.y)
+        else:
+            ordered = sorted(corners, key=lambda e: e.vert.uv.x)
+
+        for crn in ordered:
+            seg: deque[AdvPEdge] = deque()
+            first_crn = AdvPEdge(crn)
+            if first_crn in appended:
+                continue
+
+            appended.add(first_crn)
+            seg.append(first_crn)
+
+            if first_crn.is_pair:
+                pair = AdvPEdge(crn.pair)
+                pair.is_pair = True
+                appended.add(pair)
+            else:
+                # Set invert for compare convention.
+                boundary = AdvPEdge(crn.next, invert=True)
+                boundary.is_pair = False
+                appended.add(boundary)
+
+            # Forward Grow
+            # TODO: Fix forward walking or temporary fix this by joining segments.
+            while True:
+                lead = seg[-1]
+                if lead.invert:
+                    next_check = lead.e.prev
+                else:
+                    # assert lead.is_pair
+                    # assert lead.e.pair
+                    next_check = lead.e.next
+
+                count = 0
+                filtered: list[AdvPEdge] = []
+                linked = next_check.get_linked2()
+                linked.append(next_check)
+                for crn_l in linked:
+                    assert crn_l is not None
+                    # Next grow
+                    if crn_l in corners:
+                        next_grow = AdvPEdge(crn_l)
+                        count += 1
+                        if next_grow not in appended:
+                            next_grow.is_pair = bool(crn_l.pair)
+                            filtered.append(next_grow)
+
+                    # Here we skip pair edges, as they are processed in the previous condition.
+                    prev = crn_l.prev
+                    if prev in corners and not prev.pair:
+                        prev_grow = AdvPEdge(crn_l, invert=True)
+                        count += 1
+                        if prev_grow not in appended:
+                            filtered.append(prev_grow)
+        #
+                if count >= 3:  # Break segment by 3 and more selected edges.
+                    break
+
+                if len(filtered) == 1:
+                    next_elem = filtered[0]
+                    if next_elem in appended:
+                        break
+
+                    seg.append(next_elem)
+
+                    # Add possible CrnGrow variants so that we don't go through them again.
+                    appended.add(next_elem)
+                    if next_elem.invert:
+                        appended.add(AdvPEdge(next_elem.e.prev))
+                    else:
+                        is_boundary = not next_elem.e.pair
+                        if is_boundary:
+                            appended.add(AdvPEdge(next_elem.e.next, invert=True))
+                        else:
+                            # The pair doesn't have an invert option, so we do without them
+                            appended.add(AdvPEdge(next_elem.e.pair))
+                else:
+                    break
+
+            # Backward Grow
+            while True:
+                lead = seg[0]
+                if lead.invert:
+                    next_check = lead.e.prev
+                else:
+                    next_check = lead.e
+
+                count = 0
+                filtered = []
+                linked = next_check.get_linked2()
+                linked.append(next_check)
+                for crn_l in linked:
+                    # Next grow
+                    if crn_l in corners:
+                        count += 1
+                        is_boundary = not crn_l.pair
+                        if is_boundary:
+                            next_grow = AdvPEdge(crn_l.next, invert=True)
+                            next_grow.is_pair = False
+                        else:
+                            next_grow = AdvPEdge(crn_l.pair)
+                            next_grow.is_pair = True
+                        if next_grow not in appended:
+                            filtered.append(next_grow)
+
+                    prev = crn_l.prev
+                    if prev in corners and not prev.pair:
+                        prev_grow = AdvPEdge(prev)
+                        prev_grow.is_pair = False
+                        count += 1
+                        if prev_grow not in appended:
+                            filtered.append(prev_grow)
+
+                if count >= 3:  # See above.
+                    break
+
+                if len(filtered) == 1:
+                    next_elem = filtered[0]
+                    if next_elem in appended:
+                        break
+
+                    seg.appendleft(next_elem)
+                    appended.add(next_elem)
+                    if next_elem.invert:
+                        appended.add(AdvPEdge(next_elem.e.prev))
+                    else:
+                        if next_elem.is_pair:
+                            appended.add(AdvPEdge(next_elem.e.pair))
+                        else:
+                            appended.add(AdvPEdge(next_elem.e.next, invert=True))
+                else:
+                    break
+
+            segments.append(cls(seg, is_vertical=is_vertical))
+        # from .. import draw
+        # draw.lines.SegmentsDrawSimple.draw_register(segments)
+        return segments
+
+    def __iter__(self):
+        return iter(self.seg)
+
+    def __getitem__(self, idx) -> AdvPEdge:
+        return self.seg[idx]
+
+    def __len__(self):
+        return len(self.seg)
+
+    def __bool__(self):
+        return bool(self.seg)
+
 class PChart:
     def __init__(self):
         self.verts: ParametrizerIt[PVert] = ParametrizerIt()
@@ -797,6 +1174,10 @@ class PChart:
 
         self.constr_h: list[PEdge] = []
         self.constr_v: list[PEdge] = []
+
+        self.constr_h_segments: list[PSegment] = []
+        self.constr_v_segments: list[PSegment] = []
+
 
         self.area_uv: float = 0.0
         self.area_3d: float = 0.0
@@ -967,7 +1348,7 @@ class PChart:
                     break
 
 
-    def lscm_begin(self, constraints_segments):
+    def lscm_begin(self):
 
         assert self.context is None
 
@@ -992,10 +1373,9 @@ class PChart:
             pin2: list[PVert | None] = [None]
 
             if len(pins) <= 1:
-                if constraints_segments:
-                    res = None
-                    if self.constr_h or self.constr_v:
-                        res = self.extrema_verts_from_constr_segments(constraints_segments)
+                all_constr_segments = self.get_sorted_segments(self.constr_v_segments, self.constr_h_segments)
+                if all_constr_segments:
+                    res = self.extrema_verts_from_constr_segments(all_constr_segments)
                     if res:
                         self.pin1, self.pin2 = res
                     else:
@@ -1087,6 +1467,7 @@ class PChart:
         if self.pin1:
             pin1: PVert = self.pin1
             pin2: PVert = self.pin2
+
             ls.lock_variable(2 * pin1.id, pin1.uv[0])
             ls.lock_variable(2 * pin1.id + 1, pin1.uv[1])
             ls.lock_variable(2 * pin2.id, pin2.uv[0])
@@ -1611,125 +1992,115 @@ class PChart:
 
         self.pin_positions(pin1, pin2)
 
-    def extrema_verts_from_constr_segments(self, segments):
-        # pin1: list[PVert], pin2: list[PVert]
-        from ..utypes import Segment
+    @staticmethod
+    def get_sorted_segments(v: list[PSegment], h: list[PSegment]):
+        mult_h = 1.0
+        mult_v = 1.0
+        # Multiply by counts.
+        if v and h:
+            if len(v) <= len(h) / 2:
+                mult_v = 1.2
+            elif len(h) <= len(v) / 2:
+                mult_h = 1.2
 
-        seg: Segment
+
+
+        all_segments = []
+        for segments, mult, other_constr_type in ((v, mult_v, PEDGE_H_CONSTR), (h, mult_h, PEDGE_V_CONSTR)):
+            for seg in segments:
+                start_e = seg[0].e
+                if seg[-1].invert:
+                    last_e = seg[-1].e.prev
+                else:
+                    last_e = seg[-1].e.next
+
+                has_other_constr_a = False
+                has_other_constr_b = False
+                linked = start_e.get_linked()
+                for e in linked:
+                    if e.flag & other_constr_type or e.prev.flag & other_constr_type:
+                        has_other_constr_a = True
+                        break
+                    # TODO: Check all chains for other constraints if in endpoints that not exist
+
+                linked = last_e.get_linked()
+                for e in linked:
+                    if e.flag & other_constr_type or e.prev.flag & other_constr_type:
+                        has_other_constr_b = True
+                        break
+
+                if has_other_constr_a and has_other_constr_b:
+                    seg.value = seg.length_uv * mult_v + 10
+                elif has_other_constr_a or has_other_constr_b:
+                    seg.value = seg.length_uv * mult_v * 1.2
+                else:
+                    seg.value = seg.length_uv * mult_v
+
+                if seg[0].invert:
+                    seg.value *= 0.1
+                if seg.is_circular:
+                    seg.value *= 0.1
+                all_segments.append(seg)
+
+        all_segments.sort(key=lambda s: s.value, reverse=True)
+        return all_segments
+
+    @staticmethod
+    def extrema_verts_from_constr_segments(segments):
+        seg: PSegment
         for seg in segments:
-            first_crn = seg[0].crn
-            if seg[0].invert:
+            first_crn = seg.seg[0].e
+            if seg.seg[0].invert:
                 print("UniV: Unwrap: Constraint: Inverted segment, UB.")
-            start_co = seg.start_co
 
-            end_co = seg.end_co
             end_idx = -1
-            # TODO: Improve circular constraints, use true mark seam segments
             if seg.is_circular:
                 end_idx = len(seg) // 2
                 if end_idx == 0:
                     end_idx = -1
 
             if seg[end_idx].invert:
-                second_crn = seg[end_idx].crn.link_loop_prev
+                second_crn = seg[end_idx].e.prev
             else:
-                second_crn = seg[end_idx].crn.link_loop_next
+                second_crn = seg[end_idx].e.next
 
             if seg.is_circular:
-                end_co = second_crn[seg.umesh.uv].uv
-                first_crn = first_crn.link_loop_next
-                start_co = first_crn[seg.umesh.uv].uv
+                first_crn = first_crn.next
 
             # TODO: Get pins from segment also
-            # Get first extrema pin
-            pin1 = None
-            index = first_crn.vert.index
-            for v in self.verts:
-                if v.id == index and v.edge.orig_uv == start_co:
-                    pin1 = v
-                    break
-
-            if not pin1:
-                for v in self.verts:
-                    if v.edge.orig_uv == start_co:
-                        pin1 = v
-                        break
-
-            # Get second extrema pin
-            pin2 = None
-            index = second_crn.vert.index
-            for v in self.verts:
-                if v.id == index and v.edge.orig_uv == end_co:
-                    pin2 = v
-                    break
-
-            # Small island (zero) scale case
-            if not pin2 or pin1 == pin2:
-                for v in self.verts:
-                    if v.edge.orig_uv == end_co and v != pin1:
-                        pin2 = v
-                        break
+            pin1 = first_crn.vert
+            pin2 = second_crn.vert
 
             # if pin1 and pin2:
                 # from ..draw import lines
                 # lines.LinesDrawSimple.draw_register([pin1.uv.copy(), pin2.uv.copy()], (1,0,0,1))
 
-            found_unique_pins = bool((pin1 and pin2) and (pin1 != pin2))
-            if not found_unique_pins:
+            if pin1 == pin2:
                 print("UniV: Unwrap: Constraints: Degenerate case, not found start and end pin.")
+                continue
 
-            if seg.value == 'U':
-                if not found_unique_pins:
-                    if self.constr_h:
-                        e: PEdge = self.constr_h[0]
-                        pin1 = e.vert
-                        pin2 = e.next.vert
-
-                        pin1.uv[0] = 0.0
-                        pin1.uv[1] = 0.0
-                        pin2.uv[0] = 1.0
-                        pin2.uv[1] = 0.0
-
-                        return pin1, pin2
-
-
+            if not seg.is_vertical:
                 # TODO: Get center.x coord by weighted average by edge length
-                start = seg.start_co
-                if start.x > seg.end_co.x:
+                if pin1.uv.x > pin2.uv.x:
                     card_dir = Vector((-1, 0))
                 else:
                     card_dir = Vector((1, 0))
 
-                end = start + (card_dir * max(seg.length_uv, 0.001))
-                pin2.uv[0] = end.x
-                pin2.uv[1] = end.y
+                end = pin1.uv + (card_dir * max(seg.length_uv, 0.001))
+                pin2.uv[:] = end
+                # TODO: Store target segment for correct in second pass.
                 return pin1, pin2
 
             else:
-                if not found_unique_pins:
-                    if self.constr_v:
-                        e: PEdge = self.constr_v[0]  # TODO: Get max edge length
-                        pin1 = e.vert
-                        pin2 = e.next.vert
-
-                        pin1.uv[0] = 0.0
-                        pin1.uv[1] = 0.0
-                        pin2.uv[0] = 0.0
-                        pin2.uv[1] = 1.0
-
-                        return pin1, pin2
-
 
                 # TODO: Get center.y coord by weighted average by edge length
-                start = seg.start_co
-                if start.y > seg.end_co.y:
+                if pin1.uv.y > pin2.uv.y:
                     card_dir = Vector((0, -1))
                 else:
                     card_dir = Vector((0, 1))
 
-                end = start + (card_dir * max(seg.length_uv, 0.001))
-                pin2.uv[0] = end.x
-                pin2.uv[1] = end.y
+                end = pin1.uv + (card_dir * max(seg.length_uv, 0.001))
+                pin2.uv[:] = end
                 return pin1, pin2
         return None
 
@@ -2284,34 +2655,12 @@ class ParamHandleConstruct:
         self.charts: list[PChart] = []
         self.ncharts: int = 0
 
-        self.constraints_segments = []
+        self.bm_constraints_segments = []
+        self.constr_h_segments = []
+        self.constr_v_segments = []
 
         self.aspect_y = 1.0
         self.blend: float = 0.0
-
-    @classmethod
-    def construct_param_handle(cls, isl: 'utypes.AdvIsland'):
-        handle = cls()
-        umesh = isl.umesh
-
-        # we need the vert indices
-        umesh.bm.verts.index_update()
-
-        get_vert_select = bm_select.vert_select_get_func(umesh)
-        uv = umesh.uv
-        for f in isl:
-            handle.uvedit_prepare_pinned_indices(f, uv, get_vert_select)
-
-        for idx, ff in enumerate(isl.faces):
-            handle.construct_param_handle_face_add(ff, idx, umesh, get_vert_select)
-
-        handle.construct_param_edge_set_seams(isl)
-        constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
-        if UnwrapOptions.topology_from_uvs and constraints_attr:
-            handle.constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
-        handle.uv_parametrizer_construct_end()
-
-        return handle
 
     @classmethod
     def construct_param_handle_by_tag(cls, isl: 'utypes.AdvIsland'):
@@ -2332,12 +2681,9 @@ class ParamHandleConstruct:
         handle.construct_param_edge_set_seams(isl)
         constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
         if UnwrapOptions.topology_from_uvs and constraints_attr:
-            handle.constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
-
+            handle.bm_constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
 
         handle.uv_parametrizer_construct_end()
-
-
         return handle
 
 
@@ -2419,13 +2765,14 @@ class ParamHandleConstruct:
             if e:
                 e.flag |= PEDGE_SEAM
 
+
     def construct_param_edge_set_constraints(self, isl: 'utypes.AdvIsland', constraints_attr):
         """Set constraints on UV Parametrizer based on options."""
         uv = isl.umesh.uv
         from ..utypes import Segments
         v_corners = []
         h_corners = []
-
+        counter_not_found_constraints = 0
         for crn in isl.corners_iter():
             crn_e = crn.edge
             edge_bits: int = crn_e[constraints_attr]
@@ -2439,10 +2786,8 @@ class ParamHandleConstruct:
                 if e:
                     for i, crn_l in enumerate(crn_e.link_loops):
                         if crn == crn_l:
-
                             if i == 16:
                                 break
-
                             shift = i * 2
                             bits = (edge_bits >> shift) & 3
                             if bits == 2:  # vertical
@@ -2453,7 +2798,11 @@ class ParamHandleConstruct:
                                 h_corners.append(crn)
                             break
 
-                # else: raise
+                else:
+                    counter_not_found_constraints += 1
+
+        if counter_not_found_constraints:
+            print(f"UniV: Found {counter_not_found_constraints} missed constraints")
 
         segments: list[utypes.Segment] = []
         if v_corners and UnwrapOptions.unwrap_along != 'V':
@@ -2469,18 +2818,28 @@ class ParamHandleConstruct:
                 s.value = 'U'
             segments.extend(h_segments)
 
-        segments.sort(key=lambda seg: seg.length_uv, reverse=True)
+        if UnwrapOptions.unwrap_along == "UV" and UnwrapOptions.topology_from_uvs:
+            # print(segments)
+            for seg in segments:
+                if seg.value == 'U':
+                    self.constr_h_segments.extend(PSegment.from_bm_corners(self, seg, is_vertical=False))
+                else:
+                    self.constr_v_segments.extend(PSegment.from_bm_corners(self, seg, is_vertical=True))
+
+        if not UnwrapOptions.topology_from_uvs:
+            segments = []
+
         return segments
 
     def uv_parametrizer_construct_end(self):
         self.ncharts = self.connect_pairs()
-
+        if self.ncharts >= 2:
+            print(f"UniV: NCharts more then 1, {self.ncharts!r}, incorrect behavior")
         self.charts = self.construction_chart.split_charts(self.ncharts)
 
         j = 0
         for i in range(self.ncharts):
             chart: PChart = self.charts[i]
-
             outer: PEdge | None = chart.boundaries()
 
             if not UnwrapOptions.topology_from_uvs and chart.n_boundaries == 0:
@@ -2496,6 +2855,8 @@ class ParamHandleConstruct:
             for v in chart.verts:
                 v.load_pin_select_uvs()
 
+
+
             self.ncharts = j
 
             if UnwrapOptions.topology_from_uvs:
@@ -2504,13 +2865,19 @@ class ParamHandleConstruct:
                 for e in chart.edges:
                     if e.flag & PEDGE_V_CONSTR:
                         con_v.append(e)
-                        # e.flag &= ~PEDGE_V_CONSTRAIN
-
                     elif e.flag & PEDGE_H_CONSTR:
                         con_h.append(e)
-                        # e.flag &= ~PEDGE_H_CONSTRAIN
                 chart.constr_v = con_v
                 chart.constr_h = con_h
+
+                if self.ncharts >= 2:
+                    if UnwrapOptions.unwrap_along == "UV":
+                        # Non-manifold cace.
+                        chart.constr_h_segments.extend(PSegment.from_halfedges(con_h, is_vertical=False))
+                        chart.constr_v_segments.extend(PSegment.from_halfedges(con_v, is_vertical=True))
+                else:
+                    chart.constr_v_segments = self.constr_v_segments
+                    chart.constr_h_segments = self.constr_h_segments
 
             self.state = ParamHandleConstruct.PHANDLE_STATE_CONSTRUCTED
 
@@ -2843,7 +3210,7 @@ class ParamHandleSolve(ParamHandleConstruct):
             for f in chart.faces:
                 f.backup_uvs()
 
-            chart.lscm_begin(self.constraints_segments)
+            chart.lscm_begin()
 
     def uv_parametrizer_lscm_solve(self):
 
