@@ -64,7 +64,7 @@ else:
 
 
 class UNIV_PT_General(Panel):
-    bl_label = ''
+    bl_label = "  UniV Pro" if univ_pro_exist else "  UniV Lite"
     bl_idname = 'UNIV_PT_General'
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
@@ -203,7 +203,6 @@ class UNIV_PT_General(Panel):
         layout = self.layout
         row = layout.row()
         row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
-        row.label(text='UniV Pro' if univ_pro_exist else 'UniV Lite')
 
     def draw(self, context):
         layout = self.layout
@@ -425,7 +424,7 @@ class UNIV_PT_General(Panel):
 
 
 class UNIV_PT_General_VIEW_3D(Panel):
-    bl_label = ''
+    bl_label = "  UniV Pro" if univ_pro_exist else "  UniV Lite"
     bl_idname = 'UNIV_PT_General_VIEW3D'
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -439,7 +438,6 @@ class UNIV_PT_General_VIEW_3D(Panel):
         layout = self.layout
         row = layout.row()
         row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
-        row.label(text='UniV Pro' if univ_pro_exist else 'UniV Lite')
 
     def draw(self, context):
         layout = self.layout
@@ -1736,10 +1734,10 @@ class UNIV_MT_ConstraintsH(bpy.types.Menu):
     def draw_constraints_hv(self, is_vertical: bool):
         layout = self.layout
         if is_vertical:
-            text = "H-Constr"
+            text = "V-Constr"
             constraint_type = "VERTICAL"
         else:
-            text = "V-Constr"
+            text = "H-Constr"
             constraint_type = "HORIZONTAL"
 
         layout.operator("uv.univ_select_constraints", text=text, icon_value=icons.arrow).constraint_type = constraint_type
@@ -1772,8 +1770,9 @@ class IMAGE_MT_PIE_constraints(Menu):
         split = pie.split()
         col = split.column()
         # col.scale_x = 0.8
-        col.separator(factor=24)
-
+        col.separator(factor=4)
+        col.scale_x = 2
+        col.scale_y = 2
         row = col.row(align=True)
         row.operator('uv.univ_select_constraints', text='H-Constr', icon_value=icons.arrow).constraint_type = "HORIZONTAL"
         row.operator('uv.univ_select_constraints', text='V-Constr', icon_value=icons.arrow).constraint_type = "VERTICAL"
@@ -1792,7 +1791,7 @@ class IMAGE_MT_PIE_constraints(Menu):
         pie.split()
         # pie.operator('uv.univ_check_over', icon_value=icons.over)
         # Right Upper
-        pie.split()
+        pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)
         # pie.operator("uv.univ_check_other", icon_value=icons.random)
         # Left Bottom
         pie.split()
