@@ -71,7 +71,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         if not umeshes:
             return umeshes.update()
 
-        if not selected_umeshes and self.max_distance is not None and context.area.ui_type == 'UV':
+        if not selected_umeshes and self.mouse_position is not None and context.area.ui_type == 'UV':
             return self.pick_unwrap(umeshes)
         else:
             if not selected_umeshes:
