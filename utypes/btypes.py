@@ -5,9 +5,9 @@
 # The code was taken and modified from the 'btypes' module: https://github.com/K-410/btypes/tree/fafc510bd9de3aa3201edf5ad9bced26a5298bc0
 
 import bpy
-# import bmesh
 import typing
 import ctypes
+import platform
 from ctypes import (
     POINTER,
     Union,
@@ -23,9 +23,9 @@ from ctypes import (
     c_char,
     # cast,
     c_void_p,
-    sizeof,
     c_size_t,
     c_bool,
+    sizeof,
     addressof
 )
 
@@ -55,11 +55,16 @@ def info_(self):
     typ = type(self)
     total_size = 0
     for name, *dtype in self._fields_:
-        value = getattr(self, name)
-        if isinstance(value, ctypes.Array):
-            value = tuple(value)
         size = sizeof(*dtype)
         total_size += size
+
+        try:
+            safe_mem_read(addressof(self), total_size)
+            value = getattr(self, name)
+            if isinstance(value, ctypes.Array):
+                value = tuple(value)
+        except MemoryError:
+            value = "!!!MemoryError!!!"
 
         print(f"{name[:20]: <20}{size: <6}{getattr(typ, name).offset: < 6}   {value}")
 
@@ -193,49 +198,88 @@ class BVector(StructBase):
 
     _cache = {}
 
-    def __new__(cls, c_type=None):
-        if c_type in cls._cache:
-            return cls._cache[c_type]
+    def __new__(cls, c_type=None, inline_size=0):
+        if inline_size == 0:
+            inline_size = 4 if ctypes.sizeof(c_type) < 100 else 0
+        if (c_type, inline_size) in cls._cache:
+            return cls._cache[(c_type, inline_size)]
 
         elif c_type is None:
+            assert inline_size == 1
+            raise NotImplementedError
             BVector = cls  # noqa
         else:
             class BVector(Structure):  # noqa
                 __name__ = __qualname__ = f"BVector{cls.__qualname__}"
-                _fields_ = (("begin", c_void_p),
+                _fields_ = [("begin", c_void_p),
                             ("end", c_void_p),
                             ("capacity_end", POINTER(c_type)),
-                            ("_pad", c_char * 32))  # noqa
+
+                            # ("allocator_", c_void_p),  # TODO: Check old versions and implement [[no_unique_address]]
+                            ("inline_buffer_", c_char * (ctypes.sizeof(c_type) * inline_size))
+                            ]
+
+                if bpy.app.build_type != b"Release":
+                    _fields_.append(("debug_size_", c_int64))
                 __len__ = cls.__len__
                 __iter__ = cls.__iter__
                 __next__ = cls.__next__
                 __getitem__ = cls.__getitem__
+                __str__ = cls.__str__
                 to_list = cls.to_list
-        return cls._cache.setdefault(c_type, BVector)
+        return cls._cache.setdefault((c_type, inline_size), BVector)
 
     def __len__(self):
-        return (self.end - self.begin) // 8
+        if self.begin and self.end:
+            typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
+            return (self.end - self.begin) // sizeof(typ)
+        else:
+            return 0
 
     def __iter__(self):
         self.value = 0
-        self.from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
+        typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
+        self.from_address = POINTER(typ).from_address
         return self
 
     def __next__(self):
-        if self.value < len(self):
-            ret = self.from_address(self.begin + (self.value * 8)).contents
-            self.value += 1
-            return ret
-        else:
+        if self.value >= len(self):
             raise StopIteration
+
+        typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
+        offset = self.value * sizeof(typ)
+        address = self.begin + offset
+
+        safe_mem_read(address, sizeof(typ))
+
+        ret = ctypes.cast(address, POINTER(typ)).contents
+        safe_mem_read(addressof(ret))
+        self.value += 1
+        return ret
 
     def __getitem__(self, i):
         if i < 0:
             i = len(self) + i
         if i < 0 or i >= len(self):
             raise IndexError(f'vector index {i} out of range')
-        from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
-        return from_address(self.begin + 8 * i).contents
+        typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
+        from_address = POINTER(typ).from_address
+        return from_address(self.begin + sizeof(typ) * i).contents
+
+
+    def __str__(self):
+        typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
+        try:
+            safe_mem_read(self.begin)
+            safe_mem_read(self.end)
+
+
+            size = (self.end - self.begin) // ctypes.sizeof(typ)
+        except MemoryError:
+            size = -1
+
+        return f"Vector[{typ.__qualname__}], {size = }"
+
 
     def to_list(self):
         from_address = POINTER(self.capacity_end._type_).from_address  # noqa # pylint: disable=protected-access
@@ -267,6 +311,7 @@ class ListBase(Structure):
                 __iter__ = cls.__iter__
                 __bool__ = cls.__bool__
                 __getitem__ = cls.__getitem__
+                __str__ = cls.__str__
         return cls._cache.setdefault(c_type, ListBase)
 
     def __iter__(self):
@@ -274,6 +319,7 @@ class ListBase(Structure):
         # Some only have "last" member assigned, use it as a fallback.
         elem_n = self.first or self.last
         elem_p = elem_n and elem_n.contents.prev
+        # elem_p = elem_n and safe_mem_read(addressof(elem_n)) and elem_n.contents.prev
 
         # Temporarily store reversed links and yield them in the right order.
         if elem_p:
@@ -291,6 +337,137 @@ class ListBase(Structure):
 
     def __bool__(self):
         return bool(self.first or self.last)
+
+    def __str__(self):
+        first = self.first if self.first else "nullptr"
+        last = self.last if self.last else "nullptr"
+        return f"ListBase[{first}, {last}]"
+
+
+class string(Structure):
+    _fields_ = (("data", c_void_p),
+                ("size",  c_size_t),
+                ("capacity",  c_size_t),
+                ("allocator", c_void_p),
+                ("_additional_field",  c_size_t),  # TODO: This is valid or Vector has aligns ?
+                )
+
+    # _fields_ = (("data", c_char*32),)
+
+    def __str__(self):
+        BUFF_SIZE = 15
+        if self.allocator > BUFF_SIZE:
+            # TODO: Test large string and implement for gcc and clang, see: https://devblogs.microsoft.com/oldnewthing/20240510-00/?p=109742
+            try:
+                safe_mem_read(self.data, self.size)
+                return ctypes.string_at(self.data, self.size).decode("utf-8", errors="replace")
+            except MemoryError:
+                return "!!!Memory Error!!!"
+
+        ptr = addressof(self) + 8
+        return ctypes.string_at(ptr, self.allocator).decode("utf-8", errors="replace")
+
+
+#
+class AncestorPointerRNA(Structure):
+   _fields_ = (("type", c_void_p), ("data", c_void_p))
+
+ANCESTOR_POINTER_RNA_DEFAULT_SIZE = 2
+class PointerRNA(StructBase):
+    owner_id: c_void_p
+    type: c_void_p
+    data: c_void_p
+    # noinspection PyTypeHints
+    ancestors: BVector(AncestorPointerRNA, ANCESTOR_POINTER_RNA_DEFAULT_SIZE)
+
+
+def safe_mem_read(address, size=8):  # noqa
+    return True
+
+if platform.system() == "Windows":
+    # safe_memory_read
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    ReadProcessMemory = kernel32.ReadProcessMemory
+    ReadProcessMemory.argtypes = [
+        ctypes.c_void_p,  # hProcess
+        ctypes.c_void_p,  # lpBaseAddress
+        ctypes.c_void_p,  # lpBuffer
+        ctypes.c_size_t,  # nSize
+        ctypes.POINTER(ctypes.c_size_t),  # lpNumberOfBytesRead
+    ]
+    ReadProcessMemory.restype = ctypes.c_bool
+
+    GetCurrentProcess = kernel32.GetCurrentProcess
+    GetCurrentProcess.restype = ctypes.c_void_p
+
+
+    def safe_mem_read(address, size=8):
+        buffer = ctypes.create_string_buffer(size)
+        bytes_read = ctypes.c_size_t()
+
+        result = ReadProcessMemory(
+            GetCurrentProcess(),
+            ctypes.c_void_p(address),
+            buffer,
+            size,
+            ctypes.byref(bytes_read),
+        )
+
+        if not result or bytes_read.value != size:
+            raise MemoryError
+
+        return buffer.raw
+elif platform.system() == "Linux":
+    def safe_mem_read(address, size=8):
+        try:
+            with open("/proc/self/mem", "rb", buffering=0) as f:
+                f.seek(address)
+                data = f.read(size)
+
+            return data if len(data) == size else None
+        except (OSError, ValueError):
+            return None
+elif platform.system() == "Darwin":
+    try:
+        libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+
+        mach_task_self = libc.mach_task_self
+        mach_task_self.restype = ctypes.c_uint
+
+        mach_vm_read_overwrite = libc.mach_vm_read_overwrite
+        mach_vm_read_overwrite.argtypes = [
+            ctypes.c_uint,  # target_task
+            ctypes.c_uint64,  # address
+            ctypes.c_uint64,  # size
+            ctypes.c_uint64,  # data
+            ctypes.POINTER(ctypes.c_uint64),  # outsize
+        ]
+        mach_vm_read_overwrite.restype = ctypes.c_int
+
+
+        def safe_mem_read(address, size=8):
+            buffer = ctypes.create_string_buffer(size)
+            out_size = ctypes.c_uint64()
+
+            result = mach_vm_read_overwrite(
+                mach_task_self(),
+                address,
+                size,
+                addressof(buffer),
+                ctypes.byref(out_size),
+            )
+
+            if result != 0 or out_size.value != size:
+                return None
+
+            return buffer.raw
+    except: # noqa
+        import traceback
+        traceback.print_exc()
+        print(f"UniV: Can not create `safe_mem_read` function. Unsafe memory access in some types.")
+else:
+    print(f"UniV: Unknow platform { platform.system()!r}. Unsafe memory access in some types.")
 
 
 class rctf(StructBase, bbox.BBox):
@@ -343,7 +520,11 @@ class View2D(StructBase):
     alpha_vert: c_char
     alpha_hor: c_char
 
-    _pad6: c_char * 6  # noqa
+    if version >= (4, 0, 0):
+        _pad6: c_char * 2  # noqa
+        page_size_y: c_float
+    else:
+        _pad6: c_char * 6  # noqa
 
     sms: c_void_p  # SmoothView2DStore
     smooth_timer: c_void_p  # wmTimer
@@ -451,6 +632,95 @@ class SpaceImage(StructBase):
     centy: c_float
 
 
+class LayoutPanelHeader(StructBase):
+    start_y: c_float
+    end_y: c_float
+    open_owner_ptr: PointerRNA
+    open_prop_name: string
+
+
+class LayoutPanelBody(StructBase):
+    start_y: c_float
+    end_y: c_float
+
+
+# noinspection PyTypeHints
+class LayoutPanels(StructBase):
+    # _fields_ = (("headers", BVector(LayoutPanelHeader)), ("bodies", BVector(LayoutPanelBody)))
+    headers: BVector(LayoutPanelHeader)
+    bodies: BVector(LayoutPanelBody)
+
+
+# noinspection PyTypeHints
+class Panel_Runtime(StructBase):
+    region_ofsx: c_int
+    custom_data_ptr: POINTER(PointerRNA)
+    block: c_void_p # uiBlock
+    context: c_void_p  # bContextStore
+    layout_panels: LayoutPanels
+
+# noinspection PyTypeHints
+class LayoutPanelState(StructBase):
+    next: lambda: POINTER(LayoutPanelState)
+    prev: lambda: POINTER(LayoutPanelState)
+    # Identifier of the panel.
+    idname: ctypes.c_char_p
+    flag: c_uint8
+    _pad: c_char * 3
+
+    # A logical time set from #layout_panel_states_clock when the panel is used by the UI. This is
+    # used to detect the least-recently-used panel states when some panel states should be removed.
+    last_used: ctypes.c_uint32
+
+# noinspection PyTypeHints
+class Panel(StructBase):
+    next: lambda: POINTER(Panel)
+    prev: lambda: POINTER(Panel)
+    
+    # Runtime.
+    type: c_void_p # PanelType
+    # Runtime for drawing.
+    layout: c_void_p #Layout
+    panelname: c_char * 64
+    # Panel name is identifier for restoring location.
+    drawname: ctypes.c_char_p
+    # Offset within the region.
+    ofsx: c_int
+    ofsy: c_int
+    # Panel size including children. */
+    sizex: c_int
+    sizey: c_int
+    # Panel size excluding children. */
+    blocksizex: c_int
+    blocksizey: c_int
+    labelofs: c_short
+    flag: c_short  # ePanel_Flag
+    runtime_flag: c_short
+    _pad: c_char * 6
+    # Panels are aligned according to increasing sort-order. */
+    sortorder: c_int
+    # Runtime for panel manipulation.
+    activedata: c_void_p
+    # Sub panels.
+    children: lambda: ListBase(Panel)
+
+
+    #  This stores the open-close-state of layout-panels created with
+    # `layout.panel(...)` in Python. For more information on layout-panels, see
+    # `ui::Layout::panel_prop`.
+
+    layout_panel_states: ListBase(LayoutPanelState)
+
+    # This is increased whenever a layout panel state is used by the UI. This is used to allow for
+    # some garbage collection of panel states when #layout_panel_states becomes large. It works by
+    # removing all least-recently-used panel states up to a certain threshold.
+
+    if version >= (4, 5, 0):
+        layout_panel_states_clock: ctypes.c_uint32
+        _pad2: c_char*4
+
+    runtime: POINTER(Panel_Runtime)
+
 # noinspection PyTypeHints
 class PanelCategoryStack(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
@@ -475,18 +745,18 @@ class ARegion(StructBase):
     view2D: View2D
     winrct: rcti
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         drawrct: rcti
 
     winx: c_short
     winy: c_short
 
-    if version > (3, 5):
+    if version > (3, 5, 0):
         category_scroll: c_int
-        if version <= (4, 3):
+        if version <= (4, 3, 2):
             _pad0: c_char * 4  # noqa
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         visible: c_short
 
     regiontype: c_short
@@ -496,35 +766,37 @@ class ARegion(StructBase):
     sizex: c_short
     sizey: c_short
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         do_draw: c_short
         do_draw_overlay: c_short
     overlap: c_short
     flagfullscreen: c_short
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         type: c_void_p  # ARegionType
         uiblocks: ListBase
     else:
         _pad0: c_char * 2  # noqa
 
-    panels: ListBase  # Panel
+    panels: ListBase(Panel)
     panels_category_active: ListBase(PanelCategoryStack)
     ui_lists: ListBase
     ui_previews: ListBase
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         handlers: ListBase
         panels_category: ListBase(PanelCategoryDyn)
     else:
         view_states: ListBase
 
-    if version <= (4, 3):
+    if version <= (4, 3, 2):
         gizmo_map: c_void_p
         regiontimer: c_void_p
         draw_buffer: c_void_p
 
         headerstr: c_void_p
+    if version >= (5, 1, 0):
+        textbox_states: ListBase#(uiTextboxStateLink)
     regiondata: c_void_p
 
     # runtime: ARegion_Runtime
