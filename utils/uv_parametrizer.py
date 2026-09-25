@@ -1998,11 +1998,15 @@ class PChart:
         mult_v = 1.0
         # Multiply by counts.
         if v and h:
-            if len(v) <= len(h) / 2:
-                mult_v = 1.2
-            elif len(h) <= len(v) / 2:
-                mult_h = 1.2
+            if len(v) == 1 and len(h) >= 2:
+                mult_v = 1.5
+                if len(h) == 2:
+                    mult_v = 2.5
 
+            elif len(h) == 1 and len(v) >= 2:
+                mult_h = 1.8
+                if len(v) == 2:
+                    mult_h = 2.5
 
 
         all_segments = []
