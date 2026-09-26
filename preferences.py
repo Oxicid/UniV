@@ -771,9 +771,10 @@ Some operators, can interact with trims:
                             # Skip showing errors when univ keymap disabled.
                             if univ_kmi.active:
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
+                                box.context_pointer_set("keymap", km)
 
 
-            # Workspace Tool.
+                                # Workspace Tool.
             it = keymaps.KeymapFilter.get_conflict_filtered_keymaps(keymaps.keys_areas_workspace, is_ws=True)
             for area, kc, km, filtered_keymaps in it:
                 subpanel = draw_panel(layout, "Workspace Tool: " + area)
@@ -790,6 +791,7 @@ Some operators, can interact with trims:
                             rna_keymap_ui.draw_kmi([], kc, km, univ_kmi, box, 0)
                             if univ_kmi.active:
                                 self.draw_conflict_keymaps(box, config_filtered, kc)
+                                box.context_pointer_set("keymap", km)
 
             layout.label(
                 text='To restore deleted keymaps, just reload the addon. But it is better to use the checkboxes to disable them',
@@ -895,6 +897,7 @@ Some operators, can interact with trims:
         for (default_km, default_kmi) in config_filtered.conflict_keys:
             box_split = box.split(align=True, factor=0.5)
             box_split.label(text=' ', icon='ERROR' if default_kmi.active else 'BLANK1')
+            box.context_pointer_set("keymap", default_km)
             rna_keymap_ui.draw_kmi([], kc, default_km, default_kmi, box_split, 0)
 
     def get_active_trim_slot(self) -> "UNIV_TrimPresetsSlot":
