@@ -204,18 +204,14 @@ class BVector(StructBase):
 
     _cache = {}
 
-    def __new__(cls, c_type=None, inline_size=0):
+    def __new__(cls, c_type, inline_size=0):
         assert ctypes.sizeof(c_type) != 0, (f"Not found `_fields_`, maybe c_type {c_type.__qualname__!r} not initialized."
                                             f" Could lazy loading using a lambda be used?")
         if inline_size == 0:
             inline_size = 4 if ctypes.sizeof(c_type) < 100 else 0
+
         if (c_type, inline_size) in cls._cache:
             return cls._cache[(c_type, inline_size)]
-
-        elif c_type is None:
-            assert inline_size == 1
-            raise NotImplementedError
-            BVector = cls  # noqa
         else:
             class BVector(Structure):  # noqa
                 __name__ = __qualname__ = f"BVector{cls.__qualname__}"
@@ -358,48 +354,67 @@ class _Bxty(Union):
 # TODO: Test large string and implement for gcc and clang, see: https://devblogs.microsoft.com/oldnewthing/20240510-00/?p=109742
 #  https://github.com/elliotgoodrich/SSO-23
 class string(Structure):
-    _fields_ = [
-        ("bx", _Bxty),
-        ("size", c_size_t),
-        ("capacity", c_size_t)]
-
-    if is_debug_build:
+    if platform.system() == "Windows":
+        _fields_ = [
+            ("bx", _Bxty),
+            ("size", c_size_t),
+            ("capacity", c_size_t)]
+    else:
+        _fields_ = [
+            ("ptr", c_void_p),
+            ("size", c_size_t),
+            ("buf", c_char*16)
+        ]
+    if is_debug_build and platform.system() == "Windows":
         _fields_.append(("allocator", c_void_p))  # noqa
 
-    @property
-    def is_large(self):
-        return self.capacity > 15
+    if platform.system() == "Windows":
+        @property
+        def data_ptr(self):
+            if self.capacity > 15:
+                return self.bx.ptr
+            return addressof(self.bx)
 
-    @property
-    def data_ptr(self):
-        if self.is_large:
-            return self.bx.ptr
-        return addressof(self.bx)
+        def __str__(self):
+            if self.size == 0 or self.size > 1000:
+                return ""
 
-    def __str__(self):
-        if self.size == 0 or self.size > 1000:
-            return ""
+            ptr = self.data_ptr
+            try:
+                return safe_mem_read(ptr, self.size).decode("utf-8", errors="replace")
+            except MemoryError:
+                return "!!!MemoryError!!!"
+    else:
+        def __str__(self):
+            if self.size == 0 or self.size > 1000:
+                return ""
 
-        ptr = self.data_ptr
-        try:
-            return safe_mem_read(ptr, self.size).decode("utf-8", errors="replace")
-        except MemoryError:
-            return "!!!MemoryError!!!"
+            try:
+                # TODO: Check on long strings
+                return safe_mem_read(self.ptr, self.size).decode("utf-8", errors="replace")
+            except MemoryError:
+                return "!!!MemoryError!!!"
 
 #
 class AncestorPointerRNA(Structure):
-   # _fields_ = (("type", c_void_p), ("data", c_void_p))
    _fields_ = (("type", c_void_p), ("data", c_void_p))
+
+   def info(self):
+       info_(self)
 
 ANCESTOR_POINTER_RNA_DEFAULT_SIZE = 2
 class PointerRNA(StructBase):
     owner_id: c_void_p
     type: c_void_p
-    if version >= (5, 1, 0) or version <= (4, 4, 3):  # TODO: Check in other platforms
-        data: c_void_p
+    data: c_void_p
+    if platform.system() == "Windows":
+        if version >= (5, 1, 0) or version <= (4, 4, 3):  # TODO: Check in other platforms
+            data: c_void_p
     # noinspection PyTypeHints
     ancestors: BVector(AncestorPointerRNA, ANCESTOR_POINTER_RNA_DEFAULT_SIZE)
 
+    def info(self):
+        info_(self)
 
 def safe_mem_read(address, size=8):  # noqa
     return " "
@@ -449,7 +464,7 @@ elif platform.system() == "Linux":
                 raise MemoryError
             return data
         except (OSError, ValueError):
-            return None
+            raise MemoryError
 elif platform.system() == "Darwin":
     try:
         libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
@@ -575,39 +590,71 @@ class ID_Runtime_Remap(StructBase):
     skipped_indirect:       c_int
 
 
-# source/blender/makesdna/DNA_ID.h | rev 362
+# source/blender/makesdna/DNA_ID.h
 class ID_Runtime(StructBase):
     remap: ID_Runtime_Remap
-    depsgraph:                  c_void_p
-    _pad:                  c_void_p
+    if version >= (4, 2, 0):
+        depsgraph:          c_void_p
+        _pad:               c_void_p
 
-
+MAX_ID_NAME = 66
+if version >= (5, 0, 0):
+    MAX_ID_NAME = 258
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_ID.h
 class ID(StructBase):
     next:                   c_void_p
     prev:                   c_void_p
-    # noinspection PyTypeHints
-    newid: lambda: POINTER(ID)
+    newid:                  lambda: POINTER(ID)
     lib:                    c_void_p  # Library
-    asset_data:             c_void_p  # AssetMetaData
+    if version >= (2, 92, 0):
+        asset_data:         c_void_p  # AssetMetaData
 
-    name:                   c_char * 66  # MAX_ID_NAME  # noqa
+    name:                   c_char * MAX_ID_NAME
     flag:                   c_short
-    tag:                    c_int
+    if version >= (2, 80, 0):
+        tag:                c_int
+    else:
+        tag:                c_short
+        pad_s1:             c_short
     us:                     c_int
     icon_id:                c_int
-    recalc:                 c_uint
-    recalc_up_to_undo_push: c_uint
-    recalc_after_undo_push: c_uint
+    if version >= (2, 80, 0):
+        recalc:             c_uint
 
-    session_uuid:           c_uint
+    if version < (2, 83, 0):
+        if version == (2, 79, 0):
+            properties: c_void_p
+        else:
+            _pad:               c_char * 4
+            properties:         c_void_p
+            override_library:   c_void_p
 
-    properties:             c_void_p  # IDProperty
-    override_library:       c_void_p  # IDOverrideLibrary
-    # noinspection PyTypeHints
-    orig_id: lambda: POINTER(ID)
-    py_instance:            c_void_p
-    library_weak_reference: c_void_p
-    runtime:                ID_Runtime
+    if version >= (2, 83, 0):
+        recalc_up_to_undo_push: c_uint
+        recalc_after_undo_push: c_uint
+        session_uuid:           c_uint
+
+        if version >= (5, 0, 0):
+            id_hash:            c_char * 16
+
+        properties:             c_void_p  # IDProperty
+        if version >= (4, 5, 0):
+            system_properties:  c_void_p
+            _pad1:  c_void_p
+
+        override_library:       c_void_p  # IDOverrideLibrary
+
+    if version >= (2, 80, 0):
+        orig_id: lambda: POINTER(ID)
+        py_instance:            c_void_p
+    if version >= (2, 92, 0):
+        library_weak_reference: c_void_p
+    if version >= (3, 2, 0):
+        if version >= (5, 0, 0):
+            runtime:        c_void_p  # ID_RuntimeHandle
+        else:
+            runtime:        ID_Runtime
 
 
 class ImageUser(StructBase):
