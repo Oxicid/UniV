@@ -37,18 +37,28 @@ else:
     def extension_path_user(package, *, path="", create=False):
         import os
         import _bpy  # noqa
-        from addon_utils import _extension_module_name_decompose  # noqa
 
-        # Handles own errors.
-        repo_module, pkg_idname = _extension_module_name_decompose(package)
+        if bpy.app.version >= (4, 0, 0):
+            from addon_utils import _extension_module_name_decompose  # noqa
+            # Handles own errors.
+            repo_module, pkg_idname = _extension_module_name_decompose(package)
+        else:
+            repo_module = "UniV"
+            pkg_idname = ""
 
         target_path = _bpy.user_resource("DATAFILES")
         # Should always be true.
         if target_path:
-            if path:
-                target_path = os.path.join(target_path, ".user", repo_module, pkg_idname, path)
+            if bpy.app.version >= (4, 0, 0):
+                if path:
+                    target_path = os.path.join(target_path, ".user", repo_module, pkg_idname, path)
+                else:
+                    target_path = os.path.join(target_path, ".user", repo_module, pkg_idname)
             else:
-                target_path = os.path.join(target_path, ".user", repo_module, pkg_idname)
+                if path:
+                    target_path = os.path.join(target_path, ".user", repo_module, path)
+                else:
+                    target_path = os.path.join(target_path, ".user", repo_module)
             if create:
                 # create path if not existing.
                 if not os.path.exists(target_path):
