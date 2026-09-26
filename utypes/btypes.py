@@ -33,6 +33,12 @@ from . import bbox
 from mathutils import Vector
 
 version = bpy.app.version
+is_debug_build = False
+if bpy.app.build_type != b"Release":
+    # Blender built with release flag, `bpy.app.build_type` might be empty. # TODO: Bugreport ?
+    if bpy.app.build_type == b"Debug" or "Debug" in typing.__file__:
+        is_debug_build = True
+
 bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
 
 
@@ -199,6 +205,8 @@ class BVector(StructBase):
     _cache = {}
 
     def __new__(cls, c_type=None, inline_size=0):
+        assert ctypes.sizeof(c_type) != 0, (f"Not found `_fields_`, maybe c_type {c_type.__qualname__!r} not initialized."
+                                            f" Could lazy loading using a lambda be used?")
         if inline_size == 0:
             inline_size = 4 if ctypes.sizeof(c_type) < 100 else 0
         if (c_type, inline_size) in cls._cache:
@@ -219,7 +227,7 @@ class BVector(StructBase):
                             ("inline_buffer_", c_char * (ctypes.sizeof(c_type) * inline_size))
                             ]
 
-                if bpy.app.build_type != b"Release":
+                if True: #is_debug_build:
                     _fields_.append(("debug_size_", c_int64))
                 __len__ = cls.__len__
                 __iter__ = cls.__iter__
@@ -344,45 +352,57 @@ class ListBase(Structure):
         return f"ListBase[{first}, {last}]"
 
 
-class string(Structure):
-    _fields_ = (("data", c_void_p),
-                ("size",  c_size_t),
-                ("capacity",  c_size_t),
-                ("allocator", c_void_p),
-                ("_additional_field",  c_size_t),  # TODO: This is valid or Vector has aligns ?
-                )
+class _Bxty(Union):
+    _fields_ = (("buf", c_char * 16), ("ptr", c_void_p) )
 
-    # _fields_ = (("data", c_char*32),)
+# TODO: Test large string and implement for gcc and clang, see: https://devblogs.microsoft.com/oldnewthing/20240510-00/?p=109742
+#  https://github.com/elliotgoodrich/SSO-23
+class string(Structure):
+    _fields_ = [
+        ("bx", _Bxty),
+        ("size", c_size_t),
+        ("capacity", c_size_t)]
+
+    if is_debug_build:
+        _fields_.append(("allocator", c_void_p))  # noqa
+
+    @property
+    def is_large(self):
+        return self.capacity > 15
+
+    @property
+    def data_ptr(self):
+        if self.is_large:
+            return self.bx.ptr
+        return addressof(self.bx)
 
     def __str__(self):
-        BUFF_SIZE = 15
-        if self.allocator > BUFF_SIZE:
-            # TODO: Test large string and implement for gcc and clang, see: https://devblogs.microsoft.com/oldnewthing/20240510-00/?p=109742
-            try:
-                safe_mem_read(self.data, self.size)
-                return ctypes.string_at(self.data, self.size).decode("utf-8", errors="replace")
-            except MemoryError:
-                return "!!!Memory Error!!!"
+        if self.size == 0 or self.size > 1000:
+            return ""
 
-        ptr = addressof(self) + 8
-        return ctypes.string_at(ptr, self.allocator).decode("utf-8", errors="replace")
-
+        ptr = self.data_ptr
+        try:
+            return safe_mem_read(ptr, self.size).decode("utf-8", errors="replace")
+        except MemoryError:
+            return "!!!MemoryError!!!"
 
 #
 class AncestorPointerRNA(Structure):
+   # _fields_ = (("type", c_void_p), ("data", c_void_p))
    _fields_ = (("type", c_void_p), ("data", c_void_p))
 
 ANCESTOR_POINTER_RNA_DEFAULT_SIZE = 2
 class PointerRNA(StructBase):
     owner_id: c_void_p
     type: c_void_p
-    data: c_void_p
+    if version >= (5, 1, 0) or version <= (4, 4, 3):  # TODO: Check in other platforms
+        data: c_void_p
     # noinspection PyTypeHints
     ancestors: BVector(AncestorPointerRNA, ANCESTOR_POINTER_RNA_DEFAULT_SIZE)
 
 
 def safe_mem_read(address, size=8):  # noqa
-    return True
+    return " "
 
 if platform.system() == "Windows":
     # safe_memory_read
@@ -425,7 +445,9 @@ elif platform.system() == "Linux":
                 f.seek(address)
                 data = f.read(size)
 
-            return data if len(data) == size else None
+            if len(data) != size:
+                raise MemoryError
+            return data
         except (OSError, ValueError):
             return None
 elif platform.system() == "Darwin":
@@ -459,7 +481,7 @@ elif platform.system() == "Darwin":
             )
 
             if result != 0 or out_size.value != size:
-                return None
+                raise MemoryError
 
             return buffer.raw
     except: # noqa
@@ -646,9 +668,8 @@ class LayoutPanelBody(StructBase):
 
 # noinspection PyTypeHints
 class LayoutPanels(StructBase):
-    # _fields_ = (("headers", BVector(LayoutPanelHeader)), ("bodies", BVector(LayoutPanelBody)))
-    headers: BVector(LayoutPanelHeader)
-    bodies: BVector(LayoutPanelBody)
+    headers: lambda : BVector(LayoutPanelHeader)
+    bodies: lambda : BVector(LayoutPanelBody)
 
 
 # noinspection PyTypeHints
@@ -658,6 +679,8 @@ class Panel_Runtime(StructBase):
     block: c_void_p # uiBlock
     context: c_void_p  # bContextStore
     layout_panels: LayoutPanels
+    if version >= (5, 1, 0):
+        layout_panel_states_storage: lambda: POINTER(ListBase(LayoutPanelState))
 
 # noinspection PyTypeHints
 class LayoutPanelState(StructBase):
@@ -733,7 +756,10 @@ class PanelCategoryDyn(StructBase):
     next: lambda: POINTER(PanelCategoryStack)
     prev: lambda: POINTER(PanelCategoryStack)
     idname: c_char * 64  # noqa
-    rect: rcti
+    if version >= (5, 2, 0):
+        rect: rcti
+    else:
+        icon: c_int
 
 
 # noinspection PyTypeHints
@@ -799,6 +825,7 @@ class ARegion(StructBase):
         textbox_states: ListBase#(uiTextboxStateLink)
     regiondata: c_void_p
 
+    runtime: c_void_p  # ARegion_Runtime
     # runtime: ARegion_Runtime
 
     @staticmethod
@@ -976,7 +1003,7 @@ class wmWindow(StructBase):
         pie_event_type_lock: c_short
         pie_event_type_last: c_short
 
-    if version < (4, 5, 0):
+    if version <= (4, 4, 3):
         addmousemove: c_char
     tag_cursor_refresh: c_char
 
@@ -987,7 +1014,7 @@ class wmWindow(StructBase):
     if version < (3, 5, 0):
         _pad0: c_char * 1
     else:
-        if version < (4, 5, 0):
+        if version <= (4, 4, 3):
             event_queue_consecutive_gesture_type: c_char
         else:
             event_queue_consecutive_gesture_type: c_short
@@ -1000,16 +1027,16 @@ class wmWindow(StructBase):
 
     eventstate: c_void_p
     event_last_handled: c_void_p
-    if version < (4, 5, 0):
+    if version <= (4, 4, 3):
         ime_data: c_void_p  # wmIMEData
     if version >= (4, 1, 0):
-        if version < (4, 5, 0):
+        if version <= (4, 4, 3):
             ime_data_is_composing: c_char
         else:
             addmousemove: c_char
         _pad1: c_char * 7
 
-    if version < (4, 5, 0):
+    if version <= (4, 4, 3):
         event_queue: ListBase
     handlers: ListBase(wmEventHandler)
     modalhandlers: ListBase(wmEventHandler)
