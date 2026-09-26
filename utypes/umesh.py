@@ -643,6 +643,7 @@ class UMeshes:
             return
         self.report_obj(info_type, info)
 
+    # TODO: Make parameters only kw
     def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
         if sum(umesh.update(force=force) for umesh in self.umeshes):
             return {'FINISHED'}

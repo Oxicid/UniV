@@ -294,6 +294,9 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
             else:
                 self.report({'WARNING'}, 'Not found faces for manipulate')
                 return {'CANCELLED'}
+        info = "No faces for manipulate"
+        if not umeshes:
+            return umeshes.update(info=info)
         umeshes.verify_uv()
 
         self.box(umeshes)
@@ -301,7 +304,7 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
             u.check_uniform_scale(self.report)
 
         if not self.is_edit_mode:
-            umeshes.update('No faces for manipulate')
+            umeshes.update(info=info)
             umeshes.free()
             bpy.context.area.tag_redraw()
         else:
