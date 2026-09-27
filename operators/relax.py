@@ -223,7 +223,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
     def legacy_sync_relax_faces(self, umeshes: UMeshes):
         assert umeshes.elem_mode == 'FACE'
-        from ..utils import linked_crn_uv_unordered_included, shared_is_linked
+        from ..utils import linked_crn_uv_unordered_included_with_hidden, shared_is_linked
 
         relax_data: list[RelaxData] = []
         for umesh in umeshes:
@@ -238,7 +238,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             # Find border from selection corners
             for f in utils.calc_selected_uv_faces(umesh):
                 for crn in f.loops:
-                    linked_crn = linked_crn_uv_unordered_included(crn, uv)
+                    linked_crn = linked_crn_uv_unordered_included_with_hidden(crn, uv)
                     border = False
                     for l_crn in linked_crn:
                         if l_crn.face.hide:

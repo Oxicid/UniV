@@ -298,12 +298,53 @@ def linked_crn_uv_unordered(first: BMLoop, uv: BMLayerItem):
     return linked
 
 
-def linked_crn_uv_unordered_included(first: BMLoop, uv: BMLayerItem):
+def linked_crn_uv_unordered_included_with_hidden(first: BMLoop, uv: BMLayerItem):
     # TODO: Rename to with hidden
     first_co = first[uv].uv
     linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
     return linked
 
+def linked_with_unlinked_crn_uv_to_vert_unordered_included_func(umesh):
+    def catcher(uv):
+        if umesh.sync:
+            def get_linked(first: BMLoop):
+                first_co = first[uv].uv
+                linked = []
+                unlinked = []
+                for l_crn in first.vert.link_loops:
+                    if not l_crn.face.hide:
+                        if l_crn[uv].uv == first_co:
+                            linked.append(l_crn)
+                        else:
+                            unlinked.append(l_crn)
+                return linked, unlinked
+        else:
+            def get_linked(first: BMLoop):
+                first_co = first[uv].uv
+                linked = []
+                unlinked = []
+                for l_crn in first.vert.link_loops:
+                    if l_crn.face.select:
+                        if l_crn[uv].uv == first_co:
+                            linked.append(l_crn)
+                        else:
+                            unlinked.append(l_crn)
+                return linked, unlinked
+        return get_linked
+    return catcher(umesh.uv)
+
+def linked_crn_uv_to_vert_unordered_included_func(umesh):
+    def catcher(uv):
+        if umesh.sync:
+            def get_linked(first: BMLoop):
+                first_co = first[uv].uv
+                return [l_crn for l_crn in first.vert.link_loops if (not l_crn.face.hide) and l_crn[uv].uv == first_co]
+        else:
+            def get_linked(first: BMLoop):
+                first_co = first[uv].uv
+                return [l_crn for l_crn in first.vert.link_loops if l_crn.face.select and l_crn[uv].uv == first_co]
+        return get_linked
+    return catcher(umesh.uv)
 
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
     linked = []
@@ -366,20 +407,6 @@ def linked_crn_uv_by_face_tag_unordered_included(crn, uv) -> list[BMLoop]:
     """Linked to arg corner by **face** tag with arg corner and unordered"""
     first_co = crn[uv].uv
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.tag and l_crn[uv].uv == first_co]
-
-
-def linked_crn_uv_by_face_index(first: BMLoop, uv: BMLayerItem):
-    """Included Unordered"""
-    face_index = first.face.index
-    linked = [first]
-    bm_iter = first
-    while True:
-        bm_iter = prev_disc(bm_iter)
-        if bm_iter == first:
-            break
-        if bm_iter.face.index == face_index and first[uv].uv == bm_iter[uv].uv:
-            linked.append(bm_iter)
-    return linked
 
 
 def linked_crn_uv_by_idx(crn: BMLoop, uv: BMLayerItem):

@@ -770,6 +770,224 @@ def select_edge_processing(umesh, to_deselect, to_select):
         for crn in to_select:
             set_edge_select(crn, True)
 
+def deselect_uv_edges_with_preserve_around_edges(umesh, to_deselect: list[BMLoop]):
+    """ NOTE: Not deselect faces!!! """
+    uv = umesh.uv
+    from . import (is_pair, linked_crn_uv_to_vert_unordered_included_func, is_visible_func)
+    # TODO: Use set() for find deselect edges.
+    is_visible = is_visible_func(umesh)
+    if USE_GENERIC_UV_SYNC:
+        if umesh.sync:
+            if umesh.sync:
+                umesh.sync_from_mesh_if_needed()
+
+            if umesh.elem_mode == "VERT":
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    pair_crn: BMLoop | None = crn.link_loop_radial_prev
+                    if is_visible(pair_crn.face) and pair_crn.uv_select_edge:
+                        if not is_pair(crn, pair_crn, uv):
+                            pair_crn = None
+                    else:
+                        pair_crn = None
+
+                    # TODO: Deduplicate this
+                    linked = get_linked(crn)
+                    has_selected_linked_first = False
+                    for l_crn in linked:
+                        if l_crn not in (crn, pair_crn) and l_crn.uv_select_edge:
+                            has_selected_linked_first = True
+                            break
+                        prev = l_crn.link_loop_prev
+                        if prev not in (crn, pair_crn) and prev.uv_select_edge:
+                            has_selected_linked_first = True
+                            break
+
+                    if not has_selected_linked_first:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_linked_second = False
+                    for l_crn in linked:
+                        if l_crn not in (crn, pair_crn) and l_crn.uv_select_edge:
+                            has_selected_linked_second = True
+                            break
+                        prev = l_crn.link_loop_prev
+                        if prev not in (crn, pair_crn) and prev.uv_select_edge:
+                            has_selected_linked_second = True
+                            break
+                    if not has_selected_linked_second:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+
+                    if not has_selected_linked_first or not has_selected_linked_second:
+                        crn.uv_select_edge = False
+                        if pair_crn is not None:
+                            pair_crn.uv_select_edge = False  # noqa pycharm moment
+
+                for crn in to_deselect:
+                    if not any(l_crn.uv_select_vert for l_crn in crn.vert.link_loops if is_visible(l_crn.face)):
+                        crn.vert.select = False
+                    if not any(l_crn.uv_select_vert for l_crn in crn.link_loop_next.vert.link_loops if is_visible(l_crn.face)):
+                        crn.link_loop_next.vert.select = False
+
+            else:  # umesh.elem_mode == "EDGE"
+                for crn in to_deselect:
+                    crn.uv_select_edge = False
+
+                    pair_crn = crn.link_loop_radial_prev
+                    if pair_crn.uv_select_edge:
+                        if is_pair(crn, pair_crn, uv):
+                            pair_crn.uv_select_edge = False
+                            crn.edge.select = False
+                    else:
+                        crn.edge.select = False
+
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    linked = get_linked(crn)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+        else:
+            if umesh.elem_mode != "VERTEX":
+                for crn in to_deselect:
+                    crn.uv_select_edge = False
+
+                    pair_crn = crn.link_loop_radial_prev
+                    if pair_crn.uv_select_edge:
+                        if is_pair(crn, pair_crn, uv):
+                            pair_crn.uv_select_edge = False
+
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    linked = get_linked(crn)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+            else:  # umesh.elem_mode == "EDGE"
+                for crn in to_deselect:
+                    crn.uv_select_edge = False
+
+                    pair_crn = crn.link_loop_radial_prev
+                    if pair_crn.uv_select_edge:
+                        if is_pair(crn, pair_crn, uv):
+                            pair_crn.uv_select_edge = False
+
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    linked = get_linked(crn)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_edges_in_linked = any(l_crn.uv_select_edge or l_crn.link_loop_prev.uv_select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn.uv_select_vert = False
+
+    else:  # Old version support.
+        if umesh.sync:
+            if umesh.elem_mode == "VERT":
+                edge_deselect = edge_deselect_safe_3d_func(umesh)
+                for crn in to_deselect:
+                    edge_deselect(crn)
+            else:
+                for crn in to_deselect:
+                    crn.edge.select = False
+
+        else:
+            if umesh.elem_mode == "VERT":
+                # TODO: Fix for old version
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    pair_crn: BMLoop | None = crn.link_loop_radial_prev
+                    if pair_crn.face.select and pair_crn[uv].select_edge:
+                        if not is_pair(crn, pair_crn, uv):
+                            pair_crn = None
+                    else:
+                        pair_crn = None
+
+                    linked = get_linked(crn)
+                    has_selected_linked_first = False
+                    for l_crn in linked:
+                        if l_crn not in (crn, pair_crn) and l_crn[uv].select_edge:
+                            has_selected_linked_first = True
+                            break
+                        prev = l_crn.link_loop_prev
+                        if prev not in (crn, pair_crn) and prev[uv].select_edge:
+                            has_selected_linked_first = True
+                            break
+
+                    if not has_selected_linked_first:
+                        for l_crn in linked:
+                            l_crn[uv].select = False
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_linked_second = False
+                    for l_crn in linked:
+                        if l_crn not in (crn, pair_crn) and l_crn[uv].select_edge:
+                            has_selected_linked_second = True
+                            break
+                        prev = l_crn.link_loop_prev
+                        if prev not in (crn, pair_crn) and prev[uv].select_edge:
+                            has_selected_linked_second = True
+                            break
+
+                    if not has_selected_linked_second:
+                        for l_crn in linked:
+                            l_crn[uv].select = False
+
+                    if not has_selected_linked_first or not has_selected_linked_second:
+                        crn[uv].select_edge = False
+                        if pair_crn is not None:
+                            pair_crn[uv].select_edge = False  # noqa pycharm moment
+            else:  # umesh.elem_mode == "EDGE"
+                for crn in to_deselect:
+                    crn[uv].select_edge = False
+
+                    pair_crn = crn.link_loop_radial_prev
+                    if is_pair(crn, pair_crn, uv):
+                        pair_crn[uv].select_edge = False
+
+                get_linked = linked_crn_uv_to_vert_unordered_included_func(umesh)
+                for crn in to_deselect:
+                    linked = get_linked(crn)
+                    has_selected_edges_in_linked = any(l_crn[uv].select_edge or l_crn.link_loop_prev[uv].select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+
+                        for l_crn in linked:
+                            l_crn[uv].select = False
+
+                    linked = get_linked(crn.link_loop_next)
+                    has_selected_edges_in_linked = any(l_crn[uv].select_edge or l_crn.link_loop_prev[uv].select_edge for l_crn in linked)
+                    if not has_selected_edges_in_linked:
+                        for l_crn in linked:
+                            l_crn[uv].select = False
+
+
 if USE_GENERIC_UV_SYNC:
     def has_any_vert_select_func(umesh: 'utypes.UMesh'):
         def catcher():

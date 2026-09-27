@@ -1039,3 +1039,13 @@ def wrap_box(src: utypes.BBox, tar: utypes.BBox = utypes.BBox(0.0, 1.0, 0.0, 1.0
     delta = set_pos - src.min
 
     return delta
+
+def list_discard(lst, elem):
+    try:
+        idx = lst.idx(elem)
+    except ValueError:
+        return # Not found, nothing to do
+    end = len(lst) - 1
+    if idx != end:
+        lst[idx] = lst[end]
+    lst.pop()
