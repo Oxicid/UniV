@@ -961,10 +961,9 @@ class AdvIsland:
                     else:
                         crn.edge.seam = seam
 
-    def mark_seam_by_index(self, additional: bool = False):
-        # assert (enum.INDEXING in self.tags)  # TODO: Uncomment after implement tags
-        index = self.faces[0].index
-
+    def mark_seams_only_with_other_islands(self):
+        """ Adds additional seams on top of existing ones, on edges shared with other islands."""
+        self_faces = set(self.faces)
         for f in self.faces:
             for crn in f.loops:
                 shared_crn = crn.link_loop_radial_prev
@@ -972,10 +971,7 @@ class AdvIsland:
                     crn.edge.seam = True
                     continue
 
-                if additional:
-                    crn.edge.seam |= shared_crn.face.index != index
-                else:
-                    crn.edge.seam = shared_crn.face.index != index
+                crn.edge.seam |= shared_crn.face not in self_faces
 
     # TODO: Add mark seam with index
     def calc_max_uv_area_face(self):

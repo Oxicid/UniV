@@ -10,6 +10,8 @@ from .. import utypes
 from .. import utils
 from ..preferences import prefs, univ_settings
 
+from importlib.util import find_spec
+found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
 class UnwrapData:
     def __init__(self, umesh, pins, island, selected):
@@ -37,8 +39,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                                           ('MINIMUM_STRETCH', 'Organic', '')))
     blend_factor: bpy.props.FloatProperty(name='Blend Factor', default=1, soft_min=0, soft_max=1)
     fill_holes: bpy.props.BoolProperty(name='Fill Holes', default=True)
-    mark_seam_inner_island: bpy.props.BoolProperty(name='Mark Seam Self Borders', default=True,
-                                    description='Marking seams where there are split edges within the same island.')
+    mark_seams_only_with_other_islands: bpy.props.BoolProperty(name='Mark Seam Only With Other Islands', default=False)
     use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
     constr_weight: bpy.props.FloatProperty(name='Constraints Weight', default=0, min=0, max=0, options={'HIDDEN'})
 
@@ -51,7 +52,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         self.layout.prop(self, 'fill_holes')
 
         self.layout.prop(self, 'use_correct_aspect')
-        self.layout.prop(self, 'mark_seam_inner_island')
+        self.layout.prop(self, 'mark_seams_only_with_other_islands')
         self.layout.prop(self, 'blend_factor', slider=True)
         self.layout.row(align=True).prop(self, 'unwrap', expand=True)
 
@@ -107,10 +108,8 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
         # Constraints system
         ##################################################
-        from importlib.util import find_spec
-        found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
-        if found_univ_pro and self.bl_label == 'Unwrap' and self.constr_weight and isl.has_constraints_edge():
+        if self.use_constraints(isl):
             self.pick_unwrap_by_constraints(isl)
             return {'FINISHED'}
         ##################################################
@@ -131,12 +130,10 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         save_t = isl.save_transform(flip_if_needed=True)
         save_t.save_coords(self.blend_factor)
 
-        if self.mark_seam_inner_island:
-            isl.mark_seam(additional=True)
+        if self.mark_seams_only_with_other_islands:
+            isl.mark_seams_only_with_other_islands()
         else:
-            islands = utypes.Islands([isl], isl.umesh)
-            islands.indexing()
-            isl.mark_seam_by_index(additional=True)
+            isl.mark_seam(additional=True)
 
         bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)
 
@@ -160,6 +157,12 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
         isl.umesh.update()
         return {'FINISHED'}
+
+    def use_constraints(self, isl, *, selected=False):
+        return (found_univ_pro
+                and self.bl_label == 'Unwrap'
+                and self.constr_weight
+                and isl.has_constraints_edge(selected=selected))
 
     def pick_unwrap_by_constraints(self, isl):
         raise
@@ -199,8 +202,6 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
 
     def unwrap_sync_verts_or_edges(self, umeshes, **unwrap_kwargs):
-        from importlib.util import find_spec
-        found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
         has_native_unwrapped = 0
         failed_total = 0
@@ -227,15 +228,13 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             # TODO: Full select unselected verts (with pins) of island for avoid incorrect behavior for relax OT
             islands = utypes.Islands.calc_extended_any_elem(umesh)
-            if self.mark_seam_inner_island:
-                islands.indexing()
 
             for isl in islands:
                 unique_number_for_multiply += hash(isl[0])  # multiplayer
-                if self.mark_seam_inner_island:
-                    isl.mark_seam(additional=True)
+                if self.mark_seams_only_with_other_islands:
+                    isl.mark_seams_only_with_other_islands()
                 else:
-                    isl.mark_seam_by_index(additional=True)
+                    isl.mark_seam(additional=True)
 
             unpin_uvs = set()
             faces_to_select = set()
@@ -246,8 +245,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             for isl in islands:
                 # Constraints system
                 ##################################################
-                if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constr_weight and isl.has_constraints_edge(selected=True)):
+                if self.use_constraints(isl, selected=True):
                     isl.tag = False  # Non-native unwrap.
                     to_lock_constraints_islands.append(isl)
 
@@ -285,7 +283,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
                                                                             unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
-                                                                            topology_from_uvs=self.mark_seam_inner_island,
+                                                                            topology_from_uvs=not self.mark_seams_only_with_other_islands,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constr_weight * 100,
@@ -551,8 +549,6 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
     def unwrap_sync_faces(self, umeshes, **unwrap_kwargs):
         assert umeshes.elem_mode == 'FACE'
-        from importlib.util import find_spec
-        found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
 
         failed_total = 0
         unique_number_for_multiply = 0
@@ -563,22 +559,18 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
 
             islands_extended = utypes.Islands.calc_extended(umesh)
-            if not self.mark_seam_inner_island:
-                islands_extended.indexing()
-
             for isl in islands_extended:
                 unique_number_for_multiply += hash(isl[0])  # multiplayer
 
-                if self.mark_seam_inner_island:
-                    isl.mark_seam(additional=True)
+                if self.mark_seams_only_with_other_islands:
+                    isl.mark_seams_only_with_other_islands()
                 else:
-                    isl.mark_seam_by_index(additional=True)
+                    isl.mark_seam(additional=True)
                 isl.apply_aspect_ratio()
 
                 # Constraints system
                 ##################################################
-                if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constr_weight and isl.has_constraints_edge()):
+                if self.use_constraints(isl):
                     uv = isl.umesh.uv
                     sync = isl.umesh.sync
                     for f in isl:
@@ -598,7 +590,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
                                                                             unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
-                                                                            topology_from_uvs=self.mark_seam_inner_island,
+                                                                            topology_from_uvs=not self.mark_seams_only_with_other_islands,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constr_weight * 100,
@@ -658,8 +650,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         tool_settings = bpy.context.scene.tool_settings
         is_sticky_mode_disabled = tool_settings.uv_sticky_select_mode == 'DISABLED'
 
-        from importlib.util import find_spec
-        found_univ_pro = find_spec(f"{__package__.rpartition('.')[0]}.univ_pro") is not None
+
 
         for umesh in reversed(umeshes):
             uv = umesh.uv
@@ -670,23 +661,20 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
             islands = utypes.Islands.calc_extended_any_elem(umesh)
 
-            if not self.mark_seam_inner_island:
-                islands.indexing()
 
             for isl in islands:
                 unique_number_for_multiply += hash(isl[0])  # multiplayer
 
-                if self.mark_seam_inner_island:
-                    isl.mark_seam(additional=True)
+                if self.mark_seams_only_with_other_islands:
+                    isl.mark_seams_only_with_other_islands()
                 else:
-                    isl.mark_seam_by_index(additional=True)
+                    isl.mark_seam(additional=True)
 
                 isl.apply_aspect_ratio()
 
                 # Constraints system
                 ##################################################
-                if (found_univ_pro and self.bl_label == 'Unwrap' and
-                        self.constr_weight and isl.has_constraints_edge()):
+                if self.use_constraints(isl):
                     uv = isl.umesh.uv
                     sync = isl.umesh.sync
                     for f in isl:
@@ -707,7 +695,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                         failed_total += utils.uv_parametrizer.unwrap_isl_by_tag(isl,
                                                                             unwrap_along=getattr(self, "unwrap_along", "UV"),
                                                                             use_abf=self.unwrap == 'ANGLE_BASED',
-                                                                            topology_from_uvs=self.mark_seam_inner_island,
+                                                                            topology_from_uvs=not self.mark_seams_only_with_other_islands,
                                                                             blend_factor=self.blend_factor,
                                                                             fill_holes=self.fill_holes,
                                                                             constraints_factor=self.constr_weight * 100,
@@ -796,6 +784,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         if failed_total:
             self.report({'WARNING'}, f"It is not possible to unwrap {failed_total!r} islands. "
                                      f"Try again by setting at least one pin or by partially selecting the island.")
+
 
     @staticmethod
     def multiply_relax(unique_number_for_multiply, unwrap_kwargs):

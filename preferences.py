@@ -774,14 +774,12 @@ Some operators, can interact with trims:
                                 box.context_pointer_set("keymap", km)
 
 
-                                # Workspace Tool.
+            # Workspace Tool.
             it = keymaps.KeymapFilter.get_conflict_filtered_keymaps(keymaps.keys_areas_workspace, is_ws=True)
             for area, kc, km, filtered_keymaps in it:
                 subpanel = draw_panel(layout, "Workspace Tool: " + area)
                 if subpanel:
                     col = subpanel.column(align=True)
-
-
 
                     sorted_keymaps = keymaps.KeymapFilter.get_sorted(km, filtered_keymaps, self.km_show_only_error, ws_ignore_kmi='view3d.select_box')
                     for config_filtered in sorted_keymaps:
