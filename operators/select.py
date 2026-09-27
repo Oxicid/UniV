@@ -2007,7 +2007,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
     def shrink_select(self, umeshes):
         for umesh in umeshes:
-            islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
+            islands = MeshIslands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             if islands:
                 islands.indexing()
                 shrink = []

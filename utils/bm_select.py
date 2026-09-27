@@ -778,6 +778,7 @@ def deselect_uv_edges_with_preserve_around_edges(umesh, to_deselect: list[BMLoop
     is_visible = is_visible_func(umesh)
     if USE_GENERIC_UV_SYNC:
         if umesh.sync:
+            # TODO: Not validate or make optional
             if umesh.sync:
                 umesh.sync_from_mesh_if_needed()
 
