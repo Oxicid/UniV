@@ -1085,7 +1085,6 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         Stitch.__init__(self)
-        utypes.RayCastAndPick.__init__(self)
         self.update_seams = True
 
     def execute(self, context):

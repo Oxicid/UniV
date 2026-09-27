@@ -869,7 +869,6 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        utypes.RayCastAndPick.__init__(self)
         self.texel = -1
         self.texture_size = -1
 
