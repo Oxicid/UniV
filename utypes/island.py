@@ -9,7 +9,6 @@ import mathutils
 import typing
 import itertools
 import numpy as np
-import numpy.typing as npt
 import collections
 from collections import defaultdict
 
@@ -2092,18 +2091,38 @@ class UnionIslands(Islands):
 
             class ExactOverlap:
                 def __init__(self, island):
+                    from mathutils.kdtree import KDTree
                     self.island = island
-                    self.coords: npt.NDArray = np.array([])
+                    self.coords: list | None = None
+                    self.kdtree: KDTree | None = None
 
-                def calc_coords(self):
+                def calc_data(self):
+                    from mathutils.kdtree import KDTree
                     uv = self.island.umesh.uv
-                    self.coords = np.array([crn[uv].uv.to_tuple() for f in self.island for crn in f.loops], dtype='float32')
+                    self.coords = [crn[uv].uv.to_3d() for f in self.island for crn in f.loops]
+                    k = KDTree(len(self.coords))
+                    for i, co in enumerate(self.coords):
+                        k.insert(co, i)
+                    k.balance()
+                    self.kdtree = k
 
                 def compare(self, other, threshold_):
-                    distances = np.linalg.norm(self.coords[:, None] - other.coords, axis=2)
-                    a_matches = np.any(distances < threshold_, axis=1)
-                    b_matches = np.any(distances < threshold_, axis=0)
-                    return np.all(a_matches) and np.all(b_matches)
+                    if self.coords is None:
+                        self.calc_data()
+                    if other.coords is None:
+                        other.calc_data()
+
+                    k = self.kdtree
+                    for co in other.coords:
+                        if k.find(co)[2] > threshold_:
+                            return False
+
+                    k = other.kdtree
+                    for co in self.coords:
+                        if k.find(co)[2] > threshold_:
+                            return False
+
+                    return True
 
             # reduce islands by len
             islands_by_len: defaultdict[int, list[AdvIsland]] = defaultdict(list)
@@ -2171,10 +2190,9 @@ class UnionIslands(Islands):
                     single_islands.append(single_island)
 
             for finished_reduced_islands in islands_by_ngons_.values():
-                exact_islands = []
+                exact_islands: list[ExactOverlap] = []
                 for fin_isl in finished_reduced_islands:
                     exact_isl = ExactOverlap(fin_isl)
-                    exact_isl.calc_coords()
                     exact_islands.append(exact_isl)
 
                 for island_first in exact_islands:
