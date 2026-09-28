@@ -43,8 +43,8 @@ class UKeymap:
         backup_kmi = self.km.keymap_items.new(idname, type, value, **kw)
 
         # Disable key items by default.
-        from . import utypes
-        c_kmi = utypes.wmKeyMapItem(backup_kmi)
+        from . import btypes
+        c_kmi = btypes.wmKeyMapItem(backup_kmi)
 
 
         global SKIP_KEYMAPS_INACTIVATING
@@ -715,8 +715,8 @@ class UNIV_RestoreKeymaps(bpy.types.Operator):
                     # double_new_kmi = km.keymap_items.new_from_item(backup_kmi)
                     counter += 1
                     if not SKIP_KEYMAPS_INACTIVATING:
-                        from . import utypes
-                        c_kmi = utypes.wmKeyMapItem(new_kmi)
+                        from . import btypes
+                        c_kmi = btypes.wmKeyMapItem(new_kmi)
                         c_kmi.flag |= KMI_INACTIVE
 
                         # if double_new_kmi:

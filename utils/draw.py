@@ -325,7 +325,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         return edges
 
     @staticmethod
-    def uv_segments_to_lines_with_offset(segments: typing.Sequence[typing.Sequence], line_offset=0.008):
+    def uv_segments_to_lines_with_offset(segments: typing.Sequence[typing.Iterable], line_offset=0.008):
         """exact - correct line offset for flipped faces"""
         import numpy as np
         size = sum(len(seg) for seg in segments)

@@ -23,10 +23,10 @@ class UTexture:
 
     @classmethod
     def from_ibuf(cls, ibuf):
-        from ..import utypes
+        from ..import btypes
         width, height = ibuf.size
 
-        c_ibuf = utypes.Py_ImBuf.get_fields(ibuf)
+        c_ibuf = btypes.Py_ImBuf.get_fields(ibuf)
         data = np.ctypeslib.as_array(c_ibuf.byte_buffer.data, shape=[width, height, 4])
         data = data / np.float32(255)
 

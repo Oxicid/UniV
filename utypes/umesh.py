@@ -14,7 +14,7 @@ from math import pi
 from bmesh.types import BMFace, BMEdge, BMLoop
 
 from .. import utils
-from ..utypes import PyBMesh
+
 
 USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
@@ -113,49 +113,60 @@ class UMesh:
 
     @property
     def is_full_face_selected(self):
-        return PyBMesh.is_full_face_selected(self.bm)
+        from .. import btypes
+        return btypes.PyBMesh.is_full_face_selected(self.bm)
 
     @property
     def is_full_face_selected_for_avoid_force_explicit_check(self):
         """In Vertex and Edge modes, BMFace.uv_select can be False and BMFace.select can be True.
         This check avoids problems with such behavior by forcing explicit checking of UV selection tags."""
-        return PyBMesh.is_full_face_selected(self.bm) and self.sync and (not self.sync_valid or self.elem_mode == 'FACE')
+        from .. import btypes
+        return btypes.PyBMesh.is_full_face_selected(self.bm) and self.sync and (not self.sync_valid or self.elem_mode == 'FACE')
 
     @property
     def is_full_face_deselected(self):
-        return PyBMesh.fields(self.bm).totfacesel == 0
+        from .. import btypes
+        return btypes.PyBMesh.fields(self.bm).totfacesel == 0
 
     @property
     def is_full_edge_selected(self):
-        return PyBMesh.is_full_edge_selected(self.bm)
+        from .. import btypes
+        return btypes.PyBMesh.is_full_edge_selected(self.bm)
 
     @property
     def is_full_edge_deselected(self):
-        return PyBMesh.is_full_edge_deselected(self.bm)
+        from .. import btypes
+        return btypes.PyBMesh.is_full_edge_deselected(self.bm)
 
     @property
     def is_full_vert_selected(self):
-        return PyBMesh.is_full_vert_selected(self.bm)
+        from .. import btypes
+        return btypes.PyBMesh.is_full_vert_selected(self.bm)
 
     @property
     def is_full_vert_deselected(self):
-        return PyBMesh.is_full_vert_deselected(self.bm)
+        from .. import btypes
+        return btypes.PyBMesh.is_full_vert_deselected(self.bm)
 
     @property
     def total_vert_sel(self):
-        return PyBMesh.fields(self.bm).totvertsel
+        from .. import btypes
+        return btypes.PyBMesh.fields(self.bm).totvertsel
 
     @property
     def total_edge_sel(self):
-        return PyBMesh.fields(self.bm).totedgesel
+        from .. import btypes
+        return btypes.PyBMesh.fields(self.bm).totedgesel
 
     @property
     def total_face_sel(self):
-        return PyBMesh.fields(self.bm).totfacesel
+        from .. import btypes
+        return btypes.PyBMesh.fields(self.bm).totfacesel
 
     @property
     def total_corners(self):
-        return PyBMesh.fields(self.bm).totloop
+        from .. import btypes
+        return btypes.PyBMesh.fields(self.bm).totloop
 
     if USE_GENERIC_UV_SYNC:
         def has_selected_uv_faces(self) -> bool:

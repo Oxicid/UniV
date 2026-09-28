@@ -5,6 +5,7 @@ import bpy
 import numpy as np
 import platform
 import ctypes
+from .. import btypes
 from .. import utypes
 from .. import utils
 from ctypes import (
@@ -120,7 +121,6 @@ class FastAPI:
 
     @classmethod
     def init_extract_data(cls):
-        from .. import utypes
         lib = cls.lib
 
         # void UniV_extract_data_constraints2d(
@@ -131,7 +131,7 @@ class FastAPI:
         #     float *arr,
         #     int *r_tot_v,
         #     int *r_tot_h)
-        lib.UniV_extract_data_constraints2d.argtypes = (POINTER(utypes.CBMesh),
+        lib.UniV_extract_data_constraints2d.argtypes = (POINTER(btypes.CBMesh),
                                                         c_int,
                                                         c_int,
                                                         c_bool,
@@ -147,7 +147,7 @@ class FastAPI:
         #     const bool sync,
         #     float *r_array)
 
-        lib.UniV_extract_data_seams2d.argtypes = (POINTER(utypes.CBMesh),
+        lib.UniV_extract_data_seams2d.argtypes = (POINTER(btypes.CBMesh),
                                                         c_int,
                                                         c_bool,
                                                         POINTER(c_float)
@@ -158,9 +158,8 @@ class FastAPI:
 class ExtractData:
     @staticmethod
     def extract_constraints_data(umesh: 'utypes.UMesh', attr):
-        from .. import utypes
 
-        c_bm: utypes.CBMesh = utypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
+        c_bm: btypes.CBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
         uv_offset = ExtractData.get_uv_offset(umesh.uv)
         constr_offset = ExtractData.get_constr_offset(umesh, attr)
@@ -184,9 +183,8 @@ class ExtractData:
 
     @staticmethod
     def extract_seams_data(umesh: 'utypes.UMesh'):
-        from .. import utypes
+        c_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
-        c_bm: utypes.PyBMesh = utypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
         total_corners = c_bm.contents.totloop
         uv_offset = ExtractData.get_uv_offset(umesh.uv)
 
@@ -205,13 +203,13 @@ class ExtractData:
     if bpy.app.version >= (3, 5, 0):
         @staticmethod
         def get_uv_offset(uv):
-            from .. import utypes
+            # CD_MLOOPUV = 16  # TODO: Implement for oldest version.
             CD_PROP_FLOAT2 = 49
-            py_btype_uv_layer = utypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
+            py_btype_uv_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
             n = py_btype_uv_layer.index
             assert (n >= 0)
 
-            custom_data: utypes.CustomData = py_btype_uv_layer.bm.contents.ldata
+            custom_data: btypes.CustomData = py_btype_uv_layer.bm.contents.ldata
             i = custom_data.typemap[CD_PROP_FLOAT2]
 
             if i != -1:
@@ -220,39 +218,40 @@ class ExtractData:
                     layer = custom_data.layers[i + n]
                     if layer.type == CD_PROP_FLOAT2:
                         return layer.offset
-            raise
+
+            # all_layers_items = [custom_data.layers[ii].name for ii in range(int(custom_data.totlayer))]
+            raise IndexError(f"Not found `CD_PROP_FLOAT2` layer at {i + n} index for {uv.name!r}, "
+                             f"maybe CustomData, CustomDataLayer or BMesh fields is changed? ")
             return -1  # noqa
     else:
         # CustomData_get_offset
         # https://projects.blender.org/blender/blender/src/commit/bcfdb14560e77891d674c2701a5071a7c07baba3/source/blender/blenkernel/intern/customdata.cc
         @staticmethod
         def get_uv_offset(uv):
-            from .. import utypes
-            py_constr_layer = utypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
+            py_constr_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
 
             n = py_constr_layer.index
-            assert (n >= 0)  # noqa
+            assert (n >= 0), f"Given incorrect {n!r} layer index."
 
-            custom_data: utypes.CustomData = py_constr_layer.bm.contents.ldata
+            custom_data: btypes.CustomData = py_constr_layer.bm.contents.ldata
             return custom_data.get_offset(py_constr_layer.type)
 
 
     @staticmethod
     def get_constr_offset(umesh, attr):
-        from .. import utypes
-        py_constr_layer: utypes.BPy_BMLayerItem = utypes.BPy_BMLayerItem.get_fields_from_pyobj(attr)
+        py_constr_layer: btypes.BPy_BMLayerItem = btypes.BPy_BMLayerItem.get_fields_from_pyobj(attr)
 
-        n = py_constr_layer.index
+        idx = py_constr_layer.index
         typ = py_constr_layer.type
 
-        custom_data: utypes.CustomData = utypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.edata
+        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.edata
 
-        assert(n >= 0)  # noqa
+        assert(idx >= 0)  # noqa
 
         layer_index = custom_data.typemap[typ]
         assert layer_index != -1
 
-        layer: utypes.CustomDataLayer = custom_data.layers[layer_index + n]
+        layer: btypes.CustomDataLayer = custom_data.layers[layer_index + idx]
         assert layer.type == typ
         return layer.offset
 

@@ -228,7 +228,8 @@ class QuickSnap_KDMeshes:
         m_pos = self.mouse_position.to_2d()
 
         if GlobalSnapFlags.grid_snap:
-            zoom = utypes.View2D.get_zoom(self.view)
+            from .. import btypes
+            zoom = btypes.View2D.get_zoom(self.view)
             divider = 1/8 if zoom <= 1600 else 1 / 64
             divider = divider if zoom <= 12800 else 1 / 64 / 8
             pos = Vector(utils.round_threshold(v, divider) for v in m_pos)

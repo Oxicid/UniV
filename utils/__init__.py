@@ -38,7 +38,7 @@ else:
         import os
         import _bpy  # noqa
 
-        if bpy.app.version >= (4, 0, 0):
+        if bpy.app.version >= (4, 2, 0):
             from addon_utils import _extension_module_name_decompose  # noqa
             # Handles own errors.
             repo_module, pkg_idname = _extension_module_name_decompose(package)

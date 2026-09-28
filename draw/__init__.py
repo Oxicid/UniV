@@ -607,12 +607,23 @@ else:
     def has_crash_modal_running():
         # In older versions, modal operators cannot be selectively excluded,
         # so any modal operator interrupts drawing.
-        from .. import utypes
+
+        from .. import btypes
+        from ctypes import cast, addressof, POINTER
+        WM_HANDLER_TYPE_OP = 3
+        handler_base: btypes.wmEventHandler
+        handle: btypes.wmEventHandler_Op
+        op: btypes.wmOperator
         for window in bpy.context.window_manager.windows:
-            win = utypes.wmWindow.get_fields(window)  # TODO: Check in old versions
-            for handle in win.modalhandlers:
-                if handle.type == 3:  # WM_HANDLER_TYPE_OP
-                    return True
+            win = btypes.wmWindow.get_fields(window)  # TODO: Check in old versions
+            for handler_base in win.modalhandlers:
+                if handler_base.type == WM_HANDLER_TYPE_OP:
+                    handle = cast(addressof(handler_base), POINTER(btypes.wmEventHandler_Op)).contents
+                    op = handle.op.contents
+                    idname = op.idname.decode("utf-8", errors="replace")
+                    if not idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
+                        if idname not in (prop.idname for prop in prefs().excluded_operators_for_overlay):
+                            return op
         return False
 
 @bpy.app.handlers.persistent

@@ -12,6 +12,7 @@ from collections import Counter
 
 from bl_math import clamp
 from .. import utils
+from .. import btypes
 from .. import utypes
 from ..utypes import UMeshes, BBox
 from .. import preferences
@@ -732,7 +733,7 @@ class UNIV_OT_SetCursor2D(Operator):
                     pt = grid_pt
                     min_dist = grid_dist
             else:
-                zoom = utypes.View2D.get_zoom(context.region.view2d)
+                zoom = btypes.View2D.get_zoom(context.region.view2d)
                 divider = 1 / 8 if zoom <= 1600 else 1 / 64
                 divider = divider if zoom <= 12800 else 1 / 64 / 8
 
@@ -949,7 +950,7 @@ class UNIV_OT_Focus(Operator):
         bounds.scale(1.2)  # Add padding
 
         space_data = context.area.spaces.active
-        sima = utypes.SpaceImage.get_fields(space_data)
+        sima = btypes.SpaceImage.get_fields(space_data)
 
         image_size = [256, 256]
         aspect = [1, 1]
@@ -964,7 +965,7 @@ class UNIV_OT_Focus(Operator):
         image_size[1] *= aspect[1]
 
         # adjust offset and zoom
-        c_region = utypes.ARegion(context.region)
+        c_region = btypes.ARegion(context.region)
 
         zero_division_avoid = 0.00001
         size_y = c_region.winrct.height / ((bounds.height + zero_division_avoid) * image_size[1])

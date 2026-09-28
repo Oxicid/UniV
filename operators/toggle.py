@@ -8,7 +8,8 @@ import traceback
 
 from .. import utils
 from ..preferences import force_debug, prefs, stable
-from ..utypes import UMeshes, ARegion
+from ..utypes import UMeshes
+from ..btypes import ARegion
 
 from collections import defaultdict
 from bpy.props import *

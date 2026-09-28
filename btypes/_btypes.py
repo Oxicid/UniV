@@ -13,6 +13,7 @@ from ctypes import (
     Union,
     Structure,
     c_float,
+    c_double,
     c_short,
     c_int,
     c_int8,
@@ -20,19 +21,24 @@ from ctypes import (
     c_uint,
     c_long,
     c_int64,
+    c_byte,
+    c_ubyte,
     c_char,
+    c_char_p,
     # cast,
     c_void_p,
     c_size_t,
     c_bool,
     sizeof,
-    addressof
+    addressof,
+    CFUNCTYPE
 )
 
-from . import bbox
+# from .. import utypes
 from mathutils import Vector
 
 version = bpy.app.version
+
 is_debug_build = False
 if bpy.app.build_type != b"Release":
     # Blender built with release flag, `bpy.app.build_type` might be empty. # TODO: Bugreport ?
@@ -40,6 +46,16 @@ if bpy.app.build_type != b"Release":
         is_debug_build = True
 
 bpy_struct_subclass = typing.TypeVar('bpy_struct_subclass', bound=bpy.types.bpy_struct)
+
+def factory(func):
+    return func()
+
+
+@factory
+def event_type_to_string():
+    return {
+    e.value: e.identifier for e in bpy.types.Event.bl_rna.properties["type"].enum_items
+}.__getitem__
 
 
 class PyObject_HEAD(Structure):
@@ -121,7 +137,11 @@ class StructBase(Structure):
                 cls._anonynous_ = anons
 
             if fields:  # Base classes might not have _fields_. Don't set anything.
-                cls._fields_ = fields
+                try:
+                    cls._fields_ = fields
+                except Exception as e:
+                    print(f"Cant register {cls.__qualname__!r}.")
+                    raise e
             cls.__annotations__.clear()
 
         StructBase._subclasses.clear()
@@ -263,7 +283,7 @@ class BVector(StructBase):
 
     def __getitem__(self, i):
         if i < 0:
-            i = len(self) + i
+             i += len(self)
         if i < 0 or i >= len(self):
             raise IndexError(f'vector index {i} out of range')
         typ = self.capacity_end._type_  # noqa # pylint: disable=protected-access
@@ -416,6 +436,14 @@ class PointerRNA(StructBase):
     def info(self):
         info_(self)
 
+# # noinspection PyTypeHints
+# # source/blender/makesrna/RNA_types.h | rev 362
+# class PointerRNA(StructBase):
+#     owner_id: l
+#     type: c_void_p  # StructRNA
+#     data: c_void_p
+
+
 def safe_mem_read(address, size=8):  # noqa
     return " "
 
@@ -507,14 +535,44 @@ else:
     print(f"UniV: Unknow platform { platform.system()!r}. Unsafe memory access in some types.")
 
 
-class rctf(StructBase, bbox.BBox):
+class vec2Base(StructBase):
+    """Base for vec2i, vec2s, vec2f."""
+
+    def __setitem__(self, i, val):
+        setattr(self, ("x", "y")[i], val)
+
+    # Allow subscript, but avoid for performance reasons
+    def __getitem__(self, i):
+        return getattr(self, ("x", "y")[i])
+
+    def __iter__(self):
+        return iter((self.x, self.y))
+
+
+class vec2i(vec2Base):
+    x: c_int
+    y: c_int
+
+
+class vec2s(vec2Base):
+    x: c_short
+    y: c_short
+
+
+class vec2f(vec2Base):
+    x: c_float
+    y: c_float
+
+
+from .. import utypes
+class rctf(StructBase, utypes.bbox.BBox):
     xmin: c_float
     xmax: c_float
     ymin: c_float
     ymax: c_float
 
 
-class rcti(StructBase, bbox.BBox):
+class rcti(StructBase, utypes.bbox.BBox):
     xmin: c_int
     xmax: c_int
     ymin: c_int
@@ -524,65 +582,7 @@ class rcti(StructBase, bbox.BBox):
         return f"xmin={self.xmin}, xmax={self.xmax}, ymin={self.ymin}, ymax={self.ymax}, width={self.width}, height={self.height}"
 
 
-class View2D(StructBase):
-    tot: rctf
-    cur: rctf
-    vert: rcti
-    hor: rcti
-    mask: rcti
-
-    min: c_float * 2  # noqa
-    max: c_float * 2  # noqa
-
-    minzoom: c_float
-    maxzoom: c_float
-
-    scroll: c_short
-    scroll_ui: c_short
-
-    keeptot: c_short
-    keepzoom: c_short
-    keepofs: c_short
-
-    flag: c_short
-    align: c_short
-
-    winx: c_short
-    winy: c_short
-    oldwinx: c_short
-    oldwiny: c_short
-
-    around: c_short
-
-    alpha_vert: c_char
-    alpha_hor: c_char
-
-    if version >= (4, 0, 0):
-        _pad6: c_char * 2  # noqa
-        page_size_y: c_float
-    else:
-        _pad6: c_char * 6  # noqa
-
-    sms: c_void_p  # SmoothView2DStore
-    smooth_timer: c_void_p  # wmTimer
-
-    @classmethod
-    def get_rect(cls, view):
-        return cls.from_address(view.as_pointer()).cur
-
-    @classmethod
-    def get_scale(cls, view):
-        v2d = cls.from_address(view.as_pointer())
-        return Vector((v2d.mask.width / v2d.cur.width, v2d.mask.height / v2d.cur.height))
-
-    @classmethod
-    def get_zoom(cls, view):
-        v2d = cls.from_address(view.as_pointer())
-        return (v2d.mask.xmax - v2d.mask.xmin) / (v2d.cur.xmax - v2d.cur.xmin)  # noqa
-
 # source/blender/makesdna/DNA_ID.h | rev 362
-
-
 class ID_Runtime_Remap(StructBase):
     status:                 c_int
     skipped_refcounted:     c_int
@@ -596,6 +596,8 @@ class ID_Runtime(StructBase):
     if version >= (4, 2, 0):
         depsgraph:          c_void_p
         _pad:               c_void_p
+
+
 
 MAX_ID_NAME = 66
 if version >= (5, 0, 0):
@@ -656,6 +658,388 @@ class ID(StructBase):
         else:
             runtime:        ID_Runtime
 
+class LayoutPanelHeader(StructBase):
+    start_y: c_float
+    end_y: c_float
+    open_owner_ptr: PointerRNA
+    open_prop_name: string
+
+
+class LayoutPanelBody(StructBase):
+    start_y: c_float
+    end_y: c_float
+
+
+# noinspection PyTypeHints
+class LayoutPanels(StructBase):
+    headers: lambda : BVector(LayoutPanelHeader)
+    bodies: lambda : BVector(LayoutPanelBody)
+
+# # noinspection PyTypeHints
+# # source/blender/makesdna/DNA_screen_types.h | rev 362
+# class Panel_Runtime(StructBase):
+#     region_ofsx: c_int
+#     _pad4: c_char * 4
+#
+#     if version > (2, 83):
+#         custom_data_ptr: lambda: POINTER(PointerRNA)
+#         block: lambda: POINTER(uiBlock)
+#
+#     if version > (3, 1):
+#         context: c_void_p  # bContextStore
+
+# noinspection PyTypeHints
+class Panel_Runtime(StructBase):
+    region_ofsx: c_int
+    custom_data_ptr: POINTER(PointerRNA)
+    block: c_void_p # uiBlock
+    context: c_void_p  # bContextStore
+    layout_panels: LayoutPanels
+    if version >= (5, 1, 0):
+        layout_panel_states_storage: lambda: POINTER(ListBase(LayoutPanelState))
+
+
+# source/blender/editors/include/UI_interface.h | rev 362
+class uiBlockInteraction_CallbackData(StructBase):
+    begin_fn: c_void_p  # uiBlockInteractionBeginFn
+    end_fn: c_void_p  # uiBlockInteractionEndFn
+    update_fn: c_void_p  # uiBlockInteractionUpdateFn
+    arg1: c_void_p
+
+# noinspection PyTypeHints
+# source/blender/editors/interface/interface_intern.hh | rev 362
+class uiPopupBlockCreate(StructBase):
+    create_func: c_void_p  # uiBlockCreateFunc
+    handle_create_func: c_void_p  # uiBlockHandleCreateFunc
+    arg: c_void_p
+    arg_free: c_void_p
+    event_xy: vec2i
+    butregion: lambda: POINTER(ARegion)
+    but: lambda: POINTER(uiBut)
+
+
+# source/blender/editors/interface/interface_intern.hh | rev 362
+class uiKeyNavLock(StructBase):
+    is_keynav: c_bool
+    event_xy: vec2i
+
+
+# source/blender/blenlib/BLI_vector.hh | rev 362
+class blenderVector(StructBase):
+    begin_: c_void_p
+    end_: c_void_p
+    capacity_end_: c_void_p
+
+# noinspection PyTypeHints
+# source/blender/editors/interface/interface_intern.hh | rev 362
+class uiBlock(StructBase):
+    next: lambda: POINTER(uiBlock)
+    prev: lambda: POINTER(uiBlock)
+
+    buttons: lambda: ListBase(uiBut)
+    # ... (cont)
+
+# noinspection PyTypeHints
+# source/blender/editors/interface/interface_intern.hh | rev 362
+class uiBut(StructBase):
+    next: lambda: POINTER(uiBut)
+    prev: lambda: POINTER(uiBut)
+
+    if version > (2, 90):
+        layout: c_void_p  # uiLayout
+
+    flag: c_int
+    drawflag: c_int
+    type: c_int  # eButType
+    pointype: c_int  # eButPointerType
+
+    bit: c_short
+    bitnr: c_short
+    retval: c_short
+    strwidth: c_short
+    alignnr: c_short
+
+    ofs: c_short
+    pos: c_short
+    selsta: c_short
+    selend: c_short
+
+    str: c_char_p
+    strdata: c_char * 128  # UI_MAX_NAME_STR
+    drawstr: c_char * 400  # UI_MAX_DRAW_STR
+
+    rect: rctf
+    poin: c_char_p
+
+    hardmin: c_float
+    hardmax: c_float
+    softmin: c_float
+    softmax: c_float
+
+    a1: c_float
+    a2: c_float
+    col: c_ubyte * 4
+
+    if version > (3, 1):
+        identity_cmp_func: c_void_p
+
+    func: c_void_p
+    func_arg1: c_void_p
+    func_arg2: c_void_p
+
+    funcN: c_void_p
+
+    if version > (2, 82):
+        func_argN: c_void_p
+
+    context: c_void_p
+
+    autocomplete_func: c_void_p
+    autofunc_arg: c_void_p
+
+    if version < (2, 83):
+        search_create_func: c_void_p
+        search_func: c_void_p
+        free_search_arg: c_bool
+        search_arg: c_void_p
+
+    rename_func: c_void_p
+    rename_arg1: c_void_p
+    rename_orig: c_void_p
+    hold_func: c_void_p
+    hold_argN: c_void_p
+
+    tip: c_char_p
+    tip_func: c_void_p
+    tip_arg: c_void_p
+
+    if version > (2, 93):
+        tip_arg_free: c_void_p
+
+    disabled_info: c_char_p
+
+    icon: c_int  # BIFIconID
+
+    if version < (2, 93):
+        emboss: c_char
+    else:
+        emboss: c_int  # eUIEmbossType
+
+    if version < (3, 2):
+        pie_dir: c_byte
+    else:
+        pie_dir: c_int  # RadialDirection
+
+    changed: c_bool
+    unit_type: c_ubyte
+
+    if version < (3, 3):
+        modifier_key: c_short
+
+    iconadd: c_short
+
+    block_create_func: c_void_p
+    menu_create_func: c_void_p
+    menu_step_func: c_void_p
+
+    rnapoin: lambda: PointerRNA
+    # rnapoin: PointerRNA
+    rnaprop: c_void_p  # PropertyRNA
+    rnaindex: c_int
+
+    if version < (2, 93):
+        rnaserachpoin: c_void_p * 3
+        rnasearchprop: c_void_p
+
+    optype: lambda: POINTER(wmOperatorType)
+    opptr: lambda: POINTER(PointerRNA)
+    opcontext: c_int  # enum wmOperatorCallContext
+    menu_key: c_ubyte
+    extra_op_icons: ListBase  # uiButExtraOpIcon
+    dragtype: c_char
+    dragflag: c_short
+    dragpoin: c_void_p
+    imb: c_void_p  # ImBuf
+    imb_scale: c_float
+    active: c_void_p  # uiHandleButtonData
+    custom_data: c_void_p
+    editstr: c_char_p
+    editval: POINTER(c_double)
+    editvec: POINTER(c_float)
+
+    if version < (2, 93):
+        editcoba: c_void_p
+        editcumap: c_void_p
+        editprofile: c_void_p
+
+    pushed_state_func: c_void_p  # uiButPushedStateFunc
+    pushed_state_arg: c_void_p
+
+    if version > (3, 3):
+        # noinspection PyTypeHints
+        class IconTextOverlay(StructBase):
+            text: c_char * 5
+
+        icon_overlay_text: IconTextOverlay
+        _pad0: c_char * 3
+
+    block: lambda: POINTER(uiBlock)
+
+
+# noinspection PyTypeHints
+# source/blender/editors/space_text/text_draw.c | rev 362
+class DrawCache(StructBase):
+    line_height: POINTER(c_int)
+    total_lines: c_int
+    nlines: c_int
+
+    winx: c_int
+    wordwrap: c_int
+    showlnum: c_int
+    tabnumber: c_int
+
+    lheight: c_short
+    cwidth_px: c_char
+    text_id: c_char * 66  # MAX_ID_NAME
+
+    update_flag: c_short
+    valid_head: c_int
+    valid_tail: c_int
+
+
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_space_types.h | rev 362
+class SpaceText_Runtime(StructBase):
+    # Confusingly not line height in pixels. Use property instead.
+    _lheight_px: c_int
+
+    cwidth_px: c_int
+    scroll_region_handle: rcti
+    scroll_region_select: rcti
+    line_number_display_digits: c_int
+    viewlines: c_int
+    scroll_px_per_line: c_float
+    scroll_ofs_px: vec2i
+    _pad1: c_char * 4
+    drawcache: lambda: POINTER(DrawCache)
+
+    @property
+    def lpad_px(self):
+        return self.cwidth_px * (self.line_number_display_digits + 3)  # noqa
+
+    @property
+    def lheight_px(self):
+        return int(self._lheight_px * 1.3)  # noqa
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_text_types.h | rev 362
+class TextLine(StructBase):
+    next: lambda: POINTER(TextLine)
+    prev: lambda: POINTER(TextLine)
+
+    line: c_char_p
+    format: c_char_p
+    len: c_int
+    _pad0: c_char * 4
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_text_types.h | rev 362
+class Text(StructBase):
+    id: lambda: ID
+    filepath: c_char_p
+    compiled: c_void_p
+    flags: c_int
+
+    if version < (2, 90):
+        nlines: c_int
+    else:
+        _pad0: c_char * 4
+
+    lines: ListBase(TextLine)
+    curl: POINTER(TextLine)
+    sell: POINTER(TextLine)
+    curc: c_int
+    selc: c_int
+    mtime: c_double
+
+# noinspection PyTypeHints
+# source/blender/editors/interface/interface_region_menu_popup.cc | rev 362
+class uiPopupMenu(StructBase):
+    block: lambda: POINTER(uiBlock)
+    layout: c_void_p  # uiLayout
+    but: lambda: POINTER(uiBut)
+    butregion: lambda: POINTER(ARegion)
+
+    if version > (3, 3, 1):
+        title: c_char_p
+
+    mxy: vec2i
+    popup: c_bool
+    slideout: c_bool
+    # ... (cont)
+
+
+
+
+
+class View2D(StructBase):
+    tot: rctf
+    cur: rctf
+    vert: rcti
+    hor: rcti
+    mask: rcti
+
+    min: c_float * 2  # noqa
+    max: c_float * 2  # noqa
+
+    minzoom: c_float
+    maxzoom: c_float
+
+    scroll: c_short
+    scroll_ui: c_short
+
+    keeptot: c_short
+    keepzoom: c_short
+    keepofs: c_short
+
+    flag: c_short
+    align: c_short
+
+    winx: c_short
+    winy: c_short
+    oldwinx: c_short
+    oldwiny: c_short
+
+    around: c_short
+
+    alpha_vert: c_char
+    alpha_hor: c_char
+
+    if version >= (4, 0, 0):
+        _pad6: c_char * 2  # noqa
+        page_size_y: c_float
+    else:
+        _pad6: c_char * 6  # noqa
+
+    sms: c_void_p  # SmoothView2DStore
+    smooth_timer: c_void_p  # wmTimer
+
+    @classmethod
+    def get_rect(cls, view):
+        return cls.from_address(view.as_pointer()).cur
+
+    @classmethod
+    def get_scale(cls, view):
+        v2d = cls.from_address(view.as_pointer())
+        return Vector((v2d.mask.width / v2d.cur.width, v2d.mask.height / v2d.cur.height))
+
+    @classmethod
+    def get_zoom(cls, view):
+        v2d = cls.from_address(view.as_pointer())
+        return (v2d.mask.xmax - v2d.mask.xmin) / (v2d.cur.xmax - v2d.cur.xmin)  # noqa
+
+
 
 class ImageUser(StructBase):
     scene: c_void_p
@@ -701,33 +1085,6 @@ class SpaceImage(StructBase):
     centy: c_float
 
 
-class LayoutPanelHeader(StructBase):
-    start_y: c_float
-    end_y: c_float
-    open_owner_ptr: PointerRNA
-    open_prop_name: string
-
-
-class LayoutPanelBody(StructBase):
-    start_y: c_float
-    end_y: c_float
-
-
-# noinspection PyTypeHints
-class LayoutPanels(StructBase):
-    headers: lambda : BVector(LayoutPanelHeader)
-    bodies: lambda : BVector(LayoutPanelBody)
-
-
-# noinspection PyTypeHints
-class Panel_Runtime(StructBase):
-    region_ofsx: c_int
-    custom_data_ptr: POINTER(PointerRNA)
-    block: c_void_p # uiBlock
-    context: c_void_p  # bContextStore
-    layout_panels: LayoutPanels
-    if version >= (5, 1, 0):
-        layout_panel_states_storage: lambda: POINTER(ListBase(LayoutPanelState))
 
 # noinspection PyTypeHints
 class LayoutPanelState(StructBase):
@@ -808,6 +1165,53 @@ class PanelCategoryDyn(StructBase):
     else:
         icon: c_int
 
+# # noinspection PyTypeHints
+# # source/blender/makesdna/DNA_screen_types.h | rev 362
+# class ARegion(StructBase):
+#     next: lambda: POINTER(ARegion)
+#     prev: lambda: POINTER(ARegion)
+#
+#     view2D: View2D
+#     winrct: rcti
+#     drawrct: rcti
+#     winx: c_short
+#     winy: c_short
+#
+#     if version > (3, 5):
+#         category_scroll: c_int
+#         _pad0: c_char * 4
+#
+#     visible: c_short
+#     regiontype: c_short
+#     alignment: c_short
+#     flag: c_short
+#
+#     sizex: c_short
+#     sizey: c_short
+#
+#     do_draw: c_short
+#     do_draw_overlay: c_short  # (do_draw_paintcursor) they keep renaming this X_X
+#     overlap: c_short
+#     flagfullscreen: c_short
+#
+#     type: lambda: POINTER(ARegionType)  # ARegionType
+#
+#     uiblocks: ListBase(uiBlock)
+#     panels: ListBase  # Panel
+#     panels_category_active: ListBase
+#     ui_lists: ListBase
+#     ui_previews: ListBase
+#     handlers: ListBase(wmEventHandler)
+#     panels_category: ListBase
+#
+#     gizmo_map: c_void_p  # wmGizmoMap
+#     regiontimer: c_void_p  # wmTimer
+#     draw_buffer: c_void_p  # wmDrawBuffer
+#
+#     headerstr: c_char_p
+#     regiondata: c_void_p
+#
+#     runtime: ARegion_Runtime
 
 # noinspection PyTypeHints
 # source/blender/makesdna/DNA_screen_types.h | rev 362
@@ -1001,15 +1405,321 @@ class wmWindowManager(StructBase):
     _pad7:                      c_char * 7  # noqa
     message_bus:                c_void_p  # wmMsgBus
 
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_screen_types.h | rev 362
+class ScrArea_Runtime(StructBase):
+    tool:           c_void_p  # bToolRef
+    is_tool_set:    c_char
+    _pad0:          c_char * 7
+
+
+# # noinspection PyTypeHints
+# class wmEvent(StructBase):
+#     next: lambda: POINTER(wmEvent)
+#     prev: lambda: POINTER(wmEvent)
+#
+#     # Event code itself (short, is also in key-map).
+#     type: c_short
+#     # Press, release, scroll-value.
+#     val: c_short
+#     # Mouse pointer position, screen coord.
+#     xy: c_int * 2
+#     # Region relative mouse position (name convention before Blender 2.5).
+#     mval: c_int * 2
+#     # A single UTF8 encoded character.
+#     utf8_buf: c_char * 6
+#     # Modifier states: #KM_SHIFT, #KM_CTRL, #KM_ALT, #KM_OSKEY & #KM_HYPER.
+#     modifier: c_uint8
+#     # The direction (for #KM_PRESS_DRAG events only).
+#     direction: c_char
+#     # Raw-key modifier (allow using any key as a modifier).
+#     # Compatible with values in `type`.
+#     keymodifier: c_short
+#     # ...
 
 # noinspection PyTypeHints
-# source\blender\windowmanager\wm_event_system.h
-class wmEventHandler(StructBase):
+# source/blender/windowmanager/WM_types.h | rev 362
+class wmEvent(StructBase):
+    next: lambda: POINTER(wmEvent)
+    prev: lambda: POINTER(wmEvent)
+
+    type: c_short
+    val: c_short
+
+    if version < (3, 2):
+        posx: c_short
+        posy: c_short
+        mvalx: c_short
+        mvaly: c_short
+    else:
+        posx: c_int
+        posy: c_int
+        mvalx: c_int
+        mvaly: c_int
+
+    utf8_buf: c_char * 6
+
+    if version < (3, 2, 2):
+        ascii: c_char
+
+    modifier: c_char
+
+    # ... (cont)
+
+    @property
+    def ctrl(self) -> bool:
+        return bool(int.from_bytes(self.modifier, "little") & 2)
+
+    @property
+    def shift(self) -> bool:
+        return bool(int.from_bytes(self.modifier, "little") & 1)
+
+    @property
+    def alt(self) -> bool:
+        return bool(int.from_bytes(self.modifier, "little") & 4)
+
+    @property
+    def type_string(self):
+        return event_type_to_string(self.type)
+
+
+# noinspection PyTypeHints
+# source/blender/windowmanager/wm_event_system.h | rev 362
+class wmEventHandler(StructBase):  # Generic
     next: lambda: POINTER(wmEventHandler)
     prev: lambda: POINTER(wmEventHandler)
-    type: c_int
-    flag: c_char
-    poll: c_void_p
+
+    type: c_int  # enum eWM_EventHandlerType
+
+    if version < (3, 5):
+        flag: c_char
+
+    if version >= (3, 5):
+        flag: c_int  # enum eWM_EventHandlerFlag
+
+    poll: c_void_p  # func EventHandlerPoll
+
+# source/blender/blenkernel/BKE_context.h | rev 362
+class bContextPollMsgDyn_Params(StructBase):
+    get_fn: c_void_p
+    free_fn: c_void_p
+    user_data: c_void_p
+
+# noinspection PyTypeHints
+# makesdna\DNA_screen_types.h | rev 362
+class bScreen(StructBase):
+    id: lambda: ID
+    vertbase: ListBase
+    edgebase: ListBase
+    areabase: ListBase
+    regionbase: lambda: ListBase(ARegion)
+    scene: c_void_p  # Scene, DNA_DEPRECATED
+    flag: c_short
+    winid: c_short
+    redraws_flag: c_short
+    temp: c_char
+    state: c_char
+    do_draw: c_char
+    do_refresh: c_char
+    do_draw_gesture: c_char
+    do_draw_paintcursor: c_char
+    do_draw_drag: c_char
+    skip_handling: c_char
+    scrubbing: c_char
+    _pad1: c_char * 1
+    active_region: lambda: POINTER(ARegion)
+    animtimer: c_void_p  # wmTimer
+    context: c_void_p
+    tooltip: c_void_p  # wmTooltipState
+    preview: c_void_p  # PreviewImage
+
+# noinspection PyTypeHints
+# source/blender/blenkernel/BKE_screen.h | rev 362
+class SpaceType(StructBase):
+    next: lambda: POINTER(SpaceType)
+    prev: lambda: POINTER(SpaceType)
+
+    name: c_char * 64  # BKE_ST_MAXNAME
+    spaceid: c_int
+    iconid: c_int
+
+    create: c_void_p
+    free: lambda: CFUNCTYPE(None, c_void_p)  # SpaceLink
+    init: c_void_p
+    exit: c_void_p
+    listener: c_void_p
+
+    deactivate: lambda: CFUNCTYPE(None, POINTER(ScrArea))
+    refresh: c_void_p
+    duplicate: c_void_p
+
+    operatortypes: c_void_p
+    keymap: c_void_p
+    dropboxes: c_void_p
+
+    gizmos: c_void_p
+    context: c_void_p
+    id_remap: c_void_p
+
+    space_subtype_get: c_void_p
+    space_subtype_set: c_void_p
+    space_subtype_item_extend: c_void_p
+
+    if version > (3, 3, 0):
+        blend_read_data: c_void_p
+        blend_read_lib: c_void_p
+        blend_write: c_void_p
+
+    regiontypes: lambda: ListBase(ARegionType)
+    keymapflag: c_int
+
+
+# noinspection PyTypeHints
+# source/blender/blenkernel/BKE_screen.h | rev 362
+class ARegionType(StructBase):
+    next: lambda: POINTER(ARegionType)
+    prev: lambda: POINTER(ARegionType)
+
+    regionid: c_int
+
+    init: c_void_p
+    exit: c_void_p
+
+    if version > (3, 5):
+        poll: c_void_p
+
+    draw: lambda: CFUNCTYPE(None, POINTER(bContext), POINTER(ARegion))
+
+    if version > (2, 83):
+        draw_overlay: c_void_p
+
+    layout: c_void_p
+    snap_size: c_void_p
+    listener: lambda: CFUNCTYPE(None, c_void_p)
+    message_subscribe: c_void_p
+
+    free: c_void_p
+
+    duplicate: c_void_p
+
+    operatortypes: c_void_p
+    keymap: c_void_p
+
+    # Cursor handler
+    cursor: lambda: CFUNCTYPE(None, POINTER(wmWindow), POINTER(ScrArea), POINTER(ARegion))
+
+    context: c_void_p  # bContextDataCallback
+
+    if version > (2, 83):
+        on_view2d_changed: c_void_p
+
+    drawcalls: ListBase
+    paneltypes: ListBase
+    headertypes: ListBase
+
+    minsize: vec2i
+    prefsize: vec2i
+    keymapflag: c_int
+    do_lock: c_short
+    lock: c_short
+    clip_gizmo_events_by_ui: c_bool
+    event_cursor: c_short
+
+
+# source/blender/makesdna/DNA_screen_types.h | rev 362
+class ARegion_Runtime(StructBase):
+    category: c_char_p
+
+    visible_rect: rcti
+
+    offset_x: c_int
+    offset_y: c_int
+
+    block_name_map: c_void_p  # GHash
+
+
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_space_types.h | rev 362
+class SpaceLink(StructBase):
+    next: lambda: POINTER(SpaceLink)
+    prev: lambda: POINTER(SpaceLink)
+
+    regionbase: ListBase(ARegion)
+    spacetype: c_char
+    link_flag: c_char
+    _pad0: c_char * 6
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_screen_types.h | rev 362
+class ScrArea(StructBase):
+    next:                   lambda: POINTER(ScrArea)
+    prev:                   lambda: POINTER(ScrArea)
+
+    v1:                     c_void_p  # ScrVert
+    v2:                     c_void_p  # ScrVert
+    v3:                     c_void_p  # ScrVert
+    v4:                     c_void_p  # ScrVert
+
+    full:                   c_void_p  # bScreen
+    totrct:                 rcti
+
+    spacetype:              c_char
+    butspacetype:           c_char
+    butspacetype_subtype:   c_short
+
+    win:                    vec2s
+    headertype:             c_char  # DNA_DEPRECATED
+    do_refresh:             c_char
+    flag:                   c_short
+
+    region_active_win:      c_short
+    _pad2:                  c_char * 2
+
+    type:                   POINTER(SpaceType)
+    global_:                c_void_p  # ScrGlobalAreaData
+    spacedata:              ListBase(SpaceLink)  # SpaceLink
+    regionbase:             ListBase(ARegion)
+    handlers:               lambda : ListBase(wmEventHandler)  # wmEventHandler and wmEventHandler_Op
+    actionzones:            ListBase  # AZone
+    runtime:                ScrArea_Runtime
+
+    @property
+    def action_zones(self):
+        az = self.actionzones.first
+        while az:
+            yield az.contents
+            az = az.contents.prev
+
+# noinspection PyTypeHints
+class wm(StructBase):
+    manager: lambda: POINTER(wmWindowManager)
+    window: lambda: POINTER(wmWindow)
+    workspace: c_void_p  # WorkSpace
+    screen: c_void_p  # bScreen
+    area: lambda: POINTER(ScrArea)
+    region: lambda: POINTER(ARegion)
+    menu: lambda: POINTER(ARegion)
+    gizmo_group: c_void_p  # wmGizmoGroup
+    store: c_void_p  # bContextStore
+
+    operator_poll_msg: c_char_p
+    operator_poll_msg_dyn_params: bContextPollMsgDyn_Params
+
+class bContext_data(StructBase):
+    main: c_void_p  # Main
+    scene: c_void_p  # Scene
+    recursion: c_int
+    py_init: c_bool
+    py_context: c_void_p
+    py_context_orig: c_void_p
+
+# source/blender/blenkernel/intern/context.cc | rev 362
+class bContext(StructBase):
+    thread: c_int
+    wm: wm
+    data: bContext_data
+
 
 # noinspection PyTypeHints
 # source\blender\makesdna\DNA_windowmanager_types.h
@@ -1086,7 +1796,7 @@ class wmWindow(StructBase):
     if version <= (4, 4, 3):
         event_queue: ListBase
     handlers: ListBase(wmEventHandler)
-    modalhandlers: ListBase(wmEventHandler)
+    modalhandlers: lambda : ListBase(wmEventHandler)
     gesture: ListBase
     stereo3d_format: c_void_p
     drawcalls: ListBase
@@ -1102,6 +1812,60 @@ class wmWindow(StructBase):
         runtime: c_void_p
         _pad3: c_void_p
 
+
+# noinspection PyTypeHints
+# source/blender/makesdna/DNA_windowmanager_types.h | rev 362
+class wmOperator(StructBase):
+    next:           lambda: POINTER(wmOperator)
+    prev:           lambda: POINTER(wmOperator)
+
+    idname:         c_char * 64  # OP_MAX_TYPENAME
+    properties:     c_void_p     # IDProperty
+    type:           lambda: POINTER(wmOperatorType)
+    customdata:     c_void_p
+    pyinstance:     c_void_p
+    ptr:            lambda: POINTER(PointerRNA)
+    reports:        c_void_p  # ReportList
+    macro:          ListBase
+    opm:            lambda: POINTER(wmOperator)
+    layout:         c_void_p  # uiLayout
+    flag:           c_short
+    _pad6:          c_char * 6
+
+
+# noinspection PyTypeHints
+# source/blender/windowmanager/WM_types.h | rev 362
+class wmOperatorType(StructBase):
+    name:                   c_char_p
+    idname:                 c_char_p
+    translation_context:    c_char_p
+    description:            c_char_p
+    undo_group:             c_char_p
+
+    exec:                   CFUNCTYPE(c_int, POINTER(bContext), POINTER(wmOperator))
+    check:                  POINTER(c_bool)
+    invoke:                 CFUNCTYPE(c_int, POINTER(bContext), POINTER(wmOperator), POINTER(wmEvent))
+    cancel:                 CFUNCTYPE(None, POINTER(bContext), POINTER(wmOperator))
+    modal:                  CFUNCTYPE(c_int, POINTER(bContext), POINTER(wmOperator), POINTER(wmEvent))
+    poll:                   CFUNCTYPE(c_bool, POINTER(bContext))
+    poll_property:          CFUNCTYPE(c_bool, POINTER(bContext), POINTER(wmOperator), c_void_p)  # PropertyRNA
+    ui:                     CFUNCTYPE(None, POINTER(bContext), POINTER(wmOperator))
+    get_name:               lambda: CFUNCTYPE(c_char_p, POINTER(wmOperatorType), POINTER(PointerRNA))
+    get_description:        lambda: CFUNCTYPE(c_char_p, POINTER(bContext), POINTER(wmOperatorType), POINTER(PointerRNA))
+    srna:                   c_void_p  # StructRNA
+
+    last_properties:        c_void_p  # IDProperty
+    prop:                   c_void_p  # PropertyRNA
+    macro:                  ListBase  # wmOperatorTypeMacro
+    modalkeymap:            c_void_p  # wmKeyMap
+    pyop_poll:              lambda: CFUNCTYPE(c_bool, POINTER(bContext), POINTER(wmOperatorType))
+    rna_ext:                c_void_p * 4  # ExtensionRNA
+
+    if version > (2, 93):
+        cursor_pending:     c_int
+
+    flag:                   c_short
+
 class context(StructBase):  # Anonymous
     # noinspection PyTypeHints
     win: lambda: POINTER(wmWindow)
@@ -1109,34 +1873,12 @@ class context(StructBase):  # Anonymous
     region: c_void_p  # ARegion ptr
     region_type: c_short
 
+
 # noinspection PyTypeHints
-class wmEvent(StructBase):
-    next: lambda: POINTER(wmEvent)
-    prev: lambda: POINTER(wmEvent)
-
-    # Event code itself (short, is also in key-map).
-    type: c_short
-    # Press, release, scroll-value.
-    val: c_short
-    # Mouse pointer position, screen coord.
-    xy: c_int * 2
-    # Region relative mouse position (name convention before Blender 2.5).
-    mval: c_int * 2
-    # A single UTF8 encoded character.
-    utf8_buf: c_char * 6
-    # Modifier states: #KM_SHIFT, #KM_CTRL, #KM_ALT, #KM_OSKEY & #KM_HYPER.
-    modifier: c_uint8
-    # The direction (for #KM_PRESS_DRAG events only).
-    direction: c_char
-    # Raw-key modifier (allow using any key as a modifier).
-    # Compatible with values in `type`.
-    keymodifier: c_short
-    # ...
-
 # source\blender\windowmanager\wm_event_system.h
 class wmEventHandler_Op(StructBase):
     head: wmEventHandler
-    op: c_void_p  # wmOperator
+    op: lambda: POINTER(wmOperator)
     is_file_select: c_bool
     context: context
 
@@ -1196,28 +1938,39 @@ class CustomDataLayer(StructBase):
         active_mask: c_int
 
     uid: c_int
-    if version >= (3, 5, 0):
+    if version <= (3, 4, 1):
+        name: c_char * 64
+    else:
         name: c_char * 68
         _pad1: c_char * 4
-    else:
-        name: c_char * 64
     data: c_void_p
 
-    sharing_info: c_void_p
+    # NOTE: This is beyond my understanding. These fields aren't affected at all, but because of it, everything breaks.
+    # if version >= (3, 0, 0):
+    #     anonymous_id: c_void_p
+
+    if version >= (3, 6, 0):
+        sharing_info: c_void_p
 
 
 # noinspection PyTypeHints
 class CustomData(StructBase):
+    # NOTE: Adding CustomData layers to a bmesh will invalidate any existing pointers
     layers: lambda: POINTER(CustomDataLayer)
 
-    if version >= (3, 4, 0):
-        typemap: c_int * 53
-    else:
-        if version >= (3, 2, 0):
-            typemap: c_int * 52
-        else:
-            typemap: c_int * 50
+
+    if version <= (2, 82, 0):
+        typemap: c_int * 42
         _pad1: c_char * 4
+    elif version <= (2, 83, 20):
+        typemap: c_int * 47
+    elif version <= (2, 93, 9):
+        typemap: c_int * 51
+    elif version <= (3, 6, 23):
+        typemap: c_int * 52
+        _pad1: c_char * 4
+    else:
+        typemap: c_int * 53
 
     totlayer: c_int
     maxlayer: c_int
@@ -1236,6 +1989,7 @@ class CustomData(StructBase):
         return layer_index + self.layers[layer_index].active
 
 
+
 class CBMesh(StructBase):
     totvert: c_int
     totedge: c_int
@@ -1246,6 +2000,7 @@ class CBMesh(StructBase):
     totfacesel: c_int
 
     elem_index_dirty: c_char
+    elem_table_dirty: c_char
 
     vpool: c_void_p
     epool: c_void_p
@@ -1264,7 +2019,16 @@ class CBMesh(StructBase):
     etoolflagpool: c_void_p
     ftoolflagpool: c_void_p
 
-    use_toolflags: c_bool
+    if version >= (5, 0, 0):
+        use_toolflags: c_bool
+    else:
+        # if version >= (4, 2, 0) and version <= (4, 2, 1):
+        #     use_toolflags: c_bool
+        # else:
+        use_toolflags: c_uint
+
+    if version <= (2, 82, 0):
+        currentop: c_void_p
 
     if version >= (5, 0, 0):
         uv_select_sync_valid: c_bool
