@@ -1926,6 +1926,7 @@ class wmKeyMapItem(StructBase):
 
 
 # noinspection PyTypeHints
+# NOTE: This need for the pointer arithmetic in `CustomData.layers`. That is why it is important to preserve each structure.
 class CustomDataLayer(StructBase):
     type: c_int
     offset: c_int
@@ -1945,19 +1946,18 @@ class CustomDataLayer(StructBase):
         _pad1: c_char * 4
     data: c_void_p
 
-    # NOTE: This is beyond my understanding. These fields aren't affected at all, but because of it, everything breaks.
-    # if version >= (3, 0, 0):
-    #     anonymous_id: c_void_p
+    # This breaks the pointer arithmetic in `CustomData.layers`.
+    if (3, 0, 0) <= version <= (4, 2, 23):
+        anonymous_id: c_void_p
 
     if version >= (3, 6, 0):
         sharing_info: c_void_p
 
 
 # noinspection PyTypeHints
+# NOTE: Adding CustomData layers to a bmesh will invalidate any existing pointers.
 class CustomData(StructBase):
-    # NOTE: Adding CustomData layers to a bmesh will invalidate any existing pointers
     layers: lambda: POINTER(CustomDataLayer)
-
 
     if version <= (2, 82, 0):
         typemap: c_int * 42
@@ -1988,6 +1988,9 @@ class CustomData(StructBase):
         assert layer_index != -1
         return layer_index + self.layers[layer_index].active
 
+    def __str__(self):
+        layers = [self.layers[i].name.decode("utf-8", errors="replace") for i in range(int(self.totlayer))]
+        return f"Total Layer: {self.totlayer!r} Max Size: {self.maxlayer!r} Tot Size: {self.totsize!r}: Names: {layers}"
 
 
 class CBMesh(StructBase):

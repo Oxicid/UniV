@@ -745,7 +745,7 @@ Some operators, can interact with trims:
             split.prop(self, 'km_show_only_error', toggle=True)
 
             sub_row = split.row(align=True)
-            if bpy.app.version >= (4, 0, 0):
+            if bpy.app.version >= (4, 1, 0):
                 sub_row.prop(self, "km_name_filter", text="", icon='SORTALPHA', placeholder="Search by Name")
                 sub_row.prop(self, "km_key_filter", text="", icon='KEYINGSET', placeholder="Search by Key-Binding")
             else:
