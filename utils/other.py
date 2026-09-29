@@ -280,11 +280,27 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
     lib_filename = f"{lib_prefix}{lib_name}.{lib_ext}"
     candidates = list(univ_dir.rglob(lib_filename))
 
+    import time
+    import shutil
+    import tempfile
+
     lib = None
     last_err = None
     from ctypes import CDLL
     for p in candidates:
         try:
+            current_time = time.strftime("%Y%m%d-%H%M%S")
+            temp_lib_filename = f"{lib_prefix}{lib_name}_{current_time}.{lib_ext}"
+            tmp = Path(tempfile.gettempdir()) / temp_lib_filename
+            try:
+                shutil.copy2(p, tmp)
+                p = tmp
+            except:  # noqa
+                print(f"UniV: Cant copy {lib_name!r} library to temp folder, for avoid locking when reload/remove addon.")
+                import traceback
+                traceback.print_exc()
+
+            # TODO: Check versions.
             lib = CDLL(str(p))
             break
         except OSError as e:
