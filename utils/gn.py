@@ -25,6 +25,7 @@ class NewLinks:
 
 class GN_IsUVEdgeBoundary:
     name = "Is UV Edge Boundary"
+
     @classmethod
     def get(cls):
         for ng in reversed(bpy.data.node_groups):
@@ -141,7 +142,6 @@ class GN_IsUVEdgeBoundary:
         bit_or_02.operation = "OR"
         bit_or_02.location = (850, 0)
 
-
         # Initialize links
         new_links = NewLinks(group)
 
@@ -190,8 +190,18 @@ class GN_IsUVEdgeBoundary:
         if sockets_count != 23:
             return True
 
-        all_nodes_types = {'FIELD_AT_INDEX', 'INDEX', 'REROUTE', 'INPUT_ATTRIBUTE', 'OFFSET_CORNER_IN_FACE',
-                           'BOOLEAN_MATH', 'GROUP_OUTPUT', 'COMPARE', 'GROUP_INPUT', 'CORNERS_OF_EDGE'}
+        all_nodes_types = {
+            "FIELD_AT_INDEX",
+            "INDEX",
+            "REROUTE",
+            "INPUT_ATTRIBUTE",
+            "OFFSET_CORNER_IN_FACE",
+            "BOOLEAN_MATH",
+            "GROUP_OUTPUT",
+            "COMPARE",
+            "GROUP_INPUT",
+            "CORNERS_OF_EDGE",
+        }
         if {n.type for n in group.nodes} != all_nodes_types:
             return True
 

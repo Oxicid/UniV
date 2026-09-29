@@ -15,8 +15,8 @@ from bmesh.types import BMFace, BMEdge, BMLoop
 
 from .. import utils
 
+USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, "uv_select_sync_valid")
 
-USE_GENERIC_UV_SYNC = hasattr(bmesh.types.BMesh, 'uv_select_sync_valid')
 
 class FakeBMesh:
     def __init__(self, isl):
@@ -36,10 +36,12 @@ class UMesh:
         self._sync_invalidate: bool = False  # Need for 3D operators
         # self.islands_calc_type
         # self.islands_calc_subtype
-        self.value: float | int | utils.NoInit | None = utils.NoInit()  # value for different purposes
+        self.value: float | int | utils.NoInit | None = (
+            utils.NoInit()
+        )  # value for different purposes
         self.other = utils.NoInit()
         self.aspect: float = 1.0
-        self.sequence: list[BMFace | BMEdge | BMLoop] | list['AdvIsland'] | typing.Any = []  # noqa
+        self.sequence: list[BMFace | BMEdge | BMLoop] | list["AdvIsland"] | typing.Any = []  # noqa
 
     def update(self, force=False):
         if not self.update_tag:
@@ -68,14 +70,14 @@ class UMesh:
     def sync_valid(self):
         if self._sync_invalidate:
             return False
-        return getattr(self.bm, 'uv_select_sync_valid', False)
+        return getattr(self.bm, "uv_select_sync_valid", False)
 
     @sync_valid.setter
     def sync_valid(self, state: bool):
-        if hasattr(self.bm, 'uv_select_sync_valid'):
+        if hasattr(self.bm, "uv_select_sync_valid"):
             self.bm.uv_select_sync_valid = state
 
-    def sync_from_mesh_if_needed(self, sticky=''):
+    def sync_from_mesh_if_needed(self, sticky=""):
         if USE_GENERIC_UV_SYNC:
             if not self.bm.uv_select_sync_valid:
                 if sticky:
@@ -96,85 +98,105 @@ class UMesh:
         if vert:
             self.bm.verts.ensure_lookup_table()
 
-    def check_uniform_scale(self, report=None, threshold=0.01) -> 'mathutils.Vector | None':
+    def check_uniform_scale(self, report=None, threshold=0.01) -> "mathutils.Vector | None":
         _, _, scale = self.obj.matrix_world.decompose()
         if not utils.umath.vec_isclose_to_uniform(scale, threshold):
             if report:
-                report({'WARNING'}, f"The {self.obj.name!r} hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}")
+                report(
+                    {"WARNING"},
+                    f"The {self.obj.name!r} hasn't applied scale: X={scale.x:.4f}, Y={scale.y:.4f}, Z={scale.z:.4f}",
+                )
             return scale
         return None
 
     def check_faces_exist(self, report=None):
         if not self.bm.faces:
             if report:
-                report({'WARNING'}, f"Object {self.obj.name} has no faces")
+                report({"WARNING"}, f"Object {self.obj.name} has no faces")
             return False
         return True
 
     @property
     def is_full_face_selected(self):
         from .. import btypes
+
         return btypes.PyBMesh.is_full_face_selected(self.bm)
 
     @property
     def is_full_face_selected_for_avoid_force_explicit_check(self):
         """In Vertex and Edge modes, BMFace.uv_select can be False and BMFace.select can be True.
-        This check avoids problems with such behavior by forcing explicit checking of UV selection tags."""
+        This check avoids problems with such behavior by forcing explicit checking of UV selection tags.
+        """
         from .. import btypes
-        return btypes.PyBMesh.is_full_face_selected(self.bm) and self.sync and (not self.sync_valid or self.elem_mode == 'FACE')
+
+        return (
+            btypes.PyBMesh.is_full_face_selected(self.bm)
+            and self.sync
+            and (not self.sync_valid or self.elem_mode == "FACE")
+        )
 
     @property
     def is_full_face_deselected(self):
         from .. import btypes
+
         return btypes.PyBMesh.fields(self.bm).totfacesel == 0
 
     @property
     def is_full_edge_selected(self):
         from .. import btypes
+
         return btypes.PyBMesh.is_full_edge_selected(self.bm)
 
     @property
     def is_full_edge_deselected(self):
         from .. import btypes
+
         return btypes.PyBMesh.is_full_edge_deselected(self.bm)
 
     @property
     def is_full_vert_selected(self):
         from .. import btypes
+
         return btypes.PyBMesh.is_full_vert_selected(self.bm)
 
     @property
     def is_full_vert_deselected(self):
         from .. import btypes
+
         return btypes.PyBMesh.is_full_vert_deselected(self.bm)
 
     @property
     def total_vert_sel(self):
         from .. import btypes
+
         return btypes.PyBMesh.fields(self.bm).totvertsel
 
     @property
     def total_edge_sel(self):
         from .. import btypes
+
         return btypes.PyBMesh.fields(self.bm).totedgesel
 
     @property
     def total_face_sel(self):
         from .. import btypes
+
         return btypes.PyBMesh.fields(self.bm).totfacesel
 
     @property
     def total_corners(self):
         from .. import btypes
+
         return btypes.PyBMesh.fields(self.bm).totloop
 
     if USE_GENERIC_UV_SYNC:
+
         def has_selected_uv_faces(self) -> bool:
             if not self.total_face_sel:
                 return False
 
             if self.sync:
-                if self.elem_mode == 'FACE' or not self.sync_valid:
+                if self.elem_mode == "FACE" or not self.sync_valid:
                     return bool(self.total_face_sel)
                 if self.is_full_face_selected:
                     return any(f.uv_select for f in self.bm.faces)
@@ -184,7 +206,9 @@ class UMesh:
                 return any(f.uv_select for f in self.bm.faces)
             else:
                 return any(f.uv_select for f in self.bm.faces if f.select)
+
     else:
+
         def has_selected_uv_faces(self) -> bool:
             if not self.total_face_sel:
                 return False
@@ -194,25 +218,31 @@ class UMesh:
 
             uv = self.uv
             if self.is_full_face_selected:
-                if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+                if bpy.context.tool_settings.uv_select_mode == "EDGE":
                     return any(all(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
                 return any(all(crn[uv].select for crn in f.loops) for f in self.bm.faces)
             else:
-                if bpy.context.tool_settings.uv_select_mode == 'EDGE':
-                    return any(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
-                return any(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+                if bpy.context.tool_settings.uv_select_mode == "EDGE":
+                    return any(
+                        all(crn[uv].select_edge for crn in f.loops) and f.select
+                        for f in self.bm.faces
+                    )
+                return any(
+                    all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces
+                )
 
     if USE_GENERIC_UV_SYNC:
+
         def has_selected_uv_edges(self) -> bool:
             if self.sync:
                 if not self.total_edge_sel:
                     return False
-                elif self.total_face_sel and (self.elem_mode == 'FACE' or not self.sync_valid):
+                elif self.total_face_sel and (self.elem_mode == "FACE" or not self.sync_valid):
                     return True
                 else:
                     for e in self.bm.edges:
                         if e.select:
-                            for crn in getattr(e, 'link_loops', ()):
+                            for crn in getattr(e, "link_loops", ()):
                                 if not crn.face.hide:
                                     return True
                     return False
@@ -222,8 +252,12 @@ class UMesh:
 
             if self.is_full_face_selected:
                 return any(any(crn.uv_select_edge for crn in f.loops) for f in self.bm.faces)
-            return any(any(crn.uv_select_edge for crn in f.loops) for f in self.bm.faces if f.select)
+            return any(
+                any(crn.uv_select_edge for crn in f.loops) for f in self.bm.faces if f.select
+            )
+
     else:
+
         def has_selected_uv_edges(self) -> bool:
             if self.sync:
                 if not self.total_edge_sel:
@@ -242,7 +276,9 @@ class UMesh:
             uv = self.uv
             if self.is_full_face_selected:
                 return any(any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
-            return any(f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
+            return any(
+                f.select and any(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces
+            )
 
     if USE_GENERIC_UV_SYNC:
         # TODO: Fix Select OT. Selected verts in edge mode without selected edges (fix that)
@@ -255,7 +291,7 @@ class UMesh:
                 else:
                     for v in self.bm.verts:
                         if v.select:
-                            for crn in getattr(v, 'link_loops', ()):
+                            for crn in getattr(v, "link_loops", ()):
                                 if not crn.face.hide:
                                     return True
                     return False
@@ -265,8 +301,12 @@ class UMesh:
 
             if self.is_full_face_selected:
                 return any(any(crn.uv_select_vert for crn in f.loops) for f in self.bm.faces)
-            return any(any(crn.uv_select_vert for crn in f.loops) for f in self.bm.faces if f.select)
+            return any(
+                any(crn.uv_select_vert for crn in f.loops) for f in self.bm.faces if f.select
+            )
+
     else:
+
         def has_selected_uv_verts(self) -> bool:
             if self.sync:
                 if not self.total_vert_sel:
@@ -295,7 +335,10 @@ class UMesh:
 
     def has_partial_selected_uv_faces(self):
         if self.sync:
-            if self.is_full_face_deselected or self.is_full_face_selected_for_avoid_force_explicit_check:
+            if (
+                self.is_full_face_deselected
+                or self.is_full_face_selected_for_avoid_force_explicit_check
+            ):
                 return False
         else:
             if self.is_full_face_deselected:
@@ -307,7 +350,10 @@ class UMesh:
 
     def has_partial_selected_uv_edges(self):
         if self.sync:
-            if self.is_full_edge_deselected or self.is_full_face_selected_for_avoid_force_explicit_check:
+            if (
+                self.is_full_edge_deselected
+                or self.is_full_face_selected_for_avoid_force_explicit_check
+            ):
                 return False
         else:
             if self.is_full_face_deselected:
@@ -319,7 +365,10 @@ class UMesh:
 
     def has_partial_selected_uv_verts(self):
         if self.sync:
-            if self.is_full_vert_deselected or self.is_full_face_selected_for_avoid_force_explicit_check:
+            if (
+                self.is_full_vert_deselected
+                or self.is_full_face_selected_for_avoid_force_explicit_check
+            ):
                 return False
         else:
             if self.is_full_face_deselected:
@@ -330,6 +379,7 @@ class UMesh:
         return not utils.all_equal(corners, vert_select_get)
 
     if USE_GENERIC_UV_SYNC:
+
         def has_full_selected_uv_faces(self) -> bool:
             if self.is_full_face_deselected:
                 return False
@@ -347,11 +397,12 @@ class UMesh:
                         return all(f.uv_select for f in self.bm.faces)
                     return all(f.uv_select for f in self.bm.faces if not f.hide)
 
-
             if self.is_full_face_selected:
                 return all(f.uv_select for f in self.bm.faces)
             return all(f.uv_select and f.select for f in self.bm.faces)
+
     else:
+
         def has_full_selected_uv_faces(self) -> bool:
             if self.is_full_face_deselected:
                 return False
@@ -362,14 +413,18 @@ class UMesh:
                 return all(f.select for f in self.bm.faces if not f.hide)
 
             uv = self.uv
-            if bpy.context.tool_settings.uv_select_mode == 'EDGE':
+            if bpy.context.tool_settings.uv_select_mode == "EDGE":
                 if self.is_full_face_selected:
                     return all(all(crn[uv].select_edge for crn in f.loops) for f in self.bm.faces)
-                return all(all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces)
+                return all(
+                    all(crn[uv].select_edge for crn in f.loops) and f.select for f in self.bm.faces
+                )
             else:
                 if self.is_full_face_selected:
                     return all(all(crn[uv].select for crn in f.loops) for f in self.bm.faces)
-                return all(all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces)
+                return all(
+                    all(crn[uv].select for crn in f.loops) and f.select for f in self.bm.faces
+                )
 
     def has_visible_uv_faces(self) -> bool:
         if self.total_face_sel:
@@ -380,18 +435,18 @@ class UMesh:
 
     @property
     def smooth_angle(self):
-        if hasattr(self.obj.data, 'use_auto_smooth'):
+        if hasattr(self.obj.data, "use_auto_smooth"):
             if self.obj.data.use_auto_smooth:
                 return self.obj.data.auto_smooth_angle  # noqa
         else:
             for mod in self.obj.modifiers:
-                if isinstance(mod, bpy.types.NodesModifier) and 'Smooth by Angle' in mod.name:
+                if isinstance(mod, bpy.types.NodesModifier) and "Smooth by Angle" in mod.name:
                     if not (mod.show_in_editmode and mod.show_viewport):
                         continue
 
                     gn_mod = utils.GN(mod, print_missed_socket=True)
-                    if 'Input_1' in gn_mod:
-                        value = gn_mod['Input_1']
+                    if "Input_1" in gn_mod:
+                        value = gn_mod["Input_1"]
                         if isinstance(value, float):
                             return value
                     break
@@ -444,6 +499,7 @@ class UMesh:
                         crn.tag = s_tag
 
     if USE_GENERIC_UV_SYNC:
+
         def tag_selected_corners(self, both=False):
             corners = (_crn for f in self.bm.faces for _crn in f.loops)
             if self.sync:
@@ -460,7 +516,7 @@ class UMesh:
                             for crn in f.loops:
                                 crn.tag = crn.edge.select
                 else:
-                    if self.elem_mode == 'FACE':
+                    if self.elem_mode == "FACE":
                         for f in self.bm.faces:
                             if f.uv_select and not f.hide:
                                 for crn in f.loops:
@@ -497,7 +553,9 @@ class UMesh:
                             else:
                                 for crn in f.loops:
                                     crn.tag = False
+
     else:
+
         def tag_selected_corners(self, both=False):
             corners = (_crn for f in self.bm.faces for _crn in f.loops)
             if self.sync:
@@ -505,7 +563,7 @@ class UMesh:
                     for crn in corners:
                         crn.tag = True
                 else:
-                    if self.elem_mode == 'FACE':
+                    if self.elem_mode == "FACE":
                         if self.is_full_face_deselected:
                             for crn in corners:
                                 crn.tag = False
@@ -546,7 +604,6 @@ class UMesh:
                             else:
                                 for crn in f.loops:
                                     crn.tag = False
-
 
     def tag_visible_faces(self):
         if self.sync:
@@ -594,7 +651,9 @@ class UMesh:
                         crn.edge.seam = True
                         continue
                     seam = not (
-                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv
+                        and crn.link_loop_next[uv].uv == shared_crn_[uv].uv
+                    )
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -607,7 +666,9 @@ class UMesh:
                         crn.edge.seam = True
                         continue
                     seam = not (
-                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn_[uv].uv)
+                        crn[uv].uv == shared_crn_.link_loop_next[uv].uv
+                        and crn.link_loop_next[uv].uv == shared_crn_[uv].uv
+                    )
                     if additional:
                         crn.edge.seam |= seam
                     else:
@@ -616,12 +677,12 @@ class UMesh:
     def verify_uv(self):
         layers_uv = self.bm.loops.layers.uv
         if not layers_uv:
-            self.uv = layers_uv.new('UVMap')
+            self.uv = layers_uv.new("UVMap")
         else:
             self.uv = self.bm.loops.layers.uv.verify()
 
     @contextlib.contextmanager
-    def temp_override_mode(self, mode: str = 'FACE'):
+    def temp_override_mode(self, mode: str = "FACE"):
         saved_mode = self.bm.select_mode
         try:
             self.bm.select_mode = {mode}
@@ -645,22 +706,24 @@ class UMeshes:
             self.umeshes: list[UMesh] = umeshes
         self.report_obj = report
         self.sync: bool = utils.sync()
-        self._elem_mode: typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND'] = self._elem_mode_init()
-        self.is_edit_mode = bpy.context.mode == 'EDIT_MESH'
+        self._elem_mode: typing.Literal["VERT", "EDGE", "FACE", "ISLAND"] = self._elem_mode_init()
+        self.is_edit_mode = bpy.context.mode == "EDIT_MESH"
 
-    def report(self, info_type={'INFO'}, info="No uv for manipulate"):  # noqa
+    def report(self, info_type={"INFO"}, info="No uv for manipulate"):  # noqa
         if self.report_obj is None:
             print(info_type, info)
             return
         self.report_obj(info_type, info)
 
     # TODO: Make parameters only kw
-    def update(self, force=False, info_type={'INFO'}, info="No uv for manipulate"):  # noqa #pylint: disable=dangerous-default-value
+    def update(
+        self, force=False, info_type={"INFO"}, info="No uv for manipulate"
+    ):  # noqa #pylint: disable=dangerous-default-value
         if sum(umesh.update(force=force) for umesh in self.umeshes):
-            return {'FINISHED'}
+            return {"FINISHED"}
         if info:
             self.report(info_type, info)
-        return {'CANCELLED'}
+        return {"CANCELLED"}
 
     def silent_update(self):
         for umesh in self:
@@ -680,7 +743,7 @@ class UMeshes:
         return self._elem_mode
 
     @elem_mode.setter
-    def elem_mode(self, mode: typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']):
+    def elem_mode(self, mode: typing.Literal["VERT", "EDGE", "FACE", "ISLAND"]):
         if self._elem_mode != mode:
             self._elem_mode = mode
             if self.sync:
@@ -698,20 +761,19 @@ class UMeshes:
             umesh.elem_mode = mode
         return mode
 
-
-
     def ensure(self, face=True, edge=False, vert=False):
         for umesh in self.umeshes:
             umesh.ensure(face, edge, vert)
 
     if USE_GENERIC_UV_SYNC:
+
         def deselect_all_elem(self):
             for umesh in self:
                 if umesh.is_full_vert_deselected:
                     continue
 
                 if self.sync:
-                    if self._elem_mode == 'FACE':
+                    if self._elem_mode == "FACE":
                         if umesh.is_full_face_deselected:
                             continue
 
@@ -738,14 +800,16 @@ class UMeshes:
                             crn.face.uv_select = False
                             crn.uv_select_vert = False
                             crn.uv_select_edge = False
+
     else:
+
         def deselect_all_elem(self):
             for umesh in self:
                 if umesh.is_full_vert_deselected:
                     continue
 
                 if self.sync:
-                    if self._elem_mode == 'FACE':
+                    if self._elem_mode == "FACE":
                         if umesh.is_full_face_deselected:
                             continue
                         umesh.update_tag = True
@@ -771,11 +835,11 @@ class UMeshes:
 
     @staticmethod
     def loop_for_object_mode_processing(without_selection=True):
-        assert bpy.context.mode == 'EDIT_MESH'
+        assert bpy.context.mode == "EDIT_MESH"
         active = bpy.context.active_object
-        selected_objects = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
+        selected_objects = [obj for obj in bpy.context.selected_objects if obj.type == "MESH"]
 
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+        bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
         if without_selection:
             for obj in selected_objects:
                 yield obj
@@ -793,7 +857,7 @@ class UMeshes:
                 obj.select_set(True)
         if not without_selection:
             bpy.context.view_layer.objects.active = active
-        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+        bpy.ops.object.mode_set(mode="EDIT", toggle=False)
 
     def set_sync(self, state=True):
         for umesh in self:
@@ -816,8 +880,8 @@ class UMeshes:
 
     def fix_context(self):
         """If umesh without polygons, then it is not in the list. Set the first umesh with polygons as active,
-            so that the context of default operators (bpy.ops.uv) works correctly.
-            But it doesn't help when the operator is called via keymap."""
+        so that the context of default operators (bpy.ops.uv) works correctly.
+        But it doesn't help when the operator is called via keymap."""
         if self.umeshes:
             active_obj = bpy.context.active_object
             for umesh in self.umeshes:
@@ -839,16 +903,18 @@ class UMeshes:
     @classmethod
     def sel_ob_with_uv(cls):
         bmeshes = []
-        if bpy.context.mode == 'EDIT_MESH':
+        if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
                 if obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
                     bmeshes.append(UMesh(bm, obj))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
+                list
+            )
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH' and obj.data.uv_layers:
+                if obj.type == "MESH" and obj.data.uv_layers:
                     data_and_objects[obj.data].append(obj)
 
             for data, obj in data_and_objects.items():
@@ -860,17 +926,19 @@ class UMeshes:
 
     def _sel_ob_with_uv(self):
         bmeshes = []
-        if bpy.context.mode == 'EDIT_MESH':
+        if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
                 if obj.data.uv_layers:
                     bm = bmesh.from_edit_mesh(obj.data)
                     if bm.faces:
                         bmeshes.append(UMesh(bm, obj))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
+                list
+            )
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH' and obj.data.uv_layers and obj.data.polygons:
+                if obj.type == "MESH" and obj.data.uv_layers and obj.data.polygons:
                     data_and_objects[obj.data].append(obj)
 
             for data, objs in data_and_objects.items():
@@ -882,23 +950,31 @@ class UMeshes:
     @classmethod
     def view_layer_context_unselected_with_uv(cls):
         """Get unselected (not object.select_get()), visible meshes, with faces and with uv.
-            Need for AdjustScale in object mode.
+        Need for AdjustScale in object mode.
         """
         visible_objects = []
         area = bpy.context.area
-        if area.type == 'VIEW_3D' and not area.spaces.active.local_view:
+        if area.type == "VIEW_3D" and not area.spaces.active.local_view:
             for obj in bpy.context.view_layer.objects:
                 if obj.select_get() and not obj.visible_get():
                     continue
-                if (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
+                if (obj.type == "MESH") and obj.data.polygons and obj.data.uv_layers:
                     visible_objects.append(obj)
         else:
             depsgraph = bpy.context.evaluated_depsgraph_get()
-            spaces = (area.spaces.active for area in utils.get_areas_by_type('VIEW_3D'))
+            spaces = (area.spaces.active for area in utils.get_areas_by_type("VIEW_3D"))
             for obj in bpy.context.view_layer.objects:
-                if (not obj.select_get()) and (obj.type == 'MESH') and obj.data.polygons and obj.data.uv_layers:
+                if (
+                    (not obj.select_get())
+                    and (obj.type == "MESH")
+                    and obj.data.polygons
+                    and obj.data.uv_layers
+                ):
                     if spaces:
-                        if any(obj.evaluated_get(depsgraph).visible_in_viewport_get(space) for space in spaces):
+                        if any(
+                            obj.evaluated_get(depsgraph).visible_in_viewport_get(space)
+                            for space in spaces
+                        ):
                             visible_objects.append(obj)
                     else:
                         visible_objects.append(obj)
@@ -920,8 +996,8 @@ class UMeshes:
     def calc_all_objects_in_file(cls, verify_uv=True):
         bmeshes = []
         for obj in bpy.data.objects:
-            if obj.type == 'MESH':
-                if obj.mode == 'EDIT':
+            if obj.type == "MESH":
+                if obj.mode == "EDIT":
                     bm = bmesh.from_edit_mesh(obj.data)
                     bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
                 else:
@@ -932,18 +1008,20 @@ class UMeshes:
 
     @classmethod
     def calc_with_no_uv(cls, report=None, verify_uv=True):
-        """ Get umeshes without uv but with faces"""
+        """Get umeshes without uv but with faces"""
         bmeshes = []
-        if bpy.context.mode == 'EDIT_MESH':
+        if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
                 bm = bmesh.from_edit_mesh(obj.data)
                 if bm.faces:
                     bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
+                list
+            )
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH' and obj.data.polygons:
+                if obj.type == "MESH" and obj.data.polygons:
                     data_and_objects[obj.data].append(obj)
 
             for data, objs in data_and_objects.items():
@@ -963,17 +1041,19 @@ class UMeshes:
 
     @classmethod
     def calc_with_no_uv_and_no_faces(cls, report=None, verify_uv=True):
-        """ Get unique umeshes without uv and without faces"""
+        """Get unique umeshes without uv and without faces"""
         umeshes = []
-        if bpy.context.mode == 'EDIT_MESH':
+        if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
                 bm = bmesh.from_edit_mesh(obj.data)
                 umeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
+                list
+            )
 
             for obj in bpy.context.selected_objects:
-                if obj.type == 'MESH':
+                if obj.type == "MESH":
                     data_and_objects[obj.data].append(obj)
 
             for data, objs in data_and_objects.items():
@@ -1020,27 +1100,27 @@ class UMeshes:
         self.umeshes = selected
 
     def filter_by_selected_uv_by_context(self) -> None:
-        if self.elem_mode == 'VERT':
+        if self.elem_mode == "VERT":
             self.filter_by_selected_uv_verts()
-        elif self.elem_mode == 'EDGE':
+        elif self.elem_mode == "EDGE":
             self.filter_by_selected_uv_edges()
         else:
             self.filter_by_selected_uv_faces()
 
     def filtered_by_selected_and_visible_uv_by_context(self):
-        if self.elem_mode == 'VERT':
+        if self.elem_mode == "VERT":
             return self.filtered_by_selected_and_visible_uv_verts()
-        elif self.elem_mode == 'EDGE':
+        elif self.elem_mode == "EDGE":
             return self.filtered_by_selected_and_visible_uv_edges()
         else:
             return self.filtered_by_selected_and_visible_uv_faces()
 
     def filter_by_partial_selected_uv_elem_by_mode(self) -> None:
         for umesh in reversed(self):
-            if self.elem_mode == 'VERT':
+            if self.elem_mode == "VERT":
                 if not umesh.has_partial_selected_uv_verts():
                     self.umeshes.remove(umesh)
-            elif self.elem_mode == 'EDGE':
+            elif self.elem_mode == "EDGE":
                 if not umesh.has_partial_selected_uv_edges():
                     self.umeshes.remove(umesh)
             else:
@@ -1067,7 +1147,7 @@ class UMeshes:
             if not umesh.has_visible_uv_faces():
                 self.umeshes.remove(umesh)
 
-    def filtered_by_selected_and_visible_3d_edges(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_3d_edges(self) -> tuple["UMeshes", "UMeshes"]:
         selected = []
         visible = []
         for umesh in self:
@@ -1086,9 +1166,9 @@ class UMeshes:
         u2.umeshes = visible
         return u1, u2
 
-    def filtered_by_selected_and_visible_uv_verts(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_uv_verts(self) -> tuple["UMeshes", "UMeshes"]:
         """NOTE: Do not use this in edge mode (and face ???), as there may be cases where 'flush_select' is not called,
-        resulting in invisible selected vertices even when all edges are deselected. """
+        resulting in invisible selected vertices even when all edges are deselected."""
         selected = []
         visible = []
         for umesh in self:
@@ -1107,7 +1187,7 @@ class UMeshes:
         u2.umeshes = visible
         return u1, u2
 
-    def filtered_by_selected_and_visible_uv_edges(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_uv_edges(self) -> tuple["UMeshes", "UMeshes"]:
         selected = []
         visible = []
         for umesh in self:
@@ -1126,7 +1206,7 @@ class UMeshes:
         u2.umeshes = visible
         return u1, u2
 
-    def filtered_by_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_uv_faces(self) -> tuple["UMeshes", "UMeshes"]:
         """Warning: if bmesh has selected faces, non-selected might be without visible faces"""
         selected = []
         visible = []
@@ -1146,7 +1226,9 @@ class UMeshes:
         u2.umeshes = visible
         return u1, u2
 
-    def filtered_by_selected_and_visible_and_hidden_uv_faces(self) -> tuple['UMeshes', 'UMeshes', 'UMeshes']:
+    def filtered_by_selected_and_visible_and_hidden_uv_faces(
+        self,
+    ) -> tuple["UMeshes", "UMeshes", "UMeshes"]:
         selected = []
         visible = []
         hidden = []
@@ -1180,7 +1262,7 @@ class UMeshes:
         other.umeshes = unselect_or_invisible
         return other
 
-    def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple['UMeshes', 'UMeshes']:
+    def filtered_by_full_selected_and_visible_uv_faces(self) -> tuple["UMeshes", "UMeshes"]:
         """Filter full selected and visible with not full selected"""
         selected = []
         visible = []
@@ -1192,6 +1274,7 @@ class UMeshes:
                     visible.append(umesh)
 
         import copy
+
         u1 = copy.copy(self)
         u2 = copy.copy(self)
         u1.umeshes = selected

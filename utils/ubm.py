@@ -72,6 +72,7 @@ def calc_signed_face_area_uv(f, uv) -> float:
         first_crn_co = next_crn_co
     return area * 0.5
 
+
 def calc_signed_face_area_uv_exact_unnormalized(f, uv) -> float:
     corners = f.loops
 
@@ -84,14 +85,9 @@ def calc_signed_face_area_uv_exact_unnormalized(f, uv) -> float:
         c = l2[uv].uv
         d = l3[uv].uv
 
-        return (
-                a.cross(b) +
-                b.cross(c) +
-                c.cross(d) +
-                d.cross(a)
-        )
+        return a.cross(b) + b.cross(c) + c.cross(d) + d.cross(a)
 
-    elif n== 3:
+    elif n == 3:
         a = corners[0][uv].uv
         b = corners[1][uv].uv
         c = corners[2][uv].uv
@@ -110,7 +106,7 @@ def calc_signed_face_area_uv_exact_unnormalized(f, uv) -> float:
         res = bmesh.ops.triangulate(bm, faces=bm.faces)  # beauty by default
 
         total_area = 0.0
-        for f in res['faces']:
+        for f in res["faces"]:
             verts = f.verts
 
             a = verts[0].co.xy
@@ -126,16 +122,15 @@ def calc_signed_face_area_uv_exact_unnormalized(f, uv) -> float:
         return total_area
 
 
-
 def calc_total_area_uv(faces, uv):
     return sum(calc_face_area_uv(f, uv) for f in faces)
 
 
 def calc_total_area_3d(faces, scale):
     if scale:
-        avg_scale = (sum(abs(s_) for s_ in scale) / 3)
+        avg_scale = sum(abs(s_) for s_ in scale) / 3
         if all(isclose(abs(s_), avg_scale, abs_tol=0.01) for s_ in scale):
-            return sum(f.calc_area() for f in faces) * avg_scale ** 2
+            return sum(f.calc_area() for f in faces) * avg_scale**2
         # newell_cross
         area = 0.0
         for f in faces:
@@ -175,6 +170,7 @@ def calc_max_length_uv_crn_for_save_transform(corners, uv) -> BMLoop:
             max_length = new_length
         prev_co = curr_co
     return max_crn.link_loop_prev
+
 
 def calc_max_length_uv_crn_with_dist(corners, uv):
     max_length = -1.0
@@ -225,7 +221,7 @@ def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv: BMLayerItem):
 
 
 def is_flipped_uv(f, uv) -> bool:
-    """ NOTE: The algorithm is resistant to very small faces."""
+    """NOTE: The algorithm is resistant to very small faces."""
     area = 0.0
     corners = f.loops
     prev = corners[-1][uv].uv
@@ -266,7 +262,7 @@ def polyfill_beautify(coords) -> list[list[int]]:
     bm.normal_update()  # TODO: Test uv_parametrization with zero normal (if bad set normal to 0, 0, 1)
 
     res = bmesh.ops.triangulate(bm, faces=bm.faces)  # beauty by default
-    tris = [[v.index for v in f.verts] for f in res['faces']]
+    tris = [[v.index for v in f.verts] for f in res["faces"]]
 
     bm.free()
     return tris

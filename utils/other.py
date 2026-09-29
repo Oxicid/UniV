@@ -15,13 +15,15 @@ def get_aspect_ratio(umesh=None):
     if umesh:
         # Aspect from checker
         for m in umesh.obj.modifiers:
-            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Checker'):
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith(
+                "UniV Checker"
+            ):
                 gn_mod = GN(m, print_missed_socket=True)
-                if 'Socket_1' in gn_mod:
-                    mtl = gn_mod['Socket_1']
+                if "Socket_1" in gn_mod:
+                    mtl = gn_mod["Socket_1"]
                     if mtl:
                         for node in mtl.node_tree.nodes:
-                            if node.bl_idname == 'ShaderNodeTexImage':
+                            if node.bl_idname == "ShaderNodeTexImage":
                                 image = node.image
                                 if image:
                                     image_width, image_height = image.size
@@ -30,9 +32,9 @@ def get_aspect_ratio(umesh=None):
                 break
         # Aspect from material
         mtl = umesh.obj.active_material
-        if mtl and getattr(mtl, 'use_nodes', True):
+        if mtl and getattr(mtl, "use_nodes", True):
             active_node = mtl.node_tree.nodes.active
-            if active_node and active_node.bl_idname == 'ShaderNodeTexImage':
+            if active_node and active_node.bl_idname == "ShaderNodeTexImage":
                 image = active_node.image
                 if image:
                     image_width, image_height = image.size
@@ -42,7 +44,7 @@ def get_aspect_ratio(umesh=None):
 
     # Aspect from active area
     area = bpy.context.area
-    if area and area.type == 'IMAGE_EDITOR':
+    if area and area.type == "IMAGE_EDITOR":
         space_data = area.spaces.active
         if space_data and space_data.image:
             image_width, image_height = space_data.image.size
@@ -51,7 +53,7 @@ def get_aspect_ratio(umesh=None):
     else:
         # Aspect from VIEW3D
         for area in bpy.context.screen.areas:
-            if not area.type == 'IMAGE_EDITOR':
+            if not area.type == "IMAGE_EDITOR":
                 continue
             space_data = area.spaces.active
             if space_data and space_data.image:
@@ -63,7 +65,7 @@ def get_aspect_ratio(umesh=None):
 
 def get_active_image_size():
     area = bpy.context.area
-    if area and area.type == 'IMAGE_EDITOR':
+    if area and area.type == "IMAGE_EDITOR":
         space_data = area.spaces.active
         if space_data and space_data.image:
             image_width, image_height = space_data.image.size
@@ -73,7 +75,7 @@ def get_active_image_size():
 
 
 def remove_univ_duplicate_modifiers(obj_, modifier_name, toggle_enable=False):
-    if obj_.type != 'MESH':
+    if obj_.type != "MESH":
         return
     checker_modifiers_ = []
     for m_ in obj_.modifiers:
@@ -105,41 +107,41 @@ T_mesh_select_modes = typing.Literal["VERT", "EDGE", "FACE"]
 def get_select_mode_mesh() -> T_mesh_select_modes:
     mode = bpy.context.scene.tool_settings.mesh_select_mode
     if mode[0]:
-        return 'VERT'
+        return "VERT"
     elif mode[1]:
-        return 'EDGE'
+        return "EDGE"
     else:
-        return 'FACE'
+        return "FACE"
 
 
 def set_select_mode_mesh(mode: T_mesh_select_modes):
     if get_select_mode_mesh() == mode:
         return
-    if mode == 'VERT':
+    if mode == "VERT":
         bpy.context.tool_settings.mesh_select_mode[:] = True, False, False
-    elif mode == 'EDGE':
+    elif mode == "EDGE":
         bpy.context.tool_settings.mesh_select_mode[:] = False, True, False
-    elif mode == 'FACE':
+    elif mode == "FACE":
         bpy.context.tool_settings.mesh_select_mode[:] = False, False, True
     else:
         raise TypeError(f"Mode: '{mode}' not found in ('VERT', 'EDGE', 'FACE')")
 
 
-T_uv_select_modes = typing.Literal['VERT', 'EDGE', 'FACE', 'ISLAND']
+T_uv_select_modes = typing.Literal["VERT", "EDGE", "FACE", "ISLAND"]
 
 
 def get_select_mode_uv() -> T_uv_select_modes:
     mode = bpy.context.scene.tool_settings.uv_select_mode
-    if mode == 'VERTEX':
-        return 'VERT'
+    if mode == "VERTEX":
+        return "VERT"
     return mode  # noqa
 
 
 def set_select_mode_uv(mode: T_uv_select_modes):
     if get_select_mode_uv() == mode:
         return
-    if mode == 'VERT':
-        mode = 'VERTEX'
+    if mode == "VERT":
+        mode = "VERTEX"
     bpy.context.scene.tool_settings.uv_select_mode = mode
 
 
@@ -151,14 +153,25 @@ def blf_size(font_id, font_size):
 
 
 def get_max_distance_from_px(px_size: int, view: bpy.types.View2D):
-    return (Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))).length
+    return (
+        Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))
+    ).length
 
 
-def get_areas_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
-    return (area for win in bpy.context.window_manager.windows for area in win.screen.areas if area.type == area_type)
+def get_areas_by_type(
+    area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR",
+):
+    return (
+        area
+        for win in bpy.context.window_manager.windows
+        for area in win.screen.areas
+        if area.type == area_type
+    )
 
 
-def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMAGE_EDITOR'):
+def get_area_by_type(
+    area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR",
+):
     for a in get_areas_by_type(area_type):
         return a
     return None
@@ -166,11 +179,12 @@ def get_area_by_type(area_type: typing.Literal['VIEW_3D', 'IMAGE_EDITOR'] = 'IMA
 
 def update_univ_panels():
     import itertools
-    for image in itertools.chain(get_areas_by_type('VIEW_3D'), get_areas_by_type()):
+
+    for image in itertools.chain(get_areas_by_type("VIEW_3D"), get_areas_by_type()):
         for reg in image.regions:
-            if reg.type == 'UI':
-                if hasattr(reg, 'active_panel_category'):
-                    if reg.active_panel_category == 'UniV':
+            if reg.type == "UI":
+                if hasattr(reg, "active_panel_category"):
+                    if reg.active_panel_category == "UniV":
                         reg.tag_redraw()
                 else:
                     reg.tag_redraw()
@@ -191,16 +205,20 @@ def operator_context(layout, op_context):
     finally:
         layout.operator_context = orig_context
 
-def event_to_string(event, text=''):
-    if event.ctrl:
-        text += 'Ctrl + '
-    if event.shift:
-        text += 'Shift + '
-    if event.alt:
-        text += 'Alt + '
-    return f'{text} Left Mouse '
 
-T = typing.TypeVar('T')
+def event_to_string(event, text=""):
+    if event.ctrl:
+        text += "Ctrl + "
+    if event.shift:
+        text += "Shift + "
+    if event.alt:
+        text += "Alt + "
+    return f"{text} Left Mouse "
+
+
+T = typing.TypeVar("T")
+
+
 def true_groupby(seq: list[T]) -> list[list[T]]:
     """Groups and returns only identical elements"""
     seq = seq.copy()
@@ -234,8 +252,8 @@ def all_contiguous_subgroups(seq):
 
 def split_by_similarity(lst, key=None):
     """It differs from Group By in that groups are strictly separated and not reversed.
-        true_groupby:        1,0,1,1 -> [1,1,1],[0]
-        split_by_similarity: 1,0,1,1 -> [1],[0],[1,1]"""
+    true_groupby:        1,0,1,1 -> [1,1,1],[0]
+    split_by_similarity: 1,0,1,1 -> [1],[0],[1,1]"""
     if key:
         return [list(group) for _, group in groupby(lst, key=key)]
     else:
@@ -246,10 +264,15 @@ def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
     return list(zip(*[iter(lst)] * 2))  # noqa
 
 
-def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so', 'dylib'] | None=None):
-    lib_prefix = ''
+def load_lib(
+    lib_name: str,
+    root_path=None,
+    lib_ext: typing.Literal["dll", "so", "dylib"] | None = None,
+):
+    lib_prefix = ""
     if lib_ext is None:
         import platform
+
         system = platform.system()
         if system == "Windows":
             lib_ext = "dll"
@@ -257,9 +280,10 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
             lib_ext = "dylib"
         else:
             lib_ext = "so"
-            lib_prefix = 'lib'
+            lib_prefix = "lib"
 
     from pathlib import Path
+
     if root_path is None:
         root_path = Path(__file__).parent.parent.parent
     else:
@@ -270,11 +294,13 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
     for p in root_path.iterdir():
         if p.is_dir():
             name = p.name.lower()
-            if name.startswith('univ') and name != 'univ_pro':
+            if name.startswith("univ") and name != "univ_pro":
                 univ_dir = p
                 break
 
-    assert univ_dir is not None, f"No directory starting with 'univ' found in {root_path!r}"
+    assert (
+        univ_dir is not None
+    ), f"No directory starting with 'univ' found in {root_path!r}"
 
     # recursive search lib
     lib_filename = f"{lib_prefix}{lib_name}.{lib_ext}"
@@ -287,6 +313,7 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
     lib = None
     last_err = None
     from ctypes import CDLL
+
     for p in candidates:
         try:
             current_time = time.strftime("%Y%m%d-%H%M%S")
@@ -296,8 +323,11 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
                 shutil.copy2(p, tmp)
                 p = tmp
             except:  # noqa
-                print(f"UniV: Cant copy {lib_name!r} library to temp folder, for avoid locking when reload/remove addon.")
+                print(
+                    f"UniV: Cant copy {lib_name!r} library to temp folder, for avoid locking when reload/remove addon."
+                )
                 import traceback
+
                 traceback.print_exc()
 
             # TODO: Check versions.
@@ -307,9 +337,10 @@ def load_lib(lib_name: str, root_path=None, lib_ext: typing.Literal['dll', 'so',
             last_err = e
 
     if lib is None:
-        raise OSError(f"Could not load {lib_filename}. Tried: {candidates!r}\nLast error: {last_err}")
+        raise OSError(
+            f"Could not load {lib_filename}. Tried: {candidates!r}\nLast error: {last_err}"
+        )
     return lib
-
 
 
 class GN:
@@ -317,38 +348,50 @@ class GN:
         self.mod = mod
         self.print_error = print_missed_socket
 
-    def _missed_socket_print(self,exist, name):
+    def _missed_socket_print(self, exist, name):
         if not exist and self.print_error:
             import inspect
+
             caller_func_name = inspect.currentframe().f_back.f_back.f_code.co_name
-            print(f"UniV: {caller_func_name}: Socket {name!r} in {self.mod.name!r} modifier was changed.")
+            print(
+                f"UniV: {caller_func_name}: Socket {name!r} in {self.mod.name!r} modifier was changed."
+            )
 
     if bpy.app.version >= (5, 2, 0):
+
         def __contains__(self, name: str):
             exist = hasattr(self.mod.properties.inputs, name)
             self._missed_socket_print(exist, name)
             return exist
+
         def __setitem__(self, name: str, val):
             getattr(self.mod.properties.inputs, name).value = val
+
         def __getitem__(self, name: str):
             return getattr(self.mod.properties.inputs, name).value
 
     elif bpy.app.version >= (4, 0, 0):
+
         def __contains__(self, name: str):
             exist = name in self.mod
             self._missed_socket_print(exist, name)
             return exist
-        def __setitem__(self,name: str, val):
+
+        def __setitem__(self, name: str, val):
             self.mod[name] = val
+
         def __getitem__(self, name: str):
             return self.mod[name]
+
     else:
+
         def __contains__(self, name: str):
-            exist = name.replace('Input', 'Socket', 1) in self.mod
+            exist = name.replace("Input", "Socket", 1) in self.mod
             self._missed_socket_print(exist, name)
             return exist
-        def __setitem__(self, name: str, val):
-            self.mod[name.replace('Input', 'Socket', 1)] = val
-        def __getitem__(self, name: str):
-            return self.mod[name.replace('Input', 'Socket', 1)]
 
+        def __setitem__(self, name: str, val):
+            self.mod[name.replace("Input", "Socket", 1)] = val
+
+        def __getitem__(self, name: str):
+            return self.mod[name.replace("Input", "Socket", 1)]

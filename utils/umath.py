@@ -33,41 +33,44 @@ def all_equal(sequence: typing.Iterable, key: typing.Callable | None = None):
                 return False
     return True
 
+
 def argmin(sequence: typing.Iterable, key: typing.Callable | None = None) -> int:
     index = 0
     sequence_iter = iter(sequence)
     if key is None:
         min_value = next(sequence_iter)
-        for i, val, in enumerate(sequence_iter, 1):
+        for i, val in enumerate(sequence_iter, 1):
             if val < min_value:
                 index = i
                 min_value = val
     else:
         min_value = key(next(sequence_iter))
-        for i, val, in enumerate(sequence_iter, 1):
+        for i, val in enumerate(sequence_iter, 1):
             val = key(val)
             if val < min_value:
                 index = i
                 min_value = val
     return index
 
+
 def argmax(sequence: typing.Iterable, key: typing.Callable | None = None) -> int:
     index = 0
     sequence_iter = iter(sequence)
     if key is None:
         min_value = next(sequence_iter)
-        for i, val, in enumerate(sequence_iter, 1):
+        for i, val in enumerate(sequence_iter, 1):
             if val > min_value:
                 index = i
                 min_value = val
     else:
         min_value = key(next(sequence_iter))
-        for i, val, in enumerate(sequence_iter, 1):
+        for i, val in enumerate(sequence_iter, 1):
             val = key(val)
             if val > min_value:
                 index = i
                 min_value = val
     return index
+
 
 def vec_isclose(a, b, abs_tol: float = 0.00001):
     return all(math.isclose(a1, b1, abs_tol=abs_tol) for a1, b1 in zip(a, b))
@@ -84,12 +87,14 @@ def vec_isclose_to_zero(delta: Vector, abs_tol: float = 0.00001):
 def safe_divide(a: int | float, b: int | float) -> float:
     return a / b if b else 0.0
 
+
 def clamp(val, min_val=0.0, max_val=0.0):
     if val < min_val:
         return min_val
     elif val > max_val:
         return max_val
     return val
+
 
 # Source: https://gist.github.com/laundmo/b224b1f4c8ef6ca5fe47e132c8deab56
 def inv_lerp(a: float, b: float, v: float) -> float:  # ratio
@@ -146,6 +151,7 @@ def wrap_line(start, width, min_bound, max_bound, default=None):
         else:
             return default
 
+
 def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: float, eps=1e-8) -> float:
     """Returns a position within [min_bound, max_bound - width].
     If the original segment fits within the given segment, returns start.
@@ -164,6 +170,7 @@ def wrap_line_nearest(start: float, width: float, min_bound: float, max_bound: f
         return wrapped
     else:
         return clamped
+
 
 def attenuate_padding(pad: float, size: float, allowed_padding_ratio: float = 0.25, beta: float = 2.0) -> float:
     """
@@ -209,14 +216,15 @@ def power_of_2_floor(val: int) -> int:
 
 
 def is_power_of_2(n: int) -> bool:
-    assert (not n <= 0), 'Value error'
+    assert not n <= 0, "Value error"
     return (n & (n - 1)) == 0
+
 
 def find_closest_edge_3d_to_2d(mouse_pos, face, umesh, region, rv3d):
     pt = Vector(mouse_pos)
     mat = umesh.obj.matrix_world
     min_edge = None
-    min_dist = float('inf')
+    min_dist = float("inf")
     for e in face.edges:
         v_a, v_b = e.verts
 
@@ -258,7 +266,7 @@ def loc3d_to_reg2d_safe(region, rv3d, coord, push_forward=0.01):
     width_half = region.width / 2.0
     height_half = region.height / 2.0
 
-    return Vector((
+    return Vector((  # fmt: skip
         width_half + width_half * (prj.x / prj.w),
         height_half + height_half * (prj.y / prj.w),
     ))
@@ -269,7 +277,7 @@ def np_vec_dot(a, b):
     #     from numpy.core.umath_tests import inner1d  # noqa
     #     return inner1d(a, b)  # x2 faster then einsum, but deprecated
     # except: # noqa
-    return np.einsum('ij,ij->i', a, b)
+    return np.einsum("ij,ij->i", a, b)
 
 
 def np_vec_normalized(a, keepdims=True):
@@ -291,7 +299,7 @@ def largest_gap_midpoint_for_hue(values: list[float]):
 
     for i in range(len(values) - 1):
         a = values[i]
-        b = values[i+1]
+        b = values[i + 1]
 
         gap = b - a
         if gap > max_gap:
@@ -311,10 +319,12 @@ def pack_rgba_to_uint32(rgba) -> int:
 def luminance(rgb):
     return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 
+
 def interp_hue(h1, h2, t):
     """Interpolate hue by short path"""
     dh = (h2 - h1 + 0.5) % 1.0 - 0.5
     return (h1 + t * dh) % 1.0
+
 
 def interp_hue_long(h1, h2, t):
     """Interpolate hue by long path"""
@@ -328,8 +338,10 @@ def interp_hue_long(h1, h2, t):
 
     return (h1 + t * dh_long) % 1.0
 
+
 def rainbow_between(c1, c2, n):
     from mathutils import Color
+
     h1, s1, v1 = c1.hsv
     h2, s2, v2 = c2.hsv
 
@@ -348,10 +360,11 @@ def rainbow_between(c1, c2, n):
     return colors
 
 
-if hasattr(mathutils.geometry, 'intersect_point_line_segment'):
+if hasattr(mathutils.geometry, "intersect_point_line_segment"):
     # version >= (5, 0, 0)
     intersect_point_line_segment = mathutils.geometry.intersect_point_line_segment
 else:
+
     def intersect_point_line_segment(pt: Vector, line_a: Vector, line_b: Vector) -> tuple[Vector, float]:
         close_pt, percent = intersect_point_line(pt, line_a, line_b)
         if percent < 0.0:
@@ -360,19 +373,20 @@ else:
             close_pt = line_b
         return close_pt, (close_pt - pt).length
 
+
 UNIT_CONVERTION = {
-    'mm': (0.001, 1000),
-    'cm': (0.01, 100),
-    'm': (1, 1),
-    'km': (1000, 0.001),
-    'in': (0.0254, 39.3701),
-    'ft': (0.3048, 3.28084),
-    'yd': (0.9144, 1.09361),
-    'mi': (1609.34, 0.000621371),
+    "mm": (0.001, 1000),
+    "cm": (0.01, 100),
+    "m": (1, 1),
+    "km": (1000, 0.001),
+    "in": (0.0254, 39.3701),
+    "ft": (0.3048, 3.28084),
+    "yd": (0.9144, 1.09361),
+    "mi": (1609.34, 0.000621371),
 }
 
-UNITS = '(mi|mm|cm|m|km|in|ft|yd)'
-UNITS_T = typing.Literal['mm', 'cm', 'm', 'km', 'in', 'ft', 'yd', 'mi',]
+UNITS = "(mi|mm|cm|m|km|in|ft|yd)"
+UNITS_T = typing.Literal["mm", "cm", "m", "km", "in", "ft", "yd", "mi"]
 
 
 def unit_conversion(value: float, from_type: UNITS_T, to_type: UNITS_T) -> float:

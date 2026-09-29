@@ -3,27 +3,31 @@ import numpy as np
 
 class LinearSolver:
     class Coeff:
-        __slots__ = ('index', 'value')
+        __slots__ = ("index", "value")
+
         def __init__(self, index=0, value=0.0):
             self.index = index
             self.value = value
 
     class Variable:
-        __slots__ = ('index', 'locked', 'value', 'coeffs')
+        __slots__ = ("index", "locked", "value", "coeffs")
+
         def __init__(self):
-            self.index = -1     # compact index (or ~0 if locked)
+            self.index = -1  # compact index (or ~0 if locked)
             self.locked = False
             self.value = 0.0
-            self.coeffs = []    # list of Coeff (row index, value)
+            self.coeffs = []  # list of Coeff (row index, value)
 
     @classmethod
     def new(cls, num_rows: int, num_variables: int, least_squares=False):
         try:
             from .. import fastapi
             from .. import preferences
+
             if preferences.prefs().use_fastapi and fastapi.FastAPI.lib:
                 import platform
-                if platform.system() == 'Windows':
+
+                if platform.system() == "Windows":
                     return fastapi.LinearSolver.new(num_rows, num_variables, least_squares)
         except:  # noqa
             pass
@@ -36,12 +40,12 @@ class LinearSolver:
         self.num_variables = num_variables
         self.least_squares = least_squares
 
-        self.state = 'VARIABLES_CONSTRUCT'
+        self.state = "VARIABLES_CONSTRUCT"
 
         # storage used during 'matrix construct' stage
-        self.M_triplets: list[tuple[int, int, float]] = []   # list of (row, col, value)
-        self.b = None         # will be list of rhs vectors after ensure_matrix_construct
-        self.x = None         # solution vectors after ensure_matrix_construct
+        self.M_triplets: list[tuple[int, int, float]] = []  # list of (row, col, value)
+        self.b = None  # will be list of rhs vectors after ensure_matrix_construct
+        self.x = None  # solution vectors after ensure_matrix_construct
 
         # compact sizes filled by ensure_matrix_construct
         self.m = 0
@@ -52,7 +56,7 @@ class LinearSolver:
         self._ensure_matrix_construct()
 
     def _ensure_matrix_construct(self):
-        assert self.state == 'VARIABLES_CONSTRUCT'
+        assert self.state == "VARIABLES_CONSTRUCT"
 
         # assign compact indices for non-locked variables
         # TODO: Remove???
@@ -69,7 +73,7 @@ class LinearSolver:
         self.m = m
         self.n = n
 
-        assert (self.least_squares or (self.m == self.n)), "For non-least-squares m must equal n"
+        assert self.least_squares or (self.m == self.n), "For non-least-squares m must equal n"
 
         # reserve structures
         self.M_triplets = []
@@ -86,7 +90,7 @@ class LinearSolver:
                 # if user had pre-set variable.value, store into x
                 self.x[idx] = v.value
 
-        self.state = 'MATRIX_CONSTRUCT'
+        self.state = "MATRIX_CONSTRUCT"
 
     def matrix_add(self, row: int, col: int, value: float):
         # assert self.state == 'MATRIX_CONSTRUCT'
@@ -111,12 +115,12 @@ class LinearSolver:
             c = self.variable[col].index
 
             if r is None or c is None:
-                raise IndexError(f'Invalid indices: {row=}, {col=}')
+                raise IndexError(f"Invalid indices: {row=}, {col=}")
             self.M_triplets.append((r, c, value))
-
 
     def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int):
         from math import sin, cos
+
         v1_id *= 2
         v2_id *= 2
         v3_id *= 2
@@ -171,7 +175,7 @@ class LinearSolver:
 
     def solve1(self):
         # nothing to solve
-        assert self.state == 'MATRIX_CONSTRUCT'
+        assert self.state == "MATRIX_CONSTRUCT"
 
         if self.m == 0 or self.n == 0:
             raise ValueError("Empty matrix")
@@ -181,7 +185,7 @@ class LinearSolver:
 
         # Build dense matrix from triplets
         M = np.zeros((self.m, self.n), dtype=np.float64)
-        for (r, c, val) in self.M_triplets:
+        for r, c, val in self.M_triplets:
             M[r, c] += val
 
         if self.least_squares:
@@ -204,7 +208,7 @@ class LinearSolver:
         if self.least_squares:
             rhs_vec = M.T @ b_vec
             # Solve (MtM) x = M^T b
-            x_compact = np.linalg.lstsq(A, rhs_vec , rcond=None)[0]
+            x_compact = np.linalg.lstsq(A, rhs_vec, rcond=None)[0]
         else:
             try:
                 x_compact = np.linalg.solve(A, b_vec)
@@ -228,12 +232,12 @@ class LinearSolver:
 
         self.b.fill(0.0)  # TODO: Remove ???
 
-        self.state = 'MATRIX_SOLVED'
+        self.state = "MATRIX_SOLVED"
         return True
 
     def solve(self):
         # Faster when locked exist (>= 10%)
-        assert self.state == 'MATRIX_CONSTRUCT'
+        assert self.state == "MATRIX_CONSTRUCT"
 
         if self.m == 0 or self.n == 0:
             raise ValueError("Empty matrix")
@@ -258,7 +262,6 @@ class LinearSolver:
                     if 0 <= idx < b_vec.shape[0]:
                         b_vec[idx] -= coeff.value * locked_value
 
-
         # Remove zero rows
         active_rows = np.any(M != 0.0, axis=1)
 
@@ -280,11 +283,10 @@ class LinearSolver:
                     v.value = 0.0
 
             self.b.fill(0.0)
-            self.state = 'MATRIX_SOLVED'
+            self.state = "MATRIX_SOLVED"
             return True
 
         M_red = M[:, active_cols]
-
 
         # Solve
         if self.least_squares:
@@ -301,11 +303,9 @@ class LinearSolver:
             else:
                 x_red = np.linalg.lstsq(M_red, b_vec, rcond=None)[0]
 
-
         # Expand solution
         x_full[active_cols] = x_red
         self.x[:] = x_full
-
 
         # Write back variables
         for i in range(self.num_variables):
@@ -319,7 +319,7 @@ class LinearSolver:
 
         # self.b.fill(0.0)
 
-        self.state = 'MATRIX_SOLVED'
+        self.state = "MATRIX_SOLVED"
         return True
 
     def variable_get(self, index: int):
@@ -331,7 +331,9 @@ class LinearSolver:
     def __str__(self):
         return str([str(v) for v in self.variable])
 
+
 import unittest
+
 
 # class TestSolver(__import__('unittest').TestCase):
 class TestSolver(unittest.TestCase):
@@ -356,14 +358,12 @@ class TestSolver(unittest.TestCase):
         self.assertAlmostEqual(solver.variable_get(0), 1.6, delta=1e-9)
         self.assertAlmostEqual(solver.variable_get(1), 0.6, delta=1e-9)
 
-
         solver = LinearSolver(2, 2, least_squares=True)
         solver.lock_variable(1, 22)  # lock x1 = 22
         fill_solver()
 
         self.assertAlmostEqual(solver.variable_get(0), -19.8, delta=1e-9)
         self.assertAlmostEqual(solver.variable_get(1), 22.0, delta=1e-9)
-
 
     def test_solver_least_squares_with_lock(self):
         # from mathutils import Solver as LinearSolver

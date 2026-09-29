@@ -10,7 +10,7 @@ from mathutils import Color
 
 
 class UTexture:
-    def __init__(self, w, h, texture=None, channels: int=3):
+    def __init__(self, w, h, texture=None, channels: int = 3):
         self.width = w
         self.height = h
 
@@ -23,7 +23,8 @@ class UTexture:
 
     @classmethod
     def from_ibuf(cls, ibuf):
-        from ..import btypes
+        from .. import btypes
+
         width, height = ibuf.size
 
         c_ibuf = btypes.Py_ImBuf.get_fields(ibuf)
@@ -35,7 +36,7 @@ class UTexture:
 
     @classmethod
     def from_frame_buf(cls, width, height, fb, downscaled=False):
-        pixel_data = fb.read_color(0, 0, width, height, 4, 0, 'UBYTE')
+        pixel_data = fb.read_color(0, 0, width, height, 4, 0, "UBYTE")
         pixel_data.dimensions = width * height * 4
         if downscaled:
             import OpenImageIO as oiio
@@ -64,8 +65,8 @@ class UTexture:
             texture_with_alpha = np.concatenate((self.data, alpha), axis=2)
 
         assert texture_with_alpha.dtype == np.float32
-        buffer = gpu.types.Buffer('FLOAT', self.width * self.height * 4, texture_with_alpha)
-        return gpu.types.GPUTexture((self.width, self.height), format='RGBA8', data=buffer)
+        buffer = gpu.types.Buffer("FLOAT", self.width * self.height * 4, texture_with_alpha)
+        return gpu.types.GPUTexture((self.width, self.height), format="RGBA8", data=buffer)
 
     def to_4_channels(self):
         """NOTE: Not create new instance"""
@@ -76,7 +77,7 @@ class UTexture:
             self.data = np.concatenate((self.data, alpha), axis=2)
             self.channels = 4
             return self
-        raise NotImplementedError(f'Not implement for {self.channels!r} channels')
+        raise NotImplementedError(f"Not implement for {self.channels!r} channels")
 
     def fill(self, color):
         self.data[:] = self._sanitize_color(color)
@@ -92,7 +93,7 @@ class UTexture:
         else:
             return col
 
-    def lerp(self, other: 'typing.Self', factor):
+    def lerp(self, other: "typing.Self", factor):
         diff = other.data - self.data
         diff *= factor
         diff += self.data
@@ -112,13 +113,13 @@ class UTexture:
         at = top[..., 3:4]
 
         out_rgb = ct + cb * (1.0 - at)
-        out_a   = at + ab * (1.0 - at)
+        out_a = at + ab * (1.0 - at)
 
         out = np.concatenate([out_rgb, out_a], axis=-1)
 
         return UTexture(self.width, self.height, out, self.channels)
 
-    def apply_mask(self, other, mask: 'UMask'):
+    def apply_mask(self, other, mask: "UMask"):
         result = np.where(mask.data[..., None], other.data, self.data)
         return UTexture(self.width, self.height, result, self.channels)
 
@@ -128,8 +129,8 @@ class UTexture:
     def downscaled(self):
         import OpenImageIO as oiio
 
-        spec = oiio.ImageSpec(self.height//2, self.width//2, self.channels, 'float')
-        spec_aa = oiio.ImageSpec(self.height, self.width, self.channels, 'float')
+        spec = oiio.ImageSpec(self.height // 2, self.width // 2, self.channels, "float")
+        spec_aa = oiio.ImageSpec(self.height, self.width, self.channels, "float")
 
         buf_extended = oiio.ImageBuf(spec_aa)
         buf_resized = oiio.ImageBuf(spec)
@@ -137,9 +138,14 @@ class UTexture:
         buf_extended.set_pixels(oiio.ROI(0, self.height, 0, self.width), self.data)
         oiio.ImageBufAlgo.resize(buf_resized, buf_extended)
 
-        return UTexture(self.width//2, self.height//2, texture=np.array(buf_resized.get_pixels(format='float'), dtype=np.float32), channels=self.channels)
+        return UTexture(
+            self.width // 2,
+            self.height // 2,
+            texture=np.array(buf_resized.get_pixels(format="float"), dtype=np.float32),
+            channels=self.channels,
+        )
 
-    def __add__(self, other: 'typing.Self'):
+    def __add__(self, other: "typing.Self"):
         if isinstance(other, UTexture):
             other_tex = other.data
         else:
@@ -154,7 +160,7 @@ class UTexture:
 
         return UTexture(self.width, self.height, texture)
 
-    def __iadd__(self, other: 'typing.Self'):
+    def __iadd__(self, other: "typing.Self"):
         if isinstance(other, UTexture):
             other = other.data
             self.data[..., :3] += other[..., :3]
@@ -163,7 +169,7 @@ class UTexture:
 
         return self
 
-    def __sub__(self, other: 'typing.Self'):
+    def __sub__(self, other: "typing.Self"):
         if isinstance(other, UTexture):
             other_tex = other.data
         else:
@@ -178,42 +184,40 @@ class UTexture:
 
         return UTexture(self.width, self.height, texture)
 
-    def __isub__(self, other: 'typing.Self'):
+    def __isub__(self, other: "typing.Self"):
         if isinstance(other, UTexture):
             other = other.data
 
         self.data[..., :3] -= other
         return self
 
-    def __mul__(self, other: 'typing.Self'):
-            if isinstance(other, UTexture):
-                other_tex = other.data
-            else:
-                other_tex = np.float32(other)
+    def __mul__(self, other: "typing.Self"):
+        if isinstance(other, UTexture):
+            other_tex = other.data
+        else:
+            other_tex = np.float32(other)
 
-            texture = self.data.copy()
+        texture = self.data.copy()
 
-            if isinstance(other_tex, np.ndarray):
-                texture[..., :3] *= other_tex[..., :3]
-            else:
-                texture[..., :3] *= other_tex
+        if isinstance(other_tex, np.ndarray):
+            texture[..., :3] *= other_tex[..., :3]
+        else:
+            texture[..., :3] *= other_tex
 
-            return UTexture(self.width, self.height, texture)
+        return UTexture(self.width, self.height, texture)
 
-    def __imul__(self, other: 'typing.Self'):
+    def __imul__(self, other: "typing.Self"):
         if isinstance(other, UTexture):
             other = other.data
 
         self.data[..., :3] *= other
         return self
 
-
     def __setitem__(self, key, value):
         if isinstance(key, UMask):
             self.data[key.data] = value
         else:
             self.data[key] = value
-
 
 
 class UMask:
@@ -240,59 +244,59 @@ class UMask:
         texture = np.where(self.data[..., None], col_a, col_b)
         return UTexture(self.width, self.height, texture, channels=len(col_b))
 
-    def __add__(self, other: 'typing.Self'):
+    def __add__(self, other: "typing.Self"):
         assert type(other) is UMask
         tex = self.data | other.data
         return UMask(self.width, self.height, tex)
 
-    def __iadd__(self, other: 'typing.Self'):
+    def __iadd__(self, other: "typing.Self"):
         assert type(other) is UMask
         self.data |= other.data
         return self
 
-    def __sub__(self, other: 'typing.Self'):
+    def __sub__(self, other: "typing.Self"):
         assert type(other) is UMask
         tex = self.data & ~other.data
         return UMask(self.width, self.height, tex)
 
-    def __isub__(self, other: 'typing.Self'):
+    def __isub__(self, other: "typing.Self"):
         assert type(other) is UMask
         self.data &= ~other.data
         return self
 
-    def __ior__(self, other: 'typing.Self'):
+    def __ior__(self, other: "typing.Self"):
         """Union masks."""
         assert type(other) is UMask
         self.data |= other.data
         return self
 
-    def __or__(self, other: 'typing.Self'):
+    def __or__(self, other: "typing.Self"):
         """Union masks."""
         assert type(other) is UMask
 
         texture = self.data | other.data
         return UMask(self.width, self.height, texture)
 
-    def __iand__(self, other: 'typing.Self'):
+    def __iand__(self, other: "typing.Self"):
         """Inplace isect masks."""
         assert type(other) is UMask
         self.data &= other.data
         return self
 
-    def __and__(self, other: 'typing.Self'):
+    def __and__(self, other: "typing.Self"):
         """Isect masks."""
         assert type(other) is UMask
 
         texture = self.data & other.data
         return UMask(self.width, self.height, texture)
 
-    def __ixor__(self, other: 'typing.Self'):
+    def __ixor__(self, other: "typing.Self"):
         """Toggle masks."""
         assert type(other) is UMask
         self.data ^= other.data
         return self
 
-    def __xor__(self, other: 'typing.Self'):
+    def __xor__(self, other: "typing.Self"):
         """Toggle masks."""
         assert type(other) is UMask
 
@@ -305,15 +309,15 @@ class UMask:
         else:
             self.data[key] = value
 
-    def draw_rect(self, y0: int, y1: int, x0: int, x1: int, value: bool=True):
-        """ Fill wrapped rect mask. """
+    def draw_rect(self, y0: int, y1: int, x0: int, x1: int, value: bool = True):
+        """Fill wrapped rect mask."""
 
         for y_slice in self.wrap_slices_h(y0, y1):
             for x_slice in self.wrap_slices_w(x0, x1):
                 self.data[y_slice, x_slice] = value
 
     def wrap_slices_w(self, start, stop):
-        """ Returns wrapped slices for width. """
+        """Returns wrapped slices for width."""
         length = stop - start
         s0 = start % self.width
         s1 = s0 + length
@@ -324,7 +328,7 @@ class UMask:
             return [slice(s0, self.width), slice(0, s1 - self.width)]
 
     def wrap_slices_h(self, start, stop):
-        """ Returns wrapped slices for height. """
+        """Returns wrapped slices for height."""
         length = stop - start
         s0 = start % self.height
         s1 = s0 + length
@@ -335,7 +339,7 @@ class UMask:
             return [slice(s0, self.height), slice(0, s1 - self.height)]
 
     def draw_vline(self, x, thickness, value=True):
-        """ Draw wrapped vertical mask line. """
+        """Draw wrapped vertical mask line."""
         half = thickness // 2
 
         x0 = x - half
@@ -345,7 +349,7 @@ class UMask:
             self.data[:, xs] = value
 
     def draw_hline(self, y, thickness, value=True):
-        """ Draw wrapped horizontal mask line. """
+        """Draw wrapped horizontal mask line."""
         half = thickness // 2
 
         y0 = y - half
@@ -371,7 +375,7 @@ class Colors:
     _separator2 = None
 
     yellow = (0.92, 0.8, 0.11)  # good, bot need darken lines
-    yellow_green = (0.715,0.89,0.0)  # good, bot need darken big lines
+    yellow_green = (0.715, 0.89, 0.0)  # good, bot need darken big lines
 
     _separator3 = None
 
@@ -382,12 +386,12 @@ class Colors:
     _separator4 = None
 
     orange = (1.0, 0.647, 0.0)  # good
-    orange_other = (1,0.33,0)  # good
+    orange_other = (1, 0.33, 0)  # good
 
     _separator5 = None
 
     green = (0.416, 0.61, 0.235)  # good, but need colorize lines
-    green_darken = (0.18,0.4,0.18)
+    green_darken = (0.18, 0.4, 0.18)
     army_green = [0.33, 0.38, 0.12]  # good
     hunter_green = (0.172, 0.372, 0.204)  # good
 
@@ -395,7 +399,7 @@ class Colors:
 
     blue = [0.192, 0.314, 0.58]  # good
     midnight_blue = [0.08, 0.13, 0.37]  # good
-    blueprint = (0.188,0.36,0.87)  # good, but need colorize small lines
+    blueprint = (0.188, 0.36, 0.87)  # good, but need colorize small lines
     azure = [0.35, 0.98, 0.95]  # need colorize lines
     aquamarine = [0.0, 1.0, 0.74]
 
@@ -409,12 +413,13 @@ class Colors:
     pink = [1.0, 0.15, 0.38]  # good
     pink_red = [0.7, 0.0, 0.22]  # good
 
+
 class ColorsSmallLines:
-    white = (0.65,0.65,0.65)
-    gray = (0.7,0.7,0.7)
-    gray_dark = (0.4,0.4,0.4)
-    dark = (0.35,0.35,0.35)
-    black = (0.3,0.3,0.3)
+    white = (0.65, 0.65, 0.65)
+    gray = (0.7, 0.7, 0.7)
+    gray_dark = (0.4, 0.4, 0.4)
+    dark = (0.35, 0.35, 0.35)
+    black = (0.3, 0.3, 0.3)
 
     brown = Color(Colors.brown)  # good, but small lines gray (need light)
     brown.s *= 0.6
@@ -438,8 +443,6 @@ class ColorsSmallLines:
     yellow_green.v *= 0.5
     yellow_green.s *= 1.5
 
-
-
     _separator3 = None
 
     orange = Color(Colors.orange)
@@ -449,7 +452,6 @@ class ColorsSmallLines:
     orange_other = Color(Colors.orange_other)
     orange_other.v *= 0.65
     orange_other.s *= 1.5
-
 
     red_orange = Color(Colors.red_orange)
     red_orange.v *= 0.65
@@ -461,11 +463,9 @@ class ColorsSmallLines:
     red.v *= 1.55
     red.s *= 0.65
 
-
     coral = Color(Colors.coral)
     coral.v *= 0.65
     coral.s *= 1.5
-
 
     green = Color(Colors.green)
     green.v *= 0.65
@@ -478,7 +478,6 @@ class ColorsSmallLines:
     army_green = Color(Colors.army_green)
     army_green.v *= 0.65
     army_green.s *= 1.5
-
 
     hunter_green = Color(Colors.hunter_green)
     hunter_green.v *= 0.65
@@ -521,7 +520,6 @@ class ColorsSmallLines:
     pink_red.s *= 0.8
 
 
-
 class TexturePatterns:
     @staticmethod
     def draw_lines(tex: UMask, step=32, thickness=1, exclude_first=False):
@@ -544,7 +542,6 @@ class TexturePatterns:
         for ys in tex.wrap_slices_h(y0, y1):
             tex.data[ys, mask] = True
 
-
     @staticmethod
     def draw_dashed_vline(tex: UMask, x, dash=6, gap=4, thickness=1, phase=0):
         y = np.arange(tex.height)
@@ -558,7 +555,9 @@ class TexturePatterns:
             tex.data[mask, xs] = True
 
     @classmethod
-    def draw_pluses(cls, texture: UMask, step: int=128, size: int=32, thickness: int=3, center=True):
+    def draw_pluses(
+        cls, texture: UMask, step: int = 128, size: int = 32, thickness: int = 3, center=True
+    ):
         for x, y in utils.grid_points_px(texture.width, texture.height, step, center):
             cls.draw_plus(texture, y, x, size=size, thickness=thickness)
 
@@ -568,24 +567,13 @@ class TexturePatterns:
         half_th = thickness // 2
 
         # Vertical
-        tex.draw_rect(
-            cy - half_size,
-            cy + half_size,
-            cx - half_th,
-            cx + half_th + 1
-        )
+        tex.draw_rect(cy - half_size, cy + half_size, cx - half_th, cx + half_th + 1)
 
         if size == thickness:
             return
 
         # Horizontal
-        tex.draw_rect(
-            cy - half_th,
-            cy + half_th + 1,
-            cx - half_size,
-            cx + half_size
-        )
-
+        tex.draw_rect(cy - half_th, cy + half_th + 1, cx - half_size, cx + half_size)
 
     @classmethod
     def draw_checker(cls, mask, step=32):
@@ -594,11 +582,11 @@ class TexturePatterns:
 
         mask.data[:] = ((x // step + y // step) & 1) == 0
 
-
     @staticmethod
     def checker_board_text(width: int, height: int, step: int = 128, outline: int = 1):
         import blf
-        mono: int = 0 #  blf_mono_font_render;
+
+        mono: int = 0  #  blf_mono_font_render;
         text_size = 54  # hard coded size!
         utils.blf_size(mono, text_size)
 
@@ -609,8 +597,9 @@ class TexturePatterns:
         text_outline: list[float] = [1.0, 1.0, 1.0, 1.0]
 
         import string
+
         letters = string.ascii_uppercase
-        digits = string.digits[1:] + 'ABCDEF'
+        digits = string.digits[1:] + "ABCDEF"
 
         first_char_index: int = 0
         for y in range(0, height, step):
@@ -631,7 +620,7 @@ class TexturePatterns:
 
                 for dx, dy in utils.padding_deltas(outline):
 
-                    blf.position(mono, pen_x+dx, pen_y+dy, 0.0)
+                    blf.position(mono, pen_x + dx, pen_y + dy, 0.0)
                     blf.draw_buffer(mono, text)
 
                 blf.color(mono, *text_color)
@@ -643,7 +632,14 @@ class TexturePatterns:
             first_char_index = (first_char_index + 1) % len(letters)
 
     @classmethod
-    def simple_grid(cls, size=(2048, 2048), color=(0.25, 0.25, 0.25), small_lines_color=(0.4, 0.4, 0.4), bound_color=(1,1,1), draw_small_lines=True):
+    def simple_grid(
+        cls,
+        size=(2048, 2048),
+        color=(0.25, 0.25, 0.25),
+        small_lines_color=(0.4, 0.4, 0.4),
+        bound_color=(1, 1, 1),
+        draw_small_lines=True,
+    ):
         bound_line = UMask(*size)
         max_size = max(size)
         thickness = 5 if max_size <= 4096 else 7
@@ -652,22 +648,33 @@ class TexturePatterns:
 
         bound_line.draw_vline(0, thickness=thickness)
         bound_line.draw_hline(0, thickness=thickness)
-        TexturePatterns.draw_pluses(bound_line, step=max_size, size=64*thickness//2, thickness=thickness*2, center=False)
+        TexturePatterns.draw_pluses(
+            bound_line,
+            step=max_size,
+            size=64 * thickness // 2,
+            thickness=thickness * 2,
+            center=False,
+        )
 
         medium_lines = UMask(*size)
         cls.draw_lines(medium_lines, step=256, exclude_first=True)
 
         if max_size >= 1024:
-            TexturePatterns.draw_pluses(medium_lines, step=512, size=32*thickness//4, thickness=thickness*2, center=False)
+            TexturePatterns.draw_pluses(
+                medium_lines,
+                step=512,
+                size=32 * thickness // 4,
+                thickness=thickness * 2,
+                center=False,
+            )
 
         small_lines = UMask(*size)
         if draw_small_lines:
             cls.draw_lines(small_lines, step=32, exclude_first=True)
 
-
         if max_size >= 2048:
             cls.draw_lines(bound_line, step=1024, thickness=3, exclude_first=True)
-        if max_size >= 4096*2:
+        if max_size >= 4096 * 2:
             cls.draw_lines(bound_line, step=4096, thickness=5, exclude_first=True)
 
         tex = small_lines.mask_to_texture(small_lines_color, color)

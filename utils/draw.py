@@ -13,11 +13,12 @@ from bl_math import clamp
 def rgb_to_hex(rgb):
     return "#%02x%02x%02x" % (int(clamp(rgb[0]) * 255.0),
                               int(clamp(rgb[1]) * 255.0),
-                              int(clamp(rgb[2]) * 255.0))
+                              int(clamp(rgb[2]) * 255.0))  # fmt: skip
 
 
 def hex_to_rgb(hexcode):
     import binascii
+
     unhex = binascii.unhexlify(hexcode[1:])
     assert len(unhex) == 3, f"Expected hexcode size - 7, given size - {len(hexcode)}"
     return Color(unhex) / 255
@@ -27,9 +28,10 @@ def hsv_to_rgb(h, s, v):
     """Saturate is mutable"""
     # Get from https://stackoverflow.com/a/31628808/21538444
     import numpy as np
+
     shape = h.shape
-    i = np.int_(h*6.)
-    f = h*6.-i
+    i = np.int_(h * 6.0)
+    f = h * 6.0 - i
 
     q = f
     t = 1.0 - f
@@ -40,19 +42,20 @@ def hsv_to_rgb(h, s, v):
     t = np.ravel(t)
     q = np.ravel(q)
 
-    clist = (1-s * np.vstack([np.zeros_like(f), np.ones_like(f), q, t])) * v
+    clist = (1 - s * np.vstack([np.zeros_like(f), np.ones_like(f), q, t])) * v
 
     # 0:v 1:p 2:q 3:t
     order = np.array([[0, 3, 1], [2, 0, 1], [1, 0, 3], [1, 2, 0], [3, 1, 0], [0, 1, 2]])
     rgb = clist[order[i], np.arange(np.prod(shape))[:, None]]
 
-    return rgb.reshape(shape+(3,))
+    return rgb.reshape(shape + (3,))
 
 
 def color_for_groups(groups):
     """Return flat colors by group"""
     import numpy as np
-    np.random.seed((id(groups)+2) % np.iinfo(np.int32).max)
+
+    np.random.seed((id(groups) + 2) % np.iinfo(np.int32).max)
 
     groups_size = len(groups)
     h = np.random.uniform(low=0.0, high=1.0, size=groups_size)
@@ -63,13 +66,13 @@ def color_for_groups(groups):
 
     first_and_end_point = 2
     # TODO: Bug report np.ndarray for color, incorrect work
-    return np.repeat(rgb, [len(g)*first_and_end_point for g in groups], axis=0).tolist()
+    return np.repeat(rgb, [len(g) * first_and_end_point for g in groups], axis=0).tolist()
 
 
 class UNIV_OT_Draw_Test(bpy.types.Operator):
-    bl_idname = 'uv.univ_draw_test'
-    bl_label = 'Draw Test'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = "uv.univ_draw_test"
+    bl_label = "Draw Test"
+    bl_options = {"REGISTER", "UNDO"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -94,14 +97,14 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         self.area = context.area
         self.view = context.region.view2d
         if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
-            self.shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+            self.shader = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
             # self.shader_smooth_color = gpu.shader.from_builtin('POLYLINE_SMOOTH_COLOR')
-            self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
-            self.shader_smooth_color_vert = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+            self.shader_smooth_color = gpu.shader.from_builtin("SMOOTH_COLOR")
+            self.shader_smooth_color_vert = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
         else:
-            self.shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-            self.shader_smooth_color = gpu.shader.from_builtin('SMOOTH_COLOR')
-            self.shader_smooth_color_vert = gpu.shader.from_builtin('SMOOTH_COLOR')
+            self.shader = gpu.shader.from_builtin("UNIFORM_COLOR")
+            self.shader_smooth_color = gpu.shader.from_builtin("SMOOTH_COLOR")
+            self.shader_smooth_color_vert = gpu.shader.from_builtin("SMOOTH_COLOR")
         self.register_draw()
         from .. import utypes
 
@@ -113,42 +116,44 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         wm = context.window_manager
         wm.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
+        return {"RUNNING_MODAL"}
 
     def modal(self, context, event):
         try:
             return self.modal_ex(context, event)
         except Exception as e:  # noqa
             import traceback
+
             traceback.print_exc()
-            self.report({'ERROR'}, str(e))
+            self.report({"ERROR"}, str(e))
             self.umeshes.silent_update()
             self.exit()
-            return {'FINISHED'}
+            return {"FINISHED"}
 
     def modal_ex(self, _context, event):
         # print()
         # print(f'{event.type = }')
         # print(f'{event.value = }')
 
-        if event.type in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'MIDDLEMOUSE'}:
-            return {'PASS_THROUGH'}
+        if event.type in {"WHEELUPMOUSE", "WHEELDOWNMOUSE", "MIDDLEMOUSE"}:
+            return {"PASS_THROUGH"}
 
-        if event.type == 'MOUSEMOVE':
+        if event.type == "MOUSEMOVE":
             self.test(event)
             self.area.tag_redraw()
 
-        if event.type == 'LEFTMOUSE':
+        if event.type == "LEFTMOUSE":
             self.test_invoke(event)
             self.area.tag_redraw()
 
-        if event.type in ('ESC', 'RIGHTMOUSE'):
+        if event.type in ("ESC", "RIGHTMOUSE"):
             return self.exit()
 
-        return {'RUNNING_MODAL'}
+        return {"RUNNING_MODAL"}
 
     def test_invoke(self, _event):
         from .. import utypes
+
         umesh = self.umeshes[0]
         groups = utypes.LoopGroup.calc_dirt_loop_groups(umesh)
         self.calc_from_corners(groups, umesh.uv)
@@ -157,10 +162,12 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         pt = self.get_mouse_pos(event)
         self.points = (pt,)
 
-    def calc_from_corners(self, groups: typing.Sequence[typing.Sequence[BMLoop]]
-                          | typing.Sequence[BMLoop] | BMLoop, uv=None, exact=False):
+    def calc_from_corners(
+        self, groups: typing.Sequence[typing.Sequence[BMLoop]] | typing.Sequence[BMLoop] | BMLoop, uv=None, exact=False
+    ):
         from gpu_extras.batch import batch_for_shader
         from ..draw import shaders
+
         if not groups:
             self.mid_points = []
             self.texts = []
@@ -179,25 +186,36 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         self.mid_points, self.texts = self.calc_text_data_from_lines(offset_lines)
 
         self.batch_smooth_color = batch_for_shader(
-            self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+            self.shader_smooth_color, "LINES", {"pos": offset_lines, "color": color}
+        )
 
         if shaders.VK_ENABLED:
             self.batch_smooth_color_2 = batch_for_shader(
-                self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2]})
+                self.shader_smooth_color_vert, "POINTS", {"pos": offset_lines[::2]}
+            )
         else:
             self.batch_smooth_color_2 = batch_for_shader(
-                self.shader_smooth_color_vert, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+                self.shader_smooth_color_vert, "POINTS", {"pos": offset_lines[::2], "color": color[::2]}
+            )
 
-    def calc_from_segments(self, groups: typing.Sequence[typing.Sequence['CrnEdgeGrow']] | typing.Sequence['utypes.CrnEdgeGrow'] | 'utypes.CrnEdgeGrow'):  # noqa
+    def calc_from_segments(
+        self,
+        groups: (  # noqa
+            typing.Sequence[typing.Sequence["CrnEdgeGrow"]]  # noqa
+            | typing.Sequence["utypes.CrnEdgeGrow"]  # noqa
+            | "utypes.CrnEdgeGrow"  # noqa
+        ),
+    ):
         from gpu_extras.batch import batch_for_shader
+
         if not groups:
             self.mid_points = []
             self.texts = []
             return
 
-        if type(groups).__name__ == 'CrnEdgeGrow':
+        if type(groups).__name__ == "CrnEdgeGrow":
             groups = [[groups]]
-        elif type(groups[0]).__name__ == 'CrnEdgeGrow':
+        elif type(groups[0]).__name__ == "CrnEdgeGrow":
             groups = [groups]
 
         offset_lines = self.uv_segments_to_lines_with_offset(groups)
@@ -205,20 +223,23 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         self.mid_points, self.texts = self.calc_text_data_from_lines(offset_lines)
 
         self.batch_smooth_color = batch_for_shader(
-            self.shader_smooth_color, 'LINES', {"pos": offset_lines, 'color': color})
+            self.shader_smooth_color, "LINES", {"pos": offset_lines, "color": color}
+        )
         self.batch_smooth_color_2 = batch_for_shader(
-            self.shader_smooth_color, 'POINTS', {"pos": offset_lines[::2], 'color': color[::2]})
+            self.shader_smooth_color, "POINTS", {"pos": offset_lines[::2], "color": color[::2]}
+        )
 
     def get_mouse_pos(self, event):
         return Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
 
     def register_draw(self):
         self.handler = bpy.types.SpaceImageEditor.draw_handler_add(
-            self.univ_test_draw_callback, (), 'WINDOW', 'POST_VIEW')
+            self.univ_test_draw_callback, (), "WINDOW", "POST_VIEW"
+        )
         self.area.tag_redraw()
 
     def univ_test_draw_callback(self):
-        if bpy.context.area.ui_type != 'UV':
+        if bpy.context.area.ui_type != "UV":
             return
 
         import blf
@@ -237,7 +258,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         self.shader.uniform_float("color", (1, 1, 0, 0.5))
 
-        batch_nearest = batch_for_shader(self.shader, 'POINTS', {"pos": self.points})
+        batch_nearest = batch_for_shader(self.shader, "POINTS", {"pos": self.points})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)
 
@@ -279,13 +300,15 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
     @staticmethod
     def uv_crn_groups_to_lines_with_offset(
-            groups: typing.Sequence[typing.Sequence[BMLoop]], uv, line_offset=0.008, exact=False):
+        groups: typing.Sequence[typing.Sequence[BMLoop]], uv, line_offset=0.008, exact=False
+    ):
         """exact - correct line offset for flipped faces"""
         import numpy as np
         from .ubm import is_flipped_uv
+
         size = sum(len(group) for group in groups)
 
-        edges = np.empty(shape=(size*2, 2), dtype='float32')
+        edges = np.empty(shape=(size * 2, 2), dtype="float32")
         idx = 0
         if exact:
             for group in groups:
@@ -294,7 +317,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                     end_edge = crn.link_loop_next[uv].uv
 
                     # offset
-                    nx, ny = (end_edge - start_edge)
+                    nx, ny = end_edge - start_edge
                     if not is_flipped_uv(crn.face, uv):
                         ny = -ny
                     n = Vector((ny, nx))
@@ -312,7 +335,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                     end_edge = crn.link_loop_next[uv].uv
 
                     # offset
-                    nx, ny = (end_edge - start_edge)
+                    nx, ny = end_edge - start_edge
 
                     n = Vector((-ny, nx))
                     n.normalize()
@@ -325,12 +348,13 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
         return edges
 
     @staticmethod
-    def uv_segments_to_lines_with_offset(segments: typing.Sequence[typing.Iterable], line_offset=0.008):
+    def uv_segments_to_lines_with_offset(segments: typing.Sequence[typing.Iterable | typing.Sized], line_offset=0.008):
         """exact - correct line offset for flipped faces"""
         import numpy as np
+
         size = sum(len(seg) for seg in segments)
 
-        edges = np.empty(shape=(size*2, 2), dtype='float32')
+        edges = np.empty(shape=(size * 2, 2), dtype="float32")
         idx = 0
 
         for seg in segments:
@@ -339,7 +363,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                 end_edge = adv_crn.next_pt
 
                 # offset
-                nx, ny = (end_edge - start_edge)
+                nx, ny = end_edge - start_edge
 
                 n = Vector((-ny, nx))
                 n.normalize()
@@ -356,16 +380,17 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
     def calc_text_data_from_lines(edges: typing.Sequence | typing.Any, scale=0.000015):
         # import blf
         import numpy as np
+
         size = len(edges) // 2
 
-        edges: np.ndarray = edges.reshape(len(edges)//2, 2, 2)
+        edges: np.ndarray = edges.reshape(len(edges) // 2, 2, 2)
         edges_midpoints = np.mean(edges, axis=1)
 
         # font_id = 0
         # blf.size(font_id, 350)
         # blf.position(font_id, 0, 0, 0)
 
-        texts = np.arange(size, dtype='uint32').astype(str)
+        texts = np.arange(size, dtype="uint32").astype(str)
 
         # texts_dim = np.empty(shape=(size, 2), dtype='float32')
         # blf_dimensions = blf.dimensions
@@ -385,14 +410,13 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
         return edges_midpoints, texts
 
-
     def exit(self):
         if not (self.handler is None):
-            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, 'WINDOW')
+            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, "WINDOW")
 
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
-                    if area.ui_type == 'UV':
+                    if area.ui_type == "UV":
                         area.tag_redraw()
 
-        return {'FINISHED'}
+        return {"FINISHED"}

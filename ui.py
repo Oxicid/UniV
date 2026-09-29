@@ -9,55 +9,70 @@ from .icons import icons
 from .preferences import univ_settings, prefs
 
 from importlib.util import find_spec
+
 univ_pro_exist = find_spec(f"{__package__}.univ_pro") is not None
 del find_spec
 
 REDRAW_UV_LAYERS = True
 
 if bpy.app.version >= (4, 1, 0):
-    def draw_panel(layout, _name) -> bpy.types.UILayout:
-        header, panel = layout.panel("UniV_"+_name)
-        header.label(text=_name)
-        return panel
-else:
-    def draw_panel(layout, _name) -> bpy.types.UILayout:
-        layout.label(text=_name)
-        return layout
 
-if bpy.app.version >= (4, 1, 0):
-    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
-        header, panel = layout.panel("UniV_"+_name, default_closed=True)
+    def draw_panel(layout, _name) -> bpy.types.UILayout:
+        header, panel = layout.panel("UniV_" + _name)
         header.label(text=_name)
         return panel
+
 else:
-    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
+
+    def draw_panel(layout, _name) -> bpy.types.UILayout:
         layout.label(text=_name)
         return layout
 
 
 if bpy.app.version >= (4, 1, 0):
+
+    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
+        header, panel = layout.panel("UniV_" + _name, default_closed=True)
+        header.label(text=_name)
+        return panel
+
+else:
+
+    def draw_panel_hidden(layout, _name) -> bpy.types.UILayout:
+        layout.label(text=_name)
+        return layout
+
+
+if bpy.app.version >= (4, 1, 0):
+
     def draw_trim_panel(layout, _name) -> bpy.types.UILayout:
         pref = prefs()
-        header, panel = layout.panel("UniV_"+_name, default_closed=not pref.use_trims)
+        header, panel = layout.panel("UniV_" + _name, default_closed=not pref.use_trims)
 
         row = header.row(align=True)
-        row.prop(pref, 'use_trims', text='')
+        row.prop(pref, "use_trims", text="")
         row.label(text=_name)
         return panel
+
 else:
+
     def draw_trim_panel(layout, _name) -> bpy.types.UILayout:
         row = layout.row(align=True)
-        row.prop(prefs(), 'use_trims', text='')
+        row.prop(prefs(), "use_trims", text="")
         row.label(text=_name)
         return layout
 
+
 if bpy.app.version >= (4, 1, 0):
+
     def draw_panel_with_pref_checkbox(layout, pref_prop) -> bpy.types.UILayout:
         pref = prefs()
-        header, panel = layout.panel("UniV_"+pref_prop, default_closed=True)
+        header, panel = layout.panel("UniV_" + pref_prop, default_closed=True)
         header.prop(pref, pref_prop)
         return panel
+
 else:
+
     def draw_panel_with_pref_checkbox(layout, pref_prop) -> bpy.types.UILayout:
         layout.prop(prefs(), pref_prop)
         return layout
@@ -65,9 +80,9 @@ else:
 
 class UNIV_PT_General(Panel):
     bl_label = "  UniV Pro" if univ_pro_exist else "  UniV Lite"
-    bl_idname = 'UNIV_PT_General'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_General"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_category = "UniV"
 
     @staticmethod
@@ -76,60 +91,62 @@ class UNIV_PT_General(Panel):
             row = layer.row(align=True)
             row.ui_units_x = 3
             row.scale_x = 2.1
-            row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
+            row.operator("uv.univ_align", text="", icon_value=icon).direction = direct
 
         def ly_mid_mid_op(layer, direct, icon):
             row = layer.row(align=True)
-            row.operator('uv.univ_align', text="", icon_value=icon).direction = direct
+            row.operator("uv.univ_align", text="", icon_value=icon).direction = direct
             row.scale_x = 2
 
         col_main = where.column(align=True)
         row_top = col_main.row(align=True)
 
-        ly_wide_icon_op(row_top, 'LEFT_UPPER', icons.arrow_top_left)
-        ly_wide_icon_op(row_top.row(), 'UPPER', icons.arrow_top)
-        ly_wide_icon_op(row_top, 'RIGHT_UPPER', icons.arrow_top_right)
+        ly_wide_icon_op(row_top, "LEFT_UPPER", icons.arrow_top_left)
+        ly_wide_icon_op(row_top.row(), "UPPER", icons.arrow_top)
+        ly_wide_icon_op(row_top, "RIGHT_UPPER", icons.arrow_top_right)
 
         row_middle = col_main.row().row(align=True)
-        ly_wide_icon_op(row_middle, 'LEFT', icons.arrow_left)
+        ly_wide_icon_op(row_middle, "LEFT", icons.arrow_left)
 
         row_mid_middle = row_middle.row().row(align=True)
 
-        ly_mid_mid_op(row_mid_middle, 'HORIZONTAL', icons.horizontal_c)
-        ly_mid_mid_op(row_mid_middle.row(), 'CENTER', icons.center)
-        ly_mid_mid_op(row_mid_middle.row(), 'VERTICAL', icons.vertical_b)
-        ly_wide_icon_op(row_middle, 'RIGHT', icons.arrow_right)
+        ly_mid_mid_op(row_mid_middle, "HORIZONTAL", icons.horizontal_c)
+        ly_mid_mid_op(row_mid_middle.row(), "CENTER", icons.center)
+        ly_mid_mid_op(row_mid_middle.row(), "VERTICAL", icons.vertical_b)
+        ly_wide_icon_op(row_middle, "RIGHT", icons.arrow_right)
 
         row_bottom = col_main.row(align=True)
-        ly_wide_icon_op(row_bottom, 'LEFT_BOTTOM', icons.arrow_bottom_left)
-        ly_wide_icon_op(row_bottom.row(), 'BOTTOM', icons.arrow_bottom)
-        ly_wide_icon_op(row_bottom, 'RIGHT_BOTTOM', icons.arrow_bottom_right)
+        ly_wide_icon_op(row_bottom, "LEFT_BOTTOM", icons.arrow_bottom_left)
+        ly_wide_icon_op(row_bottom.row(), "BOTTOM", icons.arrow_bottom)
+        ly_wide_icon_op(row_bottom, "RIGHT_BOTTOM", icons.arrow_bottom_right)
 
     @staticmethod
     def draw_texel_density(layer, prefix):
         settings = univ_settings()
         split = layer.split(align=True)
         row = split.row(align=True)
-        set_idname = prefix + '.univ_texel_density_set'
-        row.operator(prefix + '.univ_texel_density_get', icon_value=icons.td_get)
+        set_idname = prefix + ".univ_texel_density_set"
+        row.operator(prefix + ".univ_texel_density_get", icon_value=icons.td_get)
         row.operator(set_idname, icon_value=icons.td_set).td_preset_idx = -1
-        row.prop(settings, 'texel', text='')
-        row.operator(prefix + '.univ_select_texel_density', text='', icon_value=icons.arrow)
-        if prefix == 'uv':
-            row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
+        row.prop(settings, "texel", text="")
+        row.operator(prefix + ".univ_select_texel_density", text="", icon_value=icons.arrow)
+        if prefix == "uv":
+            row.popover(panel="UNIV_PT_td_presets_manager", text="", icon_value=icons.settings_a)
         else:
-            row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
+            row.popover(
+                panel="UNIV_PT_td_presets_manager_view_3d", text="", icon_value=icons.settings_a
+            )
 
         split = layer.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
-            if idx and (idx+1) % 4 == 1:
+            if idx and (idx + 1) % 4 == 1:
                 split = layer.split()
                 row = split.row(align=True)
             row.operator(set_idname, text=preset.name).td_preset_idx = idx
 
     @staticmethod
-    def draw_uv_layers(layout, ui_list='UNIV_UL_UV_LayersManager', draw_label=True):
+    def draw_uv_layers(layout, ui_list="UNIV_UL_UV_LayersManager", draw_label=True):
         settings = univ_settings()
         if not settings.uv_layers_show:
             return
@@ -137,11 +154,14 @@ class UNIV_PT_General(Panel):
 
         if REDRAW_UV_LAYERS:
             from .operators.misc import UNIV_OT_UV_Layers_Manager
-            bpy.app.timers.register(UNIV_OT_UV_Layers_Manager.update_uv_layers_props, first_interval=0.1)
+
+            bpy.app.timers.register(
+                UNIV_OT_UV_Layers_Manager.update_uv_layers_props, first_interval=0.1
+            )
             REDRAW_UV_LAYERS = False
 
         if draw_label:
-            layout.label(text='UV Maps')
+            layout.label(text="UV Maps")
 
         row = layout.row()
         col = row.column()
@@ -153,16 +173,16 @@ class UNIV_PT_General(Panel):
             active_dataptr=settings,
             active_propname="uv_layers_active_idx",
             rows=4,
-            maxrows=4
+            maxrows=4,
         )
         col = row.column(align=True)
-        col.operator('mesh.univ_add', icon='ADD', text='')
-        col.operator('mesh.univ_remove', icon='REMOVE', text='')
+        col.operator("mesh.univ_add", icon="ADD", text="")
+        col.operator("mesh.univ_remove", icon="REMOVE", text="")
         col.separator(factor=0.25)
-        col.operator('mesh.univ_move_up', icon='TRIA_UP', text='')
-        col.operator('mesh.univ_move_down', icon='TRIA_DOWN', text='')
+        col.operator("mesh.univ_move_up", icon="TRIA_UP", text="")
+        col.operator("mesh.univ_move_down", icon="TRIA_DOWN", text="")
         col.separator(factor=0.25)
-        col.popover(panel='UNIV_PT_layers_manager', text='', icon_value=icons.settings_a)
+        col.popover(panel="UNIV_PT_layers_manager", text="", icon_value=icons.settings_a)
 
     @staticmethod
     def draw_trims(panel):
@@ -183,251 +203,270 @@ class UNIV_PT_General(Panel):
                 propname="trims_preset",
                 active_dataptr=slot,  # noqa
                 active_propname="active_trim_index",
-                rows=4
+                rows=4,
             )
 
         col = row.column(align=True)
-        col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
-        col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
-        col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
+        col.operator("scene.univ_trim_presets_processing", icon="ADD", text="").operation_type = (
+            "ADD"
+        )
+        col.operator(
+            "scene.univ_trim_presets_processing", icon="REMOVE", text=""
+        ).operation_type = "REMOVE"
+        col.operator("scene.univ_trim_presets_processing", icon="TRASH", text="").operation_type = (
+            "REMOVE_ALL"
+        )
 
         from . import utils
-        with utils.operator_context(col, 'INVOKE_REGION_WIN'):
-            col.operator('uv.univ_trim_editor', icon='GREASEPENCIL', text='')
+
+        with utils.operator_context(col, "INVOKE_REGION_WIN"):
+            col.operator("uv.univ_trim_editor", icon="GREASEPENCIL", text="")
 
         col.separator(factor=0.25)
-        col.popover(panel='UNIV_PT_trim_manager', text='', icon_value=icons.settings_a)
-
+        col.popover(panel="UNIV_PT_trim_manager", text="", icon_value=icons.settings_a)
 
     def draw_header(self, context):
         layout = self.layout
         row = layout.row()
-        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
+        row.popover(panel="UNIV_PT_GlobalSettings", text="", icon_value=icons.settings_b)
 
     def draw(self, context):
         layout = self.layout
         pref = prefs()
         if pref.use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
+            layout.operator_context = "INVOKE_DEFAULT"
         else:
-            layout.operator_context = 'EXEC_DEFAULT'
+            layout.operator_context = "EXEC_DEFAULT"
         # layout = layout.column(align=True)
 
-
         # Transforms
-        panel = draw_panel(layout, 'Transforms')
+        panel = draw_panel(layout, "Transforms")
         if panel:
             col_align = panel.column(align=True)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
-            grid.operator('uv.univ_fit', icon_value=icons.crop).axis = 'XY'
-            grid.operator('uv.univ_fit', text='', icon_value=icons.x).axis = 'X'
-            grid.operator('uv.univ_fit', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator("uv.univ_fit", icon_value=icons.crop).axis = "XY"
+            grid.operator("uv.univ_fit", text="", icon_value=icons.x).axis = "X"
+            grid.operator("uv.univ_fit", text="", icon_value=icons.y).axis = "Y"
 
-            grid.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
-            grid.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
-            grid.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator("uv.univ_fill", icon_value=icons.fill).axis = "XY"
+            grid.operator("uv.univ_fill", text="", icon_value=icons.x).axis = "X"
+            grid.operator("uv.univ_fill", text="", icon_value=icons.y).axis = "Y"
 
-            grid.operator('uv.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
-            grid.operator('uv.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
-            grid.operator('uv.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator("uv.univ_reset_scale", icon_value=icons.reset).axis = "XY"
+            grid.operator("uv.univ_reset_scale", text="", icon_value=icons.x).axis = "X"
+            grid.operator("uv.univ_reset_scale", text="", icon_value=icons.y).axis = "Y"
 
-            grid.operator('uv.univ_gravity', icon_value=icons.gravity).axis = 'Z'
-            grid.operator('uv.univ_gravity', text='', icon_value=icons.x).axis = 'X'
-            grid.operator('uv.univ_gravity', text='', icon_value=icons.y).axis = 'Y'
+            grid.operator("uv.univ_gravity", icon_value=icons.gravity).axis = "Z"
+            grid.operator("uv.univ_gravity", text="", icon_value=icons.x).axis = "X"
+            grid.operator("uv.univ_gravity", text="", icon_value=icons.y).axis = "Y"
 
-            grid.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
-            grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
-            grid.operator('uv.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
+            grid.operator("uv.univ_orient", icon_value=icons.orient).edge_dir = "BOTH"
+            grid.operator("uv.univ_orient", text="", icon_value=icons.arrow_right).edge_dir = (
+                "HORIZONTAL"
+            )
+            grid.operator("uv.univ_orient", text="", icon_value=icons.arrow_top).edge_dir = (
+                "VERTICAL"
+            )
 
             col_align.separator(factor=0.25)
             self.draw_align_buttons(col_align)
             col_align.separator(factor=0.25)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_rotate', icon_value=icons.rotate)
-            row.operator('uv.univ_flip', icon_value=icons.flip)
+            row.operator("uv.univ_rotate", icon_value=icons.rotate)
+            row.operator("uv.univ_flip", icon_value=icons.flip)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_sort', icon_value=icons.sort)
-            row.operator('uv.univ_distribute', icon_value=icons.distribute)
+            row.operator("uv.univ_sort", icon_value=icons.sort)
+            row.operator("uv.univ_distribute", icon_value=icons.distribute)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_home', icon_value=icons.home)
-            row.operator('uv.univ_shift', icon_value=icons.shift)
+            row.operator("uv.univ_home", icon_value=icons.home)
+            row.operator("uv.univ_shift", icon_value=icons.shift)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_random', icon_value=icons.random)
-            row.operator('uv.univ_break')
+            row.operator("uv.univ_random", icon_value=icons.random)
+            row.operator("uv.univ_break")
 
             col_align.separator(factor=0.25)
             row = col_align.row(align=True)
-            row.operator('uv.univ_adjust_td', icon_value=icons.adjust)
-            row.operator('uv.univ_normalize', icon_value=icons.normalize)
+            row.operator("uv.univ_adjust_td", icon_value=icons.adjust)
+            row.operator("uv.univ_normalize", icon_value=icons.normalize)
 
-            self.draw_texel_density(col_align, 'uv')
+            self.draw_texel_density(col_align, "uv")
 
             col_align.separator(factor=0.25)
             # Pack
             row = col_align.row(align=True)
             row.scale_y = 1.3
-            row.operator('uv.univ_pack', icon_value=icons.pack)
+            row.operator("uv.univ_pack", icon_value=icons.pack)
             if "NOT_BL_EXT":
                 if pref.use_uvpm:
-                    row.operator('uv.univ_pack_other', icon_value=icons.pack_others)
-            row.popover(panel='UNIV_PT_PackSettings', text='', icon_value=icons.settings_a)
-
+                    row.operator("uv.univ_pack_other", icon_value=icons.pack_others)
+            row.popover(panel="UNIV_PT_PackSettings", text="", icon_value=icons.settings_a)
 
         # Unfold
-        panel = draw_panel(layout, 'Unfold')
+        panel = draw_panel(layout, "Unfold")
         if panel:
             col_align = panel.column(align=True)
 
             if univ_pro_exist:
-                col_align.operator('uv.univ_rectify', icon_value=icons.rectify)
+                col_align.operator("uv.univ_rectify", icon_value=icons.rectify)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_quadrify', icon_value=icons.quadrify)
-            row.operator('uv.univ_straight', icon_value=icons.straight)
+            row.operator("uv.univ_quadrify", icon_value=icons.quadrify)
+            row.operator("uv.univ_straight", icon_value=icons.straight)
 
             split = col_align.split(align=True)
-            split.operator('uv.univ_relax', icon_value=icons.relax)
+            split.operator("uv.univ_relax", icon_value=icons.relax)
             if univ_pro_exist:
                 row = split.row(align=True)
-                row.operator('uv.univ_unwrap', icon_value=icons.unwrap).unwrap_along = 'UV'
-                row.operator('uv.univ_unwrap', text='', icon_value=icons.x).unwrap_along = 'U'
-                row.operator('uv.univ_unwrap', text='', icon_value=icons.y).unwrap_along = 'V'
+                row.operator("uv.univ_unwrap", icon_value=icons.unwrap).unwrap_along = "UV"
+                row.operator("uv.univ_unwrap", text="", icon_value=icons.x).unwrap_along = "U"
+                row.operator("uv.univ_unwrap", text="", icon_value=icons.y).unwrap_along = "V"
             else:
-                split.operator('uv.univ_unwrap', icon_value=icons.unwrap)
-
+                split.operator("uv.univ_unwrap", icon_value=icons.unwrap)
 
         # Mark
-        panel = draw_panel(layout, 'Mark')
+        panel = draw_panel(layout, "Mark")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('uv.univ_cut', icon_value=icons.cut)
-            row.operator('uv.univ_seam_border', icon_value=icons.border_seam)
+            row.operator("uv.univ_cut", icon_value=icons.cut)
+            row.operator("uv.univ_seam_border", icon_value=icons.border_seam)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_mark')
-            row.operator('uv.univ_pin', icon_value=icons.pin)
+            row.operator("uv.univ_mark")
+            row.operator("uv.univ_pin", icon_value=icons.pin)
 
             if univ_pro_exist:
                 row = col_align.row(align=True)
                 row.scale_y = 1.35
-                row.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
+                row.operator(
+                    "uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c
+                ).is_vertical = False
                 row.menu(UNIV_MT_ConstraintsH.__name__, icon="DOWNARROW_HLT")
 
-                row.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
+                row.operator(
+                    "uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b
+                ).is_vertical = True
                 row.menu(UNIV_MT_ConstraintsV.__name__, icon="DOWNARROW_HLT")
 
         # Misc
-        panel = draw_panel(layout, 'Misc')
+        panel = draw_panel(layout, "Misc")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
-            row.operator('uv.univ_weld', icon_value=icons.weld)
-            row.operator('uv.univ_stitch', icon_value=icons.stitch)
+            row.operator("uv.univ_weld", icon_value=icons.weld)
+            row.operator("uv.univ_stitch", icon_value=icons.stitch)
 
             split = col_align.split(align=True)
             split.scale_y = 1.3
             row = split.row(align=True)
-            row.operator('uv.univ_stack', icon_value=icons.stack)
+            row.operator("uv.univ_stack", icon_value=icons.stack)
             if univ_pro_exist:
-                row.operator('uv.univ_select_similar', text='', icon_value=icons.arrow)
+                row.operator("uv.univ_select_similar", text="", icon_value=icons.arrow)
 
             row = split.row(align=True)
-            row.operator('uv.univ_symmetrize', icon_value=icons.symmetrize)
-
+            row.operator("uv.univ_symmetrize", icon_value=icons.symmetrize)
 
         # Other
-        panel = draw_panel(layout, 'Other')
+        panel = draw_panel(layout, "Other")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('uv.univ_batch_inspect', icon_value=icons.zero)
-            row.popover(panel='UNIV_PT_BatchInspectSettings', text='', icon_value=icons.settings_a)
+            row.operator("uv.univ_batch_inspect", icon_value=icons.zero)
+            row.popover(panel="UNIV_PT_BatchInspectSettings", text="", icon_value=icons.settings_a)
 
             col_align.separator(factor=0.25)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('mesh.univ_checker', icon_value=icons.checker)
-            row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
+            row.operator("mesh.univ_checker", icon_value=icons.checker)
+            row.operator("wm.univ_checker_cleanup", text="", icon_value=icons.remove)
             if univ_pro_exist:
-                row.popover(panel='UNIV_PT_CheckerSettings', text='', icon_value=icons.settings_a)
+                row.popover(panel="UNIV_PT_CheckerSettings", text="", icon_value=icons.settings_a)
 
-            sub_panel = getattr(panel, 'panel', None)
+            sub_panel = getattr(panel, "panel", None)
             if sub_panel:
                 header, sub_panel = sub_panel("UniV_Specific", default_closed=True)
-                header.label(text='Specific')
+                header.label(text="Specific")
                 if sub_panel:
                     col = sub_panel.column(align=True)
-                    col.operator('uv.univ_align_border_verts', icon_value=icons.align_border_verts)
-                    col.operator('uv.univ_snap_to_pixels', icon='FORCE_TEXTURE')
+                    col.operator("uv.univ_align_border_verts", icon_value=icons.align_border_verts)
+                    col.operator("uv.univ_snap_to_pixels", icon="FORCE_TEXTURE")
                     col.separator(factor=0.35)
-                    col.operator('uv.univ_random_color')
-                    col.operator('uv.univ_linear_gradient')
+                    col.operator("uv.univ_random_color")
+                    col.operator("uv.univ_linear_gradient")
                     col.separator(factor=0.35)
-                    col.operator('mesh.univ_smart_scale_apply')
-
+                    col.operator("mesh.univ_smart_scale_apply")
 
         # Select
-        panel = draw_panel_hidden(layout, 'Select')
+        panel = draw_panel_hidden(layout, "Select")
         if panel:
             col_align = panel.column(align=True)
             grid = col_align.grid_flow(row_major=True, columns=2, align=True)
 
             if univ_pro_exist:
-                grid.operator('uv.univ_select_flat', icon_value=icons.flat)
-                grid.operator('uv.univ_select_loop', icon_value=icons.loop_select)
+                grid.operator("uv.univ_select_flat", icon_value=icons.flat)
+                grid.operator("uv.univ_select_loop", icon_value=icons.loop_select)
 
-            grid.operator('uv.univ_select_grow', icon_value=icons.grow)
-            grid.operator('uv.univ_select_edge_grow', icon_value=icons.edge_grow)
+            grid.operator("uv.univ_select_grow", icon_value=icons.grow)
+            grid.operator("uv.univ_select_edge_grow", icon_value=icons.edge_grow)
 
-            grid.operator('uv.univ_select_linked', icon_value=icons.linked)
-            grid.operator('uv.univ_select_by_cursor', icon_value=icons.cursor)
+            grid.operator("uv.univ_select_linked", icon_value=icons.linked)
+            grid.operator("uv.univ_select_by_cursor", icon_value=icons.cursor)
 
-            grid.operator('uv.univ_select_border', icon_value=icons.border)
-            grid.operator('uv.univ_select_stacked', icon_value=icons.select_stacked)
+            grid.operator("uv.univ_select_border", icon_value=icons.border)
+            grid.operator("uv.univ_select_stacked", icon_value=icons.select_stacked)
 
             col_align.separator(factor=0.25)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
-            grid.operator('uv.univ_select_square_island', icon_value=icons.square).shape = 'SQUARE'
-            grid.operator('uv.univ_select_square_island', text='H-Rect', icon_value=icons.horizontal_a).shape = 'HORIZONTAL'
-            grid.operator('uv.univ_select_square_island', text='V-Rect', icon_value=icons.vertical_a).shape = 'VERTICAL'
+            grid.operator("uv.univ_select_square_island", icon_value=icons.square).shape = "SQUARE"
+            grid.operator(
+                "uv.univ_select_square_island", text="H-Rect", icon_value=icons.horizontal_a
+            ).shape = "HORIZONTAL"
+            grid.operator(
+                "uv.univ_select_square_island", text="V-Rect", icon_value=icons.vertical_a
+            ).shape = "VERTICAL"
 
-            grid.operator('uv.univ_select_by_area', text='Small', icon_value=icons.small).size_mode = 'SMALL'
-            grid.operator('uv.univ_select_by_area', text='Medium', icon_value=icons.medium).size_mode = 'MEDIUM'
-            grid.operator('uv.univ_select_by_area', text='Large', icon_value=icons.large).size_mode = 'LARGE'
+            grid.operator(
+                "uv.univ_select_by_area", text="Small", icon_value=icons.small
+            ).size_mode = "SMALL"
+            grid.operator(
+                "uv.univ_select_by_area", text="Medium", icon_value=icons.medium
+            ).size_mode = "MEDIUM"
+            grid.operator(
+                "uv.univ_select_by_area", text="Large", icon_value=icons.large
+            ).size_mode = "LARGE"
 
             col_align.operator("uv.univ_local_invert_selection", icon_value=icons.local_invert)
 
         # UV Maps
         if pref.uv_layers_show:
-            panel = draw_panel(layout, 'UV Maps')
+            panel = draw_panel(layout, "UV Maps")
             if panel:
-                self.draw_uv_layers(panel,draw_label=False)
+                self.draw_uv_layers(panel, draw_label=False)
 
         if univ_pro_exist:
             # Trim
-            panel = draw_trim_panel(layout, 'Trims')
+            panel = draw_trim_panel(layout, "Trims")
             if panel:
                 self.draw_trims(panel)
 
 
 class UNIV_PT_General_VIEW_3D(Panel):
     bl_label = "  UniV Pro" if univ_pro_exist else "  UniV Lite"
-    bl_idname = 'UNIV_PT_General_VIEW3D'
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_General_VIEW3D"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
     bl_category = "UniV"
 
     @classmethod
@@ -437,162 +476,158 @@ class UNIV_PT_General_VIEW_3D(Panel):
     def draw_header(self, context):
         layout = self.layout
         row = layout.row()
-        row.popover(panel='UNIV_PT_GlobalSettings', text="", icon_value=icons.settings_b)
+        row.popover(panel="UNIV_PT_GlobalSettings", text="", icon_value=icons.settings_b)
 
     def draw(self, context):
         layout = self.layout
         pref = prefs()
         if pref.use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
+            layout.operator_context = "INVOKE_DEFAULT"
         else:
-            layout.operator_context = 'EXEC_DEFAULT'
+            layout.operator_context = "EXEC_DEFAULT"
         # col = layout.column(align=True)
 
-
         # Transform
-        panel = draw_panel(layout, 'Transforms')
+        panel = draw_panel(layout, "Transforms")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_reset_scale', icon_value=icons.reset).axis = 'XY'
-            row.operator('mesh.univ_reset_scale', text='', icon_value=icons.x).axis = 'X'
-            row.operator('mesh.univ_reset_scale', text='', icon_value=icons.y).axis = 'Y'
+            row.operator("mesh.univ_reset_scale", icon_value=icons.reset).axis = "XY"
+            row.operator("mesh.univ_reset_scale", text="", icon_value=icons.x).axis = "X"
+            row.operator("mesh.univ_reset_scale", text="", icon_value=icons.y).axis = "Y"
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_gravity', icon_value=icons.gravity).axis = 'Z'
-            row.operator('mesh.univ_gravity', text='', icon_value=icons.x).axis = 'X'
-            row.operator('mesh.univ_gravity', text='', icon_value=icons.y).axis = 'Y'
+            row.operator("mesh.univ_gravity", icon_value=icons.gravity).axis = "Z"
+            row.operator("mesh.univ_gravity", text="", icon_value=icons.x).axis = "X"
+            row.operator("mesh.univ_gravity", text="", icon_value=icons.y).axis = "Y"
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
-            row.operator('mesh.univ_orient', text='', icon_value=icons.arrow_right).edge_dir = 'HORIZONTAL'
-            row.operator('mesh.univ_orient', text='', icon_value=icons.arrow_top).edge_dir = 'VERTICAL'
+            row.operator("mesh.univ_orient", icon_value=icons.orient).edge_dir = "BOTH"
+            row.operator("mesh.univ_orient", text="", icon_value=icons.arrow_right).edge_dir = (
+                "HORIZONTAL"
+            )
+            row.operator("mesh.univ_orient", text="", icon_value=icons.arrow_top).edge_dir = (
+                "VERTICAL"
+            )
 
             col_align.separator(factor=0.25)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_rotate', icon_value=icons.rotate)
-            row.operator('mesh.univ_flip', icon_value=icons.flip)
+            row.operator("mesh.univ_rotate", icon_value=icons.rotate)
+            row.operator("mesh.univ_flip", icon_value=icons.flip)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_home', icon_value=icons.home)
-            row.operator('mesh.univ_shift', icon_value=icons.shift)
+            row.operator("mesh.univ_home", icon_value=icons.home)
+            row.operator("mesh.univ_shift", icon_value=icons.shift)
 
-            col_align.operator('mesh.univ_random', icon_value=icons.random)
+            col_align.operator("mesh.univ_random", icon_value=icons.random)
 
             col_align.separator(factor=0.25)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
-            row.operator('mesh.univ_normalize', icon_value=icons.normalize)
+            row.operator("mesh.univ_adjust_td", icon_value=icons.adjust)
+            row.operator("mesh.univ_normalize", icon_value=icons.normalize)
 
-            UNIV_PT_General.draw_texel_density(col_align, 'mesh')
-
+            UNIV_PT_General.draw_texel_density(col_align, "mesh")
 
         # Unfold
-        panel = draw_panel(layout, 'Unfold')
+        panel = draw_panel(layout, "Unfold")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_relax', icon_value=icons.relax)
-            row.operator('mesh.univ_unwrap', icon_value=icons.unwrap)
-
+            row.operator("mesh.univ_relax", icon_value=icons.relax)
+            row.operator("mesh.univ_unwrap", icon_value=icons.unwrap)
 
         # Mark
-        panel = draw_panel(layout, 'Mark')
+        panel = draw_panel(layout, "Mark")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('mesh.univ_cut', icon_value=icons.cut)
-            row.operator('mesh.univ_seam_border', icon_value=icons.border_seam)
+            row.operator("mesh.univ_cut", icon_value=icons.cut)
+            row.operator("mesh.univ_seam_border", icon_value=icons.border_seam)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_mark')
-            row.operator('mesh.univ_angle', icon_value=icons.border_by_angle)
-
+            row.operator("mesh.univ_mark")
+            row.operator("mesh.univ_angle", icon_value=icons.border_by_angle)
 
         # Misk
-        panel = draw_panel(layout, 'Misc')
+        panel = draw_panel(layout, "Misc")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_weld', icon_value=icons.weld)
-            row.operator('mesh.univ_stitch', icon_value=icons.stitch)
+            row.operator("mesh.univ_weld", icon_value=icons.weld)
+            row.operator("mesh.univ_stitch", icon_value=icons.stitch)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('mesh.univ_stack', icon_value=icons.stack)
+            row.operator("mesh.univ_stack", icon_value=icons.stack)
             if univ_pro_exist:
-                row.operator('mesh.univ_select_similar', text='', icon_value=icons.arrow)
-
+                row.operator("mesh.univ_select_similar", text="", icon_value=icons.arrow)
 
         # Project
-        panel = draw_panel(layout, 'Project')
+        panel = draw_panel(layout, "Project")
         if panel:
             col_align = panel.column(align=True)
             if univ_pro_exist:
                 row = col_align.row(align=True)
-                row.operator('mesh.univ_transfer', icon_value=icons.transfer)
+                row.operator("mesh.univ_transfer", icon_value=icons.transfer)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_normal', icon_value=icons.normal)
-            row.operator('mesh.univ_box_project', icon_value=icons.box)
+            row.operator("mesh.univ_normal", icon_value=icons.normal)
+            row.operator("mesh.univ_box_project", icon_value=icons.box)
 
             row = col_align.row(align=True)
-            row.operator('mesh.univ_smart_project', icon_value=icons.smart)
-            row.operator('mesh.univ_view_project', icon_value=icons.view)
+            row.operator("mesh.univ_smart_project", icon_value=icons.smart)
+            row.operator("mesh.univ_view_project", icon_value=icons.view)
 
             split = col_align.split(align=True)
-            split.operator('mesh.univ_wrap')
+            split.operator("mesh.univ_wrap")
 
             row = split.row(align=True)
-            row.operator('mesh.univ_flatten', icon_value=icons.flatten)
-            row.operator('mesh.univ_flatten_clean_up', icon_value=icons.remove, text='')
-
+            row.operator("mesh.univ_flatten", icon_value=icons.flatten)
+            row.operator("mesh.univ_flatten_clean_up", icon_value=icons.remove, text="")
 
         # Other
-        panel = draw_panel(layout, 'Other')
+        panel = draw_panel(layout, "Other")
         if panel:
             col_align = panel.column(align=True)
 
             row = col_align.row(align=True)
             row.scale_y = 1.35
-            row.operator('mesh.univ_checker', icon_value=icons.checker)
-            row.operator('wm.univ_checker_cleanup', text='', icon_value=icons.remove)
-
+            row.operator("mesh.univ_checker", icon_value=icons.checker)
+            row.operator("wm.univ_checker_cleanup", text="", icon_value=icons.remove)
 
         # Select
-        panel = draw_panel_hidden(layout, 'Select ')
+        panel = draw_panel_hidden(layout, "Select ")
         if panel:
             col_align = panel.column(align=True)
             if univ_pro_exist:
                 row = col_align.row(align=True)
-                row.operator('mesh.univ_select_flat', icon_value=icons.flat)
-                row.operator('mesh.univ_select_loop', icon_value=icons.loop_select)
+                row.operator("mesh.univ_select_flat", icon_value=icons.flat)
+                row.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
             row = col_align.row(align=True)
-            row.operator('mesh.univ_select_grow', icon_value=icons.grow)
-            row.operator('mesh.univ_select_edge_grow', icon_value=icons.edge_grow)
+            row.operator("mesh.univ_select_grow", icon_value=icons.grow)
+            row.operator("mesh.univ_select_edge_grow", icon_value=icons.edge_grow)
 
             col_align.operator("mesh.univ_local_invert_selection", icon_value=icons.local_invert)
 
-
         # UV Maps
         if pref.uv_layers_show:
-            panel = draw_panel(layout, 'UV Maps')
+            panel = draw_panel(layout, "UV Maps")
             if panel:
                 UNIV_PT_General.draw_uv_layers(panel, draw_label=False)
 
 
 class UNIV_PT_GlobalSettings(Panel):
-    bl_idname = 'UNIV_PT_GlobalSettings'
-    bl_label = 'Global Settings'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_GlobalSettings"
+    bl_label = "Global Settings"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
     bl_ui_units_x = 12
@@ -606,18 +641,16 @@ class UNIV_PT_GlobalSettings(Panel):
 
         # layout.separator(factor=0.5)
         pref = prefs()
-        row = layout.row(align=True, heading='Global Size')
-        row.prop(pref, 'size_x', text='')
-        row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
-        row.prop(pref, 'size_y', text='')
+        row = layout.row(align=True, heading="Global Size")
+        row.prop(pref, "size_x", text="")
+        row.prop(pref, "lock_size", text="", icon="LOCKED" if pref.lock_size else "UNLOCKED")
+        row.prop(pref, "size_y", text="")
 
+        layout.prop(pref, "padding", slider=True)
+        layout.prop(pref, "use_texel", text="Use Texel in operators")
 
-        layout.prop(pref, 'padding', slider=True)
-        layout.prop(pref, 'use_texel', text='Use Texel in operators')
-
-
-        layout.prop(pref, 'use_csa_mods')
-        layout.operator('wm.univ_show_addon_preferences', icon='TOOL_SETTINGS')
+        layout.prop(pref, "use_csa_mods")
+        layout.operator("wm.univ_show_addon_preferences", icon="TOOL_SETTINGS")
 
     @staticmethod
     def draw_ui_settings(layout):
@@ -627,64 +660,68 @@ class UNIV_PT_GlobalSettings(Panel):
         pref = prefs()
         if univ_pro_exist:
             from .draw import has_crash_modal_running
+
             bl_idname = has_crash_modal_running()
             if bl_idname:
                 layout.label(text=f"Operator {bl_idname} prevents overlays.", icon="ERROR")
-                ot = layout.operator("scene.univ_excluded_operators_for_overlay_processing", text=f"Exclude {bl_idname!r}")
+                ot = layout.operator(
+                    "scene.univ_excluded_operators_for_overlay_processing",
+                    text=f"Exclude {bl_idname!r}",
+                )
                 ot.operation_type = "ADD"
                 ot.idname = bl_idname
 
-            panel = draw_panel_with_pref_checkbox(layout, 'overlay_2d_enable')
+            panel = draw_panel_with_pref_checkbox(layout, "overlay_2d_enable")
             if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
                 col.active = pref.overlay_2d_enable
 
-                col.prop(pref, 'overlay_2d_uv_edge_seam_color')
-                col.prop(pref, 'overlay_2d_uv_edge_h_constraints_color')
-                col.prop(pref, 'overlay_2d_uv_edge_v_constraints_color')
+                col.prop(pref, "overlay_2d_uv_edge_seam_color")
+                col.prop(pref, "overlay_2d_uv_edge_h_constraints_color")
+                col.prop(pref, "overlay_2d_uv_edge_v_constraints_color")
 
                 col.separator()
-                col.prop(pref, 'overlay_2d_uv_seam_edge_pixelize')
+                col.prop(pref, "overlay_2d_uv_seam_edge_pixelize")
 
-            panel = draw_panel_with_pref_checkbox(layout, 'overlay_3d_enable')
+            panel = draw_panel_with_pref_checkbox(layout, "overlay_3d_enable")
             if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
                 col.active = pref.overlay_3d_enable
 
-                col.prop(pref, 'overlay_3d_uv_vert_color')
-                col.prop(pref, 'overlay_3d_uv_edge_color')
-                col.prop(pref, 'overlay_3d_uv_face_color')
+                col.prop(pref, "overlay_3d_uv_vert_color")
+                col.prop(pref, "overlay_3d_uv_edge_color")
+                col.prop(pref, "overlay_3d_uv_face_color")
 
-                col.prop(pref, 'overlay_toggle_xray')
+                col.prop(pref, "overlay_toggle_xray")
 
-            panel = draw_panel_with_pref_checkbox(layout, 'use_trims')
+            panel = draw_panel_with_pref_checkbox(layout, "use_trims")
             if panel:
                 split = panel.split(factor=indent)
                 _ = split.column()
                 col = split.column()
                 col.active = pref.use_trims
-                col.prop(pref, 'trim_line_width')
-                col.prop(pref, 'trim_line_opacity')
-                col.prop(pref, 'trim_tris_opacity')
+                col.prop(pref, "trim_line_width")
+                col.prop(pref, "trim_line_opacity")
+                col.prop(pref, "trim_tris_opacity")
 
-        panel = draw_panel_with_pref_checkbox(layout, 'uv_layers_show')
+        panel = draw_panel_with_pref_checkbox(layout, "uv_layers_show")
         if panel:
             split = panel.split(factor=indent)
             _ = split.column()
             col = split.column()
             col.active = pref.uv_layers_show
-            col.prop(pref, 'enable_uv_layers_sync_borders_seam')
+            col.prop(pref, "enable_uv_layers_sync_borders_seam")
 
 
 class UNIV_PT_PackSettings(Panel):
-    bl_idname = 'UNIV_PT_PackSettings'
-    bl_label = 'Pack Settings'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_PackSettings"
+    bl_label = "Pack Settings"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
     bl_ui_units_x = 12
@@ -694,16 +731,20 @@ class UNIV_PT_PackSettings(Panel):
         settings = univ_settings()
 
         if "NOT_BL_EXT":
-            uvpm_exist = hasattr(context.scene, 'uvpm4_props') or hasattr(context.scene, 'uvpm3_props')
+            uvpm_exist = hasattr(context.scene, "uvpm4_props") or hasattr(
+                context.scene, "uvpm3_props"
+            )
             if uvpm_exist:
-                layout.prop(settings, 'use_uvpm')
+                layout.prop(settings, "use_uvpm")
 
-        row = layout.row(align=True, heading='Global Size')
-        row.prop(settings, 'size_x', text='')
-        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
-        row.prop(settings, 'size_y', text='')
+        row = layout.row(align=True, heading="Global Size")
+        row.prop(settings, "size_x", text="")
+        row.prop(
+            settings, "lock_size", text="", icon="LOCKED" if settings.lock_size else "UNLOCKED"
+        )
+        row.prop(settings, "size_y", text="")
 
-        layout.prop(settings, 'padding', slider=True)
+        layout.prop(settings, "padding", slider=True)
         layout.separator()
 
         if "NOT_BL_EXT":
@@ -711,98 +752,109 @@ class UNIV_PT_PackSettings(Panel):
                 if uvpm_exist:
                     self.draw_uvpm()
                 else:
-                    layout.label(text='UVPackmaster not found')
+                    layout.label(text="UVPackmaster not found")
                 return
 
         if not bpy.app.version >= (3, 6, 0):
-            layout.prop(settings, 'rotate', toggle=True)
+            layout.prop(settings, "rotate", toggle=True)
         else:
             row = layout.row(align=True)
-            row.prop(settings, 'shape_method', expand=True)
+            row.prop(settings, "shape_method", expand=True)
 
             row = layout.row(align=True)
-            row.prop(settings, 'scale', toggle=True)
-            row.prop(settings, 'rotate', toggle=True)
+            row.prop(settings, "scale", toggle=True)
+            row.prop(settings, "rotate", toggle=True)
 
             if settings.rotate:
                 row = layout.row().column()
                 row.scale_x = 1.5
-                row.alignment = 'CENTER'
-                row.prop(settings, 'rotate_method', text='Rotation Method')
+                row.alignment = "CENTER"
+                row.prop(settings, "rotate_method", text="Rotation Method")
 
             if settings.pin:
-                row.prop(settings, 'pin_method', text='Lock Method       ')
+                row.prop(settings, "pin_method", text="Lock Method       ")
 
-            self.layout.prop(settings, 'pin')
-            layout.prop(settings, 'merge_overlap')
-        layout.prop(settings, 'udim_source')
+            self.layout.prop(settings, "pin")
+            layout.prop(settings, "merge_overlap")
+        layout.prop(settings, "udim_source")
 
     def draw_uvpm(self):
         layout = self.layout
         settings = univ_settings()
 
-        uvpm_settings = getattr(bpy.context.scene, 'uvpm4_props', None)
+        uvpm_settings = getattr(bpy.context.scene, "uvpm4_props", None)
         if not uvpm_settings:
             uvpm_settings = bpy.context.scene.uvpm3_props
 
-        if hasattr(uvpm_settings, 'default_main_props'):
+        if hasattr(uvpm_settings, "default_main_props"):
             uvpm_main_props = uvpm_settings.default_main_props
         else:
             uvpm_main_props = uvpm_settings
 
         row = layout.row(align=True)
-        row.prop(settings, 'scale', toggle=True)
-        row.prop(uvpm_main_props, 'rotation_enable', text='Rotation', toggle=True)
-        row.prop(uvpm_main_props, 'flipping_enable', text='Flip', toggle=True)
+        row.prop(settings, "scale", toggle=True)
+        row.prop(uvpm_main_props, "rotation_enable", text="Rotation", toggle=True)
+        row.prop(uvpm_main_props, "flipping_enable", text="Flip", toggle=True)
         if settings.scale:
             row = layout.row(align=True)
-            row.prop(uvpm_main_props, 'normalize_scale', text='Normalize', toggle=True)
-            row.prop(uvpm_main_props, 'heuristic_allow_mixed_scales', text='Mixed Scale', toggle=True)
+            row.prop(uvpm_main_props, "normalize_scale", text="Normalize", toggle=True)
+            row.prop(
+                uvpm_main_props, "heuristic_allow_mixed_scales", text="Mixed Scale", toggle=True
+            )
         if uvpm_main_props.rotation_enable:
             row = layout.row(align=True)
-            row.prop(uvpm_main_props, 'pre_rotation_disable', text='Pre-Rotation Disable', toggle=True)
+            row.prop(
+                uvpm_main_props, "pre_rotation_disable", text="Pre-Rotation Disable", toggle=True
+            )
             subrow = row.column()
             subrow.scale_x = 0.8
-            subrow.prop(uvpm_main_props, 'rotation_step', text='Step')
+            subrow.prop(uvpm_main_props, "rotation_step", text="Step")
 
-        layout.prop(uvpm_main_props, 'lock_overlapping_enable', text='Lock Overlaps')
+        layout.prop(uvpm_main_props, "lock_overlapping_enable", text="Lock Overlaps")
         if uvpm_main_props.lock_overlapping_enable:
             row = layout.row(align=True)
-            row.prop(uvpm_main_props, 'lock_overlapping_mode', expand=True)
+            row.prop(uvpm_main_props, "lock_overlapping_mode", expand=True)
 
-        layout.prop(uvpm_main_props.numbered_groups_descriptors.lock_group, 'enable', text='Lock Groups')
+        layout.prop(
+            uvpm_main_props.numbered_groups_descriptors.lock_group, "enable", text="Lock Groups"
+        )
 
 
 class UNIV_PT_BatchInspectSettings(Panel):
-    bl_idname = 'UNIV_PT_BatchInspectSettings'
-    bl_label = 'Batch Inspect Settings'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_BatchInspectSettings"
+    bl_label = "Batch Inspect Settings"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
 
     def draw(self, context):
         from .operators.inspect import Inspect
+
         settings = univ_settings()
         flags = settings.batch_inspect_flags
 
         def draw_tag_button(flag: Inspect):
             is_enabled = bool(flags & flag)
-            row.operator('uv.univ_batch_inspect_flags',
-                         text='',
-                         icon='CHECKBOX_HLT' if is_enabled else 'CHECKBOX_DEHLT',  # noqa
-                         depress=is_enabled).flag = flag
+            row.operator(
+                "uv.univ_batch_inspect_flags",
+                text="",
+                icon="CHECKBOX_HLT" if is_enabled else "CHECKBOX_DEHLT",  # noqa
+                depress=is_enabled,
+            ).flag = flag
 
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
         col = layout.column(align=True)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_overlap', icon_value=icons.overlap).check_mode = 'ALL'
+        row.operator("uv.univ_check_overlap", icon_value=icons.overlap).check_mode = "ALL"
         draw_tag_button(Inspect.Overlap)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_overlap', text='Inexact', icon_value=icons.overlap).check_mode = 'INEXACT'
+        row.operator(
+            "uv.univ_check_overlap", text="Inexact", icon_value=icons.overlap
+        ).check_mode = "INEXACT"
         draw_tag_button(Inspect.OverlapInexact)
 
         # row = col.row(align=True)
@@ -824,50 +876,51 @@ class UNIV_PT_BatchInspectSettings(Panel):
         col.separator()
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_over', icon_value=icons.over)
+        row.operator("uv.univ_check_over", icon_value=icons.over)
         draw_tag_button(Inspect.Over)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_zero', icon_value=icons.zero)
+        row.operator("uv.univ_check_zero", icon_value=icons.zero)
         draw_tag_button(Inspect.Zero)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_non_splitted', icon_value=icons.non_splitted)
+        row.operator("uv.univ_check_non_splitted", icon_value=icons.non_splitted)
         draw_tag_button(Inspect.NonSplitted)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_flipped', icon_value=icons.flipped)
+        row.operator("uv.univ_check_flipped", icon_value=icons.flipped)
         draw_tag_button(Inspect.Flipped)
 
         row = col.row(align=True)
-        row.operator('uv.univ_check_other', icon_value=icons.random)
+        row.operator("uv.univ_check_other", icon_value=icons.random)
         draw_tag_button(Inspect.Other)
 
 
 class UNIV_PT_CheckerSettings(Panel):
-    bl_idname = 'UNIV_PT_CheckerSettings'
-    bl_label = 'Checker Settings'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_CheckerSettings"
+    bl_label = "Checker Settings"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
 
     def draw(self, context):
         layout = self.layout
-        layout.popover(panel='UNIV_PT_CheckerTextures', icon='IMAGE_DATA')
+        layout.popover(panel="UNIV_PT_CheckerTextures", icon="IMAGE_DATA")
 
         from .univ_pro.checker import UNIV_OT_Checker
+
         UNIV_OT_Checker.draw_checker_layout(layout, True)
-        layout.operator('scene.univ_checker_show_folder', icon='FILE_FOLDER')
+        layout.operator("scene.univ_checker_show_folder", icon="FILE_FOLDER")
 
         # layout.operator('wm.univ_checker_generator')  # TODO: Improve
 
 
 class UNIV_PT_CheckerTextures(Panel):
-    bl_idname = 'UNIV_PT_CheckerTextures'
-    bl_label = 'Checker Textures'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'UI'
+    bl_idname = "UNIV_PT_CheckerTextures"
+    bl_label = "Checker Textures"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_region_type = "UI"
     bl_options = {"INSTANCED"}
     bl_category = "UniV"
     bl_ui_units_x = 12
@@ -876,52 +929,64 @@ class UNIV_PT_CheckerTextures(Panel):
         layout = self.layout
         for img in bpy.data.images:
             name = img.name
-            if name.startswith('UniV_'):
-                if name.startswith(('UniV_Grid_', 'UniV_ColorGrid_')):
+            if name.startswith("UniV_"):
+                if name.startswith(("UniV_Grid_", "UniV_ColorGrid_")):
                     continue
                 row = layout.row(align=True)
                 if not img.preview:
                     preview = img.preview_ensure()
                     if preview:
-                        row.label(text='', icon_value=preview.icon_id)
+                        row.label(text="", icon_value=preview.icon_id)
                     else:
-                        row.label(text='', icon='BLANK1')
+                        row.label(text="", icon="BLANK1")
                 else:
-                    row.label(text='', icon_value=img.preview.icon_id)
+                    row.label(text="", icon_value=img.preview.icon_id)
 
-                row.prop(img, 'name', text='')
+                row.prop(img, "name", text="")
 
                 if img.is_dirty:
-                    row.operator('wm.univ_checker_save', icon='FILE_TICK', text='').session_uid = img.session_uid
-                row.operator('wm.univ_checker_update', icon='FILE_REFRESH', text='').session_uid = img.session_uid
+                    row.operator("wm.univ_checker_save", icon="FILE_TICK", text="").session_uid = (
+                        img.session_uid
+                    )
+                row.operator("wm.univ_checker_update", icon="FILE_REFRESH", text="").session_uid = (
+                    img.session_uid
+                )
 
 
 class UNIV_UL_TD_PresetsManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0
+    ):
         row = layout.row(align=True)
-        row.prop(item, 'name', text='', emboss=False)
-        row.prop(item, 'texel', text='TD', emboss=False)
+        row.prop(item, "name", text="", emboss=False)
+        row.prop(item, "texel", text="TD", emboss=False)
 
 
 class UNIV_UL_TrimPresetsManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0
+    ):
         split = layout.split(factor=0.11, align=True)
-        split.prop(item, 'color', text='', emboss=True)
+        split.prop(item, "color", text="", emboss=True)
 
         row = split.row(align=False)
         row.scale_x = 1.3
-        row.prop(item, 'name', text='', emboss=False)
-        row.prop(item, 'visible', text='')
+        row.prop(item, "name", text="", emboss=False)
+        row.prop(item, "visible", text="")
 
 
 class UNIV_UL_TrimSlotsManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
-        layout.prop(item, 'name', text='', emboss=False)
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0
+    ):
+        layout.prop(item, "name", text="", emboss=False)
         # row.prop(item, 'visible', text='')
 
 
 class UNIV_UL_UV_LayersManager(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0
+    ):
         # TODO: Redraw if undo???
         flag = item.flag  # noqa
         if flag:
@@ -929,69 +994,81 @@ class UNIV_UL_UV_LayersManager(bpy.types.UIList):
                 layout.alert = True
             else:
                 layout.active = False
-        layout.prop(item, 'name', text='', emboss=False, icon='GROUP_UVS')  # noqa
-        icon = 'RESTRICT_RENDER_OFF' if prefs().uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
-        layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
+        layout.prop(item, "name", text="", emboss=False, icon="GROUP_UVS")  # noqa
+        icon = (
+            "RESTRICT_RENDER_OFF"
+            if prefs().uv_layers_active_render_idx == index
+            else "RESTRICT_RENDER_ON"
+        )
+        layout.operator("mesh.univ_active_render_set", text="", icon=icon).idx = index
 
 
 class UNIV_UL_UV_LayersManagerV2(bpy.types.UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index=0, flt_flag=0
+    ):
         flag = item.flag  # noqa
         if flag:
             if flag == 2:
                 layout.alert = True
             else:
                 layout.active = False
-        layout.prop(item, 'name', text='', emboss=False)  # noqa
-        icon = 'RESTRICT_RENDER_OFF' if prefs().uv_layers_active_render_idx == index else 'RESTRICT_RENDER_ON'
-        layout.operator('mesh.univ_active_render_set', text='', icon=icon).idx = index
+        layout.prop(item, "name", text="", emboss=False)  # noqa
+        icon = (
+            "RESTRICT_RENDER_OFF"
+            if prefs().uv_layers_active_render_idx == index
+            else "RESTRICT_RENDER_ON"
+        )
+        layout.operator("mesh.univ_active_render_set", text="", icon=icon).idx = index
 
 
 class UNIV_PT_TD_PresetsManager(Panel):
-    bl_label = 'Texel Density Presets Manager'
-    bl_idname = 'UNIV_PT_td_presets_manager'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_options = {'INSTANCED'}
-    bl_region_type = 'UI'
-    bl_category = 'UniV'
+    bl_label = "Texel Density Presets Manager"
+    bl_idname = "UNIV_PT_td_presets_manager"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_options = {"INSTANCED"}
+    bl_region_type = "UI"
+    bl_category = "UniV"
     bl_ui_units_x = 12
 
     def draw(self, context):
         self.draw_ex(self.layout)
 
     @staticmethod
-    def draw_ex(layout, ot_prefix='uv'):
+    def draw_ex(layout, ot_prefix="uv"):
         if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
+            layout.operator_context = "INVOKE_DEFAULT"
         else:
-            layout.operator_context = 'EXEC_DEFAULT'
+            layout.operator_context = "EXEC_DEFAULT"
 
         settings = univ_settings()
         layout.label(text=f"Texel Density: {round(settings.texel, 4)}")
 
         split = layout.split(factor=0.282)
-        split.label(text='Unit')
-        split.prop(settings, 'texel_unit', text='')
+        split.label(text="Unit")
+        split.prop(settings, "texel_unit", text="")
 
-        row = layout.row(align=True, heading='Global Size')
-        row.prop(settings, 'size_x', text='')
-        row.prop(settings, 'lock_size', text='', icon='LOCKED' if settings.lock_size else 'UNLOCKED')
-        row.prop(settings, 'size_y', text='')
+        row = layout.row(align=True, heading="Global Size")
+        row.prop(settings, "size_x", text="")
+        row.prop(
+            settings, "lock_size", text="", icon="LOCKED" if settings.lock_size else "UNLOCKED"
+        )
+        row.prop(settings, "size_y", text="")
 
-        layout.prop(settings, 'use_texel', text='Use Texel in operators')
+        layout.prop(settings, "use_texel", text="Use Texel in operators")
 
         layout.separator()
         col = layout.column(align=True)
         row = col.row(align=True)
         row.operator(ot_prefix + ".univ_calc_uv_area", icon_value=icons.area)
         row.operator(ot_prefix + ".univ_calc_uv_coverage", icon_value=icons.coverage)
-        if univ_pro_exist and ot_prefix == 'uv':
+        if univ_pro_exist and ot_prefix == "uv":
             col.operator("uv.univ_texel_density_from_texture")
         row = col.row(align=True)
-        row.operator('uv.univ_texel_density_from_physical_size')
+        row.operator("uv.univ_texel_density_from_physical_size")
         row = row.split().row(align=True)
         row.scale_x = 0.7
-        row.prop(settings, 'texture_physical_size', expand=True, text='')
+        row.prop(settings, "texture_physical_size", expand=True, text="")
 
         col.operator("mesh.univ_calc_udims_from_3d_area")
         layout.separator()
@@ -1006,14 +1083,18 @@ class UNIV_PT_TD_PresetsManager(Panel):
             propname="texels_presets",
             active_dataptr=settings,  # noqa
             active_propname="active_td_index",
-            maxrows=9
+            maxrows=9,
         )
 
         col = row.column(align=True)
-        col.operator('scene.univ_td_presets_processing', icon='ADD', text="").operation_type = 'ADD'
-        col.operator('scene.univ_td_presets_processing', icon='REMOVE', text="").operation_type = 'REMOVE'
+        col.operator("scene.univ_td_presets_processing", icon="ADD", text="").operation_type = "ADD"
+        col.operator("scene.univ_td_presets_processing", icon="REMOVE", text="").operation_type = (
+            "REMOVE"
+        )
         col.separator()
-        col.operator('scene.univ_td_presets_processing', icon='TRASH', text="").operation_type = 'REMOVE_ALL'
+        col.operator("scene.univ_td_presets_processing", icon="TRASH", text="").operation_type = (
+            "REMOVE_ALL"
+        )
 
         td_idx = univ_settings().active_td_index
         if td_idx < 0:
@@ -1024,21 +1105,21 @@ class UNIV_PT_TD_PresetsManager(Panel):
             preset = td_presets[td_idx]
 
             split = layout.split(factor=0.5)
-            split.prop(preset, 'texel')
-            split.prop(preset, 'unit')
+            split.prop(preset, "texel")
+            split.prop(preset, "unit")
 
             split = layout.split(factor=0.5)
-            split.prop(preset, 'size_x')
-            split.prop(preset, 'size_y')
+            split.prop(preset, "size_x")
+            split.prop(preset, "size_y")
 
 
 class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
-    bl_label = 'Texel Density Presets Manager'
-    bl_idname = 'UNIV_PT_td_presets_manager_view_3d'
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_options = {'INSTANCED'}
-    bl_category = 'UniV'
+    bl_label = "Texel Density Presets Manager"
+    bl_idname = "UNIV_PT_td_presets_manager_view_3d"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_options = {"INSTANCED"}
+    bl_category = "UniV"
     bl_ui_units_x = 12
 
     @classmethod
@@ -1046,16 +1127,16 @@ class UNIV_PT_TD_PresetsManager_VIEW3D(Panel):
         return prefs().show_view_3d_panel
 
     def draw(self, context):
-        UNIV_PT_TD_PresetsManager.draw_ex(self.layout, 'mesh')
+        UNIV_PT_TD_PresetsManager.draw_ex(self.layout, "mesh")
 
 
 class UNIV_PT_TrimManager(Panel):
-    bl_label = 'Trim Manager'
-    bl_idname = 'UNIV_PT_trim_manager'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_options = {'INSTANCED'}
-    bl_region_type = 'UI'
-    bl_category = 'UniV'
+    bl_label = "Trim Manager"
+    bl_idname = "UNIV_PT_trim_manager"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_options = {"INSTANCED"}
+    bl_region_type = "UI"
+    bl_category = "UniV"
     bl_ui_units_x = 12
 
     def draw(self, context):
@@ -1073,14 +1154,17 @@ class UNIV_PT_TrimManager(Panel):
             propname="trims_presets_slots",
             active_dataptr=pref,  # noqa
             active_propname="active_trim_slot_index",
-            rows=4
+            rows=4,
         )
 
         col = row.column(align=True)
-        col.operator('scene.univ_trim_slots_processing', icon='ADD', text='').operation_type = 'ADD'
-        col.operator('scene.univ_trim_slots_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
-        col.operator('scene.univ_trim_slots_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
-
+        col.operator("scene.univ_trim_slots_processing", icon="ADD", text="").operation_type = "ADD"
+        col.operator("scene.univ_trim_slots_processing", icon="REMOVE", text="").operation_type = (
+            "REMOVE"
+        )
+        col.operator("scene.univ_trim_slots_processing", icon="TRASH", text="").operation_type = (
+            "REMOVE_ALL"
+        )
 
         # Draw Trims
         row = self.layout.row()
@@ -1097,14 +1181,19 @@ class UNIV_PT_TrimManager(Panel):
                 propname="trims_preset",
                 active_dataptr=slot,  # noqa
                 active_propname="active_trim_index",
-                rows=8
+                rows=8,
             )
 
             col = row.column(align=True)
-            col.operator('scene.univ_trim_presets_processing', icon='ADD', text='').operation_type = 'ADD'
-            col.operator('scene.univ_trim_presets_processing', icon='REMOVE', text='').operation_type = 'REMOVE'
-            col.operator('scene.univ_trim_presets_processing', icon='TRASH', text='').operation_type = 'REMOVE_ALL'
-
+            col.operator(
+                "scene.univ_trim_presets_processing", icon="ADD", text=""
+            ).operation_type = "ADD"
+            col.operator(
+                "scene.univ_trim_presets_processing", icon="REMOVE", text=""
+            ).operation_type = "REMOVE"
+            col.operator(
+                "scene.univ_trim_presets_processing", icon="TRASH", text=""
+            ).operation_type = "REMOVE_ALL"
 
             slot = pref.get_active_trim_slot()
             trim_idx = slot.active_trim_index
@@ -1115,55 +1204,53 @@ class UNIV_PT_TrimManager(Panel):
 
                 row = self.layout.row(align=True)
                 col = row.column(align=True)
-                col.prop(preset, 'x')
-                col.prop(preset, 'y')
+                col.prop(preset, "x")
+                col.prop(preset, "y")
 
                 col = row.column(align=True)
-                col.prop(preset, 'width')
-                col.prop(preset, 'height')
-
-
+                col.prop(preset, "width")
+                col.prop(preset, "height")
 
         col = self.layout.column(align=True)
         col.separator()
         if bpy.app.version <= (4, 0, 0):
             # TODO: Get exact icon version
-            col.operator('uv.univ_trim_from_mesh')
+            col.operator("uv.univ_trim_from_mesh")
         else:
-            col.operator('uv.univ_trim_from_mesh', icon='AREA_JOIN_DOWN')
+            col.operator("uv.univ_trim_from_mesh", icon="AREA_JOIN_DOWN")
         row = col.row(align=True)
-        row.operator('scene.univ_trim_preset_load', icon='MOD_MULTIRES')
-        row.operator('scene.univ_trim_preset_save', icon='FILE_TICK')
+        row.operator("scene.univ_trim_preset_load", icon="MOD_MULTIRES")
+        row.operator("scene.univ_trim_preset_save", icon="FILE_TICK")
 
 
 class UNIV_PT_TD_LayersManager(Panel):
-    bl_label = 'Layers Manager'
-    bl_idname = 'UNIV_PT_layers_manager'
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_options = {'INSTANCED'}
-    bl_region_type = 'UI'
-    bl_category = 'UniV'
+    bl_label = "Layers Manager"
+    bl_idname = "UNIV_PT_layers_manager"
+    bl_space_type = "IMAGE_EDITOR"
+    bl_options = {"INSTANCED"}
+    bl_region_type = "UI"
+    bl_category = "UniV"
 
     def draw(self, context):
         layout = self.layout
         if prefs().use_csa_mods:
-            layout.operator_context = 'INVOKE_DEFAULT'
+            layout.operator_context = "INVOKE_DEFAULT"
         else:
-            layout.operator_context = 'EXEC_DEFAULT'
+            layout.operator_context = "EXEC_DEFAULT"
 
         settings = univ_settings()
-        layout.operator('mesh.univ_fix_uvs', icon='EVENT_F')
+        layout.operator("mesh.univ_fix_uvs", icon="EVENT_F")
 
         row = layout.row(align=True)
-        row.prop(settings, 'copy_to_layers_from', text='')
-        row.label(text='', icon_value=icons.shift)
-        row.prop(settings, 'copy_to_layers_to', text='')
+        row.prop(settings, "copy_to_layers_from", text="")
+        row.label(text="", icon_value=icons.shift)
+        row.prop(settings, "copy_to_layers_to", text="")
         row.separator(factor=0.35)
-        row.operator('uv.univ_copy_to_layer')
+        row.operator("uv.univ_copy_to_layer")
 
 
 class IMAGE_MT_PIE_univ_edit(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     # @classmethod
     # def poll(cls, context):
@@ -1171,7 +1258,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1181,7 +1268,7 @@ class IMAGE_MT_PIE_univ_edit(Menu):
         else:
             pie.split()
 
-        pie.operator("uv.univ_sync_uv_toggle", icon='UV_SYNC_SELECT')
+        pie.operator("uv.univ_sync_uv_toggle", icon="UV_SYNC_SELECT")
 
         # Bottom
         col = pie.column(align=True)
@@ -1190,18 +1277,18 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('uv.univ_select_by_vertex_count', text='Tris').polygon_type = 'TRIS'
-        row.operator('uv.univ_select_by_vertex_count', text='Quad').polygon_type = 'QUAD'
-        row.operator('uv.univ_select_by_vertex_count', text='N-Gon').polygon_type = 'NGON'
+        row.operator("uv.univ_select_by_vertex_count", text="Tris").polygon_type = "TRIS"
+        row.operator("uv.univ_select_by_vertex_count", text="Quad").polygon_type = "QUAD"
+        row.operator("uv.univ_select_by_vertex_count", text="N-Gon").polygon_type = "NGON"
 
-        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
+        UNIV_PT_General.draw_uv_layers(col, "UNIV_UL_UV_LayersManagerV2")
 
         # Upper
-        pie.operator("uv.univ_toggle_pivot", icon='PIVOT_ACTIVE')
+        pie.operator("uv.univ_toggle_pivot", icon="PIVOT_ACTIVE")
         # Left Upper
         pie.split()
         # Right Upper
-        pie.operator("mesh.univ_checker", text='Toggle Checker', icon_value=icons.checker)
+        pie.operator("mesh.univ_checker", text="Toggle Checker", icon_value=icons.checker)
         # Left Bottom
         if univ_pro_exist:
             pie.operator("uv.univ_select_loop", icon_value=icons.loop_select)
@@ -1210,14 +1297,15 @@ class IMAGE_MT_PIE_univ_edit(Menu):
 
 
 class IMAGE_MT_PIE_univ_align(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
         pref = prefs()
 
         from . import utils
+
         is_trim_used = utils.is_pro_version_support() and pref.use_trims
         is_active_center = True
         is_active_hv = True
@@ -1235,13 +1323,20 @@ class IMAGE_MT_PIE_univ_align(Menu):
                 is_active_hv = False
                 is_active_center = False
 
-
         pie = layout.menu_pie()
         if is_active_arrows:
-            pie.operator('uv.univ_align_pie', text='Left', icon_value=icons.arrow_left).direction = 'LEFT'
-            pie.operator('uv.univ_align_pie', text='Right', icon_value=icons.arrow_right).direction = 'RIGHT'
-            pie.operator('uv.univ_align_pie', text='Bottom', icon_value=icons.arrow_bottom).direction = 'BOTTOM'
-            pie.operator('uv.univ_align_pie', text='Upper', icon_value=icons.arrow_top).direction = 'UPPER'
+            pie.operator(
+                "uv.univ_align_pie", text="Left", icon_value=icons.arrow_left
+            ).direction = "LEFT"
+            pie.operator(
+                "uv.univ_align_pie", text="Right", icon_value=icons.arrow_right
+            ).direction = "RIGHT"
+            pie.operator(
+                "uv.univ_align_pie", text="Bottom", icon_value=icons.arrow_bottom
+            ).direction = "BOTTOM"
+            pie.operator(
+                "uv.univ_align_pie", text="Upper", icon_value=icons.arrow_top
+            ).direction = "UPPER"
         else:
             pie.split()
             pie.split()
@@ -1249,85 +1344,93 @@ class IMAGE_MT_PIE_univ_align(Menu):
             pie.split()
 
         if is_trim_used:
-            pie.prop(pref, 'use_trims', expand=True, icon="EVENT_T")
+            pie.prop(pref, "use_trims", expand=True, icon="EVENT_T")
         else:
             col = pie.column()
             col.scale_x = 1.2
             col.scale_y = 1.2
             row = col.row(align=True)
-            row.prop(pref, 'align_mode', expand=True, icon_only=True)
+            row.prop(pref, "align_mode", expand=True, icon_only=True)
 
-            if context.mode == 'EDIT_MESH' and pref.align_mode not in ("COLLECT", "ALIGN_BY_ANGLE", "MOVE"):
+            if context.mode == "EDIT_MESH" and pref.align_mode not in (
+                "COLLECT",
+                "ALIGN_BY_ANGLE",
+                "MOVE",
+            ):
                 col.separator(factor=0.2)
                 row = col.row(align=True)
-                row.alignment = 'CENTER'
+                row.alignment = "CENTER"
 
-                row.prop(pref, 'align_island_mode', expand=True, icon_only=True)
+                row.prop(pref, "align_island_mode", expand=True, icon_only=True)
                 if utils.is_pro_version_support():
                     row.separator()
-                    row.prop(pref, 'use_trims', expand=True, icon="EVENT_T", icon_only=True)
-
+                    row.prop(pref, "use_trims", expand=True, icon="EVENT_T", icon_only=True)
 
         if is_active_center:
-            pie.operator('uv.univ_align_pie', text='Center', icon_value=icons.center).direction = 'CENTER'
+            pie.operator("uv.univ_align_pie", text="Center", icon_value=icons.center).direction = (
+                "CENTER"
+            )
         else:
             pie.split()
 
-
         if is_active_hv:
-            pie.operator('uv.univ_align_pie', text='Horizontal', icon_value=icons.horizontal_c).direction = 'HORIZONTAL'
-            pie.operator('uv.univ_align_pie', text='Vertical', icon_value=icons.vertical_b).direction = 'VERTICAL'
+            pie.operator(
+                "uv.univ_align_pie", text="Horizontal", icon_value=icons.horizontal_c
+            ).direction = "HORIZONTAL"
+            pie.operator(
+                "uv.univ_align_pie", text="Vertical", icon_value=icons.vertical_b
+            ).direction = "VERTICAL"
         else:
             pie.split()
             pie.split()
 
 
 class IMAGE_MT_PIE_univ_misc(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('uv.univ_relax', icon_value=icons.relax)
+        pie.operator("uv.univ_relax", icon_value=icons.relax)
         # Right
-        pie.operator('uv.univ_unwrap', icon_value=icons.unwrap)
+        pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)
         # Bottom
-        pie.operator('uv.univ_stack', icon_value=icons.stack)
+        pie.operator("uv.univ_stack", icon_value=icons.stack)
         # Upper
         if univ_pro_exist:
-            pie.operator('uv.univ_rectify', icon_value=icons.rectify)
+            pie.operator("uv.univ_rectify", icon_value=icons.rectify)
         else:
             pie.split()
 
         # Left Upper
-        pie.operator('uv.univ_quadrify', icon_value=icons.quadrify)
+        pie.operator("uv.univ_quadrify", icon_value=icons.quadrify)
         # Right Upper
-        pie.operator('uv.univ_straight', icon_value=icons.straight)
+        pie.operator("uv.univ_straight", icon_value=icons.straight)
         # Left Bottom
-        pie.operator('uv.univ_weld', icon_value=icons.weld)
+        pie.operator("uv.univ_weld", icon_value=icons.weld)
         # Right Bottom
-        pie.operator('uv.univ_stitch', icon_value=icons.stitch)
+        pie.operator("uv.univ_stitch", icon_value=icons.stitch)
 
 
 class VIEW3D_MT_PIE_univ_misc(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('mesh.univ_relax', icon_value=icons.relax)
+        pie.operator("mesh.univ_relax", icon_value=icons.relax)
         # Right
-        pie.operator('mesh.univ_unwrap', icon_value=icons.unwrap)
+        pie.operator("mesh.univ_unwrap", icon_value=icons.unwrap)
         # Bottom
-        pie.operator('mesh.univ_stack', icon_value=icons.stack)
+        pie.operator("mesh.univ_stack", icon_value=icons.stack)
 
         # Upper
         pie.split()
@@ -1339,17 +1442,17 @@ class VIEW3D_MT_PIE_univ_misc(Menu):
         pie.split()
         # pie.operator('uv.univ_straight', icon_value=icons.straight)
         # Left Bottom
-        pie.operator('mesh.univ_weld', icon_value=icons.weld)
+        pie.operator("mesh.univ_weld", icon_value=icons.weld)
         # Right Bottom
-        pie.operator('mesh.univ_stitch', icon_value=icons.stitch)
+        pie.operator("mesh.univ_stitch", icon_value=icons.stitch)
 
 
 class VIEW3D_MT_PIE_univ_obj(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1357,23 +1460,23 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
         pie.split()
 
         # Right
-        pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
+        pie.operator("view3d.univ_modifiers_toggle", text="Toggle Modifiers", icon="HIDE_OFF")
 
         # Bottom
         split = pie.split()
         col = split.column(align=True)
         col.separator(factor=20)
         col.scale_x = 0.8
-        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
+        UNIV_PT_General.draw_uv_layers(col, "UNIV_UL_UV_LayersManagerV2")
 
         # Upper
-        pie.operator("wm.univ_toggle_pivot", icon='PIVOT_ACTIVE')
+        pie.operator("wm.univ_toggle_pivot", icon="PIVOT_ACTIVE")
 
         # Left Upper
         pie.split()
 
         # Right Upper
-        pie.operator("mesh.univ_checker", text='Toggle Checker', icon_value=icons.checker)
+        pie.operator("mesh.univ_checker", text="Toggle Checker", icon_value=icons.checker)
 
         # Left Bottom
         pie.split()
@@ -1382,11 +1485,11 @@ class VIEW3D_MT_PIE_univ_obj(Menu):
 
 
 class VIEW3D_MT_PIE_univ_edit(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1396,7 +1499,7 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         else:
             pie.operator("mesh.faces_select_linked_flat")
         # Right
-        pie.operator("view3d.univ_modifiers_toggle", text='Toggle Modifiers', icon='HIDE_OFF')
+        pie.operator("view3d.univ_modifiers_toggle", text="Toggle Modifiers", icon="HIDE_OFF")
 
         # Bottom
 
@@ -1407,24 +1510,23 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
         row = col.row(align=True)
         row.scale_y = 1.35
         if bpy.app.version >= (5, 1, 0):
-            row.operator('mesh.select_edge_ring_multi', text='Ring')
+            row.operator("mesh.select_edge_ring_multi", text="Ring")
 
         else:
-            row.operator('mesh.loop_multi_select', text='Ring').ring = True
-        row.operator('mesh.loop_to_region', text='Inner')
-        row.operator("mesh.region_to_loop", text='To Loop', icon="SELECT_SET")
+            row.operator("mesh.loop_multi_select", text="Ring").ring = True
+        row.operator("mesh.loop_to_region", text="Inner")
+        row.operator("mesh.region_to_loop", text="To Loop", icon="SELECT_SET")
 
         row = col.row(align=True)
         row.scale_y = 1.35
-        row.operator('mesh.univ_select_by_vertex_count', text='Tris').polygon_type = 'TRIS'
-        row.operator('mesh.univ_select_by_vertex_count', text='Quad').polygon_type = 'QUAD'
-        row.operator('mesh.univ_select_by_vertex_count', text='N-Gon').polygon_type = 'NGON'
+        row.operator("mesh.univ_select_by_vertex_count", text="Tris").polygon_type = "TRIS"
+        row.operator("mesh.univ_select_by_vertex_count", text="Quad").polygon_type = "QUAD"
+        row.operator("mesh.univ_select_by_vertex_count", text="N-Gon").polygon_type = "NGON"
 
-        UNIV_PT_General.draw_uv_layers(col, 'UNIV_UL_UV_LayersManagerV2')
+        UNIV_PT_General.draw_uv_layers(col, "UNIV_UL_UV_LayersManagerV2")
 
         # Upper
-        pie.operator("wm.univ_toggle_pivot", icon='PIVOT_ACTIVE')
-
+        pie.operator("wm.univ_toggle_pivot", icon="PIVOT_ACTIVE")
 
         # Left Upper
         pie.operator("mesh.select_nth", icon_value=icons.checker).offset = 1
@@ -1435,27 +1537,27 @@ class VIEW3D_MT_PIE_univ_edit(Menu):
             pie.operator("mesh.univ_select_loop", icon_value=icons.loop_select)
         else:
             if bpy.app.version >= (5, 1, 0):
-                pie.operator("mesh.select_edge_loop_multi", text='Loop')
+                pie.operator("mesh.select_edge_loop_multi", text="Loop")
             else:
-                pie.operator("mesh.loop_multi_select", text='Loop').ring = False
+                pie.operator("mesh.loop_multi_select", text="Loop").ring = False
         # Right Bottom
         pie.operator("wm.univ_workspace_toggle", icon_value=icons.unwrap)
 
 
 class IMAGE_MT_PIE_univ_transform(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('uv.univ_rotate', icon_value=icons.rotate)
+        pie.operator("uv.univ_rotate", icon_value=icons.rotate)
 
         # Right
-        pie.operator('uv.univ_flip', icon_value=icons.flip)
+        pie.operator("uv.univ_flip", icon_value=icons.flip)
 
         # Bottom
         col = pie.column(align=True)
@@ -1465,55 +1567,59 @@ class IMAGE_MT_PIE_univ_transform(Menu):
         col.scale_y = 1.35
 
         row = col.row(align=True)
-        row.operator('uv.univ_fit', icon_value=icons.crop).axis = 'XY'
-        row.operator('uv.univ_fit', text='', icon_value=icons.x).axis = 'X'
-        row.operator('uv.univ_fit', text='', icon_value=icons.y).axis = 'Y'
+        row.operator("uv.univ_fit", icon_value=icons.crop).axis = "XY"
+        row.operator("uv.univ_fit", text="", icon_value=icons.x).axis = "X"
+        row.operator("uv.univ_fit", text="", icon_value=icons.y).axis = "Y"
 
         row = col.row(align=True)
-        row.operator('uv.univ_fill', icon_value=icons.fill).axis = 'XY'
-        row.operator('uv.univ_fill', text='', icon_value=icons.x).axis = 'X'
-        row.operator('uv.univ_fill', text='', icon_value=icons.y).axis = 'Y'
+        row.operator("uv.univ_fill", icon_value=icons.fill).axis = "XY"
+        row.operator("uv.univ_fill", text="", icon_value=icons.x).axis = "X"
+        row.operator("uv.univ_fill", text="", icon_value=icons.y).axis = "Y"
 
         col.separator(factor=0.35)
 
         row = col.row(align=True)
-        row.operator('uv.univ_home', icon_value=icons.home)
-        row.operator('uv.univ_shift', icon_value=icons.shift)
+        row.operator("uv.univ_home", icon_value=icons.home)
+        row.operator("uv.univ_shift", icon_value=icons.shift)
 
         row = col.row(align=True)
-        row.operator('uv.univ_random', icon_value=icons.random)
+        row.operator("uv.univ_random", icon_value=icons.random)
 
         # Upper
-        pie.operator('uv.univ_orient', icon_value=icons.orient).edge_dir = 'BOTH'
+        pie.operator("uv.univ_orient", icon_value=icons.orient).edge_dir = "BOTH"
 
         # Left Upper
-        pie.operator('uv.univ_orient', text='H-Orient', icon_value=icons.horizontal_a).edge_dir = 'HORIZONTAL'
+        pie.operator("uv.univ_orient", text="H-Orient", icon_value=icons.horizontal_a).edge_dir = (
+            "HORIZONTAL"
+        )
 
         # Right Upper
-        pie.operator('uv.univ_orient', text='V-Orient', icon_value=icons.vertical_a).edge_dir = 'VERTICAL'
+        pie.operator("uv.univ_orient", text="V-Orient", icon_value=icons.vertical_a).edge_dir = (
+            "VERTICAL"
+        )
 
         # Left Bottom
-        pie.operator('uv.univ_sort', icon_value=icons.sort)
+        pie.operator("uv.univ_sort", icon_value=icons.sort)
 
         # Right Bottom
-        pie.operator('uv.univ_distribute', icon_value=icons.distribute)
+        pie.operator("uv.univ_distribute", icon_value=icons.distribute)
 
 
 class IMAGE_MT_PIE_univ_texel(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
     bl_ui_units_x = 8
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('uv.univ_adjust_td', icon_value=icons.adjust)
+        pie.operator("uv.univ_adjust_td", icon_value=icons.adjust)
 
         # Right
-        pie.operator('uv.univ_normalize', icon_value=icons.normalize)
+        pie.operator("uv.univ_normalize", icon_value=icons.normalize)
 
         # Bottom
         split = pie.split()
@@ -1522,48 +1628,48 @@ class IMAGE_MT_PIE_univ_texel(Menu):
         col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
-        row.prop(settings, 'texel')
-        row.operator('uv.univ_select_texel_density', text='', icon_value=icons.arrow)
-        row.popover(panel='UNIV_PT_td_presets_manager', text='', icon_value=icons.settings_a)
+        row.prop(settings, "texel")
+        row.operator("uv.univ_select_texel_density", text="", icon_value=icons.arrow)
+        row.popover(panel="UNIV_PT_td_presets_manager", text="", icon_value=icons.settings_a)
 
         split = col.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
-            if idx and (idx+1) % 4 == 1:
+            if idx and (idx + 1) % 4 == 1:
                 split = col.split()
                 row = split.row(align=True)
-            row.operator('uv.univ_texel_density_set', text=preset.name).td_preset_idx = idx
+            row.operator("uv.univ_texel_density_set", text=preset.name).td_preset_idx = idx
 
         # Upper
-        pie.operator('uv.univ_reset_scale', icon_value=icons.reset)
+        pie.operator("uv.univ_reset_scale", icon_value=icons.reset)
 
         # Left Upper
-        pie.operator('uv.univ_calc_uv_area', icon_value=icons.area)
+        pie.operator("uv.univ_calc_uv_area", icon_value=icons.area)
 
         # Right Upper
-        pie.operator('uv.univ_calc_uv_coverage', icon_value=icons.coverage)
+        pie.operator("uv.univ_calc_uv_coverage", icon_value=icons.coverage)
 
         # Left Bottom
-        pie.operator('uv.univ_texel_density_get', icon_value=icons.td_get)
+        pie.operator("uv.univ_texel_density_get", icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('uv.univ_texel_density_set', icon_value=icons.td_set).td_preset_idx = -1
+        pie.operator("uv.univ_texel_density_set", icon_value=icons.td_set).td_preset_idx = -1
 
 
 class VIEW3D_MT_PIE_univ_texel(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('mesh.univ_adjust_td', icon_value=icons.adjust)
+        pie.operator("mesh.univ_adjust_td", icon_value=icons.adjust)
 
         # Right
-        pie.operator('mesh.univ_normalize', icon_value=icons.normalize)
+        pie.operator("mesh.univ_normalize", icon_value=icons.normalize)
 
         # Bottom
         split = pie.split()
@@ -1572,40 +1678,42 @@ class VIEW3D_MT_PIE_univ_texel(Menu):
         col.separator(factor=24)
         row = col.row(align=True)
         settings = univ_settings()
-        row.prop(settings, 'texel')
-        row.operator('mesh.univ_select_texel_density', text='', icon_value=icons.arrow)
-        row.popover(panel='UNIV_PT_td_presets_manager_view_3d', text='', icon_value=icons.settings_a)
+        row.prop(settings, "texel")
+        row.operator("mesh.univ_select_texel_density", text="", icon_value=icons.arrow)
+        row.popover(
+            panel="UNIV_PT_td_presets_manager_view_3d", text="", icon_value=icons.settings_a
+        )
 
         split = col.split()
         row = split.row(align=True)
         for idx, preset in enumerate(settings.texels_presets):
-            if idx and (idx+1) % 4 == 1:
+            if idx and (idx + 1) % 4 == 1:
                 split = col.split()
                 row = split.row(align=True)
-            row.operator('mesh.univ_texel_density_set', text=preset.name).td_preset_idx = idx
+            row.operator("mesh.univ_texel_density_set", text=preset.name).td_preset_idx = idx
 
         # Upper
-        pie.operator('mesh.univ_reset_scale', icon_value=icons.reset)
+        pie.operator("mesh.univ_reset_scale", icon_value=icons.reset)
 
         # Left Upper
-        pie.operator('mesh.univ_calc_uv_area', icon_value=icons.area)
+        pie.operator("mesh.univ_calc_uv_area", icon_value=icons.area)
 
         # Right Upper
-        pie.operator('mesh.univ_calc_uv_coverage', icon_value=icons.coverage)
+        pie.operator("mesh.univ_calc_uv_coverage", icon_value=icons.coverage)
 
         # Left Bottom
-        pie.operator('mesh.univ_texel_density_get', icon_value=icons.td_get)
+        pie.operator("mesh.univ_texel_density_get", icon_value=icons.td_get)
 
         # Right Bottom
-        pie.operator('mesh.univ_texel_density_set', icon_value=icons.td_set).td_preset_idx = -1
+        pie.operator("mesh.univ_texel_density_set", icon_value=icons.td_set).td_preset_idx = -1
 
 
 class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1633,11 +1741,11 @@ class VIEW3D_MT_PIE_univ_favorites_edit(Menu):
 
 
 class IMAGE_MT_PIE_univ_favorites_edit(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1665,11 +1773,11 @@ class IMAGE_MT_PIE_univ_favorites_edit(Menu):
 
 
 class VIEW3D_MT_PIE_univ_projection(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1695,11 +1803,11 @@ class VIEW3D_MT_PIE_univ_projection(Menu):
 
 
 class IMAGE_MT_PIE_univ_inspect(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
@@ -1712,7 +1820,7 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         # Upper
         pie.operator("uv.univ_batch_inspect", icon_value=icons.zero)
         # Left Upper
-        pie.operator('uv.univ_check_over', icon_value=icons.over)
+        pie.operator("uv.univ_check_over", icon_value=icons.over)
         # Right Upper
         pie.operator("uv.univ_check_other", icon_value=icons.random)
         # Left Bottom
@@ -1739,9 +1847,15 @@ class UNIV_MT_ConstraintsH(bpy.types.Menu):
             text = "H-Constr"
             constraint_type = "HORIZONTAL"
 
-        layout.operator("uv.univ_select_constraints", text=text, icon_value=icons.arrow).constraint_type = constraint_type
-        layout.operator("uv.univ_mark_constraints_by_angle", text=text, icon="EVENT_A").is_vertical = is_vertical
-        layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").is_vertical = is_vertical
+        layout.operator(
+            "uv.univ_select_constraints", text=text, icon_value=icons.arrow
+        ).constraint_type = constraint_type
+        layout.operator(
+            "uv.univ_mark_constraints_by_angle", text=text, icon="EVENT_A"
+        ).is_vertical = is_vertical
+        layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").is_vertical = (
+            is_vertical
+        )
 
 
 class UNIV_MT_ConstraintsV(UNIV_MT_ConstraintsH):
@@ -1751,19 +1865,23 @@ class UNIV_MT_ConstraintsV(UNIV_MT_ConstraintsH):
 
 
 class IMAGE_MT_PIE_constraints(Menu):
-    bl_label = 'UniV Pie'
+    bl_label = "UniV Pie"
 
     def draw(self, _context):
         layout = self.layout
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = "EXEC_DEFAULT"
 
         pie = layout.menu_pie()
 
         # Left
-        pie.operator('uv.univ_mark_constraints', text='H-Constr', icon_value=icons.horizontal_c).is_vertical = False
+        pie.operator(
+            "uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c
+        ).is_vertical = False
 
         # Right
-        pie.operator('uv.univ_mark_constraints', text='V-Constr', icon_value=icons.vertical_b).is_vertical = True
+        pie.operator(
+            "uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b
+        ).is_vertical = True
 
         # Bottom
         split = pie.split()
@@ -1773,16 +1891,28 @@ class IMAGE_MT_PIE_constraints(Menu):
         col.scale_x = 2
         col.scale_y = 2
         row = col.row(align=True)
-        row.operator('uv.univ_select_constraints', text='H-Constr', icon_value=icons.arrow).constraint_type = "HORIZONTAL"
-        row.operator('uv.univ_select_constraints', text='V-Constr', icon_value=icons.arrow).constraint_type = "VERTICAL"
+        row.operator(
+            "uv.univ_select_constraints", text="H-Constr", icon_value=icons.arrow
+        ).constraint_type = "HORIZONTAL"
+        row.operator(
+            "uv.univ_select_constraints", text="V-Constr", icon_value=icons.arrow
+        ).constraint_type = "VERTICAL"
 
         row = col.row(align=True)
-        row.operator('uv.univ_mark_constraints_by_angle', text='H-Constr', icon='EVENT_A').is_vertical = False
-        row.operator('uv.univ_mark_constraints_by_angle', text='V-Constr', icon='EVENT_A').is_vertical = True
+        row.operator(
+            "uv.univ_mark_constraints_by_angle", text="H-Constr", icon="EVENT_A"
+        ).is_vertical = False
+        row.operator(
+            "uv.univ_mark_constraints_by_angle", text="V-Constr", icon="EVENT_A"
+        ).is_vertical = True
 
         row = col.row(align=True)
-        row.operator('uv.univ_clear_constraints', text='H-Constr', icon='PANEL_CLOSE').is_vertical = False
-        row.operator('uv.univ_clear_constraints', text='V-Constr', icon='PANEL_CLOSE').is_vertical = True
+        row.operator(
+            "uv.univ_clear_constraints", text="H-Constr", icon="PANEL_CLOSE"
+        ).is_vertical = False
+        row.operator(
+            "uv.univ_clear_constraints", text="V-Constr", icon="PANEL_CLOSE"
+        ).is_vertical = True
 
         # Upper
         pie.operator("uv.univ_straight", icon_value=icons.straight)
@@ -1801,12 +1931,12 @@ class IMAGE_MT_PIE_constraints(Menu):
 
 
 class UNIV_WT_object_VIEW3D(WorkSpaceTool):
-    bl_space_type = 'VIEW_3D'
-    bl_context_mode = 'OBJECT'
-    bl_idname = 'tool.univ'
-    bl_description = ''
-    bl_label = 'UniV'
-    bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')
+    bl_space_type = "VIEW_3D"
+    bl_context_mode = "OBJECT"
+    bl_idname = "tool.univ"
+    bl_description = ""
+    bl_label = "UniV"
+    bl_icon = os.path.join(os.path.dirname(__file__), "icons", "univ")
     bl_keymap = ()
 
     # @staticmethod
@@ -1825,10 +1955,10 @@ class UNIV_WT_object_VIEW3D(WorkSpaceTool):
 
 
 class UNIV_WT_edit_VIEW3D(WorkSpaceTool):
-    bl_space_type = 'VIEW_3D'
-    bl_context_mode = 'EDIT_MESH'
-    bl_idname = 'tool.univ'
-    bl_description = ''
-    bl_label = 'UniV'
-    bl_icon = os.path.join(os.path.dirname(__file__), 'icons', 'univ')
+    bl_space_type = "VIEW_3D"
+    bl_context_mode = "EDIT_MESH"
+    bl_idname = "tool.univ"
+    bl_description = ""
+    bl_label = "UniV"
+    bl_icon = os.path.join(os.path.dirname(__file__), "icons", "univ")
     bl_keymap = ()
