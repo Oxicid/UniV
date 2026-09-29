@@ -9,7 +9,8 @@ from itertools import chain
 from .. import utypes
 from .bm_tag import is_pair, is_invisible_func
 
-USE_GENERIC_UV_SYNC = hasattr(BMesh, 'uv_select_sync_valid')
+USE_GENERIC_UV_SYNC = hasattr(BMesh, "uv_select_sync_valid")
+
 
 def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
@@ -28,6 +29,7 @@ def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
 
 def prev_disc(l: BMLoop) -> BMLoop:
     return l.link_loop_prev.link_loop_radial_prev
+
 
 def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
     first_vert = first.vert
@@ -71,7 +73,12 @@ def linked_crn_to_vert_pair_iter(crn: BMLoop, uv, sync):
             break
         iterated = True
         # Finish CCW
-        if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or is_invisible(pair_ccw.face) or not is_pair(prev_crn, pair_ccw, uv):
+        if (
+            pair_ccw in (prev_crn, crn)
+            or (first_vert != pair_ccw.vert)
+            or is_invisible(pair_ccw.face)
+            or not is_pair(prev_crn, pair_ccw, uv)
+        ):
             bm_iter = crn
             while True:
                 pair_cw = bm_iter.link_loop_radial_prev
@@ -109,7 +116,12 @@ def linked_crn_to_vert_pair(crn: BMLoop, uv, sync: bool):
         iterated = True
 
         # Finish CCW
-        if pair_ccw in (prev_crn, crn) or (first_vert != pair_ccw.vert) or is_invisible(pair_ccw.face) or not is_pair(prev_crn, pair_ccw, uv):
+        if (
+            pair_ccw in (prev_crn, crn)
+            or (first_vert != pair_ccw.vert)
+            or is_invisible(pair_ccw.face)
+            or not is_pair(prev_crn, pair_ccw, uv)
+        ):
             bm_iter = crn
             linked_cw = []
             while True:
@@ -151,12 +163,13 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
         iterated = True
 
         # Finish CCW
-        if (pair_ccw in (prev_crn, crn) or
-                    (first_vert != pair_ccw.vert) or
-                    pair_ccw.edge.seam or
-                    is_invisible(pair_ccw.face) or
-                    not is_pair(prev_crn, pair_ccw, uv)
-                ):
+        if (
+            pair_ccw in (prev_crn, crn)
+            or (first_vert != pair_ccw.vert)
+            or pair_ccw.edge.seam
+            or is_invisible(pair_ccw.face)
+            or not is_pair(prev_crn, pair_ccw, uv)
+        ):
             bm_iter = crn
             linked_cw = []
             while True:
@@ -169,11 +182,12 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
                 if next_crn == crn:
                     break
 
-                if ((first_vert != next_crn.vert)
-                            or pair_cw.edge.seam
-                            or is_invisible(next_crn.face)
-                            or not is_pair(bm_iter, pair_cw, uv)
-                        ):
+                if (
+                    (first_vert != next_crn.vert)
+                    or pair_cw.edge.seam
+                    or is_invisible(next_crn.face)
+                    or not is_pair(bm_iter, pair_cw, uv)
+                ):
                     break
                 bm_iter = next_crn
                 linked_cw.append(next_crn)
@@ -184,15 +198,17 @@ def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
     # assert len(linked) == len(set(linked))
     return linked
 
+
 def linked_crn_to_vert_pair_with_seam_included(crn: BMLoop, uv, sync: bool) -> list[BMLoop]:
     linked = linked_crn_to_vert_pair_with_seam(crn, uv, sync)
     linked.insert(0, crn)
     return linked
 
+
 def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop):
     """Linked to arg corner with_seam without coord check(non-included)
-        NOTE: Need for unwrap in vert/edge mode for check
-        NOTE: Need actual mark seams for differencing islands by seams
+    NOTE: Need for unwrap in vert/edge mode for check
+    NOTE: Need actual mark seams for differencing islands by seams
     """
     first_vert = crn.vert
 
@@ -212,7 +228,7 @@ def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop
                     (first_vert != pair_ccw.vert) or
                     pair_ccw.edge.seam or
                     pair_ccw.face.hide
-                ):
+                ):  # fmt: skip
             bm_iter = crn
             linked_cw = []
             while True:
@@ -228,7 +244,7 @@ def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop
                 if ((first_vert != next_crn.vert)
                             or pair_cw.edge.seam
                             or pair_ccw.face.hide
-                        ):
+                        ):  # fmt: skip
                     break
                 bm_iter = next_crn
                 linked_cw.append(next_crn)
@@ -257,12 +273,13 @@ def linked_crn_to_vert_pair_by_idx_with_seam(crn: BMLoop, uv):
         iterated = True
 
         # Finish CCW
-        if (pair_ccw in (prev_crn, crn) or
-                    (first_vert != pair_ccw.vert) or
-                    pair_ccw.edge.seam or
-                    pair_ccw.face.index != idx or
-                    not is_pair(prev_crn, pair_ccw, uv)
-                ):
+        if (
+            pair_ccw in (prev_crn, crn)
+            or (first_vert != pair_ccw.vert)
+            or pair_ccw.edge.seam
+            or pair_ccw.face.index != idx
+            or not is_pair(prev_crn, pair_ccw, uv)
+        ):
             bm_iter = crn
             linked_cw = []
             while True:
@@ -275,11 +292,12 @@ def linked_crn_to_vert_pair_by_idx_with_seam(crn: BMLoop, uv):
                 if next_crn == crn:
                     break
 
-                if ((first_vert != next_crn.vert)
-                            or pair_cw.edge.seam
-                            or next_crn.face.index != idx
-                            or not is_pair(bm_iter, pair_cw, uv)
-                        ):
+                if (
+                    (first_vert != next_crn.vert)
+                    or pair_cw.edge.seam
+                    or next_crn.face.index != idx
+                    or not is_pair(bm_iter, pair_cw, uv)
+                ):
                     break
                 bm_iter = next_crn
                 linked_cw.append(next_crn)
@@ -304,9 +322,11 @@ def linked_crn_uv_unordered_included_with_hidden(first: BMLoop, uv: BMLayerItem)
     linked = [l_crn for l_crn in first.vert.link_loops if l_crn[uv].uv == first_co]
     return linked
 
+
 def linked_with_unlinked_crn_uv_to_vert_unordered_included_func(umesh):
     def catcher(uv):
         if umesh.sync:
+
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
                 linked = []
@@ -318,7 +338,9 @@ def linked_with_unlinked_crn_uv_to_vert_unordered_included_func(umesh):
                         else:
                             unlinked.append(l_crn)
                 return linked, unlinked
+
         else:
+
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
                 linked = []
@@ -330,21 +352,30 @@ def linked_with_unlinked_crn_uv_to_vert_unordered_included_func(umesh):
                         else:
                             unlinked.append(l_crn)
                 return linked, unlinked
+
         return get_linked
+
     return catcher(umesh.uv)
+
 
 def linked_crn_uv_to_vert_unordered_included_func(umesh):
     def catcher(uv):
         if umesh.sync:
+
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
                 return [l_crn for l_crn in first.vert.link_loops if (not l_crn.face.hide) and l_crn[uv].uv == first_co]
+
         else:
+
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
                 return [l_crn for l_crn in first.vert.link_loops if l_crn.face.select and l_crn[uv].uv == first_co]
+
         return get_linked
+
     return catcher(umesh.uv)
+
 
 def linked_crn_uv_by_tag_b(first: BMLoop, uv: BMLayerItem):
     linked = []
@@ -531,7 +562,9 @@ def linked_crn_uv_by_idx_unordered(crn: BMLoop, uv: BMLayerItem):
     """
     first_co = crn[uv].uv
     idx = crn.face.index
-    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
+    return [
+        l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
+    ]
 
 
 def linked_crn_uv_by_idx_unordered_included(crn: BMLoop, uv: BMLayerItem):
@@ -552,7 +585,9 @@ def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerIte
 def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: int):
     """Linked to arg corner by island index without arg corner"""
     first_co = crn[uv].uv
-    return [l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co]
+    return [
+        l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
+    ]
 
 
 def linked_crn_to_vert_by_idx_without_co_check_unordered(crn):
@@ -570,13 +605,23 @@ def linked_crn_to_vert_by_island_index_unordered(crn):
 class ShortPath:
 
     @staticmethod
-    def vert_tag_add_adjacent_uv(heap, l_a: BMLoop, loops_prev: list[BMLoop | None], cost: list[float], uv, prioritize_corners, bound_priority_factor):
+    def vert_tag_add_adjacent_uv(
+        heap,
+        l_a: BMLoop,
+        loops_prev: list[BMLoop | None],
+        cost: list[float],
+        uv,
+        prioritize_corners,
+        bound_priority_factor,
+    ):
         import heapq
+
         l_a_index = l_a.index
         uv_a = l_a[uv].uv
 
         # Loop over faces of face, but do so by first looping over loops.
-        for l in linked_crn_uv_by_idx_unordered_included(l_a, uv):  # TODO: Add mark seam and bi-direct linked
+        for l in linked_crn_uv_by_idx_unordered_included(l_a, uv):
+            # TODO: Add mark seam and bi-direct linked
             #  'l_a' is already tagged, tag all adjacent.
 
             l.tag = False
@@ -606,14 +651,17 @@ class ShortPath:
                     break
 
     @staticmethod
-    def calc_path_uv_vert(isl: 'utypes.AdvIsland',
-                          l_src: BMLoop,
-                          l_dst: BMLoop,
-                          exclude_corners_group: 'list[utypes.LoopGroup] | tuple',
-                          prioritize_corners: set[BMLoop] | tuple = (),
-                          bound_priority_factor=0.9) -> list[BMLoop]:
+    def calc_path_uv_vert(
+        isl: "utypes.AdvIsland",
+        l_src: BMLoop,
+        l_dst: BMLoop,
+        exclude_corners_group: "list[utypes.LoopGroup] | tuple",
+        prioritize_corners: set[BMLoop] | tuple = (),
+        bound_priority_factor=0.9,
+    ) -> list[BMLoop]:
         import heapq
         from collections import deque
+
         assert l_src.face.index == l_dst.face.index
         path = deque()
         # BM_ELEM_TAG flag is used to store visited edges
@@ -663,8 +711,9 @@ class ShortPath:
             if l.tag:
                 #  Adjacent loops are tagged while stepping to avoid 2x loops.
                 l.tag = False
-                ShortPath.vert_tag_add_adjacent_uv(heap, l, loops_prev, cost, uv,
-                                                   prioritize_corners, bound_priority_factor)
+                ShortPath.vert_tag_add_adjacent_uv(
+                    heap, l, loops_prev, cost, uv, prioritize_corners, bound_priority_factor
+                )
 
         return list(path)
 

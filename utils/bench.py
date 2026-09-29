@@ -10,18 +10,18 @@ import functools
 
 from dataclasses import dataclass
 
-
 # example for use timeit: print('my_func:',timeit.timeit(lambda: my_func(),number=100))
+
 
 @dataclass
 class timer:
     repeats: int = 1
-    text: str = ''  # TODO: Add temp text
+    text: str = ""  # TODO: Add temp text
 
     def __enter__(self):
         self._fix_args()
         if self.repeats != 1:
-            raise ValueError('Context t manager not support repeats')
+            raise ValueError("Context t manager not support repeats")
         gc.disable()
         self._start = time.perf_counter()
 
@@ -35,7 +35,7 @@ class timer:
         def wrapper_timer(*args, **kwargs):
             self._fix_args()
             if self.text:
-                self.text = f'{self.text} {func.__name__}'
+                self.text = f"{self.text} {func.__name__}"
             else:
                 self.text = func.__name__
 
@@ -46,6 +46,7 @@ class timer:
             self._print_time_info()
             self.reset()
             return result
+
         return wrapper_timer
 
     def __iter__(self):
@@ -66,18 +67,20 @@ class timer:
             raise ValueError(f"Expected 'repeats' to be at least 1, but got {self.repeats}")
 
     def _print_time_info(self):
-        elapsed_time = (time.perf_counter() - self._start)
+        elapsed_time = time.perf_counter() - self._start
 
         if self.text:
-            self.text += '. '
+            self.text += ". "
         if self.repeats > 1:
-            print(f"{self.text}Total time: {elapsed_time:0.4f}. Avg: {(elapsed_time / self.repeats):0.4f}")
+            print(
+                f"{self.text}Total time: {elapsed_time:0.4f}. Avg: {(elapsed_time / self.repeats):0.4f}"
+            )
         else:
             print(f"{self.text}Elapsed time: {elapsed_time:0.4f} seconds")
 
     def reset(self):
         self.repeats = 1
-        self.text = ''
+        self.text = ""
 
 
 def profile(sort_by: str = "time", lines: int = 15, strip_dirs: bool = True):
@@ -97,5 +100,7 @@ def profile(sort_by: str = "time", lines: int = 15, strip_dirs: bool = True):
                 ps.sort_stats(sort_by)
                 ps.print_stats(lines)
                 print(s.getvalue())
+
         return inner
+
     return decorator

@@ -9,9 +9,7 @@ from mathutils import Vector
 from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import (linked_crn_uv,
-                     vec_isclose_to_zero,
-                     linked_crn_uv_by_idx_unordered)
+from ..utils import linked_crn_uv, vec_isclose_to_zero, linked_crn_uv_by_idx_unordered
 
 from math import pi
 from . import umesh as _umesh
@@ -110,7 +108,7 @@ class LoopGroup:
                 bm_iter.link_loop_prev.tag = False
                 return bm_iter.link_loop_prev
 
-    def calc_shared_group_for_stitch(self) -> 'typing.Self':
+    def calc_shared_group_for_stitch(self) -> "typing.Self":
         shared_group = []
         is_flipped = self._is_flipped_3d
         if is_flipped:
@@ -148,14 +146,18 @@ class LoopGroup:
                 ref_crn.edge.seam = False
             ref_co = ref_crn[uv].uv
             # TODO: Implement linked_crn_to_vert_by_idx_pair_with_seam
-            for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(trans_crn, uv, self.umesh.sync):
+            for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(
+                trans_crn, uv, self.umesh.sync
+            ):
                 trans_crn_linked[uv].uv = ref_co
             trans_crn[uv].uv = ref_co
 
         ref_co = ref[-1].link_loop_next[uv].uv
         end_crn = self[-1].link_loop_next if self.is_flipped_3d else self[-1].link_loop_prev
 
-        for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(end_crn, uv, self.umesh.sync):
+        for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(
+            end_crn, uv, self.umesh.sync
+        ):
             trans_crn_linked[uv].uv = ref_co
         end_crn[uv].uv = ref_co
 
@@ -175,7 +177,7 @@ class LoopGroup:
         # TODO: Report small areas in stitch
         return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
 
-    def tagging(self, island: 'AdvIsland'):
+    def tagging(self, island: "AdvIsland"):
         face_is_invisible = utils.is_invisible_func(island.umesh.sync)
         get_edge_select = utils.edge_select_get_func(island.umesh)
         is_pair = utils.is_pair
@@ -211,12 +213,15 @@ class LoopGroup:
             if not shared_crn.tag:
                 count_non_shared += 1
                 continue
-            if crn[uv].uv == shared_crn.link_loop_next[uv].uv and crn.link_loop_next[uv].uv == shared_crn[uv].uv:
+            if (
+                crn[uv].uv == shared_crn.link_loop_next[uv].uv
+                and crn.link_loop_next[uv].uv == shared_crn[uv].uv
+            ):
                 return True
         return count_non_shared == len(self.corners)
 
     def has_sync_crn(self):
-        """ Need tagging and indexing"""
+        """Need tagging and indexing"""
         assert utils.sync()
         for crn in self.corners:
             shared_crn = crn.link_loop_radial_prev
@@ -389,12 +394,15 @@ class LoopGroup:
             uv = self.umesh.uv
             for crn in self:
                 linked_corners = utils.linked_crn_uv_by_crn_tag_unordered_included(
-                    crn, uv)  # TODO: Add linked_crn_uv_by_tag_c by island
+                    crn, uv
+                )  # TODO: Add linked_crn_uv_by_tag_c by island
                 move_corners.extend(linked_corners)
                 for crn_ in linked_corners:
                     crn_.tag = False
 
-                linked_corners = utils.linked_crn_uv_by_crn_tag_unordered_included(crn.link_loop_next, uv)
+                linked_corners = utils.linked_crn_uv_by_crn_tag_unordered_included(
+                    crn.link_loop_next, uv
+                )
                 move_corners.extend(linked_corners)
                 for crn_ in linked_corners:
                     crn_.tag = False
@@ -414,7 +422,7 @@ class LoopGroup:
         return bool(self.corners)
 
     def __str__(self):
-        return f'Corner Edge count = {len(self.corners)}'
+        return f"Corner Edge count = {len(self.corners)}"
 
 
 class LoopGroups:
@@ -540,7 +548,7 @@ class LoopGroups:
         return len(self.loop_groups)
 
     def __str__(self):
-        return f'Loop Groups count = {len(self.loop_groups)}'
+        return f"Loop Groups count = {len(self.loop_groups)}"
 
 
 class UnionLoopGroup(LoopGroups):
@@ -572,7 +580,7 @@ class AdvCorner:
     def vec(self, v):
         self._vec = v
 
-    def angle(self, other: 'typing.Self', max_angle: float):
+    def angle(self, other: "typing.Self", max_angle: float):
         return self.vec.angle(other.vec, max_angle)  # noqa
 
     @property
@@ -619,7 +627,7 @@ class AdvCorner:
         vec = self.vec
         card_vec = utils.vec_to_cardinal(vec)
         angle = vec.angle(card_vec, 0)
-        return min(angle, pi-angle)
+        return min(angle, pi - angle)
 
     @property
     def next(self):
@@ -668,7 +676,6 @@ class AdvCorner:
             else:
                 self.invert = False
                 self.crn = self.crn.link_loop_prev
-
 
     @property
     def curr_pt(self):
@@ -760,7 +767,7 @@ class Segment:
         self.is_start_lock = self.is_end_lock
         self.is_end_lock = temp_lock
 
-    def join_from_end(self, other: 'Segment'):
+    def join_from_end(self, other: "Segment"):
         assert self.end_vert == other.start_vert
         assert self.end_co == other.start_co
         assert not self.is_end_lock
@@ -874,6 +881,7 @@ class Segment:
 
     def break_by_cardinal_dir(self):
         from ..utils import vec_to_cardinal
+
         if len(self) <= 1:
             return Segments([self], self.umesh)
         seg = list(self.seg)
@@ -897,18 +905,15 @@ class Segment:
                     slices.append(seg[start:] + seg[:end])
         else:
 
-            for i in range(len(seg)-1):
+            for i in range(len(seg) - 1):
                 prev_cardinal = vec_to_cardinal(seg[i].vec)
-                curr_cardinal = vec_to_cardinal(seg[i+1].vec)
+                curr_cardinal = vec_to_cardinal(seg[i + 1].vec)
                 if curr_cardinal != prev_cardinal:
-                    break_indexes.append(i+1)
+                    break_indexes.append(i + 1)
 
             full_breaks = [0] + break_indexes + [len(seg)]
 
-            slices = [
-                seg[full_breaks[i]:full_breaks[i + 1]]
-                for i in range(len(full_breaks) - 1)
-            ]
+            slices = [seg[full_breaks[i] : full_breaks[i + 1]] for i in range(len(full_breaks) - 1)]
 
         slices = [Segment(seg, self.umesh) for seg in slices]
 
@@ -978,7 +983,7 @@ class Segment:
         return bool(self.seg)
 
     def __str__(self):
-        return f'Segment. Adv Corner count = {len(self.seg)}, start lock = {self.is_start_lock}, end lock {self.is_end_lock}'
+        return f"Segment. Adv Corner count = {len(self.seg)}, start lock = {self.is_start_lock}, end lock {self.is_end_lock}"
 
 
 class Segments:
@@ -1125,7 +1130,6 @@ class Segments:
             segments.append(Segment(seg, umesh))
         return cls(segments, umesh)
 
-
     def break_by_cardinal_dir(self):
         segments = []
         for seg in self:
@@ -1145,4 +1149,4 @@ class Segments:
         return bool(self.segments)
 
     def __str__(self):
-        return f'Segments. Segments count = {len(self.segments)}'
+        return f"Segments. Segments count = {len(self.segments)}"

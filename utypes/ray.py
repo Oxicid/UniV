@@ -24,7 +24,9 @@ from ..utils import point_inside_face, intersect_point_line_segment
 
 
 class KDData:
-    def __init__(self, found: tuple[Vector, int, float], elem: BMFace | BMLoop | None, kdmesh: 'KDMesh'):
+    def __init__(
+        self, found: tuple[Vector, int, float], elem: BMFace | BMLoop | None, kdmesh: "KDMesh"
+    ):
         self.found: tuple[Vector, int, float] = found  # pt, index, distance
         self.elem: BMFace | BMLoop | None = elem
         self.kdmesh: KDMesh | None | bool = kdmesh
@@ -101,7 +103,7 @@ class KDMesh:
                 co = crn[uv].uv
                 sum_crn += co
                 kd_crn_pt_insert(co.to_3d(), idx_)
-                kd_crn_center_pt_insert(((co+crn.link_loop_next[uv].uv)/2).to_3d(), idx_)
+                kd_crn_center_pt_insert(((co + crn.link_loop_next[uv].uv) / 2).to_3d(), idx_)
                 idx_ += 1
             kd_f_pt_insert((sum_crn / len(f.loops)).to_3d(), idx)
         self.corners_center = self.corners_vert
@@ -184,9 +186,9 @@ class KDMesh:
             co_b = crn_next[uv].uv.to_3d()
 
             kd_crn_pt_insert(co_a, idx_)
-            kd_crn_pt_insert(co_b, idx_+1)
+            kd_crn_pt_insert(co_b, idx_ + 1)
 
-            kd_crn_center_pt_insert((co_a+co_b)/2, idx)
+            kd_crn_center_pt_insert((co_a + co_b) / 2, idx)
             idx_ += 2
 
         for idx, f in enumerate(self.faces):
@@ -307,6 +309,7 @@ class KDMeshes:
 class TrimKDTree:
     def __init__(self):
         from ..operators.quick_snap import eSnapPointMode
+
         self.kdtree = KDTree(0)
         self.kdtree.balance()
         self.elem_flag: eSnapPointMode = eSnapPointMode.NONE
@@ -341,7 +344,7 @@ class IslandHit:
 
     def find_nearest_island(self, island: AdvIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
-            island = (island, )
+            island = (island,)
         pt = self.point
         min_dist = self.min_dist
 
@@ -361,7 +364,7 @@ class IslandHit:
                         if point_inside_face(pt, f, uv):
                             min_dist = dist
                             # This is necessary for the inequality (in below) check to be successful.
-                            self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                            self.min_dist = math.nextafter(self.min_dist, self.min_dist + 1)
                     elif dist < min_dist:
                         min_dist = dist
                     v_prev = v_curr
@@ -382,7 +385,7 @@ class IslandHit:
 
     def find_nearest_island_with_face(self, island: AdvIsland | UnionIslands):
         if not isinstance(island, UnionIslands):
-            island = (island, )
+            island = (island,)
         pt = self.point
         min_dist = self.min_dist
         min_face = None
@@ -404,7 +407,7 @@ class IslandHit:
                             min_dist = dist
                             min_face = f
                             # This is necessary for the inequality check (in below) to be successful.
-                            self.min_dist = math.nextafter(self.min_dist, self.min_dist+1.0)
+                            self.min_dist = math.nextafter(self.min_dist, self.min_dist + 1.0)
                     elif dist < min_dist:
                         min_dist = dist
                         min_face = f
@@ -443,7 +446,7 @@ class IslandHit:
                     if point_inside_face(pt, f, uv):
                         min_dist = dist
                         min_crn = crn
-                        self.min_dist = math.nextafter(self.min_dist, self.min_dist+1)
+                        self.min_dist = math.nextafter(self.min_dist, self.min_dist + 1)
                 elif dist < min_dist:
                     min_dist = dist
                     min_crn = crn
@@ -533,8 +536,9 @@ class CrnEdgeHit:
             self.min_dist = min_dist
 
             radial_prev = self.crn.link_loop_radial_prev
-            if (utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and
-                    utils.is_visible_func(umesh.sync)(radial_prev.face)):
+            if utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and utils.is_visible_func(
+                umesh.sync
+            )(radial_prev.face):
                 if point_inside_face(pt, radial_prev.face, uv):
                     self.crn = radial_prev
             else:
@@ -581,9 +585,8 @@ class CrnEdgeHit:
                             min_crn = crn
                             min_dist = dist
 
-
         if min_crn:
-            self.crn = min_crn#.link_loop_prev
+            self.crn = min_crn  # .link_loop_prev
             self.min_dist = min_dist
 
             # radial_prev = self.crn.link_loop_radial_prev
@@ -604,7 +607,7 @@ class CrnEdgeHit:
         return False
 
     def calc_island_with_seam(self):
-        assert self.crn, 'Not found picked corner'
+        assert self.crn, "Not found picked corner"
 
         uv = self.umesh.uv
         faces: set[BMFace] = {self.crn.face}
@@ -622,8 +625,10 @@ class CrnEdgeHit:
                     if ff in faces or not is_visible(ff):
                         continue
 
-                    if (l[uv].uv == pair_crn.link_loop_next[uv].uv and
-                            l.link_loop_next[uv].uv == pair_crn[uv].uv):
+                    if (
+                        l[uv].uv == pair_crn.link_loop_next[uv].uv
+                        and l.link_loop_next[uv].uv == pair_crn[uv].uv
+                    ):
                         faces.add(ff)
                         stack.append(ff)
             parts_of_island = stack
@@ -632,7 +637,7 @@ class CrnEdgeHit:
         return AdvIsland(list(faces), self.umesh), faces
 
     def calc_island_non_manifold(self) -> tuple[AdvIsland, set[BMFace]]:
-        assert self.crn, 'Not found picked corner'
+        assert self.crn, "Not found picked corner"
 
         uv = self.umesh.uv
         island: set[BMFace] = {self.crn.face}
@@ -648,8 +653,10 @@ class CrnEdgeHit:
                     if ff in island or not is_visible(ff):
                         continue
 
-                    if (crn[uv].uv == pair_crn.link_loop_next[uv].uv or
-                            crn.link_loop_next[uv].uv == pair_crn[uv].uv):
+                    if (
+                        crn[uv].uv == pair_crn.link_loop_next[uv].uv
+                        or crn.link_loop_next[uv].uv == pair_crn[uv].uv
+                    ):
                         island.add(ff)
                         stack.append(ff)
             parts_of_island = stack
@@ -658,7 +665,7 @@ class CrnEdgeHit:
         return AdvIsland(list(island), self.umesh), island
 
     def calc_island_non_manifold_with_flip(self) -> tuple[AdvIsland, set[BMFace]]:
-        assert self.crn, 'Not found picked corner'
+        assert self.crn, "Not found picked corner"
 
         uv = self.umesh.uv
         island: set[BMFace] = {self.crn.face}
@@ -675,13 +682,17 @@ class CrnEdgeHit:
                         continue
 
                     if crn.vert == pair_crn.vert:
-                        if (crn[uv].uv == pair_crn[uv].uv or
-                                crn.link_loop_next[uv].uv == pair_crn.link_loop_next[uv].uv):
+                        if (
+                            crn[uv].uv == pair_crn[uv].uv
+                            or crn.link_loop_next[uv].uv == pair_crn.link_loop_next[uv].uv
+                        ):
                             island.add(ff)
                             stack.append(ff)
                     else:
-                        if (crn[uv].uv == pair_crn.link_loop_next[uv].uv or
-                                crn.link_loop_next[uv].uv == pair_crn[uv].uv):
+                        if (
+                            crn[uv].uv == pair_crn.link_loop_next[uv].uv
+                            or crn.link_loop_next[uv].uv == pair_crn[uv].uv
+                        ):
                             island.add(ff)
                             stack.append(ff)
             parts_of_island = stack
@@ -690,7 +701,7 @@ class CrnEdgeHit:
         return AdvIsland(list(island), self.umesh), island
 
     def calc_visible_mesh_island(self) -> tuple[MeshIsland, set[BMFace]]:
-        assert self.crn, 'Not found picked corner'
+        assert self.crn, "Not found picked corner"
         island: set[BMFace] = {self.crn.face}
         stack = []
         parts_of_island = [self.crn.face]
@@ -710,7 +721,7 @@ class CrnEdgeHit:
         return MeshIsland(list(island), self.umesh), island
 
     def calc_visible_mesh_island_without_ms(self) -> tuple[MeshIsland, set[BMFace]]:
-        assert self.crn, 'Not found picked corner'
+        assert self.crn, "Not found picked corner"
         island: set[BMFace] = {self.crn.face}
         stack = []
         parts_of_island = [self.crn.face]
@@ -746,14 +757,16 @@ class RayCastAndPick(bpy.types.Operator):
         self.mouse_position: Vector | None = None
 
     def init_data_for_ray_cast(self, event):
-        if bpy.context.area.type == 'VIEW_3D':
+        if bpy.context.area.type == "VIEW_3D":
             self.mouse_pos_from_3d = event.mouse_region_x, event.mouse_region_y
             self.region = bpy.context.region
             self.rv3d = bpy.context.space_data.region_3d
             self.ray_origin = view3d_utils.region_2d_to_origin_3d(
-                self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+                self.region, self.rv3d, Vector(self.mouse_pos_from_3d)
+            )
             self.ray_direction = view3d_utils.region_2d_to_vector_3d(
-                self.region, self.rv3d, Vector(self.mouse_pos_from_3d))
+                self.region, self.rv3d, Vector(self.mouse_pos_from_3d)
+            )
 
     @staticmethod
     def get_bvh_from_polygon(umesh: UMesh) -> tuple[BVHTree, list[BMFace]]:
@@ -792,7 +805,9 @@ class RayCastAndPick(bpy.types.Operator):
             ray_direction_obj = ray_target_obj - ray_origin_obj
 
             bvh: BVHTree = BVHTree.FromBMesh(umesh_iter.bm)
-            hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj, max_dist)
+            hit, normal, face_index_, distance = bvh.ray_cast(
+                ray_origin_obj, ray_direction_obj, max_dist
+            )
 
             if not hit:
                 continue
@@ -806,7 +821,9 @@ class RayCastAndPick(bpy.types.Operator):
                 # If a face is hidden, the BVH is computed using FromPolygons.
                 if umesh_iter.bm.faces[face_index_].hide:
                     bvh, faces = self.get_bvh_from_polygon(umesh_iter)  # slow
-                    hit, normal, face_index_, distance = bvh.ray_cast(ray_origin_obj, ray_direction_obj, max_dist)
+                    hit, normal, face_index_, distance = bvh.ray_cast(
+                        ray_origin_obj, ray_direction_obj, max_dist
+                    )
                     if not hit:
                         continue
                     hit_world = world_matrix @ hit
@@ -826,15 +843,18 @@ class RayCastAndPick(bpy.types.Operator):
         # TODO: Add raycast by radial patterns
         deps = bpy.context.view_layer.depsgraph
         result, loc, normal, face_index, obj, matrix = bpy.context.scene.ray_cast(
-            deps, origin=self.ray_origin, direction=self.ray_direction)
+            deps, origin=self.ray_origin, direction=self.ray_direction
+        )
 
-        if not (result and obj and obj.type == 'MESH'):  # TODO: Fix potential non-mesh overlap object
+        if not (
+            result and obj and obj.type == "MESH"
+        ):  # TODO: Fix potential non-mesh overlap object
             # TODO: Add raycast, ignoring objects that are not in Edit Mode
             return None
 
         eval_obj = obj.evaluated_get(deps)
         has_destructive_modifiers = len(obj.data.polygons) != len(eval_obj.data.polygons)
-        if obj.mode != 'EDIT' or has_destructive_modifiers:
+        if obj.mode != "EDIT" or has_destructive_modifiers:
             # Raycast, ignoring objects that are not in Edit Mode
             umesh, face_index = self.ray_cast_umeshes(umeshes)
             if not umesh:
@@ -845,7 +865,9 @@ class RayCastAndPick(bpy.types.Operator):
         umesh.bm = bmesh.from_edit_mesh(umesh.obj.data)
 
         face = umesh.bm.faces[face_index]
-        e, dist = utils.find_closest_edge_3d_to_2d(self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d)
+        e, dist = utils.find_closest_edge_3d_to_2d(
+            self.mouse_pos_from_3d, face, umesh, self.region, self.rv3d
+        )
         if dist < max_pick_radius:
             for crn in e.link_loops:
                 if crn.face == face:
@@ -857,17 +879,18 @@ class RayCastAndPick(bpy.types.Operator):
         return None
 
     def store_mouse_pose_on_uv_and_max_distance_if_allowed(self, event):
-        if event.value == 'PRESS':
-            if self.bl_idname.startswith('UV'):
-                if bpy.context.area.ui_type == 'UV':
+        if event.value == "PRESS":
+            if self.bl_idname.startswith("UV"):
+                if bpy.context.area.ui_type == "UV":
                     from .. import preferences
+
                     self.max_distance = utils.get_max_distance_from_px(
-                        preferences.prefs().max_pick_distance,
-                        bpy.context.region.view2d)
+                        preferences.prefs().max_pick_distance, bpy.context.region.view2d
+                    )
                     self.mouse_position = Vector(
                         bpy.context.region.view2d.region_to_view(
-                        event.mouse_region_x,
-                        event.mouse_region_y)
+                            event.mouse_region_x, event.mouse_region_y
+                        )
                     )
                     return True
         return False
