@@ -15,7 +15,10 @@ USE_GENERIC_UV_SYNC = hasattr(BMesh, "uv_select_sync_valid")
 def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
     shared = crn.link_loop_radial_prev
     if shared != crn and crn.face.index == shared.face.index:
-        if crn.link_loop_next[uv].uv == shared[uv].uv and crn[uv].uv == shared.link_loop_next[uv].uv:
+        if (
+            crn.link_loop_next[uv].uv == shared[uv].uv
+            and crn[uv].uv == shared.link_loop_next[uv].uv
+        ):
             return shared
     return None
 
@@ -90,7 +93,11 @@ def linked_crn_to_vert_pair_iter(crn: BMLoop, uv, sync):
                 if next_crn == crn:
                     break
 
-                if (first_vert != next_crn.vert) or is_invisible(next_crn.face) or not is_pair(bm_iter, pair_cw, uv):
+                if (
+                    (first_vert != next_crn.vert)
+                    or is_invisible(next_crn.face)
+                    or not is_pair(bm_iter, pair_cw, uv)
+                ):
                     break
                 yield next_crn
                 bm_iter = next_crn
@@ -134,7 +141,11 @@ def linked_crn_to_vert_pair(crn: BMLoop, uv, sync: bool):
                 if next_crn == crn:
                     break
 
-                if (first_vert != next_crn.vert) or is_invisible(next_crn.face) or not is_pair(bm_iter, pair_cw, uv):
+                if (
+                    (first_vert != next_crn.vert)
+                    or is_invisible(next_crn.face)
+                    or not is_pair(bm_iter, pair_cw, uv)
+                ):
                     break
                 bm_iter = next_crn
                 linked_cw.append(next_crn)
@@ -364,13 +375,21 @@ def linked_crn_uv_to_vert_unordered_included_func(umesh):
 
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
-                return [l_crn for l_crn in first.vert.link_loops if (not l_crn.face.hide) and l_crn[uv].uv == first_co]
+                return [
+                    l_crn
+                    for l_crn in first.vert.link_loops
+                    if (not l_crn.face.hide) and l_crn[uv].uv == first_co
+                ]
 
         else:
 
             def get_linked(first: BMLoop):
                 first_co = first[uv].uv
-                return [l_crn for l_crn in first.vert.link_loops if l_crn.face.select and l_crn[uv].uv == first_co]
+                return [
+                    l_crn
+                    for l_crn in first.vert.link_loops
+                    if l_crn.face.select and l_crn[uv].uv == first_co
+                ]
 
         return get_linked
 
@@ -537,7 +556,9 @@ def linked_crn_to_vert_with_seam_3d_iter(crn: BMLoop):
     while True:
         bm_iter_prev = bm_iter.link_loop_prev
         bm_iter = bm_iter_prev.link_loop_radial_prev  # get ccw corner
-        if first_vert != bm_iter.vert or bm_iter_prev.edge.seam or bm_iter.face.hide:  # Skip boundary or flipped
+        if (
+            first_vert != bm_iter.vert or bm_iter_prev.edge.seam or bm_iter.face.hide
+        ):  # Skip boundary or flipped
             bm_iter = crn
             while True:
                 if bm_iter.edge.seam:  # clamp by seam
@@ -563,7 +584,9 @@ def linked_crn_uv_by_idx_unordered(crn: BMLoop, uv: BMLayerItem):
     first_co = crn[uv].uv
     idx = crn.face.index
     return [
-        l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
+        l_crn
+        for l_crn in crn.vert.link_loops
+        if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
     ]
 
 
@@ -573,20 +596,30 @@ def linked_crn_uv_by_idx_unordered_included(crn: BMLoop, uv: BMLayerItem):
     """
     first_co = crn[uv].uv
     idx = crn.face.index
-    return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
+    return [
+        l_crn
+        for l_crn in crn.vert.link_loops
+        if l_crn.face.index == idx and l_crn[uv].uv == first_co
+    ]
 
 
 def linked_crn_uv_by_island_index_unordered_included(crn: BMLoop, uv: BMLayerItem, idx: int):
     """Linked to arg corner by island index with arg corner"""
     first_co = crn[uv].uv
-    return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.index == idx and l_crn[uv].uv == first_co]
+    return [
+        l_crn
+        for l_crn in crn.vert.link_loops
+        if l_crn.face.index == idx and l_crn[uv].uv == first_co
+    ]
 
 
 def linked_crn_uv_by_island_index_unordered(crn: BMLoop, uv: BMLayerItem, idx: int):
     """Linked to arg corner by island index without arg corner"""
     first_co = crn[uv].uv
     return [
-        l_crn for l_crn in crn.vert.link_loops if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
+        l_crn
+        for l_crn in crn.vert.link_loops
+        if l_crn != crn and l_crn.face.index == idx and l_crn[uv].uv == first_co
     ]
 
 
