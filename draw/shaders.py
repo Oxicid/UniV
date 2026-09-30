@@ -34,12 +34,11 @@ set_line_width = lambda width: None
 set_line_width_vk = lambda shader, width=2.0: None
 set_point_size = gpu.state.point_size_set
 
-blend_set_alpha = lambda : gpu.state.blend_set('ALPHA')
-blend_set_none = lambda : gpu.state.blend_set('NONE')
+blend_set_alpha = lambda: gpu.state.blend_set("ALPHA")
+blend_set_none = lambda: gpu.state.blend_set("NONE")
 
-depth_test_set_less = lambda : gpu.state.depth_test_set('LESS')
-depth_test_set_none = lambda : gpu.state.depth_test_set('NONE')
-
+depth_test_set_less = lambda: gpu.state.depth_test_set("LESS")
+depth_test_set_none = lambda: gpu.state.depth_test_set("NONE")
 
 
 class Shaders:
@@ -54,10 +53,10 @@ class Shaders:
         global SMOOTH_COLOR_3D
 
         if bpy.app.version >= (3, 5, 0):
-            SMOOTH_COLOR_2D = SMOOTH_COLOR_3D = gpu.shader.from_builtin('SMOOTH_COLOR')
+            SMOOTH_COLOR_2D = SMOOTH_COLOR_3D = gpu.shader.from_builtin("SMOOTH_COLOR")
         else:
-            SMOOTH_COLOR_2D = gpu.shader.from_builtin('2D_SMOOTH_COLOR')
-            SMOOTH_COLOR_3D = gpu.shader.from_builtin('3D_SMOOTH_COLOR')
+            SMOOTH_COLOR_2D = gpu.shader.from_builtin("2D_SMOOTH_COLOR")
+            SMOOTH_COLOR_3D = gpu.shader.from_builtin("3D_SMOOTH_COLOR")
 
         # ----------
 
@@ -65,56 +64,59 @@ class Shaders:
         global POLYLINE_FLAT_COLOR_3D
 
         if bpy.app.version >= (3, 5, 0):
-            POLYLINE_FLAT_COLOR_2D = POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
+            POLYLINE_FLAT_COLOR_2D = POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin(
+                "POLYLINE_FLAT_COLOR"
+            )
         else:
-            POLYLINE_FLAT_COLOR_2D = gpu.shader.from_builtin('2D_FLAT_COLOR')
-            POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin('3D_POLYLINE_FLAT_COLOR')
+            POLYLINE_FLAT_COLOR_2D = gpu.shader.from_builtin("2D_FLAT_COLOR")
+            POLYLINE_FLAT_COLOR_3D = gpu.shader.from_builtin("3D_POLYLINE_FLAT_COLOR")
 
         # ---------- gpu.shader.from_builtin('POLYLINE_FLAT_COLOR')
 
         global POLYLINE_UNIFORM_COLOR_2D
         if VK_ENABLED:
-            POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+            POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin("POLYLINE_UNIFORM_COLOR")
         else:
             if bpy.app.version >= (3, 5, 0):
-                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('UNIFORM_COLOR')
+                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin("UNIFORM_COLOR")
             else:
-                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+                POLYLINE_UNIFORM_COLOR_2D = gpu.shader.from_builtin("2D_UNIFORM_COLOR")
 
         global POLYLINE_UNIFORM_COLOR_3D
         if bpy.app.version >= (3, 5, 0):
             POLYLINE_UNIFORM_COLOR_3D = POLYLINE_UNIFORM_COLOR_2D
         else:
-            POLYLINE_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+            POLYLINE_UNIFORM_COLOR_3D = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
 
         # ----------
 
         global POINT_UNIFORM_COLOR_2D
         if VK_ENABLED:
-            POINT_UNIFORM_COLOR_2D = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
+            POINT_UNIFORM_COLOR_2D = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
         else:
             POINT_UNIFORM_COLOR_2D = gpu.shader.from_builtin(
-                '2D_UNIFORM_COLOR' if bpy.app.version < (3, 5, 0) else 'UNIFORM_COLOR')
+                "2D_UNIFORM_COLOR" if bpy.app.version < (3, 5, 0) else "UNIFORM_COLOR"
+            )
 
         global POINT_UNIFORM_COLOR_3D
         if bpy.app.version >= (3, 5, 0):
             POINT_UNIFORM_COLOR_3D = POINT_UNIFORM_COLOR_2D
         else:
-            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
 
         # ----------
 
         global UNIFORM_COLOR_2D
         if bpy.app.version >= (3, 5, 0):
-            UNIFORM_COLOR_2D = gpu.shader.from_builtin('UNIFORM_COLOR')
+            UNIFORM_COLOR_2D = gpu.shader.from_builtin("UNIFORM_COLOR")
         else:
-            UNIFORM_COLOR_2D = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+            UNIFORM_COLOR_2D = gpu.shader.from_builtin("2D_UNIFORM_COLOR")
 
         global UNIFORM_COLOR_3D
         if bpy.app.version >= (3, 5, 0):
             UNIFORM_COLOR_3D = UNIFORM_COLOR_2D
         else:
-            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+            POINT_UNIFORM_COLOR_3D = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
 
         global IMG_SHADER_3D
         IMG_SHADER_3D = cls.create_img_shader()
@@ -131,7 +133,7 @@ class Shaders:
 
             def _set_line_width_vk(shader, width=2.0):
                 shader.uniform_float("viewportSize", gpu.state.viewport_get()[2:])
-                shader.uniform_float('lineWidth', width)
+                shader.uniform_float("lineWidth", width)
 
             set_line_width_vk = _set_line_width_vk
         else:
@@ -148,15 +150,17 @@ class Shaders:
                 set_line_width = gpu.state.line_width_set
             else:
                 import bgl
+
                 set_line_width = bgl.glLineWidth
                 set_point_size = bgl.glPointSize
 
                 blend_set_alpha = lambda: bgl.glEnable(bgl.GL_BLEND)
                 blend_set_none = lambda: bgl.glDisable(bgl.GL_BLEND)
 
-                depth_test_set_less = lambda: bgl.glEnable(bgl.GL_DEPTH_TEST); bgl.glEnable(bgl.GL_LINE_SMOOTH)
-                depth_test_set_none = lambda: bgl.glDisable(bgl.GL_LINE_SMOOTH); bgl.glDisable(bgl.GL_DEPTH_TEST)
-
+                depth_test_set_less = lambda: bgl.glEnable(bgl.GL_DEPTH_TEST)
+                bgl.glEnable(bgl.GL_LINE_SMOOTH)
+                depth_test_set_none = lambda: bgl.glDisable(bgl.GL_LINE_SMOOTH)
+                bgl.glDisable(bgl.GL_DEPTH_TEST)
 
         cls.init_flat_shading_uniform_color()
 
@@ -165,15 +169,15 @@ class Shaders:
         # Drawing the generated texture in 3D space
         #############################################
         vert_out = gpu.types.GPUStageInterfaceInfo("my_interface")
-        vert_out.smooth('VEC2', "uvInterp")
+        vert_out.smooth("VEC2", "uvInterp")
         shader_info = gpu.types.GPUShaderCreateInfo()
-        shader_info.push_constant('MAT4', "viewProjectionMatrix")
+        shader_info.push_constant("MAT4", "viewProjectionMatrix")
         # shader_info.push_constant('MAT4', "modelMatrix")
-        shader_info.sampler(0, 'FLOAT_2D', "image")
-        shader_info.vertex_in(0, 'VEC2', "position")
-        shader_info.vertex_in(1, 'VEC2', "uv")
+        shader_info.sampler(0, "FLOAT_2D", "image")
+        shader_info.vertex_in(0, "VEC2", "position")
+        shader_info.vertex_in(1, "VEC2", "uv")
         shader_info.vertex_out(vert_out)
-        shader_info.fragment_out(0, 'VEC4', "FragColor")
+        shader_info.fragment_out(0, "VEC4", "FragColor")
         shader_info.vertex_source(
             "void main()"
             "{"
@@ -181,12 +185,7 @@ class Shaders:
             "  gl_Position = viewProjectionMatrix * vec4(position, 0.0, 1.0);"
             "}"
         )
-        shader_info.fragment_source(
-            "void main()"
-            "{"
-            "  FragColor = texture(image, uvInterp);"
-            "}"
-        )
+        shader_info.fragment_source("void main()" "{" "  FragColor = texture(image, uvInterp);" "}")
         return gpu.shader.create_from_info(shader_info)
 
     @staticmethod
@@ -220,23 +219,24 @@ class Shaders:
     @classmethod
     def init_flat_shading_uniform_color(cls):
         vert_out = gpu.types.GPUStageInterfaceInfo("UniV")
-        vert_out.smooth('VEC3', "fcolor")
+        vert_out.smooth("VEC3", "fcolor")
 
         shader_info = gpu.types.GPUShaderCreateInfo()
-        shader_info.push_constant('MAT4', "mvp")
-        shader_info.push_constant('MAT3', "normal_matrix")
-        shader_info.push_constant('VEC2', "light_dir")
+        shader_info.push_constant("MAT4", "mvp")
+        shader_info.push_constant("MAT3", "normal_matrix")
+        shader_info.push_constant("VEC2", "light_dir")
 
-        shader_info.vertex_in(0, 'VEC3', "pos")
-        shader_info.vertex_in(1, 'VEC3', "normal")
+        shader_info.vertex_in(0, "VEC3", "pos")
+        shader_info.vertex_in(1, "VEC3", "normal")
         shader_info.vertex_out(vert_out)
-        shader_info.fragment_out(0, 'VEC4', "fragColor")
+        shader_info.fragment_out(0, "VEC4", "fragColor")
 
         from .. import preferences
+
         r, g, b, a = preferences.univ_settings().overlay_3d_uv_face_color
         color_glsl_constant = f"\nconst vec4 color = vec4({r:.6f}, {g:.6f}, {b:.6f}, {a:.6f});\n\n"
 
-        shader_info.vertex_source(color_glsl_constant + '''
+        shader_info.vertex_source(color_glsl_constant + """
         void main()
         {   
             vec3 n = normal_matrix * normal;
@@ -253,10 +253,9 @@ class Shaders:
 
             fcolor = shaded;
         }
-        '''
-        )
+        """)
 
-        shader_info.fragment_source(color_glsl_constant + '''
+        shader_info.fragment_source(color_glsl_constant + """
         void main()
         {
             if (gl_FrontFacing) {
@@ -265,15 +264,14 @@ class Shaders:
                 fragColor = vec4(fcolor * 0.6, color.a);
             }
         }
-        '''
-        )
+        """)
 
         global FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
         FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT = gpu.shader.create_from_info(shader_info)
 
     @staticmethod
     def unpack_vec4() -> str:
-        return  '''
+        return """
         vec4 unpack_vec4(uint packed) {
             float r = float((packed >> 24) & 0xFF000000u) / 255.0;
             float g = float((packed >> 16) & 0x00FF0000u) / 255.0;
@@ -282,4 +280,4 @@ class Shaders:
             return vec4(r, g, b, a);
         }
 
-        '''
+        """

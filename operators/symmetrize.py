@@ -15,49 +15,53 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
     bl_idname = "uv.univ_symmetrize"
     bl_label = "Symmetrize"
     bl_description = "Symmetrize\n\n Has [Alt+X] keymap"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    axis_uv: bpy.props.EnumProperty(name='UV Axis', default='-X to +X',
-                                      items=(('-X to +X', '-X to +X', ''), ('-Y to +Y', '-Y to +Y', '')))
-    axis_uv_flip: bpy.props.BoolProperty(name='Flip UV Axis ', default=False,
-                                         description="Flip selection between (does not affect when one face is unselected)")
+    axis_uv: bpy.props.EnumProperty(
+        name="UV Axis", default="-X to +X", items=(("-X to +X", "-X to +X", ""), ("-Y to +Y", "-Y to +Y", ""))
+    )
+    axis_uv_flip: bpy.props.BoolProperty(
+        name="Flip UV Axis ",
+        default=False,
+        description="Flip selection between (does not affect when one face is unselected)",
+    )
 
-    axis_3d: bpy.props.EnumProperty(name='3D Axis', default='X', items=(('X', 'X', ''), ('Y', 'Y', ''), ('Z', 'Z', '')))
-    by_cursor: bpy.props.BoolProperty(name='By Cursor', default=False)
-    unlink: bpy.props.BoolProperty(name='Unlink', default=False)
-    threshold: bpy.props.FloatProperty(name='Threshold', default=0.005, soft_min=0.005, min=0.00001, soft_max=1, max=10)
+    axis_3d: bpy.props.EnumProperty(name="3D Axis", default="X", items=(("X", "X", ""), ("Y", "Y", ""), ("Z", "Z", "")))
+    by_cursor: bpy.props.BoolProperty(name="By Cursor", default=False)
+    unlink: bpy.props.BoolProperty(name="Unlink", default=False)
+    threshold: bpy.props.FloatProperty(name="Threshold", default=0.005, soft_min=0.005, min=0.00001, soft_max=1, max=10)
 
     def draw(self, context):
-        row = self.layout.row(align=True, heading='UV Axis')
-        row.prop(self, 'axis_uv', expand=True)
+        row = self.layout.row(align=True, heading="UV Axis")
+        row.prop(self, "axis_uv", expand=True)
         row.separator(factor=0.35)
-        row.prop(self, 'axis_uv_flip', icon_only=True, icon='ARROW_LEFTRIGHT')
+        row.prop(self, "axis_uv_flip", icon_only=True, icon="ARROW_LEFTRIGHT")
 
-        row = self.layout.row(align=True, heading='3D Axis')
-        row.scale_x=1.3
-        row.prop(self, 'axis_3d', expand=True, slider=True)
+        row = self.layout.row(align=True, heading="3D Axis")
+        row.scale_x = 1.3
+        row.prop(self, "axis_3d", expand=True, slider=True)
 
-        self.layout.prop(self, 'unlink')
-        self.layout.prop(self, 'by_cursor')
-        self.layout.prop(self, 'threshold')
+        self.layout.prop(self, "unlink")
+        self.layout.prop(self, "by_cursor")
+        self.layout.prop(self, "threshold")
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == "EDIT_MESH"
 
     def execute(self, context):
         umeshes = utypes.UMeshes(report=self.report)
         umeshes.filter_by_selected_uv_faces()
 
         not_matched = 0
-        if self.axis_3d == 'X':
+        if self.axis_3d == "X":
             xyz_mirror_scale = Vector((-1, 1, 1))
-        elif self.axis_3d == 'Y':
+        elif self.axis_3d == "Y":
             xyz_mirror_scale = Vector((1, -1, 1))
-        else: # self.axis_3d == 'X':
+        else:  # self.axis_3d == 'X':
             xyz_mirror_scale = Vector((1, 1, -1))
 
-        if self.axis_uv == '-X to +X':
+        if self.axis_uv == "-X to +X":
             uv_mirror_scale = Vector((-1, 1))
         else:
             uv_mirror_scale = Vector((1, -1))
@@ -69,13 +73,16 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
                 faces = list(faces)
 
             tree = kdtree.KDTree(len(faces))
-            for idx, f, in enumerate(faces):
+            for (
+                idx,
+                f,
+            ) in enumerate(faces):
                 tree.insert(f.calc_center_median(), idx)
             tree.balance()
 
             # Islands are sorted by their bounding box to determine which one is the source and which is the destination.
             islands = utypes.Islands.calc_selected(umesh)
-            if self.axis_uv == '-X to +X':
+            if self.axis_uv == "-X to +X":
                 islands.islands.sort(key=lambda isl_: isl_.bbox.center.x % 1, reverse=self.axis_uv_flip)
             else:
                 islands.islands.sort(key=lambda isl_: isl_.bbox.center.y % 1, reverse=self.axis_uv_flip)
@@ -87,9 +94,9 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
             # Faces inner island are sorted along the 3D axes to avoid random determination of the source and destination.
             # For cases where the transferred faces belong to the same part of an island.
             for isl in islands:
-                if self.axis_3d == 'X':
+                if self.axis_3d == "X":
                     isl.faces.sort(key=lambda f_: f_.calc_center_median().x)
-                elif self.axis_3d == 'Y':
+                elif self.axis_3d == "Y":
                     isl.faces.sort(key=lambda f_: f_.calc_center_median().y)
                 else:  # self.axis_3d == 'X':
                     isl.faces.sort(key=lambda f_: f_.calc_center_median().z)
@@ -99,7 +106,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
                 if self.by_cursor:
                     isl.value = utils.get_cursor_location()
                 else:
-                    if self.axis_uv == '-X to +X':
+                    if self.axis_uv == "-X to +X":
                         pivot_u = math.floor(isl.bbox.center.x)
                         if pivot_u < 0:
                             isl.value = Vector((pivot_u + -math.copysign(0.5, pivot_u), 0))
@@ -148,7 +155,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
 
                             # Transfer uv coords
                             dst_crn = dst_f.loops[target_crn_idx]
-                            uv_co = (crn[uv].uv * uv_mirror_scale + scale_diff)
+                            uv_co = crn[uv].uv * uv_mirror_scale + scale_diff
                             if not self.unlink:
                                 dst_linked_loops = utils.linked_crn_to_vert_pair(dst_crn, uv, umesh.sync)
                                 for l_crn in dst_linked_loops:
@@ -163,6 +170,6 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
             umesh.update_tag = bool(has_update)
 
         if not_matched and umeshes.update_tag:
-            self.report({'WARNING'}, f'Symmetrize: {not_matched!r} faces not matched')
+            self.report({"WARNING"}, f"Symmetrize: {not_matched!r} faces not matched")
         umeshes.update()
-        return {'FINISHED'}
+        return {"FINISHED"}

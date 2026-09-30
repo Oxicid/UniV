@@ -177,7 +177,10 @@ class UKeymap:
 
         # Transform.
         km.new("uv.univ_orient", "O").prop.edge_dir = "BOTH"
-        km.new("uv.univ_flip", "F")
+        if univ_pro_exist:
+            km.new("uv.univ_drag", "F")
+        else:
+            km.new("uv.univ_flip", "F")
         km.new("uv.univ_home", "G", alt=True)
 
         kmi = km.new("uv.univ_rotate", "FIVE")

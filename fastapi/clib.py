@@ -8,17 +8,10 @@ import ctypes
 from .. import btypes
 from .. import utypes
 from .. import utils
-from ctypes import (
-    c_int,
-    c_float,
-    c_double,
-    c_void_p,
-    c_bool,
-    POINTER,
-    byref
-)
+from ctypes import c_int, c_float, c_double, c_void_p, c_bool, POINTER, byref
 
 EXPECTED_FASTAPI_VERSION = 4
+
 
 class FastAPI:
     lib: ctypes.CDLL | None = None
@@ -26,12 +19,14 @@ class FastAPI:
 
     @classmethod
     def load(cls):
-        cls.lib = utils.load_lib('univ_fastapi')
-        if hasattr(cls.lib, 'version'):  # TODO: Delete after 3 month
+        cls.lib = utils.load_lib("univ_fastapi")
+        if hasattr(cls.lib, "version"):  # TODO: Delete after 3 month
             if cls.lib.version() != EXPECTED_FASTAPI_VERSION:
                 cls.failed_version = cls.lib.version()
                 cls.close()
-                print(f"UniV: FastAPI: Expected version {EXPECTED_FASTAPI_VERSION}, given: {cls.lib.version()!r}.")
+                print(
+                    f"UniV: FastAPI: Expected version {EXPECTED_FASTAPI_VERSION}, given: {cls.lib.version()!r}."
+                )
                 return
         else:
             cls.close()
@@ -51,7 +46,7 @@ class FastAPI:
 
         success = False
         match platform.system():
-            case 'Windows':
+            case "Windows":
                 dll_close = ctypes.windll.kernel32.FreeLibrary  # noqa
                 success = dll_close(ctypes.c_void_p(handle)) != 0
 
@@ -72,11 +67,10 @@ class FastAPI:
             case platform_:
                 raise NotImplementedError(f"Unknown platform: {platform_!r}.")
 
-
-
         if not success:
             print("UniV: FastAPI: Can't unload shared library.")
         import gc
+
         gc.collect()  # clear for free lib
 
     @classmethod
@@ -96,7 +90,16 @@ class FastAPI:
         lib.solver_matrix_add.restype = None
 
         # void solver_matrix_add_angles(LinearSolver* solver, int row, double a1, double a2, double a3, int v1_id, int v2_id, int v3_id)
-        lib.solver_matrix_add_angles.argtypes = (c_void_p, c_int, c_double, c_double, c_double, c_int, c_int, c_int)
+        lib.solver_matrix_add_angles.argtypes = (
+            c_void_p,
+            c_int,
+            c_double,
+            c_double,
+            c_double,
+            c_int,
+            c_int,
+            c_int,
+        )
         lib.solver_matrix_add_angles.restype = None
 
         # void solver_right_hand_side_add(LinearSolver* solver, int index, double value)
@@ -131,14 +134,15 @@ class FastAPI:
         #     float *arr,
         #     int *r_tot_v,
         #     int *r_tot_h)
-        lib.UniV_extract_data_constraints2d.argtypes = (POINTER(btypes.CBMesh),
-                                                        c_int,
-                                                        c_int,
-                                                        c_bool,
-                                                        POINTER(c_float),
-                                                        POINTER(c_int),
-                                                        POINTER(c_int)
-                                                        )
+        lib.UniV_extract_data_constraints2d.argtypes = (
+            POINTER(btypes.CBMesh),
+            c_int,
+            c_int,
+            c_bool,
+            POINTER(c_float),
+            POINTER(c_int),
+            POINTER(c_int),
+        )
         lib.UniV_extract_data_constraints2d.restype = None
 
         # int UniV_extract_data_seams2d(
@@ -147,24 +151,25 @@ class FastAPI:
         #     const bool sync,
         #     float *r_array)
 
-        lib.UniV_extract_data_seams2d.argtypes = (POINTER(btypes.CBMesh),
-                                                        c_int,
-                                                        c_bool,
-                                                        POINTER(c_float)
-                                                        )
+        lib.UniV_extract_data_seams2d.argtypes = (
+            POINTER(btypes.CBMesh),
+            c_int,
+            c_bool,
+            POINTER(c_float),
+        )
         lib.UniV_extract_data_seams2d.restype = c_int
 
 
 class ExtractData:
     @staticmethod
-    def extract_constraints_data(umesh: 'utypes.UMesh', attr):
+    def extract_constraints_data(umesh: "utypes.UMesh", attr):
 
         c_bm: btypes.CBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
         uv_offset = ExtractData.get_uv_offset(umesh.uv)
         constr_offset = ExtractData.get_constr_offset(umesh, attr)
 
-        max_data_shape = (c_bm.contents.totloop*2, 2)
+        max_data_shape = (c_bm.contents.totloop * 2, 2)
         arr = np.empty(max_data_shape, np.float32)
 
         tot_v_coords = c_int()
@@ -177,37 +182,35 @@ class ExtractData:
             umesh.sync,
             arr.ctypes.data_as(POINTER(c_float)),
             byref(tot_v_coords),
-            byref(tot_h_coords)
+            byref(tot_h_coords),
         )
-        return arr[:tot_v_coords.value], arr[-tot_h_coords.value:] if tot_h_coords else []
+        return arr[: tot_v_coords.value], arr[-tot_h_coords.value :] if tot_h_coords else []
 
     @staticmethod
-    def extract_seams_data(umesh: 'utypes.UMesh'):
+    def extract_seams_data(umesh: "utypes.UMesh"):
         c_bm: btypes.PyBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
 
         total_corners = c_bm.contents.totloop
         uv_offset = ExtractData.get_uv_offset(umesh.uv)
 
-        max_data_shape = (total_corners*2, 2)
+        max_data_shape = (total_corners * 2, 2)
         r_array = np.empty(max_data_shape, np.float32)
 
         tot_coords = FastAPI.lib.UniV_extract_data_seams2d(
-            c_bm,
-            uv_offset,
-            umesh.sync,
-            r_array.ctypes.data_as(POINTER(c_float))
+            c_bm, uv_offset, umesh.sync, r_array.ctypes.data_as(POINTER(c_float))
         )
 
         return r_array[:tot_coords]
 
     if bpy.app.version >= (3, 5, 0):
+
         @staticmethod
         def get_uv_offset(uv):
             # CD_MLOOPUV = 16  # TODO: Implement for oldest version.
             CD_PROP_FLOAT2 = 49
             py_btype_uv_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
             n = py_btype_uv_layer.index
-            assert (n >= 0)
+            assert n >= 0
 
             custom_data: btypes.CustomData = py_btype_uv_layer.bm.contents.ldata
             i = custom_data.typemap[CD_PROP_FLOAT2]
@@ -220,9 +223,12 @@ class ExtractData:
                         return layer.offset
 
             # all_layers_items = [custom_data.layers[ii].name for ii in range(int(custom_data.totlayer))]
-            raise IndexError(f"Not found `CD_PROP_FLOAT2` layer at {i + n} index for {uv.name!r}, "
-                             f"maybe CustomData, CustomDataLayer or BMesh fields is changed? ")
+            raise IndexError(
+                f"Not found `CD_PROP_FLOAT2` layer at {i + n} index for {uv.name!r}, "
+                f"maybe CustomData, CustomDataLayer or BMesh fields is changed? "
+            )
             return -1  # noqa
+
     else:
         # CustomData_get_offset
         # https://projects.blender.org/blender/blender/src/commit/bcfdb14560e77891d674c2701a5071a7c07baba3/source/blender/blenkernel/intern/customdata.cc
@@ -231,11 +237,10 @@ class ExtractData:
             py_constr_layer = btypes.BPy_BMLayerItem.get_fields_from_pyobj(uv)
 
             n = py_constr_layer.index
-            assert (n >= 0), f"Given incorrect {n!r} layer index."
+            assert n >= 0, f"Given incorrect {n!r} layer index."
 
             custom_data: btypes.CustomData = py_constr_layer.bm.contents.ldata
             return custom_data.get_offset(py_constr_layer.type)
-
 
     @staticmethod
     def get_constr_offset(umesh, attr):
@@ -244,9 +249,11 @@ class ExtractData:
         idx = py_constr_layer.index
         typ = py_constr_layer.type
 
-        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm.contents.edata
+        custom_data: btypes.CustomData = btypes.PyBMesh.get_fields_from_pyobj(
+            umesh.bm
+        ).bm.contents.edata
 
-        assert(idx >= 0)  # noqa
+        assert idx >= 0  # noqa
 
         layer_index = custom_data.typemap[typ]
         assert layer_index != -1
@@ -256,12 +263,10 @@ class ExtractData:
         return layer.offset
 
 
-
-
 class LinearSolver:
     @classmethod
     def new(cls, num_rows: int, num_variables: int, least_squares=False):
-        assert platform.system() == 'Windows'
+        assert platform.system() == "Windows"
         return cls(num_rows, num_variables, least_squares)
 
     def __init__(self, num_rows: int, num_variables: int, least_squares: bool = False):
@@ -274,7 +279,9 @@ class LinearSolver:
     def matrix_add(self, row: int, col: int, value: float) -> None:
         FastAPI.lib.solver_matrix_add(self._handle, row, col, value)
 
-    def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int) -> None:
+    def matrix_add_angles(
+        self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int
+    ) -> None:
         FastAPI.lib.solver_matrix_add_angles(self._handle, row, a1, a2, a3, v1_id, v2_id, v3_id)
 
     def right_hand_side_add(self, index: int, value: float) -> None:
@@ -314,12 +321,15 @@ class LinearSolver:
         except Exception:  # noqa
             pass
 
+
 import unittest
+
 
 class TestExtractData(unittest.TestCase):
     @staticmethod
     def get_umesh_with_constraints_and_seams():
         import bmesh
+
         bm = bmesh.new()
 
         v1 = bm.verts.new((0, 1, 0))
@@ -355,11 +365,11 @@ class TestExtractData(unittest.TestCase):
         for crn, uv_co in zip(f4.loops, ((1, 0), (2, 0), (2, 1))):
             crn[uv].uv = uv_co
 
-        V = '10'
-        H = '11'
-        ERR = '01'
+        V = "10"
+        H = "11"
+        ERR = "01"
 
-        atr = bm.edges.layers.int.new('univ_constraints')
+        atr = bm.edges.layers.int.new("univ_constraints")
         f1.edges[0][atr] = int(H + V, 2)
         f1.edges[1][atr] = int(H + H, 2)
         f1.edges[2][atr] = int(ERR, 2)
@@ -385,15 +395,14 @@ class TestExtractData(unittest.TestCase):
 
     def test_extract_data_constraints(self):
 
-
         umesh, attr = self.get_umesh_with_constraints_and_seams()
         varray, harray = ExtractData.extract_constraints_data(umesh, attr)
 
         self.assertEqual(len(varray), 6)
         self.assertEqual(len(harray), 8)
 
-        expect_varray = [[-1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]
-        expect_harray = [[0,0],[1,0], [1,0],[2,0], [0,0],[0,1], [0,1],[0,0]]
+        expect_varray = [[-1, 0], [0, 0], [0, 0], [0, -1], [2, 0], [2, 1]]
+        expect_harray = [[0, 0], [1, 0], [1, 0], [2, 0], [0, 0], [0, 1], [0, 1], [0, 0]]
 
         self.assertEqual(varray.tolist(), expect_varray)
         self.assertEqual(harray.tolist(), expect_harray)
@@ -406,7 +415,7 @@ class TestExtractData(unittest.TestCase):
 
         self.assertEqual(len(data), 14)
 
-        expect_data = [[0,1],[0,0], [0,0],[0,1], [1,0],[2,0], [0,0],[1,0], [1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]
+        expect_data = [[0,1],[0,0], [0,0],[0,1], [1,0],[2,0], [0,0],[1,0], [1,0],[0,0], [0,0],[0,-1], [2,0],[2,1]]  # fmt: skip
         self.assertEqual(data.tolist(), expect_data)
 
         umesh.free()

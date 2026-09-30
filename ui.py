@@ -829,7 +829,7 @@ class UNIV_PT_BatchInspectSettings(Panel):
     bl_category = "UniV"
 
     def draw(self, context):
-        from .operators.inspect import Inspect
+        from .operators.uv_inspect import Inspect
 
         settings = univ_settings()
         flags = settings.batch_inspect_flags

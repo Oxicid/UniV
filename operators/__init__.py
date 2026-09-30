@@ -3,7 +3,7 @@
 
 
 from . import checker
-from . import inspect
+from . import uv_inspect
 from . import mark
 from . import misc
 from . import project

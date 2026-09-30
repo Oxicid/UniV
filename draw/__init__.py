@@ -29,10 +29,12 @@ class DrawerNonSyncSelectProcessing:
         shaders.blend_set_alpha()
         view_3d_theme = bpy.context.preferences.themes[0].view_3d
         shaders.set_point_size(view_3d_theme.vertex_size + 1.0)
-        edge_width = getattr(view_3d_theme, 'edge_width', 1.0) + 1.0
+        edge_width = getattr(view_3d_theme, "edge_width", 1.0) + 1.0
         shaders.set_line_width(edge_width)
 
-        gpu.state.depth_test_set('ALWAYS' if univ_settings().overlay_toggle_xray else 'LESS')  # enable deps-test
+        gpu.state.depth_test_set(
+            "ALWAYS" if univ_settings().overlay_toggle_xray else "LESS"
+        )  # enable deps-test
         gpu.state.depth_mask_set(True)  # write in depth-buffer
 
         if tris_batch:
@@ -49,7 +51,7 @@ class DrawerNonSyncSelectProcessing:
 
             tris_batch.draw(tris_shader)
 
-        gpu.state.depth_test_set('ALWAYS')  # enable deps-test
+        gpu.state.depth_test_set("ALWAYS")  # enable deps-test
         gpu.state.depth_mask_set(True)
         if verts_lines_batch:
             verts_lines_shader.bind()
@@ -57,7 +59,8 @@ class DrawerNonSyncSelectProcessing:
             try:
                 # TODO: Split shaders by elem mode
                 shaders.set_line_width_vk(verts_lines_shader, edge_width)
-            except: pass  # noqa
+            except:
+                pass  # noqa
             rv3d = bpy.context.region_data
 
             with gpu.matrix.push_pop():
@@ -80,24 +83,27 @@ class DrawerNonSyncSelectProcessing:
         verts_lines_batch = None
         tris_batch = None
         match bpy.context.tool_settings.uv_select_mode:
-            case 'VERTEX':
+            case "VERTEX":
                 if verts_lines:
-                    verts_lines_batch = batch_for_shader(verts_lines_shader, 'POINTS', {"pos": verts_lines})
-            case 'EDGE':
+                    verts_lines_batch = batch_for_shader(
+                        verts_lines_shader, "POINTS", {"pos": verts_lines}
+                    )
+            case "EDGE":
                 if verts_lines:
-                    verts_lines_batch = batch_for_shader(verts_lines_shader, 'LINES', {"pos": verts_lines})
+                    verts_lines_batch = batch_for_shader(
+                        verts_lines_shader, "LINES", {"pos": verts_lines}
+                    )
 
         if tris:
-            tris_batch = batch_for_shader(tris_shader, 'TRIS', {"pos": tris, "normal": normals})
+            tris_batch = batch_for_shader(tris_shader, "TRIS", {"pos": tris, "normal": normals})
 
         if verts_lines_batch or tris_batch:
             return verts_lines_batch, tris_batch
         return None
 
-
     @staticmethod
     def get_color():
-        if bpy.context.tool_settings.uv_select_mode == 'VERTEX':
+        if bpy.context.tool_settings.uv_select_mode == "VERTEX":
             return univ_settings().overlay_3d_uv_vert_color
         else:
             return univ_settings().overlay_3d_uv_edge_color
@@ -114,18 +120,24 @@ class DrawerNonSyncSelectProcessing:
                 if draw_call.draw_fn is cls.draw_fn_2d:
                     draw_call.color = cls.get_color()
 
-
     @staticmethod
     def get_shader():
-        if bpy.context.tool_settings.uv_select_mode == 'VERTEX':
-            return shaders.POINT_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
+        if bpy.context.tool_settings.uv_select_mode == "VERTEX":
+            return (
+                shaders.POINT_UNIFORM_COLOR_3D,
+                shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT,
+            )
         else:
-            return shaders.POLYLINE_UNIFORM_COLOR_3D, shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT
+            return (
+                shaders.POLYLINE_UNIFORM_COLOR_3D,
+                shaders.FLAT_SHADING_UNIFORM_COLOR_3D_FOR_UV_FACE_SELECT,
+            )
 
     @staticmethod
     def is_enable():
         try:
             from ..univ_pro import version
+
             return univ_settings().overlay_3d_enable
         except ImportError:
             return False
@@ -158,7 +170,7 @@ class DrawCallSeams2D:
         shaders.blend_set_none()
 
     @classmethod
-    def init(cls, umesh: UMesh) -> 'DrawCallSeams2D | None':
+    def init(cls, umesh: UMesh) -> "DrawCallSeams2D | None":
         if fastapi.FastAPI.lib:
             data = fastapi.ExtractData.extract_seams_data(umesh)
         else:
@@ -168,7 +180,7 @@ class DrawCallSeams2D:
             data = cls.pixelize_seams(data)
 
         if len(data):
-            return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": data}))
+            return cls(batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, "LINES", {"pos": data}))
         return None
 
     @staticmethod
@@ -179,6 +191,7 @@ class DrawCallSeams2D:
     def is_enable():
         try:
             from ..univ_pro import version
+
             return univ_settings().overlay_2d_enable
         except ImportError:
             return False
@@ -190,7 +203,6 @@ class DrawCallSeams2D:
 
         if res > 512:
             return data
-
 
         import numpy as np
         from .. import utils
@@ -299,13 +311,15 @@ class DrawCallConstraints2D:
         shaders.blend_set_none()
 
     @classmethod
-    def init(cls, umesh: UMesh) -> 'DrawCallConstraints2D | None':
-        constraints_attr = umesh.bm.edges.layers.int.get('univ_constraints')
+    def init(cls, umesh: UMesh) -> "DrawCallConstraints2D | None":
+        constraints_attr = umesh.bm.edges.layers.int.get("univ_constraints")
         if not constraints_attr:
             return None
 
         if fastapi.FastAPI.lib:
-            v_coords, h_coords = fastapi.ExtractData.extract_constraints_data(umesh, constraints_attr)
+            v_coords, h_coords = fastapi.ExtractData.extract_constraints_data(
+                umesh, constraints_attr
+            )
         else:
             v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
         if not (len(h_coords) or len(v_coords)):
@@ -315,9 +329,13 @@ class DrawCallConstraints2D:
         v_batch = None
 
         if len(h_coords):
-            h_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": h_coords})
+            h_batch = batch_for_shader(
+                shaders.POLYLINE_UNIFORM_COLOR_2D, "LINES", {"pos": h_coords}
+            )
         if len(v_coords):
-            v_batch = batch_for_shader(shaders.POLYLINE_UNIFORM_COLOR_2D, 'LINES', {"pos": v_coords})
+            v_batch = batch_for_shader(
+                shaders.POLYLINE_UNIFORM_COLOR_2D, "LINES", {"pos": v_coords}
+            )
 
         return cls(h_batch, v_batch)
 
@@ -325,6 +343,7 @@ class DrawCallConstraints2D:
     def is_enable():
         try:
             from .. import univ_pro
+
             return univ_settings().overlay_2d_enable
         except ImportError:
             return False
@@ -342,7 +361,7 @@ class DrawCallConstraints2D:
             for e in umesh.bm.edges:
                 edge_idx = e[attr]
                 if edge_idx:
-                    for crn in getattr(e, 'link_loops', ()):
+                    for crn in getattr(e, "link_loops", ()):
                         bits = edge_idx & 3
 
                         if bits == 2:  # vertical
@@ -358,7 +377,7 @@ class DrawCallConstraints2D:
                 for e in umesh.bm.edges:
                     edge_idx = e[attr]
                     if edge_idx:
-                        for crn in getattr(e, 'link_loops', ()):
+                        for crn in getattr(e, "link_loops", ()):
                             if not crn.face.hide:
                                 bits = edge_idx & 3
 
@@ -375,7 +394,7 @@ class DrawCallConstraints2D:
                 for e in umesh.bm.edges:
                     edge_idx = e[attr]
                     if edge_idx:
-                        for crn in getattr(e, 'link_loops', ()):
+                        for crn in getattr(e, "link_loops", ()):
                             if crn.face.select:
                                 bits = edge_idx & 3
 
@@ -437,6 +456,7 @@ class TrimDrawer:
             tris_opacity = pref.trim_tris_opacity
 
             from .. import utils
+
             aspect = utils.get_aspect_ratio()
             aspect_x = min(1.0, 1.0 / aspect)
             aspect_y = min(1.0, aspect)
@@ -459,16 +479,20 @@ class TrimDrawer:
                         boxes_lines.append(center - Vector((0, off_y)))
                         boxes_lines.append(center + Vector((0, off_y)))
 
-                        boxes_lines_colors.extend([[*trim.color, line_opacity+0.3]] * 12)
-                        boxes_tris_color.extend([[*trim.color, tris_opacity+0.15]] * 6)
+                        boxes_lines_colors.extend([[*trim.color, line_opacity + 0.3]] * 12)
+                        boxes_tris_color.extend([[*trim.color, tris_opacity + 0.15]] * 6)
                     else:
                         boxes_lines_colors.extend([[*trim.color, line_opacity]] * 8)
                         boxes_tris_color.extend([[*trim.color, tris_opacity]] * 6)
 
         if cls.line_shader is None:
             cls.tris_shader, cls.line_shader = cls.get_shader()
-        cls.batch_lines = batch_for_shader(cls.line_shader, 'LINES', {"pos": boxes_lines, 'color': boxes_lines_colors})
-        cls.batch_tris = batch_for_shader(cls.tris_shader, 'TRIS', {"pos": boxes_tris, 'color': boxes_tris_color})
+        cls.batch_lines = batch_for_shader(
+            cls.line_shader, "LINES", {"pos": boxes_lines, "color": boxes_lines_colors}
+        )
+        cls.batch_tris = batch_for_shader(
+            cls.tris_shader, "TRIS", {"pos": boxes_tris, "color": boxes_tris_color}
+        )
 
     @staticmethod
     def get_shader():
@@ -478,13 +502,14 @@ class TrimDrawer:
     def is_enable():
         try:
             from .. import univ_pro
+
             return univ_settings().use_trims
         except ImportError:
             return False
 
     @staticmethod
     def univ_drawer_2d_callback():
-        if bpy.context.area.ui_type == 'UV':
+        if bpy.context.area.ui_type == "UV":
             line_width = prefs().trim_line_width
 
             shaders.blend_set_alpha()
@@ -506,13 +531,14 @@ class TrimDrawer:
         if cls.is_enable():
             cls.data_to_batch()
             cls.handler = bpy.types.SpaceImageEditor.draw_handler_add(
-                cls.univ_drawer_2d_callback, (), 'WINDOW', 'POST_VIEW')
+                cls.univ_drawer_2d_callback, (), "WINDOW", "POST_VIEW"
+            )
 
     @classmethod
     def unregister(cls):
         if cls.handler:
             try:
-                bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, 'WINDOW')
+                bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, "WINDOW")
             except Exception as e:
                 print(e)
 
@@ -524,7 +550,8 @@ class TrimDrawer:
             TrimDrawer.register()
         except Exception as e:
             import traceback
-            print('UniV: Failed to add a handler for Drawer2D system.', e)
+
+            print("UniV: Failed to add a handler for Drawer2D system.", e)
             traceback.print_exc()
 
 
@@ -594,22 +621,28 @@ class DrawerSubscribeRNA:
 
 
 if bpy.app.version >= (4, 2, 0):
+
     def has_crash_modal_running():
         """Built-in Blender modal operators cause crashes, so we stop drawing elements while they are being executed."""
         for window in bpy.context.window_manager.windows:
             for op in window.modal_operators:
                 idname = op.bl_idname
-                if not idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
-                    if idname not in (prop.idname for prop in prefs().excluded_operators_for_overlay):
+                if not idname.startswith(("UV_OT_univ_", "WM_OT_sk_screencast_keys")):
+                    if idname not in (
+                        prop.idname for prop in prefs().excluded_operators_for_overlay
+                    ):
                         return idname
         return None
+
 else:
+
     def has_crash_modal_running():
         # In older versions, modal operators cannot be selectively excluded,
         # so any modal operator interrupts drawing.
 
         from .. import btypes
         from ctypes import cast, addressof, POINTER
+
         WM_HANDLER_TYPE_OP = 3
         handler_base: btypes.wmEventHandler
         handle: btypes.wmEventHandler_Op
@@ -618,13 +651,18 @@ else:
             win = btypes.wmWindow.get_fields(window)
             for handler_base in win.modalhandlers:
                 if handler_base.type == WM_HANDLER_TYPE_OP:
-                    handle = cast(addressof(handler_base), POINTER(btypes.wmEventHandler_Op)).contents
+                    handle = cast(
+                        addressof(handler_base), POINTER(btypes.wmEventHandler_Op)
+                    ).contents
                     op = handle.op.contents
                     idname = op.idname.decode("utf-8", errors="replace")
-                    if not idname.startswith(('UV_OT_univ_', 'WM_OT_sk_screencast_keys')):
-                        if idname not in (prop.idname for prop in prefs().excluded_operators_for_overlay):
+                    if not idname.startswith(("UV_OT_univ_", "WM_OT_sk_screencast_keys")):
+                        if idname not in (
+                            prop.idname for prop in prefs().excluded_operators_for_overlay
+                        ):
                             return idname
         return False
+
 
 @bpy.app.handlers.persistent
 def univ_drawer_update_tracker(_, deps):
@@ -634,7 +672,7 @@ def univ_drawer_update_tracker(_, deps):
     if not draw_objects_2d and not draw_objects_3d:
         return
 
-    if bpy.context.mode != 'EDIT_MESH':
+    if bpy.context.mode != "EDIT_MESH":
         Drawer2D.dirt = True
         Drawer3D.dirt = True
         draw_objects_2d.clear()
@@ -642,6 +680,7 @@ def univ_drawer_update_tracker(_, deps):
         return
 
     from bpy.types import Object
+
     for update_obj in deps.updates:
         obj = update_obj.id
         if type(obj) == Object:
@@ -650,20 +689,24 @@ def univ_drawer_update_tracker(_, deps):
             obj_name = obj.name
             try:
                 del draw_objects_2d[obj_name]
-            except: pass # noqa
+            except:
+                pass  # noqa
 
             try:
                 del draw_objects_3d[obj_name]
-            except: pass # noqa
+            except:
+                pass  # noqa
 
             if not draw_objects_2d and not draw_objects_3d:
                 return
+
 
 def has_update_tracker():
     for update_handler in bpy.app.handlers.depsgraph_update_post:
         if update_handler.__name__ == univ_drawer_update_tracker.__name__:
             return True
     return False
+
 
 def safe_remove_update_tracker():
     if univ_settings().overlay_2d_enable or univ_settings().overlay_3d_enable:
@@ -694,10 +737,9 @@ class Drawer2D:
         cls.draw_objects.clear()
         cls.drawers = drawers
 
-
     @classmethod
     def update(cls):
-        if bpy.context.mode != 'EDIT_MESH':
+        if bpy.context.mode != "EDIT_MESH":
             cls.dirt = True
             return
 
@@ -717,7 +759,9 @@ class Drawer2D:
             cls.dirt = True
             return
 
-        unique_objects_with_uv = [obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers]
+        unique_objects_with_uv = [
+            obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers
+        ]
         for obj in unique_objects_with_uv:
             obj_id = obj.name
             if obj_id not in draw_objects:
@@ -740,10 +784,9 @@ class Drawer2D:
 
         cls.dirt = False
 
-
     @staticmethod
     def univ_drawer_2d_callback():
-        if bpy.context.area.ui_type == 'UV':
+        if bpy.context.area.ui_type == "UV":
             Drawer2D.update()
 
             for draw_calls_seq in Drawer2D.draw_objects.values():
@@ -756,7 +799,8 @@ class Drawer2D:
         if univ_settings().overlay_2d_enable:
             Drawer2D.update_drawer_data()
             cls.handler = bpy.types.SpaceImageEditor.draw_handler_add(
-                cls.univ_drawer_2d_callback, (), 'WINDOW', 'POST_VIEW')
+                cls.univ_drawer_2d_callback, (), "WINDOW", "POST_VIEW"
+            )
 
             if not has_update_tracker():
                 bpy.app.handlers.depsgraph_update_post.append(univ_drawer_update_tracker)
@@ -767,7 +811,7 @@ class Drawer2D:
     def unregister(cls):
         if cls.handler:
             try:
-                bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, 'WINDOW')
+                bpy.types.SpaceImageEditor.draw_handler_remove(cls.handler, "WINDOW")
             except Exception as e:
                 print(e)
 
@@ -784,11 +828,13 @@ class Drawer2D:
     def append_handler_with_delay():
         try:
             from ..preferences import univ_settings
+
             if univ_settings().overlay_2d_enable:
                 Drawer2D.register()
         except Exception as e:
             import traceback
-            print('UniV: Failed to add a handler for Drawer2D system.', e)
+
+            print("UniV: Failed to add a handler for Drawer2D system.", e)
             traceback.print_exc()
 
     @staticmethod
@@ -803,7 +849,7 @@ class Drawer2D:
         if cls.dirt:
             return
 
-        if bpy.context.mode != 'EDIT_MESH':
+        if bpy.context.mode != "EDIT_MESH":
             return
 
         for obj in bpy.context.objects_in_mode_unique_data:
@@ -821,6 +867,7 @@ class Drawer2D:
         finally:
             cls.frozen = False
 
+
 class Drawer3D:
     draw_objects: dict[str, list[DrawCall3D]] = {}
     drawers = []
@@ -830,11 +877,11 @@ class Drawer3D:
     handler = None
     sync = True
     frozen = False
-    uv_select_mode = ''
+    uv_select_mode = ""
 
     prev_operators_size = 0
-    first_operator_bl_idname = ''
-    last_operator_bl_idname = ''
+    first_operator_bl_idname = ""
+    last_operator_bl_idname = ""
 
     @classmethod
     def update_drawer_data(cls):
@@ -843,8 +890,18 @@ class Drawer3D:
         mesh_extractors_with_batch = []
         if True:  # if seam
             drawers.append(DrawerNonSyncSelectProcessing.draw_fn_2d)
-            shaders_with_color.append((DrawerNonSyncSelectProcessing.get_shader(), DrawerNonSyncSelectProcessing.get_color()))
-            mesh_extractors_with_batch.append((mesh_extract.extract_non_sync_select_data, DrawerNonSyncSelectProcessing.data_to_batch))
+            shaders_with_color.append(
+                (
+                    DrawerNonSyncSelectProcessing.get_shader(),
+                    DrawerNonSyncSelectProcessing.get_color(),
+                )
+            )
+            mesh_extractors_with_batch.append(
+                (
+                    mesh_extract.extract_non_sync_select_data,
+                    DrawerNonSyncSelectProcessing.data_to_batch,
+                )
+            )
 
         cls.dirt = True
         cls.draw_objects.clear()
@@ -863,14 +920,14 @@ class Drawer3D:
             if operators_size >= 2:
                 cls.last_operator_bl_idname = operators[-1].bl_idname
             else:
-                cls.last_operator_bl_idname = ''
+                cls.last_operator_bl_idname = ""
         else:
-            cls.first_operator_bl_idname = ''
-            cls.last_operator_bl_idname = ''
+            cls.first_operator_bl_idname = ""
+            cls.last_operator_bl_idname = ""
 
     @classmethod
     def update(cls):
-        if bpy.context.mode != 'EDIT_MESH':
+        if bpy.context.mode != "EDIT_MESH":
             cls.dirt = True
             return
 
@@ -880,7 +937,10 @@ class Drawer3D:
             cls.draw_objects.clear()
 
         if bpy.context.tool_settings.uv_select_mode != cls.uv_select_mode:
-            if bpy.context.tool_settings.uv_select_mode == 'FACE' and cls.uv_select_mode == 'ISLAND':
+            if (
+                bpy.context.tool_settings.uv_select_mode == "FACE"
+                and cls.uv_select_mode == "ISLAND"
+            ):
                 cls.uv_select_mode = bpy.context.tool_settings.uv_select_mode
             else:
                 cls.update_drawer_data()
@@ -896,7 +956,9 @@ class Drawer3D:
         if not cls.dirt:
             return
 
-        unique_objects_with_uv = [obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers]
+        unique_objects_with_uv = [
+            obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers
+        ]
         for obj in unique_objects_with_uv:
             obj_id = obj.name
             if obj_id not in draw_objects:
@@ -905,9 +967,13 @@ class Drawer3D:
                 world_matrix = umesh.obj.matrix_world.copy()
 
                 draw_calls_seq = []
-                for drawer, (shader, color), (extract, to_batch) in zip(cls.drawers, cls.shaders_with_color, cls.mesh_extractors_with_batch):
+                for drawer, (shader, color), (extract, to_batch) in zip(
+                    cls.drawers, cls.shaders_with_color, cls.mesh_extractors_with_batch
+                ):
                     data = extract(umesh)
-                    draw_call = DrawCall3D(drawer, shader, color, to_batch(data, shader), world_matrix)
+                    draw_call = DrawCall3D(
+                        drawer, shader, color, to_batch(data, shader), world_matrix
+                    )
                     draw_calls_seq.append(draw_call)
 
                 draw_objects[obj_id] = draw_calls_seq
@@ -921,7 +987,8 @@ class Drawer3D:
 
         cls.dirt = False
         from .. import utils
-        utils.update_area_by_type('VIEW_3D')
+
+        utils.update_area_by_type("VIEW_3D")
 
     @classmethod
     def detect_update(cls):
@@ -935,21 +1002,23 @@ class Drawer3D:
                 cls.last_operator_bl_idname = operators[-1].bl_idname
                 cls.first_operator_bl_idname = operators[0].bl_idname
             else:
-                cls.last_operator_bl_idname = ''
-                cls.first_operator_bl_idname = ''
+                cls.last_operator_bl_idname = ""
+                cls.first_operator_bl_idname = ""
             return False
 
         last_operator_bl_idname = operators[-1].bl_idname
         if cls.prev_operators_size != operators_size:
             cls.prev_operators_size = operators_size
             # Skip non-uv select operators
-            if (not last_operator_bl_idname.startswith('UV_OT') or
-                    last_operator_bl_idname.startswith('UV_OT_univ_') or
-                    'select' not in last_operator_bl_idname):
+            if (
+                not last_operator_bl_idname.startswith("UV_OT")
+                or last_operator_bl_idname.startswith("UV_OT_univ_")
+                or "select" not in last_operator_bl_idname
+            ):
                 # NOTE: Control update UniV operators manually
                 cls.last_operator_bl_idname = last_operator_bl_idname
                 if operators_size == 1:
-                    cls.first_operator_bl_idname = ''
+                    cls.first_operator_bl_idname = ""
                 return False
             return True
 
@@ -960,13 +1029,14 @@ class Drawer3D:
 
         else:
             first_operator_bl_idname = operators[0].bl_idname
-            if (cls.last_operator_bl_idname != last_operator_bl_idname and
-                cls.first_operator_bl_idname != first_operator_bl_idname):
+            if (
+                cls.last_operator_bl_idname != last_operator_bl_idname
+                and cls.first_operator_bl_idname != first_operator_bl_idname
+            ):
                 cls.last_operator_bl_idname = last_operator_bl_idname
                 cls.first_operator_bl_idname = first_operator_bl_idname
                 return True
         return False
-
 
     @staticmethod
     def univ_drawer_3d_callback():
@@ -976,15 +1046,15 @@ class Drawer3D:
             Drawer3D.draw_objects.clear()
             return
 
-        if not any(area.ui_type == 'UV'
-                   for win in ctx.window_manager.windows
-                   for area in win.screen.areas):
+        if not any(
+            area.ui_type == "UV" for win in ctx.window_manager.windows for area in win.screen.areas
+        ):
             Drawer3D.dirt = True
             Drawer3D.draw_objects.clear()
             return
 
         if not ctx.space_data.overlay.show_overlays:
-            return 
+            return
 
         Drawer3D.update()
 
@@ -999,8 +1069,9 @@ class Drawer3D:
             cls.sync = bpy.context.tool_settings.use_uv_select_sync
             cls.uv_select_mode = bpy.context.tool_settings.uv_select_mode
             Drawer3D.update_drawer_data()
-            cls.handler =  bpy.types.SpaceView3D.draw_handler_add(
-                cls.univ_drawer_3d_callback, (), 'WINDOW', 'POST_VIEW')
+            cls.handler = bpy.types.SpaceView3D.draw_handler_add(
+                cls.univ_drawer_3d_callback, (), "WINDOW", "POST_VIEW"
+            )
 
             if not has_update_tracker():
                 bpy.app.handlers.depsgraph_update_post.append(univ_drawer_update_tracker)
@@ -1009,7 +1080,7 @@ class Drawer3D:
     def unregister(cls):
         if cls.handler:
             try:
-                bpy.types.SpaceView3D.draw_handler_remove(cls.handler, 'WINDOW')
+                bpy.types.SpaceView3D.draw_handler_remove(cls.handler, "WINDOW")
             except Exception as e:
                 print(e)
 
@@ -1023,17 +1094,19 @@ class Drawer3D:
         cls.dirt = True
         cls.frozen = False
         cls.handler = None
-        cls.uv_select_mode = ''
+        cls.uv_select_mode = ""
 
     @staticmethod
     def append_handler_with_delay():
         try:
             from ..preferences import univ_settings
+
             if univ_settings().overlay_3d_enable:
                 Drawer3D.register()
         except Exception as e:
             import traceback
-            print('UniV: Failed to add a handler for Drawer2D system.', e)
+
+            print("UniV: Failed to add a handler for Drawer2D system.", e)
             traceback.print_exc()
 
     @staticmethod

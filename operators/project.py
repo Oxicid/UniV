@@ -21,37 +21,45 @@ class UNIV_OT_Normal(bpy.types.Operator):
     bl_idname = "mesh.univ_normal"
     bl_label = "Normal"
     bl_description = "Projection by faces normal.\n\nShift - Individual"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    crop: BoolProperty(name='Crop', default=True,
-                                 description='Packs the islands into a base tile, for performance purposes, does so with uncritical inaccuracy')
-    orient: BoolProperty(name='Orient 2D', default=True)
-    individual: BoolProperty(name='Individual', default=False, description='Individual by Island Meshes')
-    mark_seam: BoolProperty(name='Mark Seam', default=True)
-    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True,
-                                               description='Gets Aspect Correct from the active image from the shader node editor')
+    crop: BoolProperty(
+        name="Crop",
+        default=True,
+        description="Packs the islands into a base tile, for performance purposes, does so with uncritical inaccuracy",
+    )
+    orient: BoolProperty(name="Orient 2D", default=True)
+    individual: BoolProperty(
+        name="Individual", default=False, description="Individual by Island Meshes"
+    )
+    mark_seam: BoolProperty(name="Mark Seam", default=True)
+    use_correct_aspect: BoolProperty(
+        name="Correct Aspect",
+        default=True,
+        description="Gets Aspect Correct from the active image from the shader node editor",
+    )
 
     def draw(self, context):
         col = self.layout.column(align=True)
         if not prefs().use_texel:
-            col.prop(self, 'crop')
-        col.prop(self, 'orient')
-        col.prop(self, 'individual')
-        col.prop(self, 'mark_seam')
+            col.prop(self, "crop")
+        col.prop(self, "orient")
+        col.prop(self, "individual")
+        col.prop(self, "mark_seam")
 
         col.separator()
-        col.prop(prefs(), 'use_texel')
-        col.prop(self, 'use_correct_aspect')
+        col.prop(prefs(), "use_texel")
+        col.prop(self, "use_correct_aspect")
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
+        if event.value == "PRESS":
             return self.execute(context)
         self.individual = event.shift
         return self.execute(context)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.info = 'No found faces for manipulate'
+        self.info = "No found faces for manipulate"
         self.has_selected: bool = True
 
     def execute(self, context):
@@ -128,7 +136,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
 
         if prefs().use_texel:
             td_scale = utils.get_scale_from_texel()
-            mtx = mtx @ Matrix.Diagonal([td_scale]*3).to_4x4()
+            mtx = mtx @ Matrix.Diagonal([td_scale] * 3).to_4x4()
 
         points = []
         points_append = points.append
@@ -180,7 +188,9 @@ class UNIV_OT_Normal(bpy.types.Operator):
                 src_bb = bbox
 
             tar_bb = BBox.from_center((0.5, 0.5))
-            scale, delta, pivot = utils.get_transform_from_box(src_bb, tar_bb, axis='XY', pad=pad, use_crop=True)
+            scale, delta, pivot = utils.get_transform_from_box(
+                src_bb, tar_bb, axis="XY", pad=pad, use_crop=True
+            )
             island.umesh.update_tag |= island.scale_with_move(scale, delta, pivot)
 
     def avg_normal_and_calc_faces_individual(self, umeshes: UMeshes):
@@ -249,35 +259,41 @@ class UNIV_OT_Normal(bpy.types.Operator):
 
         return eul.to_matrix().to_4x4()
 
+
 # noinspection PyTypeHints
 class UNIV_OT_BoxProject(bpy.types.Operator):
     bl_idname = "mesh.univ_box_project"
     bl_label = "Box"
     bl_description = "Box Projection"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    scale: FloatProperty(name='Scale', default=1, soft_min=0.5, soft_max=2)
-    scale_individual: FloatVectorProperty(name='Scale Individual', default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2)
-    rotation: FloatVectorProperty(name='Rotate', subtype='EULER', soft_min=-pi, soft_max=pi)
-    move: FloatVectorProperty(name='Move', subtype='XYZ')
-    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True,
-                                               description='Gets Aspect Correct from the active image from the shader node editor')
-    avoid_flip: BoolProperty(name='Avoid Flip', default=True)
+    scale: FloatProperty(name="Scale", default=1, soft_min=0.5, soft_max=2)
+    scale_individual: FloatVectorProperty(
+        name="Scale Individual", default=(1.0, 1.0, 1.0), soft_min=0.5, soft_max=2
+    )
+    rotation: FloatVectorProperty(name="Rotate", subtype="EULER", soft_min=-pi, soft_max=pi)
+    move: FloatVectorProperty(name="Move", subtype="XYZ")
+    use_correct_aspect: BoolProperty(
+        name="Correct Aspect",
+        default=True,
+        description="Gets Aspect Correct from the active image from the shader node editor",
+    )
+    avoid_flip: BoolProperty(name="Avoid Flip", default=True)
 
     def draw(self, context):
-        self.layout.prop(self, 'scale', slider=True)
+        self.layout.prop(self, "scale", slider=True)
         col = self.layout.column(align=True)
-        col.prop(self, 'scale_individual', expand=True, slider=True)
-        col.prop(self, 'rotation', expand=True, slider=True)
-        col.prop(self, 'move', expand=True)
-        col.prop(self, 'avoid_flip')
+        col.prop(self, "scale_individual", expand=True, slider=True)
+        col.prop(self, "rotation", expand=True, slider=True)
+        col.prop(self, "move", expand=True)
+        col.prop(self, "avoid_flip")
         col.separator()
-        col.prop(prefs(), 'use_texel')
-        col.prop(self, 'use_correct_aspect')
+        col.prop(prefs(), "use_texel")
+        col.prop(self, "use_correct_aspect")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.is_edit_mode: bool = bpy.context.mode == 'EDIT_MESH'
+        self.is_edit_mode: bool = bpy.context.mode == "EDIT_MESH"
         self.has_selected: bool = True
 
     def execute(self, context):
@@ -292,8 +308,8 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
                 umeshes = visible
                 self.has_selected = False
             else:
-                self.report({'WARNING'}, 'Not found faces for manipulate')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Not found faces for manipulate")
+                return {"CANCELLED"}
         info = "No faces for manipulate"
         if not umeshes:
             return umeshes.update(info=info)
@@ -308,8 +324,8 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
             umeshes.free()
             bpy.context.area.tag_redraw()
         else:
-            umeshes.update(info='Not selected face')
-        return {'FINISHED'}
+            umeshes.update(info="Not selected face")
+        return {"FINISHED"}
 
     def box(self, umeshes):
         for umesh in umeshes:
@@ -344,7 +360,9 @@ class UNIV_OT_BoxProject(bpy.types.Operator):
         return mtx_x, mtx_y, mtx_z, r
 
     def get_aspect_matrix(self, umesh):
-        aspect = (utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0)  # TODO: Compute aspects in execute
+        aspect = (
+            utils.get_aspect_ratio(umesh) if self.use_correct_aspect else 1.0
+        )  # TODO: Compute aspects in execute
         if aspect >= 1.0:
             aspect_x_mtx = Matrix.Diagonal((1, 1 / aspect, 1))
             aspect_y_mtx = Matrix.Diagonal((1 / aspect, 1, 1))
@@ -426,8 +444,8 @@ class ProjCameraInfo:
     def uv_project_camera_info(cls, ob: bpy.types.Object, rot_mat, winx, winy):
         uci = cls()
         camera: bpy.types.Camera = ob.data
-        uci.do_pano = camera.type == 'PANO'
-        uci.do_persp = camera.type == 'PERSP'
+        uci.do_pano = camera.type == "PANO"
+        uci.do_persp = camera.type == "PERSP"
         uci.cam_angle = cls.focal_length_to_fov(camera.lens, camera.sensor_width) / 2.0
         uci.cam_size = math.tan(uci.cam_angle) if uci.do_persp else camera.ortho_scale
 
@@ -459,29 +477,32 @@ class ProjCameraInfo:
     def focal_length_to_fov(focal_length: float, sensor: float):
         return 2.0 * math.atan((sensor / 2.0) / focal_length)
 
+
 # noinspection PyTypeHints
 class UNIV_OT_ViewProject(bpy.types.Operator):
     bl_idname = "mesh.univ_view_project"
     bl_label = "View"
     bl_description = "Projection by View"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    camera_bounds: BoolProperty(name='Camera Bounds', default=False)
-    use_crop: BoolProperty(name='Crop', default=True, description='Packs the islands into a base tile')
-    use_orthographic: BoolProperty(name='Use Orthographic', default=False)
-    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
+    camera_bounds: BoolProperty(name="Camera Bounds", default=False)
+    use_crop: BoolProperty(
+        name="Crop", default=True, description="Packs the islands into a base tile"
+    )
+    use_orthographic: BoolProperty(name="Use Orthographic", default=False)
+    use_correct_aspect: BoolProperty(name="Correct Aspect", default=True)
 
     def draw(self, context):
         layout = self.layout
         if not self.use_orthographic and self.camera:
-            layout.prop(self, 'camera_bounds')
-        layout.prop(self, 'use_crop')
-        layout.prop(self, 'use_orthographic')
-        layout.prop(self, 'use_correct_aspect')
+            layout.prop(self, "camera_bounds")
+        layout.prop(self, "use_crop")
+        layout.prop(self, "use_orthographic")
+        layout.prop(self, "use_correct_aspect")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.info = 'No found faces for manipulate'
+        self.info = "No found faces for manipulate"
         self.has_selected: bool = True
         self.region = None
         self.area = None
@@ -496,14 +517,14 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         umeshes.sync_invalidate()
 
         self.area = context.area
-        if self.area.type != 'VIEW_3D':
-            self.area = utils.get_area_by_type('VIEW_3D')
+        if self.area.type != "VIEW_3D":
+            self.area = utils.get_area_by_type("VIEW_3D")
             if not self.area:
-                self.report({'WARNING'}, 'Active area must be 3D View')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Active area must be 3D View")
+                return {"CANCELLED"}
 
         self.v3d = self.area.spaces.active
-        self.region = next(reg for reg in self.area.regions if reg.type == 'WINDOW')
+        self.region = next(reg for reg in self.area.regions if reg.type == "WINDOW")
         self.rv3d = self.region.data
         self.camera = utils.get_view3d_camera_data(self.v3d, self.rv3d)  # noqa
 
@@ -566,7 +587,8 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
                     self.v3d.camera,
                     umesh.obj.matrix_world,
                     (r.resolution_x * r.pixel_aspect_x) * 2 if self.camera_bounds else 1.0,
-                    (r.resolution_y * r.pixel_aspect_y) * 2 if self.camera_bounds else 1.0)
+                    (r.resolution_y * r.pixel_aspect_y) * 2 if self.camera_bounds else 1.0,
+                )
                 if uci:
                     for f in self.faces_calc_type(umesh):
                         for crn in f.loops:
@@ -574,7 +596,7 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
                             coords_append(crn_co)
                             self.uv_project_from_camera(crn_co, crn.vert.co, uci)
                 else:
-                    self.report({'WARNING'}, 'Not found camera info')
+                    self.report({"WARNING"}, "Not found camera info")
                     return
             else:
 
@@ -586,7 +608,9 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
                     for crn in f.loops:
                         crn_co = crn[uv].uv
                         coords_append(crn_co)
-                        self.uv_project_from_view(crn_co, crn.vert.co, pers_mat, rot_mat, winx, winy)
+                        self.uv_project_from_view(
+                            crn_co, crn.vert.co, pers_mat, rot_mat, winx, winy
+                        )
         if self.use_crop:
             self.crop(pointers_to_coords)
 
@@ -623,7 +647,9 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         target[0] = (x + target[0]) / winx
         target[1] = (y + target[1]) / winy
 
-    def uv_map_rotation_matrix_ex(self, umesh, up_angle_deg=90.0, side_angle_deg=0.0, radius=1.0, aspect=1.0):
+    def uv_map_rotation_matrix_ex(
+        self, umesh, up_angle_deg=90.0, side_angle_deg=0.0, radius=1.0, aspect=1.0
+    ):
         # get rotation of the current view matrix
         view_matrix = self.rv3d.view_matrix.copy()
         view_matrix[3] = [0] * 4  # but shifting
@@ -662,8 +688,8 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
         if aspect < 1:
             aspect_mtx = Matrix.Diagonal((1, aspect, 1)).to_4x4()
         else:
-            aspect_mtx = Matrix.Diagonal((1/aspect, 1, 1)).to_4x4()
-        return rot_up  @ aspect_mtx @ rot_side  @ view_matrix   @ rot_obj
+            aspect_mtx = Matrix.Diagonal((1 / aspect, 1, 1)).to_4x4()
+        return rot_up @ aspect_mtx @ rot_side @ view_matrix @ rot_obj
 
     @staticmethod
     def uv_project_from_camera(target: Vector, source: Vector, uci: ProjCameraInfo):
@@ -725,16 +751,18 @@ class UNIV_OT_ViewProject(bpy.types.Operator):
             co *= scale
             co += diff
 
+
 # noinspection PyTypeHints
 class UNIV_OT_SmartProject(bpy.types.Operator):
-    bl_idname = 'mesh.univ_smart_project'
-    bl_label = 'Smart'
-    bl_description = 'Smart Projection'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = "mesh.univ_smart_project"
+    bl_label = "Smart"
+    bl_description = "Smart Projection"
+    bl_options = {"REGISTER", "UNDO"}
 
-    add_padding: IntProperty(name='Additional Padding', default=0, min=-16, max=16, subtype='PIXEL')
-    angle_limit: FloatProperty(name='Angle', default=math.radians(66), min=0, max=pi/2, subtype='ANGLE')
-
+    add_padding: IntProperty(name="Additional Padding", default=0, min=-16, max=16, subtype="PIXEL")
+    angle_limit: FloatProperty(
+        name="Angle", default=math.radians(66), min=0, max=pi / 2, subtype="ANGLE"
+    )
 
     def invoke(self, context, event):
         settings = univ_settings()
@@ -744,10 +772,10 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         pad = univ_settings().padding
-        layout.label(text=f'Texture Size: {self.texture_size}')
-        layout.label(text=f'Padding: {int(clamp(pad + self.add_padding, 0, 100))} ({pad})')
-        layout.prop(self, 'add_padding', slider=True)
-        layout.prop(self, 'angle_limit', slider=True)
+        layout.label(text=f"Texture Size: {self.texture_size}")
+        layout.label(text=f"Padding: {int(clamp(pad + self.add_padding, 0, 100))} ({pad})")
+        layout.prop(self, "add_padding", slider=True)
+        layout.prop(self, "angle_limit", slider=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -756,15 +784,17 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
     def execute(self, context):
         settings = univ_settings()
         kwargs = {
-            'angle_limit': self.angle_limit,
-            'margin_method': 'FRACTION',
-            'island_margin': int(clamp(settings.padding + self.add_padding, 0, 100)) / 2 / self.texture_size,
-            'area_weight': 0,
-            'correct_aspect': True,
-            'scale_to_bounds': False,
+            "angle_limit": self.angle_limit,
+            "margin_method": "FRACTION",
+            "island_margin": int(clamp(settings.padding + self.add_padding, 0, 100))
+            / 2
+            / self.texture_size,
+            "area_weight": 0,
+            "correct_aspect": True,
+            "scale_to_bounds": False,
         }
         # TODO: Add normalize and correct aspect by modifier
-        if context.mode == 'EDIT_MESH':
+        if context.mode == "EDIT_MESH":
             umeshes = utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False)
             umeshes.fix_context()
             umeshes.set_sync()
@@ -781,82 +811,81 @@ class UNIV_OT_SmartProject(bpy.types.Operator):
             elif unselected:
                 for umesh in unselected:
                     umesh.check_uniform_scale(report=self.report)
-                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.select_all(action="SELECT")
                 bpy.ops.uv.smart_project(**kwargs)
-                bpy.ops.mesh.select_all(action='DESELECT')
+                bpy.ops.mesh.select_all(action="DESELECT")
             else:
-                self.report({'WARNING'}, 'Not found faces')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Not found faces")
+                return {"CANCELLED"}
         else:
             meshes = utils.calc_any_unique_obj()
             if not any(obj.data.polygons for obj in meshes):
-                self.report({'WARNING'}, 'Not found faces')
-                return {'CANCELLED'}
+                self.report({"WARNING"}, "Not found faces")
+                return {"CANCELLED"}
 
-            if not context.active_object or context.active_object.type != 'MESH':
+            if not context.active_object or context.active_object.type != "MESH":
                 for obj in meshes:
                     bpy.context.view_layer.objects.active = obj
                     break
 
-
-            bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+            bpy.ops.object.mode_set(mode="EDIT", toggle=False)
             for umesh in utypes.UMeshes.calc_with_no_uv(self.report, verify_uv=False):
                 umesh.check_uniform_scale(report=self.report)
 
             bpy.ops.mesh.reveal(select=True)
-            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.select_all(action="SELECT")
             bpy.ops.uv.smart_project(**kwargs)
             bpy.ops.object.editmode_toggle()
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 # noinspection PyTypeHints
 class UNIV_OT_Flatten(bpy.types.Operator):
-    bl_idname = 'mesh.univ_flatten'
-    bl_label = 'Flatten'
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Convert 3d coords to 2D from uv map\n\n" \
-                     "Context keymaps on button:\n" \
-                     "\t\tDefault - Mesh\n" \
-                     "\t\tShift - Shape Keys\n" \
-                     "\t\tAlt - Modifier" \
+    bl_idname = "mesh.univ_flatten"
+    bl_label = "Flatten"
+    bl_options = {"REGISTER", "UNDO"}
+    bl_description = (
+        "Convert 3d coords to 2D from uv map\n\n"
+        "Context keymaps on button:\n"
+        "\t\tDefault - Mesh\n"
+        "\t\tShift - Shape Keys\n"
+        "\t\tAlt - Modifier"
+    )
+    axis: EnumProperty(
+        name="Axis", default="z", items=(("z", "Bottom", ""), ("y", "Side", ""), ("x", "Front", ""))
+    )
 
-    axis: EnumProperty(name="Axis", default='z', items=(
-        ('z', 'Bottom', ''),
-        ('y', 'Side', ''),
-        ('x', 'Front', '')))
-
-    flatten_type: EnumProperty(name="Flatten Type", default='MESH', items=(
-                                    ('MESH', 'Mesh', ''),
-                                    ('SHAPE_KEY', 'Shape Key', ''),
-                                    ('MODIFIER', 'Modifier', '')))
-    use_correct_aspect: BoolProperty(name='Correct Aspect', default=True)
-    mix_factor: FloatProperty(name='Mix Factor', default=1, min=0, max=1)
-    weld_distance: FloatProperty(name='Weld Distance', default=0.00001, min=0)
-
+    flatten_type: EnumProperty(
+        name="Flatten Type",
+        default="MESH",
+        items=(("MESH", "Mesh", ""), ("SHAPE_KEY", "Shape Key", ""), ("MODIFIER", "Modifier", "")),
+    )
+    use_correct_aspect: BoolProperty(name="Correct Aspect", default=True)
+    mix_factor: FloatProperty(name="Mix Factor", default=1, min=0, max=1)
+    weld_distance: FloatProperty(name="Weld Distance", default=0.00001, min=0)
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
+        if event.value == "PRESS":
             return self.execute(context)
 
         if event.alt:
-            self.flatten_type = 'MODIFIER'
+            self.flatten_type = "MODIFIER"
         elif event.shift:
-            self.flatten_type = 'SHAPE_KEY'
+            self.flatten_type = "SHAPE_KEY"
         else:
-            self.flatten_type = 'MESH'
+            self.flatten_type = "MESH"
 
         return self.execute(context)
 
     def draw(self, context):
         layout = self.layout
-        layout.row(align=True).prop(self, 'axis', expand=True)
-        layout.prop(self, 'use_correct_aspect')
-        if self.flatten_type == 'MODIFIER':
-            layout.prop(self, 'mix_factor')
-            layout.prop(self, 'weld_distance')
-        layout.row(align=True).prop(self, 'flatten_type', expand=True)
+        layout.row(align=True).prop(self, "axis", expand=True)
+        layout.prop(self, "use_correct_aspect")
+        if self.flatten_type == "MODIFIER":
+            layout.prop(self, "mix_factor")
+            layout.prop(self, "weld_distance")
+        layout.row(align=True).prop(self, "flatten_type", expand=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -865,6 +894,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
     def execute(self, context):
         import bmesh
+
         umeshes = utypes.UMeshes(report=self.report)
         umeshes.fix_context()
         umeshes.set_sync()
@@ -879,10 +909,10 @@ class UNIV_OT_Flatten(bpy.types.Operator):
             selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
             umeshes = selected_umeshes if selected_umeshes else visible_umeshes
             if not umeshes:
-                return umeshes.update(info='Not found faces for manipulate')
+                return umeshes.update(info="Not found faces for manipulate")
 
             if self.apply_gn(umeshes):
-                return {'FINISHED'}
+                return {"FINISHED"}
 
             if selected_umeshes:
                 for umesh in umeshes:
@@ -891,23 +921,27 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                     selected_faces = utils.calc_selected_uv_faces(umesh)
                     for f in selected_faces:
                         for crn in f.loops:
-                            if not crn.link_loop_radial_prev.face.select or utils.is_boundary_sync(crn, uv):
+                            if not crn.link_loop_radial_prev.face.select or utils.is_boundary_sync(
+                                crn, uv
+                            ):
                                 split_edges.add(crn.edge)
                     if split_edges:
                         bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
                         for e in split_edges:
                             e.select = True
                         umesh.bm.select_flush(True)
-                    if self.flatten_type == 'SHAPE_KEY':
+                    if self.flatten_type == "SHAPE_KEY":
                         continue
                     self.apply_coords(selected_faces, umesh)
-                if self.flatten_type == 'SHAPE_KEY':
-                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+                if self.flatten_type == "SHAPE_KEY":
+                    bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
                     for umesh in umeshes:
-                        self.apply_shape_keys((f for f in umesh.obj.data.polygons if f.select), umesh)
+                        self.apply_shape_keys(
+                            (f for f in umesh.obj.data.polygons if f.select), umesh
+                        )
                         umesh.obj.data.update_tag()
-                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-                    return {'FINISHED'}
+                    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
+                    return {"FINISHED"}
 
             else:
                 for umesh in umeshes:
@@ -919,19 +953,21 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                             if utils.is_boundary_sync(crn, uv):
                                 split_edges.add(crn.edge)
                     bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
-                    if self.flatten_type == 'SHAPE_KEY':
+                    if self.flatten_type == "SHAPE_KEY":
                         continue
                     self.apply_coords(visible_faces, umesh)
 
-                if self.flatten_type == 'SHAPE_KEY':
-                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+                if self.flatten_type == "SHAPE_KEY":
+                    bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
                     for umesh in umeshes:
-                        self.apply_shape_keys((f for f in umesh.obj.data.polygons if not f.hide), umesh)
+                        self.apply_shape_keys(
+                            (f for f in umesh.obj.data.polygons if not f.hide), umesh
+                        )
                         umesh.obj.data.update_tag()
-                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+                    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
         else:
             if self.apply_gn(umeshes):
-                return {'FINISHED'}
+                return {"FINISHED"}
 
             for umesh in umeshes:
                 uv = umesh.uv
@@ -944,18 +980,18 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                     bmesh.ops.split_edges(umesh.bm, edges=list(split_edges))
                     umesh.update()
 
-                if self.flatten_type == 'SHAPE_KEY':
+                if self.flatten_type == "SHAPE_KEY":
                     umesh.free()
                     self.apply_shape_keys((f for f in umesh.obj.data.polygons), umesh)
                     umesh.obj.data.update_tag()
                 else:
                     self.apply_coords(umesh.bm.faces, umesh)
-            if self.flatten_type == 'SHAPE_KEY':
-                return {'FINISHED'}
+            if self.flatten_type == "SHAPE_KEY":
+                return {"FINISHED"}
 
         umeshes.silent_update()
         umeshes.free()
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def apply_coords(self, faces, umesh):
         uv = umesh.uv
@@ -968,9 +1004,9 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
         for f in faces:
             for crn in f.loops:
-                if self.axis == 'z':
+                if self.axis == "z":
                     crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d()
-                elif self.axis == 'y':
+                elif self.axis == "y":
                     crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().zxy
                 else:
                     crn.vert.co = ((crn[uv].uv + delta) * max_length).to_3d().xzy
@@ -997,7 +1033,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
             umesh.obj.shape_key_add(name="model", from_mix=True)
             sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
         else:
-            sk = umesh.obj.data.shape_keys.key_blocks.get('uv')
+            sk = umesh.obj.data.shape_keys.key_blocks.get("uv")
             if not sk:
                 sk = umesh.obj.shape_key_add(name="uv", from_mix=True)
 
@@ -1016,61 +1052,63 @@ class UNIV_OT_Flatten(bpy.types.Operator):
                 uv_co = uv_data[loop_index].uv
                 vert_index = corners[loop_index].vertex_index
 
-                if self.axis == 'z':
+                if self.axis == "z":
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d()
-                elif self.axis == 'y':
+                elif self.axis == "y":
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().zxy
                 else:
                     sk_data[vert_index].co = ((uv_co + delta) * max_length).to_3d().xzy
 
     def apply_gn(self, umeshes: UMeshes):
-        if self.flatten_type == 'MODIFIER':
+        if self.flatten_type == "MODIFIER":
             if bpy.app.version < (4, 1, 0):
-                self.report({'WARNING'}, 'Modifier types is not supported in Blender versions below 4.1')
+                self.report(
+                    {"WARNING"}, "Modifier types is not supported in Blender versions below 4.1"
+                )
                 return True
             node_group = self.get_flatten_node_group()
             self.create_gn_flatter_modifier(umeshes, node_group)
-            utils.update_area_by_type('VIEW_3D')
+            utils.update_area_by_type("VIEW_3D")
             return True
         return False
 
     def create_gn_flatter_modifier(self, umeshes, node_group):
         if bpy.app.version >= (5, 2, 0):
-            axis = {'z': 'Bottom', 'y': 'Front', 'x': 'Side'}
+            axis = {"z": "Bottom", "y": "Front", "x": "Side"}
         else:
-            axis = {'z': 2, 'y': 3, 'x': 4}
+            axis = {"z": 2, "y": 3, "x": 4}
         for umesh in umeshes:
             has_flatten_modifier = False
 
             for m in umesh.obj.modifiers:
                 if not isinstance(m, bpy.types.NodesModifier):
                     continue
-                if m.name.startswith('UniV Flatten'):
+                if m.name.startswith("UniV Flatten"):
                     has_flatten_modifier = True
                     if m.node_group != node_group:
                         m.node_group = node_group
 
                     gn_mod = utils.GN(m)
-                    gn_mod['Socket_2'] = umesh.uv.name
-                    gn_mod['Socket_3'] = axis[self.axis]
-                    gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                    gn_mod['Socket_5'] = self.mix_factor
+                    gn_mod["Socket_2"] = umesh.uv.name
+                    gn_mod["Socket_3"] = axis[self.axis]
+                    gn_mod["Socket_4"] = self.aspect_to_scale(umesh.aspect)
+                    gn_mod["Socket_5"] = self.mix_factor
                     umesh.obj.update_tag()
                     break
 
             if not has_flatten_modifier:
-                m = umesh.obj.modifiers.new(name='UniV Flatten', type='NODES')
+                m = umesh.obj.modifiers.new(name="UniV Flatten", type="NODES")
                 m.node_group = node_group
                 gn_mod = utils.GN(m)
-                gn_mod['Socket_2'] = umesh.uv.name
-                gn_mod['Socket_3'] = axis[self.axis]
-                gn_mod['Socket_4'] = self.aspect_to_scale(umesh.aspect)
-                gn_mod['Socket_5'] = self.mix_factor
+                gn_mod["Socket_2"] = umesh.uv.name
+                gn_mod["Socket_3"] = axis[self.axis]
+                gn_mod["Socket_4"] = self.aspect_to_scale(umesh.aspect)
+                gn_mod["Socket_5"] = self.mix_factor
 
     def get_flatten_node_group(self):
         """Get exist flatten node group"""
         for ng in reversed(bpy.data.node_groups):
-            if ng.name.startswith('UniV Flatten'):
+            if ng.name.startswith("UniV Flatten"):
                 if self.flatten_node_group_is_changed(ng):
                     print(f"UniV: Flatten: Node Group {ng.name!r} is changed.")
                     if ng.users == 0:
@@ -1084,16 +1122,9 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         items = ng.interface.items_tree
         if len(items) != 6:
             return True
-        expect_types = (
-            'Geometry',
-            'Geometry',
-            'String',
-            'Menu',
-            'Vector',
-            'Float'
-        )
+        expect_types = ("Geometry", "Geometry", "String", "Menu", "Vector", "Float")
         for str_typ, item in zip(expect_types, items):
-            bpy_type = (getattr(bpy.types, 'NodeTreeInterfaceSocket' + str_typ))
+            bpy_type = getattr(bpy.types, "NodeTreeInterfaceSocket" + str_typ)
             if not isinstance(item.rna_type, bpy_type):
                 return True
 
@@ -1113,9 +1144,24 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         if sockets_count != 44:
             return True
 
-        all_nodes_types = {'VECT_MATH', 'SET_POSITION', 'SEPXYZ', 'SPLIT_EDGES', 'GROUP_OUTPUT', 'INDEX_SWITCH',
-                           'COMBXYZ', 'MATH', 'BOUNDING_BOX', 'MENU_SWITCH', 'MIX', 'SWITCH', 'GROUP', 'GROUP_INPUT',
-                           'POSITION', 'INPUT_ATTRIBUTE'}
+        all_nodes_types = {
+            "VECT_MATH",
+            "SET_POSITION",
+            "SEPXYZ",
+            "SPLIT_EDGES",
+            "GROUP_OUTPUT",
+            "INDEX_SWITCH",
+            "COMBXYZ",
+            "MATH",
+            "BOUNDING_BOX",
+            "MENU_SWITCH",
+            "MIX",
+            "SWITCH",
+            "GROUP",
+            "GROUP_INPUT",
+            "POSITION",
+            "INPUT_ATTRIBUTE",
+        }
 
         if {n.type for n in ng.nodes} != all_nodes_types:
             return True
@@ -1124,7 +1170,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
     @staticmethod
     def _create_flatten_node_group():
-        bb = bpy.data.node_groups.new(type='GeometryNodeTree', name="UniV Flatten")
+        bb = bpy.data.node_groups.new(type="GeometryNodeTree", name="UniV Flatten")
         # bb = bpy.data.node_groups["UniV Flatten"]
         # bb.nodes.clear()
         # bb.interface.clear()
@@ -1133,39 +1179,50 @@ class UNIV_OT_Flatten(bpy.types.Operator):
 
         # Interface
         # Socket Geometry
-        geometry_socket = bb.interface.new_socket(name="Geometry", in_out='OUTPUT', socket_type='NodeSocketGeometry')
-        geometry_socket.attribute_domain = 'POINT'
+        geometry_socket = bb.interface.new_socket(
+            name="Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry"
+        )
+        geometry_socket.attribute_domain = "POINT"
 
         # Socket Geometry
-        geometry_socket_1 = bb.interface.new_socket(name="Geometry", in_out='INPUT', socket_type='NodeSocketGeometry')
-        geometry_socket_1.attribute_domain = 'POINT'
+        geometry_socket_1 = bb.interface.new_socket(
+            name="Geometry", in_out="INPUT", socket_type="NodeSocketGeometry"
+        )
+        geometry_socket_1.attribute_domain = "POINT"
 
         # Socket UV Map
-        uv_map_socket = bb.interface.new_socket(name="UV Map", in_out='INPUT', socket_type='NodeSocketString')
+        uv_map_socket = bb.interface.new_socket(
+            name="UV Map", in_out="INPUT", socket_type="NodeSocketString"
+        )
         uv_map_socket.default_value = "UVMap"
-        uv_map_socket.subtype = 'NONE'
-        uv_map_socket.attribute_domain = 'POINT'
+        uv_map_socket.subtype = "NONE"
+        uv_map_socket.attribute_domain = "POINT"
 
         # Socket Axis
-        axis_socket = bb.interface.new_socket(name="Axis", in_out='INPUT', socket_type='NodeSocketMenu')
-        axis_socket.attribute_domain = 'POINT'
+        axis_socket = bb.interface.new_socket(
+            name="Axis", in_out="INPUT", socket_type="NodeSocketMenu"
+        )
+        axis_socket.attribute_domain = "POINT"
         axis_socket.force_non_field = True
 
         # Socket Aspect Ratio
         aspect_ratio_socket = bb.interface.new_socket(
-            name="Aspect Ratio", in_out='INPUT', socket_type='NodeSocketVector')
+            name="Aspect Ratio", in_out="INPUT", socket_type="NodeSocketVector"
+        )
         aspect_ratio_socket.default_value = (1.0, 1.0, 0.0)
         aspect_ratio_socket.min_value = 0.01
         aspect_ratio_socket.max_value = 10000
         aspect_ratio_socket.force_non_field = True
 
         # Socket Factor
-        factor_socket = bb.interface.new_socket(name="Factor", in_out='INPUT', socket_type='NodeSocketFloat')
+        factor_socket = bb.interface.new_socket(
+            name="Factor", in_out="INPUT", socket_type="NodeSocketFloat"
+        )
         factor_socket.default_value = 1.0
         factor_socket.min_value = 0.0
         factor_socket.max_value = 1.0
-        factor_socket.subtype = 'FACTOR'
-        factor_socket.attribute_domain = 'POINT'
+        factor_socket.subtype = "FACTOR"
+        factor_socket.attribute_domain = "POINT"
         factor_socket.force_non_field = True
 
         # initialize UniV Flatten nodes
@@ -1192,7 +1249,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # node Named Attribute
         named_attribute = bb.nodes.new("GeometryNodeInputNamedAttribute")
         named_attribute.label = "UV Attribute"
-        named_attribute.data_type = 'FLOAT_VECTOR'
+        named_attribute.data_type = "FLOAT_VECTOR"
 
         # node Bounding Box
         bounding_box = bb.nodes.new("GeometryNodeBoundBox")
@@ -1200,7 +1257,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # node Vector Math
         vector_math = bb.nodes.new("ShaderNodeVectorMath")
         vector_math.name = "Vector Math"
-        vector_math.operation = 'SUBTRACT'
+        vector_math.operation = "SUBTRACT"
 
         # node Separate XYZ
         separate_xyz_widths = bb.nodes.new("ShaderNodeSeparateXYZ")
@@ -1209,33 +1266,33 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # Remap
         remap_to_center = bb.nodes.new("ShaderNodeVectorMath")
         remap_to_center.label = "Remap to centered range"
-        remap_to_center.operation = 'SUBTRACT'
+        remap_to_center.operation = "SUBTRACT"
         remap_to_center.inputs[1].default_value = (0.5, 0.5, 0.0)
 
         # Scale UV
         max_length_1 = bb.nodes.new("ShaderNodeMath")
         max_length_1.label = "Max Length"
-        max_length_1.operation = 'MAXIMUM'
+        max_length_1.operation = "MAXIMUM"
 
         max_length_2 = bb.nodes.new("ShaderNodeMath")
         max_length_2.label = "Max Length"
-        max_length_2.operation = 'MAXIMUM'
+        max_length_2.operation = "MAXIMUM"
 
         max_length_3 = bb.nodes.new("ShaderNodeMath")
         max_length_3.label = "Max Length"
-        max_length_3.operation = 'MAXIMUM'
+        max_length_3.operation = "MAXIMUM"
 
         scale_uv = bb.nodes.new("ShaderNodeVectorMath")
         scale_uv.label = "Scale UV"
-        scale_uv.operation = 'MULTIPLY'
+        scale_uv.operation = "MULTIPLY"
 
         # node Menu Switch
         menu_switch = bb.nodes.new("GeometryNodeMenuSwitch")
         menu_switch.label = "Axis Index Menu"
-        menu_switch.data_type = 'INT'
+        menu_switch.data_type = "INT"
         menu_switch.enum_items.clear()
 
-        for idx, item in enumerate(['Bottom', 'Side', 'Front']):
+        for idx, item in enumerate(["Bottom", "Side", "Front"]):
             menu_switch.enum_items.new(item)
             menu_switch.inputs[idx + 1].default_value = idx
 
@@ -1243,7 +1300,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         index_switch = bb.nodes.new("GeometryNodeIndexSwitch")
         index_switch.label = "Get scale from bbox"
         index_switch.name = "Index Switch"
-        index_switch.data_type = 'FLOAT'
+        index_switch.data_type = "FLOAT"
         index_switch.index_switch_items.clear()
         for _ in range(3):
             index_switch.index_switch_items.new()
@@ -1251,7 +1308,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # node Index Switch
         index_switch_001 = bb.nodes.new("GeometryNodeIndexSwitch")
         index_switch_001.label = "Switch scale by axis"
-        index_switch_001.data_type = 'VECTOR'
+        index_switch_001.data_type = "VECTOR"
         index_switch_001.index_switch_items.clear()
         for _ in range(3):
             index_switch_001.index_switch_items.new()
@@ -1273,14 +1330,14 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # node Aspect Ratio Scale
         vector_math_004 = bb.nodes.new("ShaderNodeVectorMath")
         vector_math_004.label = "Aspect Ratio Scale"
-        vector_math_004.operation = 'MULTIPLY'
+        vector_math_004.operation = "MULTIPLY"
 
         # node Factor
         mix_factor = bb.nodes.new("ShaderNodeMix")
         mix_factor.label = "Factor"
-        mix_factor.blend_type = 'MIX'
-        mix_factor.data_type = 'VECTOR'
-        mix_factor.factor_mode = 'UNIFORM'
+        mix_factor.blend_type = "MIX"
+        mix_factor.data_type = "VECTOR"
+        mix_factor.factor_mode = "UNIFORM"
 
         # node Position
         position = bb.nodes.new("GeometryNodeInputPosition")
@@ -1289,7 +1346,7 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         # node No UVMap case
         switch = bb.nodes.new("GeometryNodeSwitch")
         switch.label = "No UVMap case"
-        switch.input_type = 'FLOAT'
+        switch.input_type = "FLOAT"
         switch.inputs[1].default_value = 0.0
 
         # Set locations
@@ -1374,13 +1431,13 @@ class UNIV_OT_Flatten(bpy.types.Operator):
         if aspect_y > 1:
             return Vector((aspect_y, 1, 0))
         else:
-            return Vector((1, 1/aspect_y, 0))
+            return Vector((1, 1 / aspect_y, 0))
 
 
 class UNIV_OT_FlattenCleanup(bpy.types.Operator):
-    bl_idname = 'mesh.univ_flatten_clean_up'
-    bl_label = 'Flatten'
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = "mesh.univ_flatten_clean_up"
+    bl_label = "Flatten"
+    bl_options = {"REGISTER", "UNDO"}
     bl_description = f"Remove Flatten modifiers and shape keys and unused nodes"
 
     def __init__(self, *args, **kwargs):
@@ -1401,37 +1458,37 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
             has_shape_keys = self.has_flatten_shape_keys(umeshes)
             if has_shape_keys:
                 if umeshes.is_edit_mode:
-                    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+                    bpy.ops.object.mode_set(mode="OBJECT", toggle=False)
 
             for umesh in umeshes:
                 # Remove shape keys
-                if umesh.obj.data.shape_keys and umesh.obj.data.shape_keys.key_blocks.get('uv'):
+                if umesh.obj.data.shape_keys and umesh.obj.data.shape_keys.key_blocks.get("uv"):
                     if len(umesh.obj.data.shape_keys.key_blocks) == 2:
                         umesh.obj.shape_key_clear()
                         removed_sk_counter += 1
                     else:
-                        sk = umesh.obj.data.shape_keys.key_blocks.get('uv')
+                        sk = umesh.obj.data.shape_keys.key_blocks.get("uv")
                         umesh.obj.shape_key_remove(sk)
                         removed_sk_counter += 1
 
                 # Remove modifiers
                 for m in reversed(umesh.obj.modifiers):
-                    if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                    if isinstance(m, bpy.types.NodesModifier) and m.name.startswith("UniV Flatten"):
                         umesh.obj.modifiers.remove(m)
                         removed_modifiers += 1
 
                 umesh.obj.data.update_tag()
                 if umeshes.is_edit_mode:
-                    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+                    bpy.ops.object.mode_set(mode="EDIT", toggle=False)
 
         # Remove geometry nodes
         for ng in reversed(bpy.data.node_groups):
-            if ng.name.startswith('UniV Flatten'):
+            if ng.name.startswith("UniV Flatten"):
                 if ng.users == 0:
                     bpy.data.node_groups.remove(ng)
                     removed_geometry_nodes += 1
 
-        info = ''
+        info = ""
         if removed_sk_counter:
             info += f"Removed {removed_sk_counter} shape keys. "
         if removed_modifiers:
@@ -1440,15 +1497,15 @@ class UNIV_OT_FlattenCleanup(bpy.types.Operator):
             info += f"Removed {removed_geometry_nodes} node groups."
 
         if info:
-            self.report({'INFO'}, info)
+            self.report({"INFO"}, info)
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     @staticmethod
     def has_flatten_shape_keys(umeshes: UMeshes):
         for umesh in umeshes:
             if umesh.obj.data.shape_keys:
-                if umesh.obj.data.shape_keys.key_blocks.get('uv'):
+                if umesh.obj.data.shape_keys.key_blocks.get("uv"):
                     return True
         return False
 
@@ -1457,33 +1514,40 @@ class UNIV_OT_WrapProject(bpy.types.Operator):
     bl_idname = "mesh.univ_wrap"
     bl_label = "Wrap"
     bl_description = "Swap UV to XYZ coordinates"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT'
+        return context.mode == "OBJECT"
 
     def execute(self, context):
         active = context.active_object
         if not active or active.type != "MESH":
-            self.report({'WARNING'}, "Not found active mesh object")
+            self.report({"WARNING"}, "Not found active mesh object")
             return {"FINISHED"}
 
-        for_wrapping_objects = [obj for obj in bpy.context.selected_objects if obj.type == "MESH" and obj != active]
+        for_wrapping_objects = [
+            obj for obj in bpy.context.selected_objects if obj.type == "MESH" and obj != active
+        ]
 
         # Check existing flatten.
         if not active.data.shape_keys or len(active.data.shape_keys.key_blocks) <= 1:
             for m in active.modifiers:
-                if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+                if isinstance(m, bpy.types.NodesModifier) and m.name.startswith("UniV Flatten"):
                     gn_mod = utils.GN(m, print_missed_socket=True)
-                    if 'Socket_5' in gn_mod:
+                    if "Socket_5" in gn_mod:
                         break
             else:
-                for_wrapping_objects = [obj for obj in bpy.context.selected_objects if obj.type == "MESH"]
+                for_wrapping_objects = [
+                    obj for obj in bpy.context.selected_objects if obj.type == "MESH"
+                ]
                 count = self.remove_surface_deform(for_wrapping_objects)
                 if count:
-                    self.report({"INFO"}, f"Not found shape keys or flatten modifier. "
-                                          f"But removed {count!r} surface deform modifiers.")
+                    self.report(
+                        {"INFO"},
+                        f"Not found shape keys or flatten modifier. "
+                        f"But removed {count!r} surface deform modifiers.",
+                    )
                 else:
                     self.report({"WARNING"}, "Not found shape keys or flatten modifier.")
 
@@ -1499,17 +1563,16 @@ class UNIV_OT_WrapProject(bpy.types.Operator):
         for obj in for_wrapping_objects:
             # Delete previous modifiers
             for modifier in reversed(obj.modifiers):
-                if modifier.type == 'SURFACE_DEFORM':
+                if modifier.type == "SURFACE_DEFORM":
                     obj.modifiers.remove(modifier)
 
             # Add mesh modifier
-            modifier_deform = obj.modifiers.new(name="SurfaceDeform", type='SURFACE_DEFORM')
+            modifier_deform = obj.modifiers.new(name="SurfaceDeform", type="SURFACE_DEFORM")
             modifier_deform.target = active
 
             obj.select_set(state=True, view_layer=None)
             bpy.context.view_layer.objects.active = obj
             bpy.ops.object.surfacedeform_bind(modifier="SurfaceDeform")
-
 
         # Set shape keys to 1.0.
         if active.data.shape_keys and len(active.data.shape_keys.key_blocks) >= 2:
@@ -1518,10 +1581,10 @@ class UNIV_OT_WrapProject(bpy.types.Operator):
 
         # Set flatten modifier to 0.0.
         for m in active.modifiers:
-            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith("UniV Flatten"):
                 gn_mod = utils.GN(m, print_missed_socket=True)
-                if 'Socket_5' in gn_mod:
-                    gn_mod['Socket_5'] = 0.0
+                if "Socket_5" in gn_mod:
+                    gn_mod["Socket_5"] = 0.0
 
         bpy.context.view_layer.objects.active = active
         active.update_tag()
@@ -1538,11 +1601,11 @@ class UNIV_OT_WrapProject(bpy.types.Operator):
 
         # Set flatten modifier to 1.0.
         for m in active.modifiers:
-            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith('UniV Flatten'):
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith("UniV Flatten"):
                 gn_mod = utils.GN(m, print_missed_socket=True)
-                if 'Socket_5' in gn_mod:
-                    if gn_mod['Socket_5'] == 0.0:
-                        gn_mod['Socket_5'] = 1.0
+                if "Socket_5" in gn_mod:
+                    if gn_mod["Socket_5"] == 0.0:
+                        gn_mod["Socket_5"] = 1.0
                         is_unflatten = True
 
         if is_unflatten:
@@ -1556,7 +1619,7 @@ class UNIV_OT_WrapProject(bpy.types.Operator):
         for obj in for_wrapping_objects:
             # Delete previous modifiers
             for modifier in reversed(obj.modifiers):
-                if modifier.type == 'SURFACE_DEFORM':
+                if modifier.type == "SURFACE_DEFORM":
                     obj.modifiers.remove(modifier)
                     count += 1
         return count

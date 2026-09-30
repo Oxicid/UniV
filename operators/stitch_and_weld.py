@@ -14,14 +14,7 @@ from bpy.props import *
 from .. import draw
 from .. import utils
 from .. import utypes
-from ..utypes import (
-    BBox,
-    UMeshes,
-    Islands,
-    AdvIsland,
-    LoopGroup,
-    LoopGroups
-)
+from ..utypes import BBox, UMeshes, Islands, AdvIsland, LoopGroup, LoopGroups
 from ..preferences import prefs, univ_settings
 
 
@@ -30,9 +23,9 @@ class Stitch:
         self.padding = 0.0
         self.zero_area_count = 0
         self.flipped_3d_count = 0
-        if not hasattr(self, 'update_seams'):
+        if not hasattr(self, "update_seams"):
             self.update_seams = True
-        if not hasattr(self, 'between'):
+        if not hasattr(self, "between"):
             self.between = False
 
     def stitch(self, umeshes, mouse_position):
@@ -54,14 +47,18 @@ class Stitch:
             if self.between:
                 target_islands = islands.islands.copy()
             else:
-                if umesh.elem_mode in ('VERT', 'EDGE'):
+                if umesh.elem_mode in ("VERT", "EDGE"):
                     target_islands = [
-                        isl for isl in islands if
-                        utypes.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)]
+                        isl
+                        for isl in islands
+                        if utypes.IslandsBase.island_filter_is_any_edge_selected(isl.faces, umesh)
+                    ]
                 else:
                     target_islands = [
-                        isl for isl in islands if
-                        utypes.IslandsBase.island_filter_is_any_face_selected(isl.faces, umesh)]
+                        isl
+                        for isl in islands
+                        if utypes.IslandsBase.island_filter_is_any_face_selected(isl.faces, umesh)
+                    ]
 
             self.sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh, mouse_position)
 
@@ -85,7 +82,9 @@ class Stitch:
 
                 loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
                 filtered = self.split_lg_for_stitch(loop_groups)
-                filtered.sort(key=lambda lg_: lg_.length_uv, reverse=True) # Prioritize multi-stitch by length
+                filtered.sort(
+                    key=lambda lg_: lg_.length_uv, reverse=True
+                )  # Prioritize multi-stitch by length
 
                 if filtered:
                     # An island may not have any selected edges, but it can still be a reoriented island.
@@ -103,9 +102,21 @@ class Stitch:
                         balanced_target_islands.append(trans_isl)
 
                     if self.padding:
-                        self.reorient_to_target_with_padding(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
+                        self.reorient_to_target_with_padding(
+                            ref_isl,
+                            trans_isl,
+                            ref_lg,
+                            trans_lg,
+                            correct_flip=getattr(self, "correct_flip", True),
+                        )
                     else:
-                        self.reorient_to_target(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
+                        self.reorient_to_target(
+                            ref_isl,
+                            trans_isl,
+                            ref_lg,
+                            trans_lg,
+                            correct_flip=getattr(self, "correct_flip", True),
+                        )
                     umesh.update_tag = True
 
                 while True:
@@ -126,23 +137,50 @@ class Stitch:
                                 if self.padding:
                                     # NOTE: ref_isl is not the island from which ref_lg(lg) is derived
                                     # TODO: Check to pass balance_isl
-                                    self.reorient_to_target_with_padding(ref_isl, trans_isl, lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
+                                    self.reorient_to_target_with_padding(
+                                        ref_isl,
+                                        trans_isl,
+                                        lg,
+                                        trans_lg,
+                                        correct_flip=getattr(self, "correct_flip", True),
+                                    )
                                 else:
-                                    self.reorient_to_target(ref_isl, trans_isl, lg, trans_lg, correct_flip=getattr(self, 'correct_flip', True))
+                                    self.reorient_to_target(
+                                        ref_isl,
+                                        trans_isl,
+                                        lg,
+                                        trans_lg,
+                                        correct_flip=getattr(self, "correct_flip", True),
+                                    )
 
-                    balanced_target_islands = [b_isl for b_isl in balanced_target_islands if b_isl.tag]
+                    balanced_target_islands = [
+                        b_isl for b_isl in balanced_target_islands if b_isl.tag
+                    ]
                     balanced_target_islands.extend(stack)
 
                     if not balanced_target_islands:
                         break
 
         if self.zero_area_count:
-            self.report({'WARNING'}, f'Found {self.zero_area_count} zero length edge loop. Use inspect tools to find the problem')  # noqa
+            self.report(
+                {"WARNING"},
+                f"Found {self.zero_area_count} zero length edge loop. Use inspect tools to find the problem",
+            )  # noqa
         if self.flipped_3d_count:
-            self.report({'WARNING'}, f'Found {self.flipped_3d_count} loops with 3D flipped faces. '  # noqa
-                                     f'For correct result need recalculate normals')
+            self.report(
+                {"WARNING"},
+                f"Found {self.flipped_3d_count} loops with 3D flipped faces. "  # noqa
+                f"For correct result need recalculate normals",
+            )
 
-    def reorient_to_target(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
+    def reorient_to_target(
+        self,
+        ref_isl: AdvIsland,
+        trans: AdvIsland,
+        ref_lg: LoopGroup,
+        trans_lg: LoopGroup,
+        correct_flip=True,
+    ):
         uv = ref_isl.umesh.uv
 
         is_flipped_3d = False
@@ -232,13 +270,19 @@ class Stitch:
             trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
 
         # Select shared edges.
-        if bpy.context.scene.tool_settings.uv_sticky_select_mode != 'DISABLED':
+        if bpy.context.scene.tool_settings.uv_sticky_select_mode != "DISABLED":
             set_select_edge = utils.edge_select_linked_set_func(trans_lg.umesh)
             for crn in ref_lg:
                 set_select_edge(crn.link_loop_radial_prev, True)
 
-
-    def reorient_to_target_with_padding(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
+    def reorient_to_target_with_padding(
+        self,
+        ref_isl: AdvIsland,
+        trans: AdvIsland,
+        ref_lg: LoopGroup,
+        trans_lg: LoopGroup,
+        correct_flip=True,
+    ):
         uv = ref_isl.umesh.uv
 
         ref_is_flipped = False
@@ -313,7 +357,7 @@ class Stitch:
                 min_length = bbox.min_length
                 if min_length < 1e-06:
                     min_length = length_a
-                pad_scale = bl_math.clamp((min_length-self.padding * 2) / min_length, 0.5, 1.5)
+                pad_scale = bl_math.clamp((min_length - self.padding * 2) / min_length, 0.5, 1.5)
 
                 # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
                 trans.set_boundary_tag(match_idx=True)
@@ -323,8 +367,9 @@ class Stitch:
                     if len(loop_groups) != 1:
                         longest_border_lg = max(loop_groups, key=lambda lg: lg.length_uv)
                         vert = longest_border_lg[0].vert
-                        if (len(longest_border_lg) == len(trans_lg) and
-                                any(trans_crn.vert == vert for trans_crn in trans_lg)):
+                        if len(longest_border_lg) == len(trans_lg) and any(
+                            trans_crn.vert == vert for trans_crn in trans_lg
+                        ):
                             trans_lg_is_basic_boundary = True
 
                     else:
@@ -362,14 +407,17 @@ class Stitch:
             aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
             orto = normal_a.orthogonal().normalized() * self.padding
             if orto == Vector((0, 0)):
-                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
+                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector(
+                    (ref_isl.umesh.aspect, 1.0)
+                )
                 orto = orto.normalized() * self.padding
             if orto == Vector((0, 0)):
                 orto = Vector((self.padding, 0))
             orto *= aspect_vec
 
-            correct_flipped_islands = (ref_is_flipped and not trans_is_flipped or
-                                       ref_is_flipped and trans_is_flipped)
+            correct_flipped_islands = (
+                ref_is_flipped and not trans_is_flipped or ref_is_flipped and trans_is_flipped
+            )
             if correct_flipped_islands:
                 delta = (pt_a1 - pt_b1) - orto
             else:
@@ -392,7 +440,7 @@ class Stitch:
                 return None
 
         # Selects an island for stitching based on a similar length to the one that was reoriented
-        min_diff = float('inf')
+        min_diff = float("inf")
         min_lg = None
         for lg in balance_isl.sequence:
             idx = lg[0].link_loop_radial_prev.face.index
@@ -410,6 +458,7 @@ class Stitch:
         # TODO: Segment has a similar feature that groups data by indices. Use it, when refactor the LoopGroup to Segments.
         filtered_lg = []
         uv = lgs.umesh.uv
+
         def get_shared_face_idx(crn_):
             return crn_.link_loop_radial_prev.face.index
 
@@ -423,7 +472,9 @@ class Stitch:
                 start_crn = split_lgs[0][0]
                 end_next_crn = split_lgs[-1][-1].link_loop_next
                 # Circular case
-                is_cyclic = start_crn.vert == end_next_crn.vert and start_crn[uv].uv == end_next_crn[uv].uv
+                is_cyclic = (
+                    start_crn.vert == end_next_crn.vert and start_crn[uv].uv == end_next_crn[uv].uv
+                )
                 if is_cyclic:
                     # Join, if cyclic similar index.
                     crn_from_last_group = split_lgs[-1][-1]
@@ -443,17 +494,20 @@ class Stitch:
                     lg_combined.corners = sub_lg
                     filtered_lg.append(lg_combined)
 
-
         # There can be multiple shared segments between islands.
         # Here we remove redundant segments using indices taken from the shared face.
         groups = collections.defaultdict(list)
         for lg in filtered_lg:
             groups[get_shared_face_idx(lg[0])].append(lg)
-        return [max(g, key=lambda lg_: lg_.length_uv) for g in groups.values()]  # Remove duplicates by length uv
+        return [
+            max(g, key=lambda lg_: lg_.length_uv) for g in groups.values()
+        ]  # Remove duplicates by length uv
 
     def set_selected_boundary_tag_with_exclude_face_idx(self, isl, exclude_idx: set):
         """Sets tags for the segments that will be used for stitching. Islands that have already been stitched are ignored."""
-        is_bound = utils.is_boundary_func(isl.umesh, with_flipped_check=False)  # TODO: Check with flipped
+        is_bound = utils.is_boundary_func(
+            isl.umesh, with_flipped_check=False
+        )  # TODO: Check with flipped
         if self.between:
             for f in isl:
                 for crn in f.loops:
@@ -466,12 +520,22 @@ class Stitch:
             get_edge_select = utils.edge_select_get_func(isl.umesh)
             for f in isl:
                 for crn in f.loops:
-                    if not get_edge_select(crn) or crn.link_loop_radial_prev.face.index in exclude_idx:
+                    if (
+                        not get_edge_select(crn)
+                        or crn.link_loop_radial_prev.face.index in exclude_idx
+                    ):
                         crn.tag = False
                         continue
                     crn.tag = is_bound(crn)
 
-    def pick_reorient(self, ref_isl: AdvIsland, trans: AdvIsland, ref_lg: LoopGroup, trans_lg: LoopGroup, correct_flip=True):
+    def pick_reorient(
+        self,
+        ref_isl: AdvIsland,
+        trans: AdvIsland,
+        ref_lg: LoopGroup,
+        trans_lg: LoopGroup,
+        correct_flip=True,
+    ):
 
         if correct_flip:
             is_flipped = trans_lg.is_flipped_3d
@@ -498,7 +562,9 @@ class Stitch:
         length_b = normal_b.length
 
         if length_a < 1e-06 or length_b < 1e-06:
-            self.report({'WARNING'}, 'Found zero length edge loop. Use inspect tools to find the problem')  # noqa
+            self.report(
+                {"WARNING"}, "Found zero length edge loop. Use inspect tools to find the problem"
+            )  # noqa
         else:
             scale = length_a / length_b
             trans.scale_simple(Vector((scale, scale)))
@@ -508,7 +574,9 @@ class Stitch:
             aspect_vec = Vector((1 / ref_isl.umesh.aspect, 1))
             orto = normal_a.orthogonal().normalized() * self.padding
             if orto == Vector((0, 0)):
-                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector((ref_isl.umesh.aspect, 1.0))
+                orto = (trans.bbox.center - ref_isl.bbox.center) * Vector(
+                    (ref_isl.umesh.aspect, 1.0)
+                )
                 orto = orto.normalized() * self.padding
             if orto == Vector((0, 0)):
                 orto = Vector((self.padding, 0))
@@ -519,15 +587,18 @@ class Stitch:
             trans.move(pt_a1 - pt_b1)
             trans_lg.copy_coords_from_ref(ref_lg, self.update_seams)
 
-
     @staticmethod
     def sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh, mouse_position):
 
         if not utils.USE_GENERIC_UV_SYNC:
             if umesh.sync and mouse_position:
-                if umesh.elem_mode in ('VERT', 'EDGE'):
+                if umesh.elem_mode in ("VERT", "EDGE"):
                     if not umesh.has_selected_uv_faces():
-                        target_islands.sort(key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(isl, mouse_position))
+                        target_islands.sort(
+                            key=lambda isl: utypes.IslandHit.closest_pt_to_selected_edge(
+                                isl, mouse_position
+                            )
+                        )
                         return
 
         def calc_edge_length(isl: utypes.AdvIsland):
@@ -600,6 +671,7 @@ class Stitch:
             umesh.update_tag = bool(counter_seam_local)
         return counter_seam
 
+
 # TODO: Implement delayed report class
 LAST_WELD_BY_DISTANCE_TIME = 0.0
 LAST_WELD_BY_DISTANCE_COUNTERS = (0, 0)
@@ -609,40 +681,45 @@ LAST_WELD_BY_DISTANCE_COUNTERS = (0, 0)
 class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
-    bl_description = "Weld selected UV vertices\n\n" \
-                     "If there are paired and unpaired selections with no connections \nat the same time in the off sync mode, \n" \
-                     "the paired connection is given priority, but when you press again, \nthe unpaired selections are also connected.\n" \
-                     "This prevents unwanted connections.\n" \
-                     "Works like Stitch if everything is welded in the island.\n\n" \
-                     "Context keymaps on button:\n" \
-                     "Default - Weld\n" \
-                     "Alt - Weld by Distance\n\n" \
-                     "Has [W] keymap"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = (
+        "Weld selected UV vertices\n\n"
+        "If there are paired and unpaired selections with no connections \nat the same time in the off sync mode, \n"
+        "the paired connection is given priority, but when you press again, \nthe unpaired selections are also connected.\n"
+        "This prevents unwanted connections.\n"
+        "Works like Stitch if everything is welded in the island.\n\n"
+        "Context keymaps on button:\n"
+        "Default - Weld\n"
+        "Alt - Weld by Distance\n\n"
+        "Has [W] keymap"
+    )
+    bl_options = {"REGISTER", "UNDO"}
 
-    use_by_distance: BoolProperty(name='By Distance', default=False)
-    distance: FloatProperty(name='Distance', default=0.0005, min=0, soft_max=0.05, step=0.0001)  # noqa
-    weld_by_distance_type: EnumProperty(name='Weld by', default='BY_ISLANDS', items=(
-        ('ALL', 'All', ''),
-        ('BY_ISLANDS', 'By Islands', '')
-    ))
+    use_by_distance: BoolProperty(name="By Distance", default=False)
+    distance: FloatProperty(
+        name="Distance", default=0.0005, min=0, soft_max=0.05, step=0.0001
+    )  # noqa
+    weld_by_distance_type: EnumProperty(
+        name="Weld by",
+        default="BY_ISLANDS",
+        items=(("ALL", "All", ""), ("BY_ISLANDS", "By Islands", "")),
+    )
 
-    flip: BoolProperty(name='Flip', default=False, options={'HIDDEN'})
-    use_aspect: BoolProperty(name='Correct Aspect', default=True)
+    flip: BoolProperty(name="Flip", default=False, options={"HIDDEN"})
+    use_aspect: BoolProperty(name="Correct Aspect", default=True)
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == "EDIT_MESH"
 
     def draw(self, context):
         layout = self.layout
         if self.use_by_distance:
-            layout.row(align=True).prop(self, 'weld_by_distance_type', expand=True)
+            layout.row(align=True).prop(self, "weld_by_distance_type", expand=True)
         row = layout.row(align=True)
         row.prop(self, "use_by_distance", text="")
         row.active = self.use_by_distance
-        row.prop(self, 'distance', slider=True)
-        layout.prop(self, 'use_aspect')
+        row.prop(self, "distance", slider=True)
+        layout.prop(self, "use_aspect")
 
     def invoke(self, context, event):
         if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
@@ -662,31 +739,40 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
             umesh.aspect = utils.get_aspect_ratio() if self.use_aspect else 1.0
 
         if self.use_by_distance:
-            selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
+            selected_umeshes, visible_umeshes = (
+                umeshes.filtered_by_selected_and_visible_uv_by_context()
+            )
             umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
             if not umeshes:
                 return umeshes.update()
 
-            if self.weld_by_distance_type == 'BY_ISLANDS':
-                counter_welded, counter_seams = self.weld_by_distance_island(umeshes, extended=bool(selected_umeshes))
+            if self.weld_by_distance_type == "BY_ISLANDS":
+                counter_welded, counter_seams = self.weld_by_distance_island(
+                    umeshes, extended=bool(selected_umeshes)
+                )
             else:
-                counter_welded, counter_seams = self.weld_by_distance_all(umeshes, selected=bool(selected_umeshes))
+                counter_welded, counter_seams = self.weld_by_distance_all(
+                    umeshes, selected=bool(selected_umeshes)
+                )
 
             global LAST_WELD_BY_DISTANCE_TIME
             global LAST_WELD_BY_DISTANCE_COUNTERS
             from time import perf_counter
 
-            delta_time = (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)
+            delta_time = perf_counter() - LAST_WELD_BY_DISTANCE_TIME
             if delta_time > 0.5:
-                if LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams) or delta_time > 1.5:
-                    info = ''
+                if (
+                    LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams)
+                    or delta_time > 1.5
+                ):
+                    info = ""
                     if counter_welded:
-                        info = f'Welded {counter_welded} vertices. '
+                        info = f"Welded {counter_welded} vertices. "
                     if counter_seams:
-                        info += f'Cleaned {counter_seams} seams.'
+                        info += f"Cleaned {counter_seams} seams."
                     if info:
-                        self.report({'INFO'}, 'Weld by Distance: ' + info)
+                        self.report({"INFO"}, "Weld by Distance: " + info)
 
                     LAST_WELD_BY_DISTANCE_TIME = perf_counter()
                     LAST_WELD_BY_DISTANCE_COUNTERS = (counter_welded, counter_seams)
@@ -707,14 +793,14 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                 self.pick_weld(hit)
                 self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
                 bpy.context.area.tag_redraw()
-                return {'FINISHED'}
+                return {"FINISHED"}
 
             self.weld(umeshes)
             self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
             bpy.context.area.tag_redraw()
 
-        umeshes.update(info='Not found verts for weld')
-        return {'FINISHED'}
+        umeshes.update(info="Not found verts for weld")
+        return {"FINISHED"}
 
     def weld(self, umeshes):
         from ..utils import weld_crn_edge_by_idx
@@ -815,7 +901,9 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
                             crn_co = crn[uv].uv
                             shared_next = shared.link_loop_next
-                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(shared_next, uv):
+                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(
+                                shared_next, uv
+                            ):
                                 shared_l_crn[uv].uv = crn_co
 
                             # TODO: Check selection on flipped faces
@@ -854,7 +942,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                             continue
 
                         linked = []
-                        for crn in getattr(v, 'link_loops', ()):
+                        for crn in getattr(v, "link_loops", ()):
                             if get_vert_select(crn) and crn.face.index == idx:
                                 linked.append(crn)
                         all_linked_corners.update(linked)
@@ -863,7 +951,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                 else:
                     for v in unique_verts_3d:
                         linked = []
-                        for crn in getattr(v, 'link_loops', ()):
+                        for crn in getattr(v, "link_loops", ()):
                             if crn.face.index == idx:
                                 linked.append(crn)
                         all_linked_corners.update(linked)
@@ -905,7 +993,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                         continue
 
                     linked = []
-                    for crn in getattr(v, 'link_loops', ()):
+                    for crn in getattr(v, "link_loops", ()):
                         if get_vert_select(crn) and not is_invisible(crn.face):
                             linked.append(crn)
                     all_linked_corners.update(linked)
@@ -914,7 +1002,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
             else:
                 for v in umesh.bm.verts:
                     linked = []
-                    for crn in getattr(v, 'link_loops', ()):
+                    for crn in getattr(v, "link_loops", ()):
                         if not is_invisible(crn.face):
                             linked.append(crn)
                     all_linked_corners.update(linked)
@@ -983,7 +1071,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
     def pick_weld(self, hit: utypes.CrnEdgeHit):
         if not hit:
-            self.report({'WARNING'}, 'Edge not found within a given radius')
+            self.report({"WARNING"}, "Edge not found within a given radius")
             return
 
         sync = hit.umesh.sync
@@ -991,7 +1079,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
         shared = ref_crn.link_loop_radial_prev
         is_visible = utils.is_visible_func(sync)
         if shared == ref_crn or not is_visible(shared.face):
-            self.report({'INFO'}, 'Edge is boundary')
+            self.report({"INFO"}, "Edge is boundary")
             return
 
         uv = hit.umesh.uv
@@ -1007,12 +1095,16 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
         if utils.is_flipped_3d(ref_crn):
             if ref_crn[uv].uv.to_tuple() == shared[uv].uv.to_tuple():  # check a
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
+                    shared_next, uv, sync
+                ):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv  # join b
                 e.seam = False
                 hit.umesh.update()
                 return
-            elif ref_crn.link_loop_next[uv].uv.to_tuple() == shared.link_loop_next[uv].uv.to_tuple():  # check b
+            elif (
+                ref_crn.link_loop_next[uv].uv.to_tuple() == shared.link_loop_next[uv].uv.to_tuple()
+            ):  # check b
                 for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
                     crn[uv].uv = ref_crn[uv].uv  # join a
                 e.seam = False
@@ -1027,14 +1119,16 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                 return
             elif ref_crn.link_loop_next[uv].uv.to_tuple() == shared[uv].uv.to_tuple():  # check b
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
+                    shared_next, uv, sync
+                ):
                     crn[uv].uv = ref_crn[uv].uv  # join a
                 e.seam = False
                 hit.umesh.update()
                 return
 
         if utils.is_flipped_3d(ref_crn):
-            self.report({'WARNING'}, 'Edge has 3D flipped face, need recalculate normals')
+            self.report({"WARNING"}, "Edge has 3D flipped face, need recalculate normals")
 
         if utils.is_flipped_3d(ref_crn):
             ref_isl, isl_set = hit.calc_island_non_manifold_with_flip()
@@ -1047,13 +1141,17 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                     crn[uv].uv = ref_crn[uv].uv
 
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(shared_next, uv, sync):
+                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
+                    shared_next, uv, sync
+                ):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv
                 e.seam = False
                 hit.umesh.update()
             else:
                 shared_next_crn = shared.link_loop_next
-                for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(shared_next_crn, uv, sync):
+                for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(
+                    shared_next_crn, uv, sync
+                ):
                     crn[uv].uv = ref_crn[uv].uv
 
                 for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
@@ -1076,7 +1174,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
     bl_idname = "mesh.univ_weld"
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
+        if event.value == "PRESS":
             self.init_data_for_ray_cast(event)
             return self.execute(context)
         self.use_by_distance = event.alt
@@ -1101,8 +1199,8 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
             if res:
                 return res
 
-        umeshes.update(info='Not found elements for weld')
-        return {'FINISHED'}
+        umeshes.update(info="Not found elements for weld")
+        return {"FINISHED"}
 
     def weld_by_distance_from_3d(self, umeshes):
         selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_by_context()
@@ -1112,30 +1210,37 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
         umeshes.verify_uv()
 
         if not umeshes and not umeshes_without_uv:
-            self.report({'WARNING'}, 'Not found edges for manipulate')
+            self.report({"WARNING"}, "Not found edges for manipulate")
             return
 
         if umeshes:
-            if self.weld_by_distance_type == 'BY_ISLANDS':
-                counter_welded, counter_seams = self.weld_by_distance_island(umeshes, extended=bool(selected_umeshes))
+            if self.weld_by_distance_type == "BY_ISLANDS":
+                counter_welded, counter_seams = self.weld_by_distance_island(
+                    umeshes, extended=bool(selected_umeshes)
+                )
             else:
-                counter_welded, counter_seams = self.weld_by_distance_all(umeshes, selected=bool(selected_umeshes))
+                counter_welded, counter_seams = self.weld_by_distance_all(
+                    umeshes, selected=bool(selected_umeshes)
+                )
             counter_seams += self.clear_seams_from_selected_edges(umeshes_without_uv)
 
             global LAST_WELD_BY_DISTANCE_TIME
             global LAST_WELD_BY_DISTANCE_COUNTERS
             from time import perf_counter
 
-            delta_time = (perf_counter() - LAST_WELD_BY_DISTANCE_TIME)
+            delta_time = perf_counter() - LAST_WELD_BY_DISTANCE_TIME
             if delta_time > 0.5:
-                if LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams) or delta_time > 1.5:
-                    info = ''
+                if (
+                    LAST_WELD_BY_DISTANCE_COUNTERS != (counter_welded, counter_seams)
+                    or delta_time > 1.5
+                ):
+                    info = ""
                     if counter_welded:
-                        info = f'Welded {counter_welded} vertices. '
+                        info = f"Welded {counter_welded} vertices. "
                     if counter_seams:
-                        info += f'Cleaned {counter_seams} seams.'
+                        info += f"Cleaned {counter_seams} seams."
                     if info:
-                        self.report({'INFO'}, 'Weld by Distance: ' + info)
+                        self.report({"INFO"}, "Weld by Distance: " + info)
 
                     LAST_WELD_BY_DISTANCE_TIME = perf_counter()
                     LAST_WELD_BY_DISTANCE_COUNTERS = (counter_welded, counter_seams)
@@ -1147,7 +1252,7 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
         umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
         if not umeshes:
-            return umeshes.update(info='Not found edges for manipulate')
+            return umeshes.update(info="Not found edges for manipulate")
         if not selected_umeshes and self.mouse_pos_from_3d:
             hit = self.ray_cast(umeshes, prefs().max_pick_distance)
             if hit:
@@ -1156,10 +1261,10 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
                     self.pick_weld(hit)
                 else:
                     if not hit.crn.edge.seam:
-                        return {'CANCELLED'}
+                        return {"CANCELLED"}
                     hit.crn.edge.seam = False
                     hit.umesh.update()
-            return {'FINISHED'}
+            return {"FINISHED"}
 
         umeshes_without_uv = umeshes.filtered_by_uv_exist()
         umeshes.verify_uv()
@@ -1172,25 +1277,28 @@ class UNIV_OT_Weld_VIEW3D(UNIV_OT_Weld):
 # noinspection PyTypeHints
 class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
     bl_idname = "uv.univ_stitch"
-    bl_label = 'Stitch'
-    bl_description = "Stitch selected UV vertices by proximity\n\n" \
-                     "Default - Stitch\n" \
-                     "Alt - Stitch Between\n\n" \
-                     "Has [Shift + W] keymap. \n" \
-                     "In sync mode when calling stitch via keymap, the stitch priority is done by mouse cursor.\n" \
-                     "In other cases of pairwise selection, prioritization occurs by island size"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_label = "Stitch"
+    bl_description = (
+        "Stitch selected UV vertices by proximity\n\n"
+        "Default - Stitch\n"
+        "Alt - Stitch Between\n\n"
+        "Has [Shift + W] keymap. \n"
+        "In sync mode when calling stitch via keymap, the stitch priority is done by mouse cursor.\n"
+        "In other cases of pairwise selection, prioritization occurs by island size"
+    )
+    bl_options = {"REGISTER", "UNDO"}
 
-    between: BoolProperty(name='Between', default=False, description='Attention, it is unstable')
-    update_seams: BoolProperty(name='Update Seams', default=True)
-    use_aspect: BoolProperty(name='Correct Aspect', default=True)
-    correct_flip: BoolProperty(name='Correct Flip', default=True)
-    padding_multiplayer: bpy.props.FloatProperty(name='Padding Multiplayer', default=0, min=-32, soft_min=0,
-                                                 soft_max=4, max=32)
+    between: BoolProperty(name="Between", default=False, description="Attention, it is unstable")
+    update_seams: BoolProperty(name="Update Seams", default=True)
+    use_aspect: BoolProperty(name="Correct Aspect", default=True)
+    correct_flip: BoolProperty(name="Correct Flip", default=True)
+    padding_multiplayer: bpy.props.FloatProperty(
+        name="Padding Multiplayer", default=0, min=-32, soft_min=0, soft_max=4, max=32
+    )
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == "EDIT_MESH"
 
     def draw(self, context):
         layout = self.layout
@@ -1242,19 +1350,19 @@ class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
                 if hit:
                     self.pick_stitch(hit)
                 else:
-                    self.report({'WARNING'}, 'Edge not found within a given radius')
+                    self.report({"WARNING"}, "Edge not found within a given radius")
 
                 self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
                 bpy.context.area.tag_redraw()
-                return {'FINISHED'}
+                return {"FINISHED"}
 
             self.stitch(umeshes, self.mouse_position)
 
         self.filter_and_draw_lines(selected_umeshes, visible_umeshes)
         bpy.context.area.tag_redraw()
 
-        umeshes.update(info='Not found islands for stitch')
-        return {'FINISHED'}
+        umeshes.update(info="Not found islands for stitch")
+        return {"FINISHED"}
 
     def pick_stitch(self, hit: utypes.CrnEdgeHit):
         sync = hit.umesh.sync
@@ -1263,11 +1371,13 @@ class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
         shared = ref_crn.link_loop_radial_prev
         is_visible = utils.is_visible_func(sync)
         if shared == ref_crn or not is_visible(shared.face):
-            self.report({'WARNING'}, 'Edge is boundary')
+            self.report({"WARNING"}, "Edge is boundary")
             return
 
         if ref_crn.link_loop_next.vert != shared.vert:
-            self.report({'WARNING'}, 'Edge has 3D flipped face, for correct result need recalculate normals')
+            self.report(
+                {"WARNING"}, "Edge has 3D flipped face, for correct result need recalculate normals"
+            )
 
         uv = hit.umesh.uv
         e = ref_crn.edge
@@ -1276,13 +1386,15 @@ class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
                 e.seam = False
                 hit.umesh.update()
             else:
-                self.report({'INFO'}, 'The edge was already stitched, no action was taken')
+                self.report({"INFO"}, "The edge was already stitched, no action was taken")
             return
 
         ref_isl, isl_set = hit.calc_island_with_seam()
 
         if shared.face in isl_set:
-            self.report({'WARNING'}, 'It is not possible to use Stitch on itself, use Weld operator')
+            self.report(
+                {"WARNING"}, "It is not possible to use Stitch on itself, use Weld operator"
+            )
         else:
             ref_lg = LoopGroup(hit.umesh)
             ref_lg.corners = [hit.crn]
@@ -1298,7 +1410,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
     bl_idname = "mesh.univ_stitch"
 
     def invoke(self, context, event):
-        if event.value == 'PRESS':
+        if event.value == "PRESS":
             self.init_data_for_ray_cast(event)
             return self.execute(context)
         self.between = event.alt
@@ -1318,8 +1430,9 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
         settings = univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / \
-            min(int(settings.size_x), int(settings.size_y))
+        self.padding = int(settings.padding * self.padding_multiplayer) / min(
+            int(settings.size_x), int(settings.size_y)
+        )
 
         if self.between:
             self.stitch_between(umeshes)
@@ -1327,8 +1440,8 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
             res = self.stitch_by_edge(umeshes)
             if res:
                 return res
-        umeshes.update(info='Not found islands for stitch')
-        return {'FINISHED'}
+        umeshes.update(info="Not found islands for stitch")
+        return {"FINISHED"}
 
     def stitch_between(self, umeshes):
         umeshes.filtered_by_selected_uv_faces()
@@ -1351,8 +1464,11 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
                 img_size = utils.get_active_image_size()
                 if img_size:  # TODO: Get active image size from material id
                     if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
-                        self.report({'WARNING'}, 'Global and Active texture sizes have different values, '
-                                                 'which will result in incorrect padding.')
+                        self.report(
+                            {"WARNING"},
+                            "Global and Active texture sizes have different values, "
+                            "which will result in incorrect padding.",
+                        )
 
             hit = self.ray_cast(umeshes, prefs().max_pick_distance)
             if hit:
@@ -1361,11 +1477,11 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
                     self.pick_stitch(hit)
                 else:
                     if not hit.crn.edge.seam:
-                        return {'CANCELLED'}
+                        return {"CANCELLED"}
                     hit.crn.edge.seam = False
                     hit.umesh.update()
-                    return {'FINISHED'}
-            return {'FINISHED'}
+                    return {"FINISHED"}
+            return {"FINISHED"}
 
         without_uv = umeshes.filtered_by_uv_exist()
         umeshes.verify_uv()

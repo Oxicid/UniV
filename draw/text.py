@@ -13,13 +13,14 @@ from .. import utils
 
 class TextDraw:
     """NOTE: max_draw_time and target_area automatically revert to their default values."""
+
     start_time = time()
     max_draw_time = 1.5
     width: int = 0
     height: int = 0
     y_pad__with_text: list[tuple[int, str]] = []
     handler: None = None
-    target_area: typing.Literal['UV', 'VIEW_3D'] = 'UV'
+    target_area: typing.Literal["UV", "VIEW_3D"] = "UV"
     size: int = 16
 
     @classmethod
@@ -28,63 +29,65 @@ class TextDraw:
         cls.size = size
         cls._text_precessing(text)
 
-        if cls.target_area == 'UV':
+        if cls.target_area == "UV":
             sima_or_view3d = bpy.types.SpaceImageEditor
         else:
             sima_or_view3d = bpy.types.SpaceView3D
         if not (cls.handler is None):
-            sima_or_view3d.draw_handler_remove(cls.handler, 'WINDOW')
+            sima_or_view3d.draw_handler_remove(cls.handler, "WINDOW")
 
-        cls.handler = sima_or_view3d.draw_handler_add(cls.draw_callback_px_uv_area, (), 'WINDOW', 'POST_PIXEL')
+        cls.handler = sima_or_view3d.draw_handler_add(
+            cls.draw_callback_px_uv_area, (), "WINDOW", "POST_PIXEL"
+        )
         bpy.app.timers.register(cls.uv_area_draw_timer)
 
     @classmethod
     def uv_area_draw_timer(cls):
         if cls.handler is None:
             cls.max_draw_time = 1.5
-            cls.target_area = 'UV'
+            cls.target_area = "UV"
             return None
         counter = time() - cls.start_time
 
         if counter < cls.max_draw_time:
             return 0.2
 
-        if cls.target_area == 'UV':
+        if cls.target_area == "UV":
             sima_or_view3d = bpy.types.SpaceImageEditor
         else:
             sima_or_view3d = bpy.types.SpaceView3D
-        sima_or_view3d.draw_handler_remove(cls.handler, 'WINDOW')
+        sima_or_view3d.draw_handler_remove(cls.handler, "WINDOW")
 
         for a in bpy.context.screen.areas:
-            if cls.target_area == 'UV':
-                if a.type == 'IMAGE_EDITOR' and a.ui_type == 'UV':
+            if cls.target_area == "UV":
+                if a.type == "IMAGE_EDITOR" and a.ui_type == "UV":
                     a.tag_redraw()
-            elif cls.target_area == 'VIEW_3D':
-                if a.type == 'VIEW_3D':
+            elif cls.target_area == "VIEW_3D":
+                if a.type == "VIEW_3D":
                     a.tag_redraw()
 
         cls.handler = None
         cls.max_draw_time = 1.5
-        cls.target_area = 'UV'
+        cls.target_area = "UV"
         return None
 
     @classmethod
     def draw_callback_px_uv_area(cls):
         area = bpy.context.area
-        if cls.target_area == 'UV':
-            if area.ui_type != 'UV':
+        if cls.target_area == "UV":
+            if area.ui_type != "UV":
                 return
         else:
             if area.type != cls.target_area:
                 return
 
-        n_panel_width = next(r.width for r in area.regions if r.type == 'UI')
+        n_panel_width = next(r.width for r in area.regions if r.type == "UI")
         if (area.width - n_panel_width) < cls.width or area.height < cls.height:
             return
 
         x_pos = area.width - n_panel_width - cls.width
 
-        gpu.state.blend_set('ALPHA')
+        gpu.state.blend_set("ALPHA")
         font_id = 0
         utils.blf_size(font_id, cls.size)
 
@@ -93,7 +96,7 @@ class TextDraw:
             blf.position(font_id, x_pos, y_pad, 0)
             blf.draw(font_id, txt)
 
-        gpu.state.blend_set('NONE')
+        gpu.state.blend_set("NONE")
 
     @classmethod
     def _text_precessing(cls, text):
@@ -101,7 +104,7 @@ class TextDraw:
         utils.blf_size(font_id, cls.size)
 
         text = [text] if isinstance(text, str) else text
-        text_x_size, char_y_size = blf.dimensions(font_id, 'T')
+        text_x_size, char_y_size = blf.dimensions(font_id, "T")
         pad_x = 40
         cls.width = max(len(line) for line in text) * text_x_size + pad_x
 

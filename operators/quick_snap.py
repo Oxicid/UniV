@@ -27,8 +27,10 @@ class eSnapPointMode(enum.IntFlag):
     FACE = 1 << 3
     ALL = VERTEX | EDGE | FACE
 
+
 class GlobalSnapFlags:
     grid_snap: bool = False
+
 
 class SnapMode:
     def __init__(self):
@@ -37,7 +39,7 @@ class SnapMode:
 
     def snap_mode_init(self):
         self.snap_points_mode = eSnapPointMode.VERTEX
-        if prefs().snap_points_default == 'FOLLOW_MODE':
+        if prefs().snap_points_default == "FOLLOW_MODE":
             if self.sync:
                 if bpy.context.tool_settings.mesh_select_mode[1]:  # EDGE
                     self.snap_points_mode |= eSnapPointMode.EDGE
@@ -45,26 +47,26 @@ class SnapMode:
                     self.snap_points_mode |= eSnapPointMode.FACE
             else:
                 uv_mode = utils.get_select_mode_uv()
-                if uv_mode in ('FACE', 'ISLAND'):
+                if uv_mode in ("FACE", "ISLAND"):
                     self.snap_points_mode |= eSnapPointMode.FACE
-                elif uv_mode == 'EDGE':
+                elif uv_mode == "EDGE":
                     self.snap_points_mode |= eSnapPointMode.EDGE
         else:
             self.snap_points_mode = eSnapPointMode.ALL
 
     def snap_mode_update(self, event):
         match event.type:
-            case 'ONE':
+            case "ONE":
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.VERTEX
                 else:
                     self.snap_points_mode = eSnapPointMode.VERTEX
-            case 'TWO':
+            case "TWO":
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.EDGE
                 else:
                     self.snap_points_mode = eSnapPointMode.EDGE
-            case 'THREE':
+            case "THREE":
                 if event.shift:
                     self.snap_points_mode ^= eSnapPointMode.FACE
                 else:
@@ -229,8 +231,9 @@ class QuickSnap_KDMeshes:
 
         if GlobalSnapFlags.grid_snap:
             from .. import btypes
+
             zoom = btypes.View2D.get_zoom(self.view)
-            divider = 1/8 if zoom <= 1600 else 1 / 64
+            divider = 1 / 8 if zoom <= 1600 else 1 / 64
             divider = divider if zoom <= 12800 else 1 / 64 / 8
             pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
             dist_to_grid = (pos - m_pos).length
@@ -299,14 +302,14 @@ class QuickSnap_KDMeshes:
 class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
     bl_idname = "uv.univ_quick_snap"
     bl_label = "Quick Snap"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
-    island_mode: bpy.props.BoolProperty(name='Island Mode', default=True)
-    quick_start: bpy.props.BoolProperty(name='Quick Start', default=True)
+    island_mode: bpy.props.BoolProperty(name="Island Mode", default=True)
+    quick_start: bpy.props.BoolProperty(name="Quick Start", default=True)
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == "EDIT_MESH"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -332,7 +335,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
         self.visible: bool | None = None
         self.radius: float = 0.0
-        self.axis: str = ''
+        self.axis: str = ""
 
         self._cancel: bool = False
 
@@ -340,9 +343,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
     def invoke(self, context, event):
         self.area = context.area
-        if self.area.ui_type != 'UV':
-            self.report({'INFO'}, 'Area must be UV')
-            return {'CANCELLED'}
+        if self.area.ui_type != "UV":
+            self.report({"INFO"}, "Area must be UV")
+            return {"CANCELLED"}
         self.view = context.region.view2d
         self.sync = utils.sync()
         self.shader = shaders.POINT_UNIFORM_COLOR_3D
@@ -361,26 +364,27 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
         wm = context.window_manager
         wm.modal_handler_add(self)
-        return {'RUNNING_MODAL'}
+        return {"RUNNING_MODAL"}
 
     def modal(self, context, event):
         try:
             return self.modal_ex(context, event)
         except Exception as e:  # noqa
             import traceback
+
             traceback.print_exc()
-            self.report({'ERROR'}, str(e))
+            self.report({"ERROR"}, str(e))
             self.umeshes.silent_update()
             self.exit()
-            return {'FINISHED'}
+            return {"FINISHED"}
 
     def modal_ex(self, _context, event):
         # print()
         # print(f'{event.type = }')
         # print(f'{event.value = }')
 
-        if event.type in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE', 'MIDDLEMOUSE'}:
-            return {'PASS_THROUGH'}
+        if event.type in {"WHEELUPMOUSE", "WHEELDOWNMOUSE", "MIDDLEMOUSE"}:
+            return {"PASS_THROUGH"}
 
         # TODO: Test
         # if event.type == 'INBETWEEN_MOUSEMOVE':  # fix over move
@@ -388,38 +392,38 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
         self.calc_radius_and_mouse_position(event)
 
-        if event.type in ('ESC', 'RIGHTMOUSE'):
+        if event.type in ("ESC", "RIGHTMOUSE"):
             self._cancel = self.dragged
             return self.exit()
 
-        if event.type == 'LEFTMOUSE' and event.value == 'RELEASE':
+        if event.type == "LEFTMOUSE" and event.value == "RELEASE":
             return self.exit()
 
-        axis_sliding_event = event.type in ('X', 'Y')
-        if axis_sliding_event and event.value == 'PRESS':
-            if event.type == 'X':
-                if self.axis == 'X':
-                    self.axis = ''
+        axis_sliding_event = event.type in ("X", "Y")
+        if axis_sliding_event and event.value == "PRESS":
+            if event.type == "X":
+                if self.axis == "X":
+                    self.axis = ""
                 else:
-                    self.axis = 'X'
+                    self.axis = "X"
             else:
-                if self.axis == 'Y':
-                    self.axis = ''
+                if self.axis == "Y":
+                    self.axis = ""
                 else:
-                    self.axis = 'Y'
+                    self.axis = "Y"
 
-        if event.type == 'G' and event.value == 'PRESS':
+        if event.type == "G" and event.value == "PRESS":
             GlobalSnapFlags.grid_snap ^= 1
             self.area.tag_redraw()
 
-        if event.value == 'PRESS' and event.type in {'ONE', 'TWO', 'THREE', 'FOUR'}:
+        if event.value == "PRESS" and event.type in {"ONE", "TWO", "THREE", "FOUR"}:
             self.snap_mode_update(event)
             self.area.tag_redraw()
 
         if self.dragged:
             if self.mouse_position == self.prev_elem_position.to_3d():
                 if not axis_sliding_event:
-                    return {'RUNNING_MODAL'}
+                    return {"RUNNING_MODAL"}
 
             self.points = self.find_range()
             self.refresh_draw_points()
@@ -438,23 +442,25 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                 pos = self.mouse_position.to_2d()
 
             # Sliding by axis
-            if self.axis == 'X':
+            if self.axis == "X":
                 pos.y = self.first_pick_co.y
-            if self.axis == 'Y':
+            if self.axis == "Y":
                 pos.x = self.first_pick_co.x
 
             self.move_object.set_position(pos, self.prev_elem_position)
             self.prev_elem_position = pos
             self.umeshes.silent_update()
             self.area.tag_redraw()
-            return {'RUNNING_MODAL'}
+            return {"RUNNING_MODAL"}
 
-        if event.type == 'TAB' and event.value == 'PRESS':
+        if event.type == "TAB" and event.value == "PRESS":
             self.island_mode = not self.island_mode
             self.preprocessing()
             self.area.tag_redraw()
 
-        if event.type == 'MOUSEMOVE' and not self.quick_start:  # ', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}:
+        if (
+            event.type == "MOUSEMOVE" and not self.quick_start
+        ):  # ', 'WHEELUPMOUSE', 'WHEELDOWNMOUSE'}:
 
             self.points = self.find_range()
             self.refresh_draw_points()
@@ -467,13 +473,13 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
             self.area.tag_redraw()
 
-        elif event.type == 'LEFTMOUSE' or self.quick_start:
+        elif event.type == "LEFTMOUSE" or self.quick_start:
 
             kd_data = self.find()
             if not kd_data:
                 self.quick_start = False
-                self.report({'WARNING'}, 'Not found nearest elem')
-                return {'PASS_THROUGH'}
+                self.report({"WARNING"}, "Not found nearest elem")
+                return {"PASS_THROUGH"}
 
             self.dragged = True
             if self.island_mode:
@@ -498,8 +504,8 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.umeshes.silent_update()
             self.area.tag_redraw()
 
-            return {'RUNNING_MODAL'}
-        return {'RUNNING_MODAL'}
+            return {"RUNNING_MODAL"}
+        return {"RUNNING_MODAL"}
 
     def preprocessing(self):
         if self.island_mode:
@@ -551,7 +557,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     _face = kd_data.elem if isinstance(kd_data.elem, BMFace) else kd_data.elem.face
                     self.move_object = AdvIsland([_face], _kdmesh.umesh)
                     islands = _kdmesh.islands
-                    assert (len(islands) == 1)
+                    assert len(islands) == 1
 
                     if isinstance(islands[0].faces, list):
                         islands[0].faces.remove(_face)
@@ -582,7 +588,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     # Edge Mode with preserve boundary
                     # If the peak group non has_non_sync_crn, we still add it, but all other
                     # non has_non_sync_crn groups do not
-                    _crn = kd_data.elem.loops[0] if isinstance(kd_data.elem, BMFace) else kd_data.elem
+                    _crn = (
+                        kd_data.elem.loops[0] if isinstance(kd_data.elem, BMFace) else kd_data.elem
+                    )
                     lgs = _kdmesh.loop_groups
                     lgs.indexing()
 
@@ -593,7 +601,9 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
                     move_corners_of_mesh: list[LoopGroup] = []
 
                     kd_data.kdmesh.umesh.tag_selected_corners()
-                    if picked_lg.has_sync_crn():  # Transform only picked group if it has sync corner in loop_group
+                    if (
+                        picked_lg.has_sync_crn()
+                    ):  # Transform only picked group if it has sync corner in loop_group
                         move_corners_of_mesh.append(picked_lg)
                         for umesh in self.umeshes:
                             umesh.tag_visible_corners()
@@ -749,20 +759,24 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.kdmeshes.kdmeshes.remove(_kdmesh)
 
     def calc_radius_and_mouse_position(self, event):
-        mouse_position = Vector(self.view.region_to_view(event.mouse_region_x, event.mouse_region_y))
+        mouse_position = Vector(
+            self.view.region_to_view(event.mouse_region_x, event.mouse_region_y)
+        )
         dist = prefs().max_pick_distance // 2 if self.dragged else prefs().max_pick_distance
         self.radius = utils.get_max_distance_from_px(dist, self.view)
         self.mouse_position = mouse_position.to_3d()
 
     def register_draw(self):
         self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(
-            self.univ_quick_snap_ui_draw_callback, (), 'WINDOW', 'POST_PIXEL')
+            self.univ_quick_snap_ui_draw_callback, (), "WINDOW", "POST_PIXEL"
+        )
         self.handler = bpy.types.SpaceImageEditor.draw_handler_add(
-            self.univ_quick_snap_draw_callback, (), 'WINDOW', 'POST_VIEW')
+            self.univ_quick_snap_draw_callback, (), "WINDOW", "POST_VIEW"
+        )
         self.area.tag_redraw()
 
     def univ_quick_snap_draw_callback(self):
-        if bpy.context.area.ui_type != 'UV':
+        if bpy.context.area.ui_type != "UV":
             return
 
         shaders.set_point_size(4)
@@ -773,7 +787,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.batch.draw(self.shader)
 
         self.nearest_point[0] = self.nearest_point[0].to_3d()
-        batch_nearest = batch_for_shader(self.shader, 'POINTS', {"pos": self.nearest_point})
+        batch_nearest = batch_for_shader(self.shader, "POINTS", {"pos": self.nearest_point})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)
 
@@ -784,10 +798,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
     def univ_quick_snap_ui_draw_callback(self):
         area = bpy.context.area
-        if area.ui_type != 'UV':
+        if area.ui_type != "UV":
             return
 
-        n_panel_width = next(r.width for r in area.regions if r.type == 'UI')
+        n_panel_width = next(r.width for r in area.regions if r.type == "UI")
         max_dim = 240
         if (area.width - n_panel_width) < max_dim or area.height < max_dim:
             return
@@ -795,71 +809,75 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         first_col = area.width - max_dim - n_panel_width
         second_col = first_col + 90
 
-        gpu.state.blend_set('ALPHA')
+        gpu.state.blend_set("ALPHA")
 
         font_id = 0
         utils.blf_size(font_id, 16)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
 
-        text_y_size = blf.dimensions(0, 'T')[1]
+        text_y_size = blf.dimensions(0, "T")[1]
         text_y_size *= 1.75
 
         blf.position(font_id, first_col, 20, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
-        blf.draw(font_id, 'Tab')
+        blf.draw(font_id, "Tab")
         blf.position(font_id, second_col, 20, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
-        blf.draw(font_id, 'Island Mode' if self.island_mode else 'Element Mode')
+        blf.draw(font_id, "Island Mode" if self.island_mode else "Element Mode")
 
         blf.position(font_id, first_col, 20 + text_y_size, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
-        blf.draw(font_id, 'X, Y')
+        blf.draw(font_id, "X, Y")
         blf.position(font_id, second_col, 20 + text_y_size, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, f"Axis: {self.axis if self.axis else 'Both'}")
 
-        blf.position(font_id, first_col, 20 + text_y_size*2, 0)
+        blf.position(font_id, first_col, 20 + text_y_size * 2, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
-        blf.draw(font_id, 'G')
-        blf.position(font_id, second_col, 20 + text_y_size*2, 0)
+        blf.draw(font_id, "G")
+        blf.position(font_id, second_col, 20 + text_y_size * 2, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, f"Grid: {'Enabled' if GlobalSnapFlags.grid_snap else 'Disabled'}")
 
-        text = self.snap_points_mode.name if self.snap_points_mode else 'NONE'
+        text = self.snap_points_mode.name if self.snap_points_mode else "NONE"
         if text is None:
-            text = str(self.snap_points_mode).split('.')[1]
+            text = str(self.snap_points_mode).split(".")[1]
 
-        blf.position(font_id, first_col, 20 + text_y_size*3, 0)
+        blf.position(font_id, first_col, 20 + text_y_size * 3, 0)
         blf.color(font_id, 0.75, 0.75, 0.75, 0.85)
-        blf.draw(font_id, '(Shift) 1-4')
-        blf.position(font_id, second_col, 20 + text_y_size*3, 0)
+        blf.draw(font_id, "(Shift) 1-4")
+        blf.position(font_id, second_col, 20 + text_y_size * 3, 0)
         blf.color(font_id, 0.95, 0.95, 0.95, 0.85)
         blf.draw(font_id, text)
 
-        gpu.state.blend_set('NONE')
+        gpu.state.blend_set("NONE")
 
     def refresh_draw_points(self):
-        self.batch = batch_for_shader(self.shader, 'POINTS', {"pos": self.points})
+        self.batch = batch_for_shader(self.shader, "POINTS", {"pos": self.points})
 
     def exit(self):
         if self._cancel:
-            if not (self.first_pick_co is None or self.prev_elem_position is None or self.move_object is None):
+            if not (
+                self.first_pick_co is None
+                or self.prev_elem_position is None
+                or self.move_object is None
+            ):
                 if self.move_object.move(self.first_pick_co - self.prev_elem_position):
                     self.umeshes.silent_update()
             else:
                 if debug() and self.move_object:
-                    self.report({'WARNING'}, 'Failed to cancel the operator')
+                    self.report({"WARNING"}, "Failed to cancel the operator")
 
         if not (self.handler is None):
-            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, 'WINDOW')
-            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler_ui, 'WINDOW')
+            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler, "WINDOW")
+            bpy.types.SpaceImageEditor.draw_handler_remove(self.handler_ui, "WINDOW")
 
             for window in bpy.context.window_manager.windows:
                 for area in window.screen.areas:
-                    if area.ui_type == 'UV':
+                    if area.ui_type == "UV":
                         area.tag_redraw()
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     def calc_update_meshes(self):
         if isinstance(self.move_object, AdvIsland):

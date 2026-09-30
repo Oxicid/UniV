@@ -8,7 +8,6 @@ from .. import utypes
 from .. import utils
 from ..preferences import prefs, checker_generated_types
 
-
 # Patterns for future
 # _ARS-10.5  # Arrow Scale
 # _C(1,2,3)-FFFFFF_  # Color
@@ -24,35 +23,34 @@ class UNIV_OT_Checker(bpy.types.Operator):
     bl_idname = "mesh.univ_checker"
     bl_label = "Checker"
     bl_description = "Used as a texture for testing UV maps"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     def draw(self, context):
         layout = self.layout
         pref = prefs()
 
-        row = layout.row(align=True, heading='Texture Type')
+        row = layout.row(align=True, heading="Texture Type")
         row.scale_x = 0.92
-        row.prop(pref, 'checker_generated_type', expand=True)
+        row.prop(pref, "checker_generated_type", expand=True)
 
-        row = layout.row(align=True, heading='Apply Method')
+        row = layout.row(align=True, heading="Apply Method")
         row.scale_x = 0.92
-        row.prop(pref, 'checker_toggle', expand=True)
+        row.prop(pref, "checker_toggle", expand=True)
 
-
-        row = layout.row(align=True, heading='Size')
-        row.prop(pref, 'size_x', text='')
-        row.prop(pref, 'lock_size', text='', icon='LOCKED' if pref.lock_size else 'UNLOCKED')
-        row.prop(pref, 'size_y', text='')
+        row = layout.row(align=True, heading="Size")
+        row.prop(pref, "size_x", text="")
+        row.prop(pref, "lock_size", text="", icon="LOCKED" if pref.lock_size else "UNLOCKED")
+        row.prop(pref, "size_y", text="")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.full_pattern_name: str = ''
+        self.full_pattern_name: str = ""
         self.shader = None
         self.batch = None
 
     def execute(self, context):
-        self.checker_default(prefs().checker_toggle == 'TOGGLE')
-        return {'FINISHED'}
+        self.checker_default(prefs().checker_toggle == "TOGGLE")
+        return {"FINISHED"}
 
     def checker_default(self, toggle):
         if self.sanitize_generated_textures():
@@ -64,13 +62,13 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
         node_group = self.get_checker_node_group()
         for obj in bpy.context.selected_objects:
-            utils.remove_univ_duplicate_modifiers(obj, 'UniV Checker', toggle_enable=toggle)
+            utils.remove_univ_duplicate_modifiers(obj, "UniV Checker", toggle_enable=toggle)
 
         def set_active_image():
             area = bpy.context.area
-            if area and area.type == 'IMAGE_EDITOR':
+            if area and area.type == "IMAGE_EDITOR":
                 for node in mtl.node_tree.nodes:
-                    if node.bl_idname == 'ShaderNodeTexImage':
+                    if node.bl_idname == "ShaderNodeTexImage":
                         if node.image:
                             assert node.image.name.startswith(self.full_pattern_name)
                             space_data = area.spaces.active
@@ -93,7 +91,10 @@ class UNIV_OT_Checker(bpy.types.Operator):
         for image in reversed(bpy.data.images):
             image_name = image.name
             if image_name.startswith(self.full_pattern_name):
-                if self.has_x_after_resolution(image_name) or tuple(image.size) != prefs().glob_size:
+                if (
+                    self.has_x_after_resolution(image_name)
+                    or tuple(image.size) != prefs().glob_size
+                ):
                     if image.users == 0:
                         bpy.data.images.remove(image)
                         print(f"UniV: Checker Image '{image_name}' was removed")
@@ -103,20 +104,24 @@ class UNIV_OT_Checker(bpy.types.Operator):
         return self.generate_checker_texture()
 
     def material_is_changed_by_context(self, mtl):
-        if getattr(mtl, 'use_nodes', True):
+        if getattr(mtl, "use_nodes", True):
             nodes = mtl.node_tree.nodes
             if len(nodes) == 3:
                 # TODO: Log it.
-                output_node = [n for n in nodes if n.bl_idname == 'ShaderNodeOutputMaterial']
+                output_node = [n for n in nodes if n.bl_idname == "ShaderNodeOutputMaterial"]
                 if output_node:
-                    if output_node[0].target == 'ALL' and output_node[0].inputs[0].links:
+                    if output_node[0].target == "ALL" and output_node[0].inputs[0].links:
                         diffuse = output_node[0].inputs[0].links[0].from_node
-                        if not diffuse.mute and diffuse.bl_idname == 'ShaderNodeBsdfDiffuse':
+                        if not diffuse.mute and diffuse.bl_idname == "ShaderNodeBsdfDiffuse":
                             if diffuse.inputs[0].links:
                                 img_node = diffuse.inputs[0].links[0].from_node
-                                if not img_node.mute and img_node.bl_idname == 'ShaderNodeTexImage':
+                                if not img_node.mute and img_node.bl_idname == "ShaderNodeTexImage":
                                     img = img_node.image
-                                    if img and img.name.startswith(self.full_pattern_name) and not self.has_x_after_resolution(img.name):
+                                    if (
+                                        img
+                                        and img.name.startswith(self.full_pattern_name)
+                                        and not self.has_x_after_resolution(img.name)
+                                    ):
                                         if tuple(img.size) == prefs().glob_size:
                                             return False
         return True
@@ -125,7 +130,9 @@ class UNIV_OT_Checker(bpy.types.Operator):
         for mtl in reversed(bpy.data.materials):
             mtl_name = mtl.name
             if mtl_name.startswith(self.full_pattern_name):
-                if self.has_x_after_resolution(mtl_name) or self.material_is_changed_by_context(mtl):
+                if self.has_x_after_resolution(mtl_name) or self.material_is_changed_by_context(
+                    mtl
+                ):
                     if mtl.users == 0:
                         bpy.data.materials.remove(mtl)
                         print(f"UniV: Checker Material '{mtl_name}' was removed")
@@ -136,7 +143,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
         img = self.get_exist_texture_or_create()
 
         area = bpy.context.area
-        if area and area.type == 'IMAGE_EDITOR':
+        if area and area.type == "IMAGE_EDITOR":
             space_data = area.spaces.active
             if space_data:
                 if space_data.image != img:
@@ -144,7 +151,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
                     area.tag_redraw()
 
         mtl = bpy.data.materials.new(name=self.full_pattern_name)
-        if hasattr(mtl, 'use_nodes'):
+        if hasattr(mtl, "use_nodes"):
             mtl.use_nodes = True
 
         nodes = mtl.node_tree.nodes
@@ -174,33 +181,36 @@ class UNIV_OT_Checker(bpy.types.Operator):
         if len(nodes) != 3:
             return True
         # Output node check.
-        output_node = [n for n in nodes if n.bl_idname == 'NodeGroupOutput']
+        output_node = [n for n in nodes if n.bl_idname == "NodeGroupOutput"]
         if output_node and output_node[0].inputs:  # Check output node exist and exist inputs.
             output_links = output_node[0].inputs[0].links
             if output_links:  # Check links exist.
 
                 # Material node check.
                 set_mtl_node = output_links[0].from_node
-                if set_mtl_node.bl_idname == 'GeometryNodeSetMaterial':
+                if set_mtl_node.bl_idname == "GeometryNodeSetMaterial":
                     geom_link_to_input_node = set_mtl_node.inputs[0].links
                     if not geom_link_to_input_node:
                         return True
 
                     # Input node check.
                     input_node = geom_link_to_input_node[0].from_node
-                    if input_node.bl_idname == 'NodeGroupInput':
+                    if input_node.bl_idname == "NodeGroupInput":
                         if len(input_node.outputs) != 3:
                             return True
 
                         mtl_link_to_input_node = set_mtl_node.inputs[2].links
-                        if mtl_link_to_input_node and mtl_link_to_input_node[0].from_node == input_node:
+                        if (
+                            mtl_link_to_input_node
+                            and mtl_link_to_input_node[0].from_node == input_node
+                        ):
                             return False
         return True
 
     def get_checker_node_group(self):
         """Get exist checker node group"""
         for ng in reversed(bpy.data.node_groups):
-            if ng.name.startswith('UniV Checker'):
+            if ng.name.startswith("UniV Checker"):
                 if self.checker_node_group_is_changed(ng):
                     if ng.users == 0:
                         bpy.data.node_groups.remove(ng)
@@ -213,7 +223,7 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
     @staticmethod
     def _create_checker_node_group():
-        node_group = bpy.data.node_groups.new(name='UniV Checker', type='GeometryNodeTree')
+        node_group = bpy.data.node_groups.new(name="UniV Checker", type="GeometryNodeTree")
 
         input_node = node_group.nodes.new(type="NodeGroupInput")
         output_node = node_group.nodes.new(type="NodeGroupOutput")
@@ -221,77 +231,83 @@ class UNIV_OT_Checker(bpy.types.Operator):
         input_node.location = (-200, 0)
         output_node.location = (200, 0)
 
-        iface = getattr(node_group, 'interface', None)
+        iface = getattr(node_group, "interface", None)
         if iface:
-            iface.new_socket('Input', description="", in_out='INPUT', socket_type='NodeSocketGeometry')
-            iface.new_socket('Checker Material', description="", in_out='INPUT', socket_type='NodeSocketMaterial')
-            iface.new_socket('Output', description="", in_out='OUTPUT', socket_type='NodeSocketGeometry')
+            iface.new_socket(
+                "Input", description="", in_out="INPUT", socket_type="NodeSocketGeometry"
+            )
+            iface.new_socket(
+                "Checker Material", description="", in_out="INPUT", socket_type="NodeSocketMaterial"
+            )
+            iface.new_socket(
+                "Output", description="", in_out="OUTPUT", socket_type="NodeSocketGeometry"
+            )
         else:
-            node_group.inputs.new('NodeSocketGeometry', 'Input')
-            node_group.inputs.new('NodeSocketMaterial', 'Checker Material')
-            node_group.outputs.new('NodeSocketGeometry', 'Output')
+            node_group.inputs.new("NodeSocketGeometry", "Input")
+            node_group.inputs.new("NodeSocketMaterial", "Checker Material")
+            node_group.outputs.new("NodeSocketGeometry", "Output")
 
         set_material_node = node_group.nodes.new(type="GeometryNodeSetMaterial")
         set_material_node.location = (0, 0)
 
-        mtl_socket = [s for s in set_material_node.inputs if s.bl_idname == 'NodeSocketMaterial'][0]
+        mtl_socket = [s for s in set_material_node.inputs if s.bl_idname == "NodeSocketMaterial"][0]
 
-        node_group.links.new(input_node.outputs['Input'], set_material_node.inputs['Geometry'])
-        node_group.links.new(set_material_node.outputs['Geometry'], output_node.inputs['Output'])
-        node_group.links.new(input_node.outputs['Checker Material'], mtl_socket)
+        node_group.links.new(input_node.outputs["Input"], set_material_node.inputs["Geometry"])
+        node_group.links.new(set_material_node.outputs["Geometry"], output_node.inputs["Output"])
+        node_group.links.new(input_node.outputs["Checker Material"], mtl_socket)
 
         return node_group
 
     @staticmethod
     def create_gn_checker_modifier(node_group, mtl):
         for obj in bpy.context.selected_objects:
-            if not obj.type == 'MESH':
+            if not obj.type == "MESH":
                 continue
             has_checker_modifier = False
             for m in obj.modifiers:
                 if not isinstance(m, bpy.types.NodesModifier):
                     continue
-                if m.name.startswith('UniV Checker'):
+                if m.name.startswith("UniV Checker"):
                     has_checker_modifier = True
                     if m.node_group != node_group:
                         m.node_group = node_group
 
                     gn_mod = utils.GN(m, print_missed_socket=True)
-                    if 'Socket_1' in gn_mod:
-                        if gn_mod['Socket_1'] != mtl:
-                            gn_mod['Socket_1'] = mtl
+                    if "Socket_1" in gn_mod:
+                        if gn_mod["Socket_1"] != mtl:
+                            gn_mod["Socket_1"] = mtl
                     obj.update_tag()  # TODO: No update when not changed (check).
                     break
             if not has_checker_modifier:
-                m = obj.modifiers.new(name='UniV Checker', type='NODES')
+                m = obj.modifiers.new(name="UniV Checker", type="NODES")
                 m.node_group = node_group
                 m.show_render = False
                 gn_mod = utils.GN(m, print_missed_socket=True)
-                if 'Socket_1' in gn_mod:
-                    gn_mod['Socket_1'] = mtl
+                if "Socket_1" in gn_mod:
+                    gn_mod["Socket_1"] = mtl
 
     @staticmethod
     def all_has_enable_gn_checker_modifier():
         counter = 0
-        selected_objects = [obj_ for obj_ in bpy.context.selected_objects if obj_.type == 'MESH']
+        selected_objects = [obj_ for obj_ in bpy.context.selected_objects if obj_.type == "MESH"]
         for obj in selected_objects:
             for m in obj.modifiers:
                 if isinstance(m, bpy.types.NodesModifier):
-                    if m.name.startswith('UniV Checker'):
-                        counter += (m.show_in_editmode and m.show_viewport)
+                    if m.name.startswith("UniV Checker"):
+                        counter += m.show_in_editmode and m.show_viewport
                         break
         return len(selected_objects) == counter
 
     @staticmethod
     def enable_and_set_gn_checker_modifier(node_group, mtl):
         for obj in bpy.context.selected_objects:
-            if not obj.type == 'MESH':
+            if not obj.type == "MESH":
                 continue
             has_checker_modifier = False
             for m in obj.modifiers:
                 if not isinstance(m, bpy.types.NodesModifier):
                     continue
-                if m.name.startswith('UniV Checker'):
+                if m.name.startswith("UniV Checker"):
                     if not m.show_in_editmode:
                         m.show_in_editmode = True
                     if not m.show_viewport:
@@ -299,51 +315,53 @@ class UNIV_OT_Checker(bpy.types.Operator):
 
                     # Set fixed node groups.
                     if m.node_group != node_group:
-                        print(f"UniV: Checker: Restored {node_group.name!r} Node Group for {m.name!r} modifier for {obj.name!r} object.")
+                        print(
+                            f"UniV: Checker: Restored {node_group.name!r} Node Group for {m.name!r} modifier for {obj.name!r} object."
+                        )
                         m.node_group = node_group
 
                     # Set fixed materials.
                     gn_mod = utils.GN(m, print_missed_socket=True)
-                    if 'Socket_1' in gn_mod:
-                        if not gn_mod['Socket_1']:
-                            gn_mod['Socket_1'] = mtl
-                            print(f"UniV: Checker: Restored {mtl.name!r} material for {m.name!r} modifier for {obj.name!r} object.")
-
+                    if "Socket_1" in gn_mod:
+                        if not gn_mod["Socket_1"]:
+                            gn_mod["Socket_1"] = mtl
+                            print(
+                                f"UniV: Checker: Restored {mtl.name!r} material for {m.name!r} modifier for {obj.name!r} object."
+                            )
 
                     has_checker_modifier = True
                     obj.update_tag()
                     break
             if not has_checker_modifier:
-                m = obj.modifiers.new(name='UniV Checker', type='NODES')
+                m = obj.modifiers.new(name="UniV Checker", type="NODES")
                 m.node_group = node_group
                 m.show_render = False
 
                 gn_mod = utils.GN(m, print_missed_socket=True)
-                if 'Socket_1' in gn_mod:
-                    gn_mod['Socket_1'] = mtl
+                if "Socket_1" in gn_mod:
+                    gn_mod["Socket_1"] = mtl
 
     @staticmethod
     def disable_all_gn_checker_modifier():
         for obj in bpy.context.selected_objects:
-            if obj.type == 'MESH':
+            if obj.type == "MESH":
                 for m in obj.modifiers:
                     if isinstance(m, bpy.types.NodesModifier):
-                        if m.name.startswith('UniV Checker'):
+                        if m.name.startswith("UniV Checker"):
                             m.show_in_editmode = False
                             m.show_viewport = False
                             break
-
 
     @staticmethod
     def get_name_from_gen_type_idname(name):
         for gt in checker_generated_types:
             if gt[0] == name:
-                return gt[1].replace(' ', '')
-        raise NotImplementedError(f'Texture {name} not implement')
+                return gt[1].replace(" ", "")
+        raise NotImplementedError(f"Texture {name} not implement")
 
     @staticmethod
     def get_color_name(tex_name):
-        return ''.join([name.capitalize() for name in tex_name.split('_')])
+        return "".join([name.capitalize() for name in tex_name.split("_")])
 
     @classmethod
     def get_full_image_name(cls):
@@ -351,112 +369,117 @@ class UNIV_OT_Checker(bpy.types.Operator):
         res_name = utils.glob_resolutions_to_name()
 
         match prefs().checker_generated_type:
-            case 'UV_GRID' | 'COLOR_GRID':
+            case "UV_GRID" | "COLOR_GRID":
                 return f"UniV_{idname}_{res_name}"
-            case 'SIMPLE_GRID' | 'GRAVITY':
+            case "SIMPLE_GRID" | "GRAVITY":
                 return f"UniV_{idname}_{cls.get_color_name(prefs().checker_colors)}_{res_name}"
-            case 'ATLUX':
-                palettes = ''
-                if prefs().checker_palettes != 'DEFAULT':
-                    palettes = '_' + prefs().checker_palettes.capitalize()
-                atlux_settings = ''
-                if prefs().checker_offset != 0 or prefs().checker_thickness != 0 or prefs().checker_frequency != 2:
-                    atlux_settings = (f"_{hex(prefs().checker_offset)[2]}"
-                                      f"{hex(min(13, prefs().checker_thickness))[2]}"
-                                      f"{hex(min(4, prefs().checker_frequency))[2]}")
+            case "ATLUX":
+                palettes = ""
+                if prefs().checker_palettes != "DEFAULT":
+                    palettes = "_" + prefs().checker_palettes.capitalize()
+                atlux_settings = ""
+                if (
+                    prefs().checker_offset != 0
+                    or prefs().checker_thickness != 0
+                    or prefs().checker_frequency != 2
+                ):
+                    atlux_settings = (
+                        f"_{hex(prefs().checker_offset)[2]}"
+                        f"{hex(min(13, prefs().checker_thickness))[2]}"
+                        f"{hex(min(4, prefs().checker_frequency))[2]}"
+                    )
                 return f"UniV_{idname}{palettes}{atlux_settings}_{res_name}"
             case _:
-                raise NotImplementedError(f'Texture {idname} not implement')
-
+                raise NotImplementedError(f"Texture {idname} not implement")
 
     def generate_checker_texture(self):
         full_image_name = self.get_full_image_name()
 
-        if prefs().checker_generated_type in ('UV_GRID', 'COLOR_GRID'):
+        if prefs().checker_generated_type in ("UV_GRID", "COLOR_GRID"):
             before = set(bpy.data.images)
             bpy.ops.image.new(
                 name=full_image_name,
                 width=int(prefs().size_x),
                 height=int(prefs().size_y),
                 alpha=False,
-                generated_type=prefs().checker_generated_type)
+                generated_type=prefs().checker_generated_type,
+            )
             return tuple(set(bpy.data.images) - before)[0]
         else:
-            raise NotImplementedError(f'Texture {prefs().checker_generated_type} not implement')
+            raise NotImplementedError(f"Texture {prefs().checker_generated_type} not implement")
 
     @staticmethod
     def update_views():
         changed = False
-        for area in utils.get_areas_by_type('VIEW_3D'):
+        for area in utils.get_areas_by_type("VIEW_3D"):
             for space in area.spaces:
-                if space.type == 'VIEW_3D':
-                    if space.shading.type == 'SOLID':
-                        if space.shading.color_type != 'TEXTURE':
-                            space.shading.color_type = 'TEXTURE'
+                if space.type == "VIEW_3D":
+                    if space.shading.type == "SOLID":
+                        if space.shading.color_type != "TEXTURE":
+                            space.shading.color_type = "TEXTURE"
                             changed = True
-                    elif space.shading.type == 'WIREFRAME':
-                        space.shading.type = 'SOLID'
-                        space.shading.color_type = 'TEXTURE'
+                    elif space.shading.type == "WIREFRAME":
+                        space.shading.type = "SOLID"
+                        space.shading.color_type = "TEXTURE"
                         changed = True
         if changed:
             bpy.context.view_layer.update()
 
     def has_x_after_resolution(self, name):
         x_idx = len(self.full_pattern_name)
-        return len(name) > x_idx and name[x_idx] == 'x'
+        return len(name) > x_idx and name[x_idx] == "x"
 
 
 class UNIV_OT_CheckerCleanup(bpy.types.Operator):
     bl_idname = "wm.univ_checker_cleanup"
     bl_label = "Checker Map Cleanup"
     bl_description = "Cleanup textures, materials, nodes and modifiers"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         self.remove_modifiers()
         self.remove_node_group()
         self.remove_materials()
         # TODO: Close img from selected meshes
-        for a in utils.get_areas_by_type('IMAGE_EDITOR'):
+        for a in utils.get_areas_by_type("IMAGE_EDITOR"):
             space = a.spaces.active
             img = space.image
-            if img and img.name.startswith('UniV_'):
+            if img and img.name.startswith("UniV_"):
                 space.image = None
         self.remove_images()
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     @staticmethod
     def remove_modifiers():
-        if bpy.context.mode == 'EDIT_MESH':
-            selected_objects = utypes.UMeshes.loop_for_object_mode_processing(without_selection=True)
+        if bpy.context.mode == "EDIT_MESH":
+            selected_objects = utypes.UMeshes.loop_for_object_mode_processing(
+                without_selection=True
+            )
         else:
             selected_objects = bpy.context.selected_objects
         # mod_counter = 0
         for obj in selected_objects:
-            if obj.type == 'MESH':
+            if obj.type == "MESH":
                 for m in reversed(obj.modifiers):
                     if isinstance(m, bpy.types.NodesModifier):
-                        if m.name.startswith('UniV Checker'):
+                        if m.name.startswith("UniV Checker"):
                             obj.modifiers.remove(m)
 
     @staticmethod
     def remove_node_group():
         for ng in reversed(bpy.data.node_groups):
-            if ng.name.startswith('UniV Checker'):
+            if ng.name.startswith("UniV Checker"):
                 if not ng.users:
                     bpy.data.node_groups.remove(ng)
 
     @staticmethod
     def remove_materials():
         for mtl in reversed(bpy.data.materials):
-            if mtl.name.startswith('UniV_') and not mtl.users:
+            if mtl.name.startswith("UniV_") and not mtl.users:
                 bpy.data.materials.remove(mtl)
 
     @staticmethod
     def remove_images():
         for img in reversed(bpy.data.images):
-            if img.name.startswith('UniV_') and not img.users:
+            if img.name.startswith("UniV_") and not img.users:
                 bpy.data.images.remove(img)
-
-
-

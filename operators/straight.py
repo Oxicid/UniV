@@ -21,33 +21,36 @@ class StraightIsland:
 class UNIV_OT_Straight(bpy.types.Operator):
     bl_idname = "uv.univ_straight"
     bl_label = "Straight"
-    bl_description = ("Straighten selected edge-chain and relax the rest of the UV Island. \n\n "
-                      "It also supports circularizing selected faces or selected edge chains that close into a cyclic loop.\n\n"
-                      "NOTE: When segment might be circular, to avoid squashing need deselect non-circle segments, "
-                      "or work in Face/Island mode to avoid such problems.")
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = (
+        "Straighten selected edge-chain and relax the rest of the UV Island. \n\n "
+        "It also supports circularizing selected faces or selected edge chains that close into a cyclic loop.\n\n"
+        "NOTE: When segment might be circular, to avoid squashing need deselect non-circle segments, "
+        "or work in Face/Island mode to avoid such problems."
+    )
+    bl_options = {"REGISTER", "UNDO"}
 
     # noinspection PyTypeHints
-    use_correct_aspect: bpy.props.BoolProperty(name='Correct Aspect', default=True)
+    use_correct_aspect: bpy.props.BoolProperty(name="Correct Aspect", default=True)
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'EDIT_MESH'
+        return context.mode == "EDIT_MESH"
 
     def draw(self, context):
         from ..preferences import univ_settings
-        self.layout.prop(univ_settings(), 'use_texel')
-        self.layout.prop(self, 'use_correct_aspect')
+
+        self.layout.prop(univ_settings(), "use_texel")
+        self.layout.prop(self, "use_correct_aspect")
 
     def execute(self, context):
-        assert (context.area.ui_type == 'UV')
+        assert context.area.ui_type == "UV"
 
         umeshes = utypes.UMeshes(report=self.report)
         if self.use_correct_aspect:
             umeshes.calc_aspect_ratio(from_mesh=False)
 
         umeshes.fix_context()
-        if umeshes.elem_mode in ('VERT', 'EDGE'):
+        if umeshes.elem_mode in ("VERT", "EDGE"):
             umeshes.filter_by_selected_uv_edges()
             islands_calc_type = utypes.Islands.calc_visible
         else:
@@ -93,8 +96,8 @@ class UNIV_OT_Straight(bpy.types.Operator):
                 f.hide_set(True)
 
         if not straight_islands:
-            self.report({'WARNING'}, f"Loops not found")
-            return {'CANCELLED'}
+            self.report({"WARNING"}, f"Loops not found")
+            return {"CANCELLED"}
 
         for straight_isl in straight_islands:
             isl = straight_isl.isl
@@ -122,21 +125,21 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     crn[uv].pin_uv = True
 
             # Select for unwrap.
-            if umeshes.elem_mode in ('VERT', 'EDGE'):
+            if umeshes.elem_mode in ("VERT", "EDGE"):
                 isl.select = True
             else:
                 face_select = utils.face_select_func(isl.umesh)
                 for f in isl.sequence:
                     face_select(f)
 
-        bpy.ops.uv.unwrap(method='ANGLE_BASED', fill_holes=True, correct_aspect=False, use_subsurf_data=False, margin=0)
+        bpy.ops.uv.unwrap(method="ANGLE_BASED", fill_holes=True, correct_aspect=False, use_subsurf_data=False, margin=0)
 
         # Deselect islands and restore edge selection and clear pins.
         for straight_isl in straight_islands:
             isl = straight_isl.isl
             # NOTE: The aspect ratio must be restored before applying the texel in order to use the correct UV area.
             isl.reset_aspect_ratio()
-            if umeshes.elem_mode in ('VERT', 'EDGE'):
+            if umeshes.elem_mode in ("VERT", "EDGE"):
                 isl.select = False
             else:
                 face_deselect = utils.face_deselect_func(isl.umesh)
@@ -152,7 +155,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
             umesh = isl.umesh
 
             segment: utypes.Segment = straight_isl.segment
-            if umeshes.elem_mode in ('VERT', 'EDGE'):
+            if umeshes.elem_mode in ("VERT", "EDGE"):
                 set_edge_select = utils.edge_select_linked_set_func(umesh)
                 for adv_crn in segment:
                     if adv_crn.invert:
@@ -176,7 +179,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
                     crn[uv].pin_uv = False
 
         umeshes.update()
-        return {'FINISHED'}
+        return {"FINISHED"}
 
     @staticmethod
     def get_to_segmenting_corners_and_deselecting_faces(isl) -> list:
@@ -187,7 +190,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
         get_edge_select = utils.edge_select_get_func(umesh)
         get_face_select = utils.face_select_get_func(umesh)
 
-        if umesh.elem_mode in ('VERT', 'EDGE'):
+        if umesh.elem_mode in ("VERT", "EDGE"):
             for crn in isl.corners_iter():
                 if get_edge_select(crn):
                     if is_boundary(crn):
@@ -218,7 +221,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
 
     @staticmethod
     def need_hide(umesh):
-        if umesh.elem_mode in ('VERT', 'EDGE'):
+        if umesh.elem_mode in ("VERT", "EDGE"):
             if umesh.sync:
                 if utils.USE_GENERIC_UV_SYNC:
                     if not umesh.sync_valid:
@@ -255,7 +258,7 @@ class UNIV_OT_Straight(bpy.types.Operator):
         # TODO: Find out why the angle needs to start at −180 here, and why its sign has to be inverted.
         start_angle = math.pi
         last_angle = -math.pi
-        if segment.umesh.elem_mode in ('VERT', 'EDGE'):
+        if segment.umesh.elem_mode in ("VERT", "EDGE"):
             if tar_adv_crn.invert or tar_adv_crn.is_pair:
                 start_angle = -start_angle
                 last_angle = -last_angle

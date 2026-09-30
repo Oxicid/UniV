@@ -14,14 +14,14 @@ def extract_seams_umesh_ex(umesh: utypes.UMesh, coords_append):
     if umesh.is_full_face_selected:
         for e in umesh.bm.edges:
             if e.seam:
-                for crn in getattr(e, 'link_loops', ()):
+                for crn in getattr(e, "link_loops", ()):
                     coords_append(crn[uv].uv)
                     coords_append(crn.link_loop_next[uv].uv)
     else:
         if umesh.sync:
             for e in umesh.bm.edges:
                 if e.seam:
-                    for crn in getattr(e, 'link_loops', ()):
+                    for crn in getattr(e, "link_loops", ()):
                         if not crn.face.hide:
                             coords_append(crn[uv].uv)
                             coords_append(crn.link_loop_next[uv].uv)
@@ -30,16 +30,18 @@ def extract_seams_umesh_ex(umesh: utypes.UMesh, coords_append):
                 return
             for e in umesh.bm.edges:
                 if e.seam:
-                    for crn in getattr(e, 'link_loops', ()):
+                    for crn in getattr(e, "link_loops", ()):
                         if crn.face.select:
                             coords_append(crn[uv].uv)
                             coords_append(crn.link_loop_next[uv].uv)
+
 
 def extract_seams_umesh(umesh: utypes.UMesh):
     coords = []
     coords_append = coords.append
     extract_seams_umesh_ex(umesh, coords_append)
     return coords
+
 
 def extract_non_sync_select_data(umesh: utypes.UMesh):
     assert not umesh.sync
@@ -53,7 +55,7 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
     edge_select_get = utils.edge_select_get_func(umesh)
     # uv = umesh.uv
     match bpy.context.tool_settings.uv_select_mode:
-        case 'VERTEX':
+        case "VERTEX":
             for f in utils.calc_visible_uv_faces_iter(umesh):
                 selected_mask = [vert_select_get(crn) for crn in f.loops]
                 if not any(selected_mask):
@@ -72,7 +74,7 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
                     for select_state, v in zip(selected_mask, f.verts):
                         if select_state:
                             verts_or_edges.append(v.co)
-        case 'EDGE':
+        case "EDGE":
             for f in utils.calc_visible_uv_faces_iter(umesh):
                 selected_mask = [edge_select_get(crn) for crn in f.loops]
                 if not any(selected_mask):
@@ -111,8 +113,6 @@ def extract_non_sync_select_data(umesh: utypes.UMesh):
     return verts_or_edges, (flat_tris, normals)
 
 
-
-
 def extract_seams_umeshes(umeshes: utypes.UMeshes) -> list[Vector]:
     coords = []
     coords_append = coords.append
@@ -129,38 +129,53 @@ def extract_edges_with_seams(umesh: utypes.UMesh):
 
     if umesh.is_full_face_selected:
         for e in umesh.bm.edges:
-            if e.seam and hasattr(e, 'link_loops'):
+            if e.seam and hasattr(e, "link_loops"):
                 edges_append(e)
     else:
         if umesh.sync:
             for e in umesh.bm.edges:
-                if e.seam and hasattr(e, 'link_loops'):
+                if e.seam and hasattr(e, "link_loops"):
                     edges_append(e)
         else:
             if umesh.is_full_face_deselected:
                 return []
             for e in umesh.bm.edges:
-                if e.seam and hasattr(e, 'link_loops'):
+                if e.seam and hasattr(e, "link_loops"):
                     edges_append(e)
     return edges
 
 
-_local_verts = np.array([
-    [-0.5, -0.5, -0.5, 1.0],
-    [ 0.5, -0.5, -0.5, 1.0],
-    [ 0.5,  0.5, -0.5, 1.0],
-    [-0.5,  0.5, -0.5, 1.0],
-    [-0.5, -0.5,  0.5, 1.0],
-    [ 0.5, -0.5,  0.5, 1.0],
-    [ 0.5,  0.5,  0.5, 1.0],
-    [-0.5,  0.5,  0.5, 1.0],
-], dtype=np.float32)
+_local_verts = np.array(
+    [
+        [-0.5, -0.5, -0.5, 1.0],
+        [0.5, -0.5, -0.5, 1.0],
+        [0.5, 0.5, -0.5, 1.0],
+        [-0.5, 0.5, -0.5, 1.0],
+        [-0.5, -0.5, 0.5, 1.0],
+        [0.5, -0.5, 0.5, 1.0],
+        [0.5, 0.5, 0.5, 1.0],
+        [-0.5, 0.5, 0.5, 1.0],
+    ],
+    dtype=np.float32,
+)
 
-_edges_indexes = np.array([
-    [0, 1], [1, 2], [2, 3], [3, 0],
-    [4, 5], [5, 6], [6, 7], [7, 4],
-    [0, 4], [1, 5], [2, 6], [3, 7],
-], dtype=np.uint8)
+_edges_indexes = np.array(
+    [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 0],
+        [4, 5],
+        [5, 6],
+        [6, 7],
+        [7, 4],
+        [0, 4],
+        [1, 5],
+        [2, 6],
+        [3, 7],
+    ],
+    dtype=np.uint8,
+)
 
 
 def extraxt_cube_lines_for_orient_bound(orient_matrix: Matrix, dims):
