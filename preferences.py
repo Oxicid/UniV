@@ -525,8 +525,8 @@ Some operators, can interact with trims:
     ))
 
     batch_inspect_flags: IntProperty(name="Batch Inspect Tags", min=0,
-                                     default=__import__(__package__.replace("preferences", "") + ".operators.inspect",
-                                                        fromlist=["inspect"]).Inspect.default_value_for_settings()
+                                     default=__import__(__package__.replace("preferences", "") + ".operators.uv_inspect",
+                                                        fromlist=["uv_inspect"]).Inspect.default_value_for_settings()
                                      )
 
     # ================================================================================

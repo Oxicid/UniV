@@ -423,6 +423,7 @@ def register():
     if "NOT_BL_EXT":
         import platform
 
+        # TODO: Load with checking `prefs().use_fastapi`.
         if platform.system() in ("Windows", "Linux"):
             try:
                 fastapi.clib.FastAPI.load()
@@ -499,6 +500,15 @@ def unregister():
     for handler in reversed(bpy.app.handlers.load_post):
         if handler.__name__ == univ_load_post.__name__:
             bpy.app.handlers.load_post.remove(handler)
+
+    if "NOT_BL_EXT":
+        import platform
+
+        if platform.system() in ("Windows", "Linux"):
+            try:
+                fastapi.clib.FastAPI.close()
+            except:  # noqa
+                pass
 
 
 if __name__ == "__main__":

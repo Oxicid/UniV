@@ -15,9 +15,7 @@ def get_aspect_ratio(umesh=None):
     if umesh:
         # Aspect from checker
         for m in umesh.obj.modifiers:
-            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith(
-                "UniV Checker"
-            ):
+            if isinstance(m, bpy.types.NodesModifier) and m.name.startswith("UniV Checker"):
                 gn_mod = GN(m, print_missed_socket=True)
                 if "Socket_1" in gn_mod:
                     mtl = gn_mod["Socket_1"]
@@ -153,14 +151,10 @@ def blf_size(font_id, font_size):
 
 
 def get_max_distance_from_px(px_size: int, view: bpy.types.View2D):
-    return (
-        Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))
-    ).length
+    return (Vector(view.region_to_view(0, 0)) - Vector(view.region_to_view(0, px_size))).length
 
 
-def get_areas_by_type(
-    area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR",
-):
+def get_areas_by_type(area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR"):
     return (
         area
         for win in bpy.context.window_manager.windows
@@ -169,9 +163,7 @@ def get_areas_by_type(
     )
 
 
-def get_area_by_type(
-    area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR",
-):
+def get_area_by_type(area_type: typing.Literal["VIEW_3D", "IMAGE_EDITOR"] = "IMAGE_EDITOR"):
     for a in get_areas_by_type(area_type):
         return a
     return None
@@ -266,9 +258,18 @@ def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
 
 def load_lib(
     lib_name: str,
+    expected_version,
     root_path=None,
     lib_ext: typing.Literal["dll", "so", "dylib"] | None = None,
 ):
+    import glob
+    import time
+    import shutil
+    import tempfile
+    import traceback
+    from ctypes import CDLL
+    from pathlib import Path
+
     lib_prefix = ""
     if lib_ext is None:
         import platform
@@ -282,8 +283,6 @@ def load_lib(
             lib_ext = "so"
             lib_prefix = "lib"
 
-    from pathlib import Path
-
     if root_path is None:
         root_path = Path(__file__).parent.parent.parent
     else:
@@ -291,47 +290,71 @@ def load_lib(
 
     # search 'univ' folder
     univ_dir = None
-    for p in root_path.iterdir():
-        if p.is_dir():
-            name = p.name.lower()
+    for upath in root_path.iterdir():
+        if upath.is_dir():
+            name = upath.name.lower()
             if name.startswith("univ") and name != "univ_pro":
-                univ_dir = p
+                univ_dir = upath
                 break
 
-    assert (
-        univ_dir is not None
-    ), f"No directory starting with 'univ' found in {root_path!r}"
+    assert univ_dir is not None, f"No directory starting with 'univ' found in {root_path!r}"
 
     # recursive search lib
-    lib_filename = f"{lib_prefix}{lib_name}.{lib_ext}"
-    candidates = list(univ_dir.rglob(lib_filename))
+    start_name = f"{lib_prefix}{lib_name}"
+    lib_filename = f"{start_name}.{lib_ext}"
 
-    import time
-    import shutil
-    import tempfile
+    # Get lib from tempfile first.
+    tmpdir = Path(tempfile.gettempdir())
+    tmp_pattern = str(tmpdir / start_name) + f"_*.{lib_ext}"
+
+    for tmp_candidate in glob.glob(tmp_pattern):
+        try:
+            lib = CDLL(str(tmp_candidate))
+            if not hasattr(lib, "version"):
+                continue
+
+            if lib.version() != expected_version:
+                continue
+
+            print(f"UniV: Load Lib: Load from temp dir: {tmp_candidate!r}")
+            return lib
+        except:  # noqa
+            pass
+
+    candidates = list(univ_dir.rglob(lib_filename))
 
     lib = None
     last_err = None
-    from ctypes import CDLL
 
-    for p in candidates:
+    for i, upath in enumerate(candidates):
+        orig_upath = upath
         try:
+            # Store library to tempfile, to avoid remove/reinstall lock.
             current_time = time.strftime("%Y%m%d-%H%M%S")
-            temp_lib_filename = f"{lib_prefix}{lib_name}_{current_time}.{lib_ext}"
-            tmp = Path(tempfile.gettempdir()) / temp_lib_filename
+            if i:
+                current_time += f"_{i}"  # For avoid additional conflicts.
+
+            temp_lib_filename = f"{start_name}_{current_time}.{lib_ext}"
+            tmp = tmpdir / temp_lib_filename
             try:
-                shutil.copy2(p, tmp)
-                p = tmp
+                shutil.copy2(upath, tmp)
+                upath = tmp  # Replace with temp file, other else load from addon directory.
             except:  # noqa
                 print(
-                    f"UniV: Cant copy {lib_name!r} library to temp folder, for avoid locking when reload/remove addon."
+                    f"UniV: Load Lib: Cant copy {lib_name!r} library to temp folder, "
+                    f"for avoid locking when reload/remove addon."
                 )
-                import traceback
-
                 traceback.print_exc()
 
-            # TODO: Check versions.
-            lib = CDLL(str(p))
+            # Load Lib.
+            lib = CDLL(str(upath))
+            if lib.version() != expected_version:
+                print(
+                    f"UniV: Load Lib: File {orig_upath!r} has incompatible version {lib.version()!r}, "
+                    f"expected {expected_version!r}."
+                )
+                continue
+
             break
         except OSError as e:
             last_err = e

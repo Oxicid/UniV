@@ -19,17 +19,13 @@ class FastAPI:
 
     @classmethod
     def load(cls):
-        cls.lib = utils.load_lib("univ_fastapi")
-        if hasattr(cls.lib, "version"):  # TODO: Delete after 3 month
-            if cls.lib.version() != EXPECTED_FASTAPI_VERSION:
-                cls.failed_version = cls.lib.version()
-                cls.close()
-                print(
-                    f"UniV: FastAPI: Expected version {EXPECTED_FASTAPI_VERSION}, given: {cls.lib.version()!r}."
-                )
-                return
-        else:
+        cls.lib = utils.load_lib("univ_fastapi", expected_version=EXPECTED_FASTAPI_VERSION)
+        if cls.lib.version() != EXPECTED_FASTAPI_VERSION:
+            cls.failed_version = cls.lib.version()
             cls.close()
+            print(
+                f"UniV: FastAPI: Expected version {EXPECTED_FASTAPI_VERSION}, given: {cls.lib.version()!r}."
+            )
             return
 
         cls.failed_version = -1
@@ -315,7 +311,7 @@ class LinearSolver:
 
     # ensure resource freed
     def __del__(self):
-        # destructor may be called during interpreter shutdown; guard against exceptions
+        # Destructor may be called during interpreter shutdown. Guard against exceptions.
         try:
             self.close()
         except Exception:  # noqa
