@@ -4070,7 +4070,7 @@ class UNIV_OT_Gravity_VIEW2D(Operator):
                 else:
                     sum_angle += angle
 
-        return sum_angle / n_edges
+        return utils.safe_divide(sum_angle, n_edges)
 
 
 class UNIV_OT_Gravity_VIEW3D(UNIV_OT_Gravity_VIEW2D):
