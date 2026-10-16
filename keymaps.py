@@ -209,7 +209,8 @@ class UKeymap:
 
         # Misc
         km.new("uv.univ_weld", "W").prop.use_by_distance = False
-        km.new("uv.univ_stitch", "W", shift=True)
+        kmi = km.new("uv.univ_stitch", "W", shift=True)
+        kmi.prop.between = False
         km.new("uv.univ_stack", "S", alt=True)
         km.new("uv.univ_symmetrize", "X", alt=True)
 

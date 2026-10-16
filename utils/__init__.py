@@ -9,7 +9,7 @@ from math import pi
 
 from .bench import timer, profile
 from .draw import *
-from .gn import *
+from . import gn
 from .other import *
 from .shapes import *
 from .ubm import *
@@ -789,8 +789,7 @@ def sync():
     return bpy.context.scene.tool_settings.use_uv_select_sync
 
 
-def calc_avg_normal():
-    umeshes = utypes.UMeshes.sel_ob_with_uv()
+def calc_avg_normal(umeshes):
     size = sum(len(umesh.bm.faces) for umesh in umeshes)
 
     normals = np.empty(3 * size).reshape((-1, 3))

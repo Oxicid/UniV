@@ -59,8 +59,8 @@ class DrawerNonSyncSelectProcessing:
             try:
                 # TODO: Split shaders by elem mode
                 shaders.set_line_width_vk(verts_lines_shader, edge_width)
-            except:
-                pass  # noqa
+            except:  # noqa
+                pass
             rv3d = bpy.context.region_data
 
             with gpu.matrix.push_pop():
@@ -689,13 +689,13 @@ def univ_drawer_update_tracker(_, deps):
             obj_name = obj.name
             try:
                 del draw_objects_2d[obj_name]
-            except:
-                pass  # noqa
+            except:  # noqa
+                pass
 
             try:
                 del draw_objects_3d[obj_name]
-            except:
-                pass  # noqa
+            except:  # noqa
+                pass
 
             if not draw_objects_2d and not draw_objects_3d:
                 return

@@ -418,3 +418,42 @@ class GN:
 
         def __getitem__(self, name: str):
             return self.mod[name.replace("Input", "Socket", 1)]
+
+
+def pprint_type(instance, ignore_fn=True):
+
+    class_name = type(instance).__qualname__
+    super_class = type(instance).mro()[1]
+
+    print(f"class {class_name}({super_class.__module__}.{super_class.__qualname__}):")
+
+    exclude = {"hide", "mute", "select", "show_options", "show_preview", "show_texture", "use_custom_color", "inputs",
+"internal_links", "outputs", "panel_states", "color", "bl_height_default", "bl_height_max", "bl_height_min",
+"bl_width_default", "bl_width_max", "bl_width_min", "height", "width", "hops", "parent", "rna_type", "bl_description",
+"bl_icon", "bl_idname", "bl_label", "bl_static_type", "color_tag", "label", "name", "type",
+"warning_propagation", "dimensions", "location", "location_absolute"} # fmt: skip
+
+    attrs_with_types: list[tuple[str, type]] = []
+    for attr in sorted(dir(instance)):
+        if attr in exclude:
+            continue
+        if ignore_fn and issubclass(type(getattr(instance, attr)), bpy.types.bpy_func):
+            continue
+
+        attrs_with_types.append((attr, type(getattr(instance, attr))))
+    attrs_with_types.sort(key=lambda a: a[0])
+    attrs_with_types.sort(
+        key=lambda a: (
+            "Z" if issubclass(a[1], bpy.types.bpy_func) else "." + a[1].__qualname__.lower()
+        )
+    )
+
+    for attr_with_type in attrs_with_types:
+        attr, typ = attr_with_type
+        if attr == "bl_rna" or attr.startswith("__"):
+            continue
+
+        if not issubclass(typ, bpy.types.bpy_func):
+            print(f"""{" "*4}{attr}: {typ.__qualname__}""")
+        else:
+            print(f"    def {attr}(self, *args, **kwargs): ...")

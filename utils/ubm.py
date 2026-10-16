@@ -38,6 +38,23 @@ def calc_face_area_3d(f, scale) -> float:
         v_prev = v_curr
     return n.length
 
+def calc_face_area_from_coords_3d_squared(coords) -> float:
+    """newell cross"""
+    n = Vector()
+    co_prev = coords[-1]
+    for co_curr in coords:
+        # inplace optimization ~20%: n += (co_prev.yzx - co_curr.yzx) * (co_prev.zxy + co_curr.zxy)
+        co_prev_yzx = co_prev.yzx
+        co_prev_zxy = co_prev.zxy
+
+        co_prev_yzx -= co_curr.yzx
+        co_prev_zxy += co_curr.zxy
+
+        co_prev_yzx *= co_prev_zxy
+        n += co_prev_yzx
+
+        co_prev = co_curr
+    return n.length
 
 def calc_face_area_uv(f, uv) -> float:
     corners = f.loops
@@ -61,6 +78,17 @@ def calc_face_area_uv(f, uv) -> float:
             first_crn_co = next_crn_co
         return abs(area) * 0.5
 
+def calc_vert_centroid_from_faces(faces: list[BMFace]):
+    visited_verts = set()
+    total = 0
+    sum_pos = Vector()
+    for f in faces:
+        for v in f.verts:
+            if v not in visited_verts:
+                sum_pos += v.co
+                total += 1
+                visited_verts.add(v)
+    return sum_pos / total
 
 def calc_signed_face_area_uv(f, uv) -> float:
     area = 0.0
@@ -126,7 +154,7 @@ def calc_total_area_uv(faces, uv):
     return sum(calc_face_area_uv(f, uv) for f in faces)
 
 
-def calc_total_area_3d(faces, scale):
+def calc_total_area_3d(faces, scale=None):
     if scale:
         avg_scale = sum(abs(s_) for s_ in scale) / 3
         if all(isclose(abs(s_), avg_scale, abs_tol=0.01) for s_ in scale):

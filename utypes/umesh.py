@@ -701,7 +701,7 @@ class UMesh:
 class UMeshes:
     def __init__(self, umeshes=None, *, report=None):
         if umeshes is None:
-            self._sel_ob_with_uv()
+            self._umeshes_default_meshes_getter()
         else:
             self.umeshes: list[UMesh] = umeshes
         self.report_obj = report
@@ -716,13 +716,14 @@ class UMeshes:
         self.report_obj(info_type, info)
 
     # TODO: Make parameters only kw
-    def update(
-        self, force=False, info_type={"INFO"}, info="No uv for manipulate"
-    ):  # noqa #pylint: disable=dangerous-default-value
+    def update(self, force=False, info_type: str | set[str] = "INFO", info: str = "No uv for manipulate"):  # fmt: skip
         if sum(umesh.update(force=force) for umesh in self.umeshes):
             return {"FINISHED"}
         if info:
-            self.report(info_type, info)
+            if isinstance(info_type, str):
+                self.report({info_type}, info)
+            else:
+                self.report(info_type, info)
         return {"CANCELLED"}
 
     def silent_update(self):
@@ -888,6 +889,7 @@ class UMeshes:
                 if umesh.obj == active_obj:
                     if umesh.total_corners:
                         return True
+                    break
 
             for umesh in self.umeshes:
                 if umesh.total_corners:
@@ -900,31 +902,8 @@ class UMeshes:
         for umesh in self:
             umesh.free(force)
 
-    @classmethod
-    def sel_ob_with_uv(cls):
-        bmeshes = []
-        if bpy.context.mode == "EDIT_MESH":
-            for obj in bpy.context.objects_in_mode_unique_data:
-                if obj.data.uv_layers:
-                    bm = bmesh.from_edit_mesh(obj.data)
-                    bmeshes.append(UMesh(bm, obj))
-        else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
-                list
-            )
-
-            for obj in bpy.context.selected_objects:
-                if obj.type == "MESH" and obj.data.uv_layers:
-                    data_and_objects[obj.data].append(obj)
-
-            for data, obj in data_and_objects.items():
-                bm = bmesh.new()
-                bm.from_mesh(data)
-                bmeshes.append(UMesh(bm, obj[0], False))
-
-        return cls(bmeshes)
-
-    def _sel_ob_with_uv(self):
+    def _umeshes_default_meshes_getter(self):
+        """Get selected mesh objects with uv and polygons."""
         bmeshes = []
         if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
@@ -933,9 +912,7 @@ class UMeshes:
                     if bm.faces:
                         bmeshes.append(UMesh(bm, obj))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
-                list
-            )
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)  # fmt: skip
 
             for obj in bpy.context.selected_objects:
                 if obj.type == "MESH" and obj.data.uv_layers and obj.data.polygons:
@@ -1008,7 +985,7 @@ class UMeshes:
 
     @classmethod
     def calc_with_no_uv(cls, report=None, verify_uv=True):
-        """Get umeshes without uv but with faces"""
+        """Get umeshes with/without uv but with faces"""
         bmeshes = []
         if bpy.context.mode == "EDIT_MESH":
             for obj in bpy.context.objects_in_mode_unique_data:
@@ -1016,9 +993,7 @@ class UMeshes:
                 if bm.faces:
                     bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv))
         else:
-            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(
-                list
-            )
+            data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)  # fmt: skip
 
             for obj in bpy.context.selected_objects:
                 if obj.type == "MESH" and obj.data.polygons:
@@ -1029,6 +1004,20 @@ class UMeshes:
                 bm.from_mesh(data)
                 objs.sort(key=lambda a: a.name)
                 bmeshes.append(UMesh(bm, objs[0], False, verify_uv))
+        return cls(bmeshes, report=report)
+
+    @classmethod
+    def from_objects(cls, objects, report=None, verify_uv=True):
+        bmeshes = []
+        is_edit = bpy.context.mode == "EDIT_MESH"
+        for obj in objects:
+            if is_edit:
+                bm = bmesh.from_edit_mesh(obj.data)
+            else:
+                bm = bmesh.new()
+                bm.from_mesh(obj.data)
+
+            bmeshes.append(UMesh(bm, obj, verify_uv=verify_uv, is_edit_bm=is_edit)),
         return cls(bmeshes, report=report)
 
     def calc_aspect_ratio(self, from_mesh):

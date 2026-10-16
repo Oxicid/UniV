@@ -753,13 +753,16 @@ class BBox3D:
         self.max = xyz_max
 
     @classmethod
-    def get_from_umesh(cls, umesh):
-        return cls(Vector(umesh.obj.bound_box[0]), Vector(umesh.obj.bound_box[6]))
+    def from_umesh(cls, umesh, *, from_original_bbox=False):
+        """ Get bounds with avoid shape keys."""
+        if from_original_bbox:
+            return cls(Vector(umesh.obj.bound_box[0]), Vector(umesh.obj.bound_box[6]))
+        return cls.calc_bbox(v.co for v in umesh.obj.data.vertices)
 
     def to_bbox_2d(self, axis: typing.Literal["x", "y", "z"]):
         if axis == "z":
             return BBox(self.min.x, self.max.x, self.min.y, self.max.y)
-        elif axis == "y":
+        elif axis == "x":
             return BBox(self.min.y, self.max.y, self.min.z, self.max.z)
         else:
             return BBox(self.min.x, self.max.x, self.min.z, self.max.z)
