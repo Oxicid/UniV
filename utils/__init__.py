@@ -922,13 +922,16 @@ def get_hv_constraints(corners, attr) -> tuple[list[BMLoop], list[BMLoop]]:
     return h_corners, v_corners
 
 
-def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bpy.types.Object]]]:
+def get_selected_object_with_instances(*, only_uv=False, with_faces=False) -> list[tuple[bpy.types.Object, list[bpy.types.Object]]]:
     """Get unique selected meshes with/without uv and get selected/visible/hidden instances (non-included)"""
 
     objects = []
     if bpy.context.mode == "EDIT_MESH":
-        for obj in bpy.context.objects_in_mode_unique_data:
-            objects.append(obj)
+        objects.extend(bpy.context.objects_in_mode_unique_data)
+        if bpy.context.active_object in bpy.context.objects_in_mode_unique_data:
+            objects.remove(bpy.context.active_object)
+            objects.insert(0, bpy.context.active_object)
+
     else:
         from collections import defaultdict
 
@@ -945,6 +948,12 @@ def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bp
         for data, objs in data_and_objects.items():
             objects.append(objs[0])
 
+
+    if only_uv:
+        objects = [obj for obj in objects if obj.data.uv_layers]
+    if with_faces:
+        objects = [obj for obj in objects if obj.data.polygons]
+
     ret = []
     for tar_obj in objects:
         instances = []
@@ -959,6 +968,40 @@ def get_selected_object_with_instances() -> list[tuple[bpy.types.Object, list[bp
         ret.append((tar_obj, instances))
 
     return ret
+
+
+def get_selected_object(*, only_uv=False, with_faces=False) -> list[bpy.types.Object]:
+    """Get unique selected meshes"""
+
+    objects = []
+    if bpy.context.mode == "EDIT_MESH":
+        objects.extend(bpy.context.objects_in_mode_unique_data)
+        if bpy.context.active_object in bpy.context.objects_in_mode_unique_data:
+            objects.remove(bpy.context.active_object)
+            objects.insert(0, bpy.context.active_object)
+
+    else:
+        from collections import defaultdict
+
+        selected = bpy.context.selected_objects[:]
+        active = bpy.context.active_object
+        if active:
+            selected.insert(0, active)  # Set active to first
+
+        data_and_objects: defaultdict[bpy.types.Mesh, list[bpy.types.Object]] = defaultdict(list)
+        for obj in selected:
+            if obj.type == "MESH":
+                data_and_objects[obj.data].append(obj)
+
+        for data, objs in data_and_objects.items():
+            objects.append(objs[0])
+
+    if only_uv:
+        objects = [obj for obj in objects if obj.data.uv_layers]
+    if with_faces:
+        objects = [obj for obj in objects if obj.data.polygons]
+
+    return objects
 
 
 def get_trim_bboxes():

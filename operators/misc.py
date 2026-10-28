@@ -1918,7 +1918,7 @@ class UNIV_OT_SmartScaleApply(Operator):
                     inst.scale = UNIFORM_SCALE
 
         if count:
-            self.report({"INFO"}, f"Fixed scales for {count!r} selected objects")
+            self.report({"INFO"}, f"Applied scales for {count!r} selected objects")
         else:
             self.report({"INFO"}, f"All selected objects has uniform scale")
 

@@ -99,7 +99,7 @@ class UNIV_OT_Normal(bpy.types.Operator):
         return umeshes.update(info=self.info)
 
     def xyz_to_uv(self, umeshes: UMeshes):
-        vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces(umeshes)
+        vector_nor, islands_of_mesh = self.avg_normal_and_calc_faces(umeshes, has_selected=self.has_selected)
         rot_mtx_from_normal = self.calc_rot_mtx_from_normal(vector_nor)
 
         global_bbox = BBox()
@@ -139,14 +139,13 @@ class UNIV_OT_Normal(bpy.types.Operator):
             mtx = mtx @ Matrix.Diagonal([td_scale] * 3).to_4x4()
 
         points = []
-        points_append = points.append
 
         if self.orient or (self.crop and not prefs().use_texel):
             for f in adv_island:
                 for crn in f.loops:
                     uv_co = (mtx @ crn.vert.co).to_2d()
                     crn[uv].uv = uv_co
-                    points_append(uv_co)
+                    points.append(uv_co)
         else:
             for f in adv_island:
                 for crn in f.loops:
@@ -212,21 +211,25 @@ class UNIV_OT_Normal(bpy.types.Operator):
                 weight = mtx @ weight
                 yield weight, mesh_isl
 
-    def avg_normal_and_calc_faces(self, umeshes: UMeshes):
+    @staticmethod
+    def avg_normal_and_calc_faces(umeshes: UMeshes, has_selected: bool, faces_from_sequence=False):
         tot_weight = Vector()
         islands_of_mesh: list[MeshIslands] = []
         for umesh in umeshes:
             weight = Vector()
-            if not umeshes.is_edit_mode:
-                faces = umesh.bm.faces
+            if faces_from_sequence:
+                faces = umesh.sequence
             else:
-                if self.has_selected:
-                    faces = utils.calc_selected_uv_faces(umesh)
+                if umeshes.is_edit_mode:
+                    if has_selected:
+                        faces = utils.calc_selected_uv_faces(umesh)
+                    else:
+                        faces = utils.calc_visible_uv_faces(umesh)
                 else:
-                    faces = utils.calc_visible_uv_faces(umesh)
+                    faces = umesh.bm.faces
 
-            for f in faces:
-                weight += f.normal * f.calc_area()
+                for f in faces:
+                    weight += f.normal * f.calc_area()
 
             _, r, s = umesh.obj.matrix_world.decompose()
             mtx = Matrix.LocRotScale(Vector(), r, s)

@@ -3883,7 +3883,7 @@ class UNIV_OT_Orient_VIEW3D(UNIV_OT_Orient):
 # noinspection PyTypeHints
 class UNIV_OT_Gravity_VIEW2D(Operator):
     bl_idname = "uv.univ_gravity"
-    bl_label = "Gravity"
+    bl_label = "World Align"
     bl_description = "Align selected UV islands or faces to world / gravity directions"
     bl_options = {"REGISTER", "UNDO"}
 
