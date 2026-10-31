@@ -4,9 +4,6 @@
 import bpy  # noqa
 
 from bmesh.types import BMesh, BMLoop, BMLayerItem
-from itertools import chain
-
-from .. import utypes
 from .bm_tag import is_pair, is_invisible_func
 
 USE_GENERIC_UV_SYNC = hasattr(BMesh, "uv_select_sync_valid")
@@ -636,32 +633,32 @@ def linked_crn_to_vert_by_island_index_unordered(crn):
 
 
 class ShortPath:
-
     @staticmethod
     def vert_tag_add_adjacent_uv(
         heap,
         l_a: BMLoop,
         loops_prev: list[BMLoop | None],
         cost: list[float],
-        uv,
+        umesh,
         prioritize_corners,
         bound_priority_factor,
+        visited,
+        include_corners,
     ):
         import heapq
-
+        uv = umesh.uv
         l_a_index = l_a.index
         uv_a = l_a[uv].uv
 
         # Loop over faces of face, but do so by first looping over loops.
-        for l in linked_crn_uv_by_idx_unordered_included(l_a, uv):
-            # TODO: Add mark seam and bi-direct linked
+        for l in linked_crn_to_vert_pair_with_seam_included(l_a, uv, umesh.sync):
             #  'l_a' is already tagged, tag all adjacent.
 
-            l.tag = False
+            visited.add(l)
             l_b = l.link_loop_next
 
             while True:
-                if l_b.tag:
+                if l_b in include_corners and l_b not in visited:
                     uv_b = l_b[uv].uv
                     # We know 'l_b' is not visited, check it out!
                     l_b_index = l_b.index
@@ -685,46 +682,38 @@ class ShortPath:
 
     @staticmethod
     def calc_path_uv_vert(
-        isl: "utypes.AdvIsland",
         l_src: BMLoop,
         l_dst: BMLoop,
-        exclude_corners_group: "list[utypes.LoopGroup] | tuple",
+        umesh,
+        include_corners: set[BMLoop],
+        exclude_corners: set[BMLoop],
         prioritize_corners: set[BMLoop] | tuple = (),
         bound_priority_factor=0.9,
-    ) -> list[BMLoop]:
+    ):
         import heapq
         from collections import deque
-
-        assert l_src.face.index == l_dst.face.index
+        uv = umesh.uv
         path = deque()
         # BM_ELEM_TAG flag is used to store visited edges
-        uv = isl.umesh.uv
         heap: list[tuple[float, int, BMLoop]] = []
 
         # NOTE: would pass BM_EDGE except we are looping over all faces anyway.
         # BM_mesh_elem_index_ensure(bm, BM_LOOP); NOTE: not needed for face tag.
-        i = 0
-        for f in isl:
-            for crn in f.loops:
-                crn.tag = True
-                crn.index = i
-                i += 1
+        prev_size = len(include_corners)
+        include_corners = include_corners - exclude_corners
+        if exclude_corners:
+            assert prev_size != len(include_corners)
 
-        if exclude_corners_group:
-            for exclude_lg in exclude_corners_group:
-                for chain_corners in exclude_lg.chain_linked_corners:
-                    for crn in chain_corners:
-                        crn.tag = False
+        include_corners.update(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync))
+        include_corners.update(linked_crn_to_vert_pair_with_seam_included(l_dst, umesh.uv, umesh.sync))
 
-            # Restore tags that may have been excluded above.
-            dst_corners = exclude_corners_group[0].chain_linked_corners[-1]
-            src_corners = exclude_corners_group[2].chain_linked_corners[0]
-            for crn in chain(dst_corners, src_corners):
-                crn.tag = True
+        for idx, crn in enumerate(include_corners):
+            crn.index = idx
 
+        visited = set()
         # Allocate.
-        loops_prev: list[BMLoop | None] = [None] * i
-        cost = [1e100] * i
+        loops_prev: list[BMLoop | None] = [None] * len(include_corners)
+        cost = [1e100] * len(include_corners)
 
         # Regular dijkstra the shortest path, but over UV loops instead of vertices.
         heapq.heappush(heap, (0.0, l_src.index, l_src))
@@ -741,62 +730,50 @@ class ShortPath:
                         break
                 break
 
-            if l.tag:
+            if l not in visited:
                 #  Adjacent loops are tagged while stepping to avoid 2x loops.
-                l.tag = False
+                visited.add(l)
                 ShortPath.vert_tag_add_adjacent_uv(
-                    heap, l, loops_prev, cost, uv, prioritize_corners, bound_priority_factor
+                    heap, l, loops_prev, cost, umesh, prioritize_corners, bound_priority_factor, visited, include_corners
                 )
 
-        return list(path)
+        # assert bool(set(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync)) & set(path))
+        # assert bool(set(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync)) & set(path))
+        return ShortPath._short_pat_to_segment(path, umesh)  # TODO: Fix that.
 
     @staticmethod
-    def path_to_loop_group_for_rect(path, umesh):
-        assert path
+    def _short_pat_to_segment(path, umesh):
+        from . import is_boundary_func
+        from ..utypes import AdvCorner, Segment
 
         uv = umesh.uv
-        chain_linked_corners = []
-        for crn in path:
-            linked = linked_crn_uv_by_idx_unordered(crn, uv)
-            linked.insert(0, crn)
-            chain_linked_corners.append(linked)
-
-        it = iter(path)
-        prev_vert_co = next(it).vert.co
-
-        weights = []
-        for crn in it:
-            cur_vert_co = crn.vert.co
-            length = (prev_vert_co - cur_vert_co).length
-            weights.append(length)
-            prev_vert_co = cur_vert_co
-
-        lg = utypes.LoopGroup(umesh)
-        lg.corners = path
-        lg.chain_linked_corners = chain_linked_corners
-        lg.dirt = True
-        lg.weights = weights
-        return lg
-
-    @staticmethod
-    def calc_length_3d_and_uv_from_path(path, umesh):  # TODO: Add aspect
-        uv = umesh.uv
-        it = iter(path)
-        first_crn = next(it)
-
-        prev_uv_co = first_crn[uv].uv
-        prev_vert_co = first_crn.vert.co
-
-        total_length_3d = 0.0
-        total_length_uv = 0.0
-
-        for crn in it:
-            cur_uv_co = crn[uv].uv
-            cur_vert_co = crn.vert.co
-            total_length_3d += (prev_vert_co - cur_vert_co).length
-            total_length_uv += (prev_uv_co - cur_uv_co).length
-
-            prev_uv_co = cur_uv_co
-            prev_vert_co = cur_vert_co
-
-        return total_length_3d, total_length_uv
+        segment = []
+        is_boundary = is_boundary_func(umesh)
+        for i in range(len(path) - 1):
+            linked = linked_crn_to_vert_pair_with_seam_included(path[i], umesh.uv, umesh.sync)
+            next_v = path[i+1].vert
+            for curr_crn in linked:
+                if curr_crn.link_loop_next.vert == next_v:
+                    new_adv_crn = AdvCorner(curr_crn, uv)
+                    new_adv_crn.is_pair = not is_boundary(curr_crn)
+                    segment.append(new_adv_crn)
+                    break
+            else:
+                for curr_crn in linked:
+                    prev_crn = curr_crn.link_loop_prev
+                    if prev_crn.vert == next_v:
+                        if is_boundary(prev_crn):
+                            # Set invert for compare convention.
+                            boundary = AdvCorner(curr_crn, uv, invert=True)
+                            boundary.is_pair = False
+                            segment.append(boundary)
+                            break
+                        else:
+                            pair = AdvCorner(prev_crn.link_loop_radial_prev, uv)
+                            pair.is_pair = True
+                            segment.append(pair)
+                            break
+                else:
+                    # TODO: Add assert for debug
+                    print("UniV: Short Path: Missed corner in segment.")
+        return Segment(segment, umesh)

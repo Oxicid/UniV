@@ -17,7 +17,7 @@ from .. import fastapi
 from .text import TextDraw
 from ..utypes import UMesh
 from ..preferences import univ_settings, prefs
-from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple
+from .lines import LinesDrawSimple, LinesDrawSimple3D, DotLinesDrawSimple, SegmentsDrawSimple
 
 
 class DrawerNonSyncSelectProcessing:

@@ -265,6 +265,7 @@ class SegmentsDrawSimple:
 
     @classmethod
     def draw_register(cls, groups: "typing.Sequence[typing.Iterable]"):
+        # TODO: Add segments statistic.
         from gpu_extras.batch import batch_for_shader
         from ..utils import UNIV_OT_Draw_Test, color_for_groups
 
@@ -272,12 +273,12 @@ class SegmentsDrawSimple:
             return
         cls.start_time = time()
 
-        if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
-            cls.shader = gpu.shader.from_builtin("SMOOTH_COLOR")
-            cls.shader2 = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
-        else:
-            cls.shader = gpu.shader.from_builtin("SMOOTH_COLOR")
-            cls.shader2 = gpu.shader.from_builtin("SMOOTH_COLOR")
+        # if getattr(bpy.context.preferences.system, "gpu_backend", None) == "VULKAN":
+        #     cls.shader = gpu.shader.from_builtin("SMOOTH_COLOR")
+        #     cls.shader2 = gpu.shader.from_builtin("POINT_UNIFORM_COLOR")
+        # else:
+        cls.shader = gpu.shader.from_builtin("SMOOTH_COLOR")
+        cls.shader2 = gpu.shader.from_builtin("SMOOTH_COLOR")
 
         offset_lines = UNIV_OT_Draw_Test.uv_segments_to_lines_with_offset(groups)
         color = color_for_groups(groups)

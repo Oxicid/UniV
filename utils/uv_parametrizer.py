@@ -7,7 +7,7 @@ import contextlib
 
 import numpy as np
 import numpy.typing as npt
-from bmesh.types import BMFace
+from bmesh.types import BMFace, BMLoop
 from mathutils import Vector, Matrix
 
 from math import pi
@@ -122,6 +122,59 @@ def unwrap_isl_by_tag(
         return 0
 
     handle = ParamHandle.construct_param_handle_by_tag(isl)
+    handle.uv_parametrizer_lscm_begin()
+    failed_solve = handle.uv_parametrizer_lscm_solve()
+    handle.uv_parametrizer_flush()
+    return failed_solve
+
+
+def unwrap_isl_by_tag_v2(
+    isl: "utypes.AdvIsland",
+    unwrap_along: typing.Literal["UV", "U", "V"],
+    constr_correction_weight,
+    use_abf=True,
+    topology_from_uvs=True,
+    blend_factor=1.0,
+    fill_holes=True,
+    constraints_factor: float=100.0,
+    constr_edge_weight: float=0.0,
+    constraints: tuple[list[BMLoop], list[BMLoop]] = ((),) * 2,
+):
+    """NOTE: Need indexing for constraints for segments and tagging for pinning (False = Pin)"""
+    assert len(constraints) == 2
+
+    if constraints_factor < 100.0:
+        # Weight starts working with the smallest values, so remap the input values to smaller ones.
+        steps = [2**i for i in range(-10, 1)]
+
+        # Smooth step from 100 to 0.
+        t = constraints_factor / 100
+        pos = t * (len(steps) - 1)
+
+        i = int(pos)
+        f = pos - i
+
+        a = steps[i]
+        b = steps[min(i + 1, len(steps) - 1)]
+        # Interpolate steps.
+        constraints_factor = (a + (b - a) * f) * 100
+
+    options = UnwrapOptions
+    options.fill_holes = fill_holes
+    options.blend = blend_factor
+    options.constraints_factor = constraints_factor
+    options.constr_correction_weight = constr_correction_weight
+    options.constr_edge_weight = constr_edge_weight
+    options.use_abf = use_abf
+    options.unwrap_along = unwrap_along
+
+    options.topology_from_uvs = topology_from_uvs
+    options.topology_from_uvs_use_seams = True
+
+    if not any(isl.iter_corners_by_tag()):
+        return 0
+
+    handle = ParamHandle.construct_param_handle_by_tag(isl, constraints)
     handle.uv_parametrizer_lscm_begin()
     failed_solve = handle.uv_parametrizer_lscm_solve()
     handle.uv_parametrizer_flush()
@@ -1159,8 +1212,6 @@ class PSegment:
                     break
 
             segments.append(cls(seg, is_vertical=is_vertical))
-        # from .. import draw
-        # draw.lines.SegmentsDrawSimple.draw_register(segments)
         return segments
 
     def __iter__(self):
@@ -1631,11 +1682,7 @@ class PChart:
 
     @staticmethod
     def matrix_add_edge_length_constraint(
-        ls: LinearSolver,
-        row: int,
-        edge: PEdge,
-        target_scale: float,
-        weight: float,
+        ls: LinearSolver, row: int, edge: PEdge, target_scale: float, weight: float
     ):
         v1 = edge.vert
         v2 = edge.next.vert
@@ -2671,7 +2718,6 @@ class ParamHandleConstruct:
         self.charts: list[PChart] = []
         self.ncharts: int = 0
 
-        self.bm_constraints_segments = []
         self.constr_h_segments = []
         self.constr_v_segments = []
 
@@ -2679,7 +2725,7 @@ class ParamHandleConstruct:
         self.blend: float = 0.0
 
     @classmethod
-    def construct_param_handle_by_tag(cls, isl: "utypes.AdvIsland"):
+    def construct_param_handle_by_tag(cls, isl: "utypes.AdvIsland", constraints=None):
         """Tagged = Unwrapped, Untagged = Pinned"""
         handle = cls()
         umesh = isl.umesh
@@ -2694,20 +2740,19 @@ class ParamHandleConstruct:
         for idx, ff in enumerate(isl.faces):
             handle.construct_param_handle_face_add_by_tag(ff, idx, umesh)
 
-        handle.construct_param_edge_set_seams(isl)
-        constraints_attr = umesh.bm.edges.layers.int.get("univ_constraints")
-        if UnwrapOptions.topology_from_uvs and constraints_attr:
-            handle.bm_constraints_segments = handle.construct_param_edge_set_constraints(isl, constraints_attr)
+        handle.set_seams(isl)
+        if constraints is None:
+            constraints_attr = umesh.bm.edges.layers.int.get("univ_constraints")
+            if UnwrapOptions.topology_from_uvs and constraints_attr:
+                handle.set_edge_constraints(isl, constraints_attr)
+        else:
+            handle.set_edge_constraints_v2(isl, constraints)
 
         handle.uv_parametrizer_construct_end()
         return handle
 
     def construct_param_handle_face_add(
-        self,
-        f: BMFace,
-        face_index: ParamKey | int,
-        umesh: "utypes.UMesh",
-        get_vertex_select,
+        self, f: BMFace, face_index: ParamKey | int, umesh: "utypes.UMesh", get_vertex_select
     ):
         vkeys: list[ParamKey] = []
         pin: list[bool] = []
@@ -2762,7 +2807,7 @@ class ParamHandleConstruct:
 
         self.uv_parametrizer_face_add(face_index, vkeys, coord_3d, coord_uv, weight, pin, select)
 
-    def construct_param_edge_set_seams(self, isl: "utypes.AdvIsland"):
+    def set_seams(self, isl: "utypes.AdvIsland"):
         """Set seams on UV Parametrizer based on options."""
         if UnwrapOptions.topology_from_uvs and not UnwrapOptions.topology_from_uvs_use_seams:
             return  # Seams are not required with these options.
@@ -2786,7 +2831,7 @@ class ParamHandleConstruct:
             if e:
                 e.flag |= PEDGE_SEAM
 
-    def construct_param_edge_set_constraints(self, isl: "utypes.AdvIsland", constraints_attr):
+    def set_edge_constraints(self, isl: "utypes.AdvIsland", constraints_attr):
         """Set constraints on UV Parametrizer based on options."""
         uv = isl.umesh.uv
         from ..utypes import Segments
@@ -2824,32 +2869,69 @@ class ParamHandleConstruct:
 
         if counter_not_found_constraints:
             print(f"UniV: Found {counter_not_found_constraints} missed constraints")
-
-        segments: list[utypes.Segment] = []
+        # if UnwrapOptions.topology_from_uvs:  # TODO: Check or add from mesh.
         if v_corners and UnwrapOptions.unwrap_along != "V":
             v_segments = Segments.from_corners(v_corners, isl.umesh)
             for s in v_segments:
-                s.value = "V"
-            segments.extend(v_segments)
+                self.constr_v_segments.extend(PSegment.from_bm_corners(self, s, is_vertical=True))
 
         if h_corners and UnwrapOptions.unwrap_along != "U":
             h_segments = Segments.from_corners(h_corners, isl.umesh)
             for s in h_segments:
-                s.value = "U"
-            segments.extend(h_segments)
+                self.constr_h_segments.extend(PSegment.from_bm_corners(self, s, is_vertical=False))
 
-        if UnwrapOptions.unwrap_along == "UV" and UnwrapOptions.topology_from_uvs:
-            # print(segments)
-            for seg in segments:
-                if seg.value == "U":
-                    self.constr_h_segments.extend(PSegment.from_bm_corners(self, seg, is_vertical=False))
-                else:
-                    self.constr_v_segments.extend(PSegment.from_bm_corners(self, seg, is_vertical=True))
+    def set_edge_constraints_v2(
+        self,
+        isl: "utypes.AdvIsland",
+        constraints: tuple[list[BMLoop], list[BMLoop]],
+    ):
+        """Set constraints on UV Parametrizer based on options."""
+        uv = isl.umesh.uv
+        from ..utypes import Segments
 
-        if not UnwrapOptions.topology_from_uvs:
-            segments = []
+        v_corners = []
+        h_corners = []
+        counter_not_found_constraints = 0
 
-        return segments
+        # Horizontal.
+        for crn in constraints[0]:
+            # Set the constraints.
+            e: PEdge = self.edge_lookup_exact(
+                self.uv_find_pin_index(crn.vert.index, crn[uv].uv),
+                self.uv_find_pin_index(crn.link_loop_next.vert.index, crn.link_loop_next[uv].uv),
+            )
+            if e:
+                e.flag |= PEDGE_H_CONSTR
+                h_corners.append(crn)
+            else:
+                counter_not_found_constraints += 1
+
+        # Vertical.
+        for crn in constraints[1]:
+            # Set the constraints.
+            e: PEdge = self.edge_lookup_exact(
+                self.uv_find_pin_index(crn.vert.index, crn[uv].uv),
+                self.uv_find_pin_index(crn.link_loop_next.vert.index, crn.link_loop_next[uv].uv),
+            )
+            if e:
+                e.flag |= PEDGE_V_CONSTR
+                v_corners.append(crn)
+            else:
+                counter_not_found_constraints += 1
+
+        if counter_not_found_constraints:
+            print(f"UniV: Found {counter_not_found_constraints} missed constraints")
+
+        assert UnwrapOptions.topology_from_uvs # TODO: Check or add from mesh.
+        if v_corners and UnwrapOptions.unwrap_along != "V":
+            v_segments = Segments.from_corners(v_corners, isl.umesh)
+            for s in v_segments:
+                self.constr_v_segments.extend(PSegment.from_bm_corners(self, s, is_vertical=True))
+
+        if h_corners and UnwrapOptions.unwrap_along != "U":
+            h_segments = Segments.from_corners(h_corners, isl.umesh)
+            for s in h_segments:
+                self.constr_h_segments.extend(PSegment.from_bm_corners(self, s, is_vertical=False))
 
     def uv_parametrizer_construct_end(self):
         self.ncharts = self.connect_pairs()
@@ -2896,6 +2978,9 @@ class ParamHandleConstruct:
                 else:
                     chart.constr_v_segments = self.constr_v_segments
                     chart.constr_h_segments = self.constr_h_segments
+
+            # from .. import draw
+            # draw.lines.SegmentsDrawSimple.draw_register(chart.constr_h_segments)
 
             self.state = ParamHandleConstruct.PHANDLE_STATE_CONSTRUCTED
 

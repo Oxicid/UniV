@@ -36,12 +36,6 @@ class LoopGroup:
         self.chain_linked_corners: list[list[BMLoop]] = []
         self.chain_linked_corners_mask: list[bool] = []
 
-    def has_unpinned(self):  # rename to has_unpinned
-        if self.is_unpinned_exist_ is None:
-            assert self.chain_linked_corners_mask
-            self.is_unpinned_exist_ = not all(self.chain_linked_corners_mask)
-        return self.is_unpinned_exist_
-
     @property
     def is_cyclic(self):
         crn_a = self.corners[0]
@@ -317,15 +311,6 @@ class LoopGroup:
             for crn in linked_groups:
                 crn[uv].pin_uv = state
 
-    def calc_chain_linked_corners_mask_from_short_path(self, short_path):
-        assert self.chain_linked_corners
-        mask = []
-        uv = self.umesh.uv
-        path_corners = set(short_path)
-        for corners in self.chain_linked_corners:
-            mask.append(corners[0][uv].pin_uv or any((l_crn in path_corners) for l_crn in corners))
-        self.chain_linked_corners_mask = mask
-
     def calc_chain_linked_corners(self):
         uv = self.umesh.uv
         for crn in chain(self, [self[-1].link_loop_next]):
@@ -565,6 +550,12 @@ class AdvCorner:
         self._is_pair: bool | None = None
 
     @property
+    def orig_crn(self):
+        """ Corner with invert correction."""
+        return self.crn.link_loop_prev if self.invert else self.crn
+
+
+    @property
     def vec(self):
         if not self._vec:
             if self.invert:
@@ -733,6 +724,13 @@ class Segment:
         self.is_start_lock: bool = False
         self.is_end_lock: bool = False
 
+    def to_corners(self):
+        return [(adv_crn.crn.link_loop_prev if adv_crn.invert else adv_crn.crn) for adv_crn in self]
+
+    def mark_seam(self):
+        for adv_crn in self:
+            adv_crn.orig_crn.edge.seam = True
+
     def calc_chain_linked_corners(self):
         uv = self.umesh.uv
         sync = self.umesh.sync
@@ -854,7 +852,7 @@ class Segment:
     def end_vert(self):
         adv_crn = self.seg[-1]
         if adv_crn.invert:
-            return adv_crn.crn.link_loop_prev.vert
+            return adv_crn.crn.link_loop_prev.vert  # TODO: Incorrect, need link_loop_next ???
         else:
             return adv_crn.crn.link_loop_next.vert
 
@@ -872,8 +870,28 @@ class Segment:
             return adv_crn.crn.link_loop_next[adv_crn.uv].uv
 
     @property
+    def start_orig_crn(self) -> BMLoop:
+        adv_crn = self.seg[0]
+        return adv_crn.crn
+
+    @property
+    def end_orig_crn(self) -> BMLoop:
+        adv_crn = self.seg[-1]
+        if adv_crn.invert:
+            return adv_crn.crn.link_loop_prev
+        else:
+            return adv_crn.crn.link_loop_next
+
+    @property
     def is_circular(self):
         return self.start_vert == self.end_vert and self.start_co == self.end_co
+
+    @property
+    def is_horizontal_by_bbox(self):
+        from . import BBox
+        bb = BBox.calc_bbox(adv.curr_pt for adv in self)
+        bb.update([self.start_co, self.end_co])
+        return bool(bb.width > bb.height)
 
     @staticmethod
     def fix_zero_vec(seg):
@@ -983,7 +1001,10 @@ class Segment:
         return bool(self.seg)
 
     def __str__(self):
-        return f"Segment. Adv Corner count = {len(self.seg)}, start lock = {self.is_start_lock}, end lock {self.is_end_lock}"
+        txt = f"Segment. Adv Corner count = {len(self.seg)}."
+        if self.is_start_lock or self.is_end_lock:
+            txt += f" Start Lock: {self.is_start_lock}. End Lock: {self.is_end_lock}"
+        return txt
 
 
 class Segments:
@@ -1127,14 +1148,24 @@ class Segments:
                 else:
                     break
 
-            segments.append(Segment(seg, umesh))
+            segments.append(Segment(list(seg), umesh))
         return cls(segments, umesh)
+
+    def rotate_longest_to_first(self):
+        idx = self.segments.index(max(self, key=lambda s: s.length_uv))
+        segments = deque(self.segments)
+        segments.rotate(-idx)
+        self.segments = list(segments)
 
     def break_by_cardinal_dir(self):
         segments = []
         for seg in self:
             segments.extend(seg.break_by_cardinal_dir().segments)
         return Segments(segments, self.umesh)
+
+    def draw(self):
+        from .. import draw
+        draw.SegmentsDrawSimple.draw_register(self)  # noqa
 
     def __iter__(self) -> typing.Iterator[Segment]:
         return iter(self.segments)

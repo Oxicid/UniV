@@ -251,6 +251,19 @@ def split_by_similarity(lst, key=None):
     else:
         return [list(group) for _, group in groupby(lst)]
 
+def groups_by_mask(lst, mask):
+    """Split iterable by mask: 0,1,0,1,1 -> [1],[1,1]"""
+    new_group = []
+    for v, m in zip(lst, mask):
+        if m:
+            new_group.append(v)
+        elif new_group:
+            yield new_group
+            new_group = []
+
+    if new_group:
+        yield new_group
+
 
 def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
     return list(zip(*[iter(lst)] * 2))  # noqa
@@ -316,7 +329,7 @@ def load_lib(
             if lib.version() != expected_version:
                 continue
 
-            print(f"UniV: Load Lib: Load from temp dir: {tmp_candidate!r}")
+            # print(f"UniV: Load Lib: Load from temp dir: {tmp_candidate!r}")
             return lib
         except:  # noqa
             pass
