@@ -1209,6 +1209,7 @@ else:
 
             for umesh in umeshes:
                 get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
+                get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True, with_seam=self.clamp_on_seam)
                 uv = umesh.uv
                 # TODO: Implement without island calc (use linked with pair iter and mark seam)
                 # Since the islands are filtered by partial selection, we use `visible` to speedup
@@ -1233,25 +1234,20 @@ else:
                                 # To optimize performance, the logic should be split based on whether
                                 # there are many selected faces or just a few.
                                 for f in isl:
-                                    if not f.select and any(
-                                        l_crn.face.select
-                                        for crn in f.loops
-                                        if crn.vert.select
-                                        for l_crn in utils.linked_crn_uv_by_island_index_unordered_included(
-                                            crn, uv, idx
-                                        )
-                                    ):
+                                    if f.select:
+                                        continue
+                                    if any(l_crn.face.select for crn in f.loops if crn.vert.select for l_crn in get_linked_it(crn)):  # fmt: skip
                                         to_select.append(f)
                             else:
-                                if (
-                                    umesh.is_full_face_deselected
-                                ):  # optimize case when only one vertex/edge selected
+                                if umesh.is_full_face_deselected:  # optimize case when only vertices/edges selected  # fmt: skip
                                     for f in isl:
                                         if any(v.select for v in f.verts):
                                             to_select.append(f)
                                 else:
                                     for f in isl:
-                                        if not f.select and self.is_grow_face(f, uv, idx):
+                                        if f.select:
+                                            continue
+                                        if self.is_grow_face(f, uv, get_linked_it):
                                             to_select.append(f)
                         else:
                             if umeshes.elem_mode == "EDGE":
@@ -1275,14 +1271,9 @@ else:
                                 face_select_set(f, True)
                         else:
                             for f in to_select:
-                                idx = f.index
                                 for crn in f.loops:
                                     if not crn[uv].select:
-                                        for (
-                                            l_crn
-                                        ) in utils.linked_crn_uv_by_island_index_unordered_included(
-                                            crn, uv, idx
-                                        ):
+                                        for l_crn in get_linked_it_inc(crn):
                                             l_crn[uv].select = True
                             for isl in islands:
                                 for f in isl:
@@ -1298,6 +1289,9 @@ else:
 
             for umesh in umeshes:
                 get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
+                get_linked_it_inc = utils.get_linked_crn_iter_fn(
+                    umesh, included=True, with_seam=self.clamp_on_seam
+                )
                 uv = umesh.uv
                 islands = Islands.calc_visible(umesh, with_seams=self.clamp_on_seam)
                 islands.indexing()
@@ -1319,12 +1313,12 @@ else:
                         if sync:
                             if umeshes.elem_mode == "FACE":
                                 for f in isl:
-                                    if f.select and any(
+                                    if not f.select:
+                                        continue
+                                    if any(
                                         not l_crn.face.select
                                         for crn in f.loops
-                                        for l_crn in utils.linked_crn_uv_by_island_index_unordered(
-                                            crn, uv, idx
-                                        )
+                                        for l_crn in get_linked_it(crn)
                                     ):
                                         to_deselect_append(f)
                             else:
@@ -1368,14 +1362,9 @@ else:
                         else:
                             # TODO: Implement face linked deselect with pair check and mark seam
                             for f in to_deselect:
-                                idx = f.index
                                 for crn in f.loops:
                                     if crn[uv].select:
-                                        for (
-                                            l_crn
-                                        ) in utils.linked_crn_uv_by_island_index_unordered_included(
-                                            crn, uv, idx
-                                        ):
+                                        for l_crn in get_linked_it_inc(crn):
                                             l_crn[uv].select = False
 
                             for isl in islands:
@@ -1389,15 +1378,14 @@ else:
             return {"FINISHED"}
 
         @staticmethod
-        def is_grow_face(face: BMFace, uv, idx):
+        def is_grow_face(face: BMFace, uv, get_linked_it):
             for crn in face.loops:
                 crn_vert = crn.vert
                 if not crn_vert.select:
                     continue
 
-                if len(utils.linked_crn_uv_by_island_index_unordered(crn, uv, idx)) + 1 == len(
-                    crn_vert.link_loops
-                ):
+                # TODO: Add has_visible_unlinked_crn function.
+                if len(list(get_linked_it(crn))) + 1 == len(crn_vert.link_loops):
                     return True
 
                 crn_edge = crn.edge
@@ -1866,24 +1854,24 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         for umesh in umeshes:
             islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             islands.indexing()
-            is_clamped = self.is_clamped_by_selected_and_seams_func(umesh)
+            get_linked = utils.get_linked_crn_fn(umesh, with_seam=self.clamp_on_seam)
+            is_clamped_with_seam = self.is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp=True)
+            is_clamped_no_seam = self.is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp=False)
+
             grew = []
             uv = umesh.uv
             for isl in islands:
                 for crn in isl.calc_selected_edge_corners_iter():
                     check_seam = self.clamp_on_seam and not crn.edge.seam
-                    selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
+                    is_clamped = is_clamped_with_seam if check_seam else is_clamped_no_seam
 
-                    grow_prev_crn = self.grow_prev(
-                        crn, selected_dir, uv, self.max_angle, check_seam, is_clamped
-                    )
+                    selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
+                    grow_prev_crn = self.grow_prev(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked)  # fmt: skip
                     if grow_prev_crn:
                         if not (check_seam and grow_prev_crn.edge.seam):
                             grew.append(grow_prev_crn)
 
-                    grow_next_crn = self.grow_next(
-                        crn, selected_dir, uv, self.max_angle, check_seam, is_clamped
-                    )
+                    grow_next_crn = self.grow_next(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked)  # fmt: skip
                     if grow_next_crn:
                         if not (check_seam and grow_next_crn.edge.seam):
                             grew.append(grow_next_crn)
@@ -1892,14 +1880,18 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                 if utils.USE_GENERIC_UV_SYNC:
                     if umesh.sync:
                         umesh.sync_from_mesh_if_needed()
+
+                    set_uv_edge_select = utils.edge_select_linked_full_func(
+                        umesh, with_seam=self.clamp_on_seam
+                    )
                     for grew_crn in grew:
-                        utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
+                        set_uv_edge_select(grew_crn)
 
                     # Select linked faces.
                     if umesh.elem_mode == "VERT":
                         set_face_select = utils.face_select_set_func(umesh)
                         for grew_crn in grew:
-                            for l_crn in utils.linked_crn_uv_by_idx_unordered_included(
+                            for l_crn in utils.linked_crn_uv_by_idx_unordered_included_v2(
                                 grew_crn, uv
                             ):
                                 f = l_crn.face
@@ -1919,8 +1911,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                         for grew_crn in grew:
                             grew_crn.edge.select = True
                     else:
+                        set_uv_edge_select = utils.edge_select_linked_full_func(umesh, with_seam=self.clamp_on_seam)
                         for grew_crn in grew:
-                            utils.select_crn_uv_edge_with_shared_by_idx(grew_crn, uv, force=True)
+                            set_uv_edge_select(grew_crn)
                 umesh.update_tag = True
 
     def shrink_select(self, umeshes: UMeshes):
@@ -1928,27 +1921,28 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             islands = Islands.calc_extended_any_edge(umesh, with_seams=self.clamp_on_seam)
             islands.indexing()
 
-            is_clamped = self.is_clamped_by_selected_and_seams_func(umesh)
+            get_linked = utils.get_linked_crn_fn(umesh, with_seam=self.clamp_on_seam)
+            is_clamped_with_seam = self.is_clamped_by_selected_and_seams_func(umesh, True)
+            is_clamped_no_seam = self.is_clamped_by_selected_and_seams_func(umesh, False)
+
             uv = umesh.uv
             shrink = []
             for isl in islands:
                 for crn in isl.calc_selected_edge_corners_iter():
-                    with_seam_clamp = self.clamp_on_seam and not crn.edge.seam
+                    check_seam = self.clamp_on_seam and not crn.edge.seam
+                    is_clamped = is_clamped_with_seam if check_seam else is_clamped_no_seam
+
                     selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
 
-                    grow_prev_crn = self.grow_prev(
-                        crn, selected_dir, uv, self.max_angle, with_seam_clamp, is_clamped
-                    )
+                    grow_prev_crn = self.grow_prev(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked)
                     if grow_prev_crn:
-                        if not (with_seam_clamp and grow_prev_crn.edge.seam):
+                        if not (check_seam and grow_prev_crn.edge.seam):
                             shrink.append(crn)
                             continue
 
-                    grow_next_crn = self.grow_next(
-                        crn, selected_dir, uv, self.max_angle, with_seam_clamp, is_clamped
-                    )
+                    grow_next_crn = self.grow_next(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked)
                     if grow_next_crn:
-                        if not (with_seam_clamp and grow_next_crn.edge.seam):
+                        if not (check_seam and grow_next_crn.edge.seam):
                             shrink.append(crn)
 
             if shrink:
@@ -1958,14 +1952,12 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                     umesh.bm.select_history.validate()  # Active elem validate
                 umesh.update_tag = True
 
-    def grow_prev(
-        self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped
-    ) -> "BMLoop | None":
+    def grow_prev(self, crn, selected_dir, uv, max_angle, is_clamped, get_linked_) -> BMLoop | None:
         prev_crn = crn.link_loop_prev
         shared = utils.shared_linked_crn_by_idx(crn, uv)
-        cur_linked_corners = utils.linked_crn_uv_by_island_index_unordered(crn, uv, crn.face.index)
+        cur_linked_corners = get_linked_(crn)
 
-        if is_clamped(cur_linked_corners, shared, prev_crn, with_seam_clamp):
+        if is_clamped(cur_linked_corners, shared, prev_crn):
             return None
 
         # Border case.
@@ -1975,11 +1967,10 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             return None
 
         # Get corner without check (quad case)
+
+        # TODO: Add left_and_right_linked_crn function for avoid potentially unordered CW corners.
         if len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 and shared:
-            cur_quad_linked_crn_uv = utils.linked_crn_uv_by_idx(crn, uv)
-            if len(cur_quad_linked_crn_uv) == 3:
-                if utils.shared_linked_crn_by_idx(cur_quad_linked_crn_uv[1], uv):
-                    return cur_quad_linked_crn_uv[1]
+            return cur_linked_corners[1]
 
         min_crn = None
         angle = max_angle * 1.0001
@@ -2011,7 +2002,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                 if angle_ < angle:
                     if self.boundary_by_boundary:
                         status_grow = bool(utils.shared_linked_crn_by_idx(prev_crn_, uv))
-                        if bool(shared) is status_grow:
+                        if bool(shared) is status_grow:  # TODO: Remove bools.
                             angle = angle_
                             min_crn = prev_crn_
                     else:
@@ -2020,16 +2011,12 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
         return min_crn
 
-    def grow_next(
-        self, crn, selected_dir, uv, max_angle, with_seam_clamp, is_clamped
-    ) -> "BMLoop | None":
+    def grow_next(self, crn, selected_dir, uv, max_angle, is_clamped, get_linked_) -> "BMLoop | None":
         next_crn = crn.link_loop_next
         shared = utils.shared_linked_crn_by_idx(crn, uv)
-        next_linked_corners = utils.linked_crn_uv_by_island_index_unordered(
-            crn.link_loop_next, uv, crn.link_loop_next.face.index
-        )
+        next_linked_corners = get_linked_(crn.link_loop_next)
 
-        if is_clamped(next_linked_corners, shared, next_crn, with_seam_clamp):
+        if is_clamped(next_linked_corners, shared, next_crn):
             return None
 
         # Border case
@@ -2042,11 +2029,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             return None
 
         # Quad case
+        # TODO: Add left_and_right_linked_crn function for avoid potentially unordered CW corners.
         if len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 and shared:
-            next_quad_linked_crn_uv = utils.linked_crn_uv_by_idx(next_crn, uv)
-            if len(next_quad_linked_crn_uv) == 3:
-                if utils.shared_linked_crn_by_idx(next_quad_linked_crn_uv[1].link_loop_prev, uv):
-                    return next_quad_linked_crn_uv[1].link_loop_prev
+            return next_linked_corners[1].link_loop_prev
 
         min_crn = None
         angle = max_angle * 1.0001
@@ -2087,15 +2072,15 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         return min_crn
 
     @staticmethod
-    def is_clamped_by_selected_and_seams_func(umesh):
+    def is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp: bool):
         """Skip if selected or with seam"""
 
-        def catcher(get_edge_select):
-            def fn(linked_corners, shared, next_or_prev_crn, with_seam_clamp):
-                if get_edge_select(next_or_prev_crn):
-                    return True
+        def catcher(get_edge_select, with_seam_clamp_: bool):
+            if with_seam_clamp_:
+                def fn(linked_corners, shared, next_or_prev_crn):
+                    if get_edge_select(next_or_prev_crn):
+                        return True
 
-                if with_seam_clamp:
                     if next_or_prev_crn.edge.seam:
                         return True
                     for crn in linked_corners:
@@ -2105,7 +2090,12 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                         if prev_crn != shared:
                             if prev_crn.edge.seam or get_edge_select(prev_crn):
                                 return True
-                else:
+                    return False
+            else:
+                def fn(linked_corners, shared, next_or_prev_crn):
+                    if get_edge_select(next_or_prev_crn):
+                        return True
+
                     for crn in linked_corners:
                         if get_edge_select(crn):
                             return True
@@ -2113,11 +2103,11 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                         if prev_crn != shared:
                             if get_edge_select(prev_crn):
                                 return True
-                return False
+                    return False
 
             return fn
 
-        return catcher(utils.edge_select_get_func(umesh))
+        return catcher(utils.edge_select_get_func(umesh), with_seam_clamp)
 
 
 class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
@@ -2245,7 +2235,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
     def grow_prev(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> "BMLoop | None":
         prev_crn = crn.link_loop_prev
         shared = utils.shared_linked_crn_to_edge_by_idx(crn)
-        cur_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(crn)
+        cur_linked_corners = utils.linked_crn_to_vert_by_idx_without_co_check_unordered(crn)
 
         if is_clamped(cur_linked_corners, shared, prev_crn, with_seam):
             return None
@@ -2309,7 +2299,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
     def grow_next(self, crn, selected_dir, max_angle, with_seam, is_clamped) -> "BMLoop | None":
         next_crn = crn.link_loop_next
         shared = utils.shared_linked_crn_to_edge_by_idx(crn)
-        next_linked_corners = utils.linked_crn_to_vert_by_island_index_unordered(next_crn)
+        next_linked_corners = utils.linked_crn_to_vert_by_idx_without_co_check_unordered(next_crn)
 
         if is_clamped(next_linked_corners, shared, next_crn, with_seam):
             return None

@@ -541,7 +541,7 @@ else:
 
 if USE_GENERIC_UV_SYNC:
 
-    def edge_select_linked_full_func(umesh: "utypes.UMesh") -> typing.Callable[[BMLoop], None]:
+    def edge_select_linked_full_func(umesh: "utypes.UMesh", with_seam=True) -> typing.Callable[[BMLoop], None]:
         """Selected linked vertices, with correct edge and face selection.
         NOTE: Only for edge mode.
         """
@@ -620,13 +620,13 @@ if USE_GENERIC_UV_SYNC:
             umesh.uv,
             umesh.sync,
             (umesh.sync and not umesh.sync_valid),
-            is_boundary_func(umesh),
-            get_linked_crn_iter_fn(umesh, included=True)
+            is_boundary_func(umesh, with_seam=with_seam),
+            get_linked_crn_iter_fn(umesh, included=True, with_seam=with_seam)
         )
 
 else:
 
-    def edge_select_linked_full_func(umesh: "utypes.UMesh") -> typing.Callable[[BMLoop], None]:
+    def edge_select_linked_full_func(umesh: "utypes.UMesh", with_seam=True) -> typing.Callable[[BMLoop], None]:
         from . import get_linked_crn_iter_fn, is_boundary_func
 
         def catcher(uv, sync, is_boundary, get_linked_it_inc_):
@@ -661,7 +661,10 @@ else:
 
             return select_set
 
-        return catcher(umesh.uv, umesh.sync, is_boundary_func(umesh), get_linked_crn_iter_fn(umesh, included=True))
+        return catcher(umesh.uv,
+                       umesh.sync,
+                       is_boundary_func(umesh, with_seam=with_seam),
+                       get_linked_crn_iter_fn(umesh, included=True, with_seam=with_seam))
 
 
 if USE_GENERIC_UV_SYNC:
@@ -789,73 +792,6 @@ else:
             return select_get
 
         return inner(umesh.uv, umesh.sync)
-
-
-if USE_GENERIC_UV_SYNC:
-
-    def select_crn_uv_edge_with_shared_by_idx(crn: BMLoop, uv, force=False):
-        idx = crn.face.index
-        from .bm_tag import shared_is_linked
-        from .bm_walk import linked_crn_uv_by_island_index_unordered_included
-
-        shared = crn.link_loop_radial_prev
-        if shared != crn:
-            if shared.face.index == idx:
-                if shared_is_linked(crn, shared, uv):
-                    shared.uv_select_edge = True
-
-        crn.edge.select = True
-        crn.uv_select_edge = True
-
-        if force:
-            for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
-                crn_a.uv_select_vert = True
-
-            crn_uv_next = crn.link_loop_next
-            for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
-                crn_b.uv_select_vert = True
-        else:
-            if not crn.uv_select_vert:
-                for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
-                    crn_a.uv_select_vert = True
-
-            crn_uv_next = crn.link_loop_next
-            if not crn_uv_next.uv_select_vert:
-                for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
-                    crn_b.uv_select_vert = True
-
-else:
-
-    def select_crn_uv_edge_with_shared_by_idx(crn: BMLoop, uv, force=False):
-        idx = crn.face.index
-        from .bm_tag import shared_is_linked
-        from .bm_walk import linked_crn_uv_by_island_index_unordered_included
-
-        shared = crn.link_loop_radial_prev
-        if shared != crn:
-            if shared.face.index == idx:
-                if shared_is_linked(crn, shared, uv):
-                    shared[uv].select_edge = True
-
-        crn_uv_a = crn[uv]
-        crn_uv_a.select_edge = True
-
-        if force:
-            for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
-                crn_a[uv].select = True
-
-            crn_uv_next = crn.link_loop_next
-            for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
-                crn_b[uv].select = True
-        else:
-            if not crn_uv_a.select:
-                for crn_a in linked_crn_uv_by_island_index_unordered_included(crn, uv, idx):
-                    crn_a[uv].select = True
-
-            crn_uv_next = crn.link_loop_next
-            if not crn_uv_next[uv].select:
-                for crn_b in linked_crn_uv_by_island_index_unordered_included(crn_uv_next, uv, idx):
-                    crn_b[uv].select = True
 
 
 if USE_GENERIC_UV_SYNC:

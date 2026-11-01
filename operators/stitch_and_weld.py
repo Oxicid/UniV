@@ -162,14 +162,14 @@ class Stitch:
                         break
 
         if self.zero_area_count:
-            self.report(
+            self.report(  # noqa
                 {"WARNING"},
                 f"Found {self.zero_area_count} zero length edge loop. Use inspect tools to find the problem",
-            )  # noqa
+            )
         if self.flipped_3d_count:
-            self.report(
+            self.report(  # noqa
                 {"WARNING"},
-                f"Found {self.flipped_3d_count} loops with 3D flipped faces. "  # noqa
+                f"Found {self.flipped_3d_count} loops with 3D flipped faces. "
                 f"For correct result need recalculate normals",
             )
 
@@ -562,9 +562,9 @@ class Stitch:
         length_b = normal_b.length
 
         if length_a < 1e-06 or length_b < 1e-06:
-            self.report(
+            self.report(  # noqa
                 {"WARNING"}, "Found zero length edge loop. Use inspect tools to find the problem"
-            )  # noqa
+            )
         else:
             scale = length_a / length_b
             trans.scale_simple(Vector((scale, scale)))
@@ -872,7 +872,7 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
         # Weld unpair selected edges
         if not umeshes.sync or any(u.sync_valid for u in umeshes):
-            from ..utils import linked_crn_uv_by_idx_unordered_included
+            from ..utils import linked_crn_uv_by_idx_unordered_included_v2
             from ..utils import is_pair
 
             for islands in islands_of_mesh:
@@ -896,12 +896,12 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                             # Weld verts
                             next_crn_co = crn.link_loop_next[uv].uv
                             shared = crn.link_loop_radial_prev
-                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(shared, uv):
+                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included_v2(shared, uv):
                                 shared_l_crn[uv].uv = next_crn_co
 
                             crn_co = crn[uv].uv
                             shared_next = shared.link_loop_next
-                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included(
+                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included_v2(
                                 shared_next, uv
                             ):
                                 shared_l_crn[uv].uv = crn_co

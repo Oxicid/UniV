@@ -9,7 +9,7 @@ from mathutils import Vector
 from collections import defaultdict, deque
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import linked_crn_uv, vec_isclose_to_zero, linked_crn_uv_by_idx_unordered
+from ..utils import linked_crn_uv, vec_isclose_to_zero
 
 from math import pi
 from . import umesh as _umesh
@@ -310,11 +310,9 @@ class LoopGroup:
                 crn[uv].pin_uv = state
 
     def calc_chain_linked_corners(self):
-        uv = self.umesh.uv
+        get_linked_inc = utils.get_linked_crn_fn(self.umesh, included=True)  # TODO: Add with_seam ???
         for crn in chain(self, [self[-1].link_loop_next]):
-            linked = linked_crn_uv_by_idx_unordered(crn, uv)
-            linked.insert(0, crn)
-            self.chain_linked_corners.append(linked)
+            self.chain_linked_corners.append(get_linked_inc(crn))
 
     def distribute(self, start, end):
         assert self.chain_linked_corners
@@ -417,7 +415,7 @@ class LoopGroups:
     @classmethod
     def calc_by_boundary_crn_tags(cls, isl):
         """Warning: Need uninterrupted tagging by boundary loops"""
-        uv = isl.umesh.uv
+        get_linked = utils.get_linked_crn_fn(isl.umesh, with_seam=True)
         loop_groups = []
         for crn in isl.iter_corners_by_tag():
             crn.tag = False
@@ -431,7 +429,8 @@ class LoopGroups:
                     group.append(next_crn)
                     continue
 
-                for linked_crn in reversed(utils.linked_crn_uv_by_idx_unordered(next_crn, uv)):
+
+                for linked_crn in reversed(get_linked(next_crn)):  # TODO: Test without reverse.
                     if linked_crn.tag:
                         linked_crn.tag = False
                         temp_crn = linked_crn
@@ -540,12 +539,12 @@ class UnionLoopGroup(LoopGroups):
 
 
 class AdvCorner:
-    def __init__(self, crn: BMLoop, uv, invert=False):
+    def __init__(self, crn: BMLoop, uv, is_pair, invert=False):
         self.crn = crn
         self.invert: bool = invert
         self.uv = uv
         self._vec = None
-        self._is_pair: bool | None = None
+        self.is_pair: bool = is_pair
 
     @property
     def orig_crn(self):
@@ -571,21 +570,6 @@ class AdvCorner:
 
     def angle(self, other: "typing.Self", max_angle: float):
         return self.vec.angle(other.vec, max_angle)  # noqa
-
-    @property
-    def is_pair(self):
-        if self._is_pair is None:
-            if self.invert:
-                pair = self.crn.link_loop_prev.link_loop_radial_prev
-                self._is_pair = utils.is_pair_by_idx(self.crn.link_loop_prev, pair, self.uv)
-            else:
-                pair = self.crn.link_loop_radial_prev
-                self._is_pair = utils.is_pair_by_idx(self.crn, pair, self.uv)
-        return self._is_pair
-
-    @is_pair.setter
-    def is_pair(self, v: bool):
-        self._is_pair = v
 
     @property
     def vert(self):
@@ -617,32 +601,6 @@ class AdvCorner:
         card_vec = utils.vec_to_cardinal(vec)
         angle = vec.angle(card_vec, 0)
         return min(angle, pi - angle)
-
-    @property
-    def next(self):
-        # NOTE: Need face indexing
-        if self.invert:
-            crn_prev = self.crn.link_loop_prev
-            crn_prev_prev = crn_prev.link_loop_prev
-            pair_prev_prev = crn_prev_prev.link_loop_radial_prev
-            if utils.is_pair_by_idx(crn_prev_prev, pair_prev_prev, self.uv):
-                return AdvCorner(pair_prev_prev, self.uv)
-            else:
-                return AdvCorner(crn_prev, self.uv, invert=True)
-        else:
-            return AdvCorner(self.crn.link_loop_next, self.uv)
-
-    @property
-    def prev(self):
-        # NOTE: Need face indexing
-        if self.invert:
-            pair = self.crn.link_loop_radial_prev
-            if utils.is_pair_by_idx(self.crn, pair, self.uv):
-                return AdvCorner(pair, self.uv)
-            else:
-                return AdvCorner(self.crn.link_loop_next, self.uv, invert=True)
-        else:
-            return AdvCorner(self.crn.link_loop_prev, self.uv)
 
     def toggle_dir(self):
         if self.is_pair:
@@ -690,8 +648,7 @@ class AdvCorner:
     #     return False
 
     def copy(self):
-        adv_crn = AdvCorner(self.crn, self.uv, self.invert)
-        adv_crn._is_pair = self.is_pair
+        adv_crn = AdvCorner(self.crn, self.uv, self.is_pair, self.invert)
         if self._vec:
             adv_crn._vec = self._vec.copy()
         else:
@@ -699,6 +656,7 @@ class AdvCorner:
         return adv_crn
 
     def __hash__(self):
+        # NOTE: Don't use *.is_pair in this.
         return hash(self.crn)
 
     def __eq__(self, other):
@@ -746,7 +704,7 @@ class Segment:
             if last_adv_crn.invert:
                 crn = last_adv_crn.crn
             else:
-                crn = last_adv_crn.next.crn
+                crn = last_adv_crn.crn.link_loop_next
             self.chain_linked_corners.append(get_linked_inc(crn))
 
     def reverse(self):
@@ -1022,22 +980,19 @@ class Segments:
         corners = set(corners)
         for crn in corners:
             seg = deque()
-            first_crn = AdvCorner(crn, uv)
+            first_crn = AdvCorner(crn, uv, is_pair=not is_boundary(crn))
             if first_crn in appended:
                 continue
 
             appended.add(first_crn)
             seg.append(first_crn)
 
-            first_crn.is_pair = not is_boundary(crn)
             if first_crn.is_pair:
-                pair = AdvCorner(crn.link_loop_radial_prev, uv)
-                pair.is_pair = True
+                pair = AdvCorner(crn.link_loop_radial_prev, uv, is_pair=True)
                 appended.add(pair)
             else:
                 # Set invert for compare convention.
-                boundary = AdvCorner(crn.link_loop_next, uv, invert=True)
-                boundary.is_pair = False
+                boundary = AdvCorner(crn.link_loop_next, uv, is_pair=False, invert=True)
                 appended.add(boundary)
 
             # Forward Grow
@@ -1053,16 +1008,15 @@ class Segments:
                 for crn_l in get_linked_it_inc(next_check):
                     # Next grow
                     if crn_l in corners:
-                        next_grow = AdvCorner(crn_l, uv)
+                        next_grow = AdvCorner(crn_l, uv, is_pair=not is_boundary(crn_l))
                         count += 1
                         if next_grow not in appended:
-                            next_grow.is_pair = not is_boundary(crn_l)
                             filtered.append(next_grow)
 
                     # Here we skip pair edges, as they are processed in the previous condition.
                     prev = crn_l.link_loop_prev
-                    if prev in corners and is_boundary(prev):
-                        prev_grow = AdvCorner(crn_l, uv, invert=True)
+                    if prev in corners and is_boundary(prev):  # TODO: Check with is_boundary(crn_l) for avoid bug in multi-face case.
+                        prev_grow = AdvCorner(crn_l, uv, is_pair=False, invert=True)
                         count += 1
                         if prev_grow not in appended:
                             filtered.append(prev_grow)
@@ -1079,14 +1033,15 @@ class Segments:
 
                     # Add possible CrnGrow variants so that we don't go through them again.
                     appended.add(next_elem)
+                    # NOTE: is_pair in this case doesn't matter.
                     if next_elem.invert:
-                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv))
+                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv, is_pair=False))
                     else:
                         if is_boundary(next_elem.crn):
-                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, invert=True))
+                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, is_pair=False, invert=True))
                         else:
                             # The pair doesn't have an invert option, so we do without them
-                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv))
+                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv, is_pair=True))
                 else:
                     break
 
@@ -1102,18 +1057,15 @@ class Segments:
                     if crn_l in corners:
                         count += 1
                         if is_boundary(crn_l):
-                            next_grow = AdvCorner(crn_l.link_loop_next, uv, invert=True)
-                            next_grow.is_pair = False
+                            next_grow = AdvCorner(crn_l.link_loop_next, uv, is_pair=False, invert=True)
                         else:
-                            next_grow = AdvCorner(crn_l.link_loop_radial_prev, uv)
-                            next_grow.is_pair = True
+                            next_grow = AdvCorner(crn_l.link_loop_radial_prev, uv, is_pair = True)
                         if next_grow not in appended:
                             filtered.append(next_grow)
 
                     prev = crn_l.link_loop_prev
                     if prev in corners and is_boundary(prev):
-                        prev_grow = AdvCorner(prev, uv)
-                        prev_grow.is_pair = False
+                        prev_grow = AdvCorner(prev, uv, is_pair = False)
                         count += 1
                         if prev_grow not in appended:
                             filtered.append(prev_grow)
@@ -1128,13 +1080,14 @@ class Segments:
 
                     seg.appendleft(next_elem)
                     appended.add(next_elem)
+                    # NOTE: is_pair in this case doesn't matter.
                     if next_elem.invert:
-                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv))
+                        appended.add(AdvCorner(next_elem.crn.link_loop_prev, uv, is_pair=False))
                     else:
                         if next_elem.is_pair:
-                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv))
+                            appended.add(AdvCorner(next_elem.crn.link_loop_radial_prev, uv, is_pair=True))
                         else:
-                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, invert=True))
+                            appended.add(AdvCorner(next_elem.crn.link_loop_next, uv, is_pair=False, invert=True))
                 else:
                     break
 
