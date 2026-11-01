@@ -545,9 +545,10 @@ if USE_GENERIC_UV_SYNC:
         """Selected linked vertices, with correct edge and face selection.
         NOTE: Only for edge mode.
         """
-        from . import linked_crn_to_vert_pair_with_seam_included, is_boundary_func
+        from . import get_linked_crn_iter_fn, is_boundary_func
 
-        def inner(uv, sync, sync_invalid, is_boundary):
+
+        def catcher(uv, sync, sync_invalid, is_boundary, get_linked_it_inc_):
             if sync_invalid:
 
                 def select_set(crn):
@@ -586,13 +587,11 @@ if USE_GENERIC_UV_SYNC:
                                     f.select = True
                                     f.uv_select = True
 
-                        linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, True)
+                        linked = get_linked_it_inc_(crn)
                         for l_crn in linked:
                             l_crn.uv_select_vert = True
 
-                        linked = linked_crn_to_vert_pair_with_seam_included(
-                            crn.link_loop_next, uv, True
-                        )
+                        linked = get_linked_it_inc_(crn.link_loop_next)
                         for l_crn in linked:
                             l_crn.uv_select_vert = True
 
@@ -605,11 +604,11 @@ if USE_GENERIC_UV_SYNC:
                             pair = crn.link_loop_radial_prev
                             pair[uv].select_edge = True
 
-                        linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, True)
+                        linked = get_linked_it_inc_(crn, uv, True)
                         for l_crn in linked:
                             l_crn[uv].select = True
 
-                        linked = linked_crn_to_vert_pair_with_seam_included(
+                        linked = get_linked_it_inc_(
                             crn.link_loop_next, uv, True
                         )
                         for l_crn in linked:
@@ -617,16 +616,20 @@ if USE_GENERIC_UV_SYNC:
 
             return select_set
 
-        return inner(
-            umesh.uv, umesh.sync, (umesh.sync and not umesh.sync_valid), is_boundary_func(umesh)
+        return catcher(
+            umesh.uv,
+            umesh.sync,
+            (umesh.sync and not umesh.sync_valid),
+            is_boundary_func(umesh),
+            get_linked_crn_iter_fn(umesh, included=True)
         )
 
 else:
 
     def edge_select_linked_full_func(umesh: "utypes.UMesh") -> typing.Callable[[BMLoop], None]:
-        from . import linked_crn_to_vert_pair_with_seam_included, is_boundary_func
+        from . import get_linked_crn_iter_fn, is_boundary_func
 
-        def inner(uv, sync, is_boundary):
+        def catcher(uv, sync, is_boundary, get_linked_it_inc_):
             if sync:
 
                 def select_set(crn):
@@ -644,9 +647,8 @@ else:
                                 pair_face.select = True
 
             else:
-
                 def select_set(crn: BMLoop):
-                    linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, False)
+                    linked = get_linked_it_inc_(crn)
                     for l_crn in linked:
                         l_crn[uv].select = True
                         next_crn = l_crn.link_loop_next[uv]
@@ -659,7 +661,7 @@ else:
 
             return select_set
 
-        return inner(umesh.uv, umesh.sync, is_boundary_func(umesh))
+        return catcher(umesh.uv, umesh.sync, is_boundary_func(umesh), get_linked_crn_iter_fn(umesh, included=True))
 
 
 if USE_GENERIC_UV_SYNC:
@@ -863,14 +865,14 @@ if USE_GENERIC_UV_SYNC:
         NOTE: Only for vertex mode.
         """
 
-        def inner(uv, sync, sync_invalid):
-            from . import linked_crn_to_vert_pair_with_seam_included
+        from . import get_linked_crn_iter_fn
+        def catcher(sync, sync_invalid, get_linked_it_inc_: typing.Callable[[BMLoop], typing.Generator]):
 
             if sync_invalid:
 
                 def select_set(crn):
                     crn.vert.select = True
-                    for l_crn in linked_crn_to_vert_pair_with_seam_included(crn, uv, True):
+                    for l_crn in get_linked_it_inc_(crn):
                         if not l_crn.face.select:
                             if all(v.select for v in l_crn.face.verts):
                                 l_crn.face.select = True
@@ -881,8 +883,7 @@ if USE_GENERIC_UV_SYNC:
                     def select_set(crn: BMLoop):
                         crn.vert.select = True
 
-                        linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, True)
-                        for l_crn in linked:
+                        for l_crn in get_linked_it_inc_(crn):
                             l_crn.uv_select_vert = True
                             next_crn = l_crn.link_loop_next
                             if not next_crn.uv_select_edge and next_crn.uv_select_vert:
@@ -903,8 +904,7 @@ if USE_GENERIC_UV_SYNC:
                 else:
 
                     def select_set(crn: BMLoop):
-                        linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, False)
-                        for l_crn in linked:
+                        for l_crn in get_linked_it_inc_(crn):
                             l_crn.uv_select_vert = True
                             next_crn = l_crn.link_loop_next
                             if not next_crn.uv_select_edge and next_crn.uv_select_vert:
@@ -921,19 +921,20 @@ if USE_GENERIC_UV_SYNC:
 
             return select_set
 
-        return inner(umesh.uv, umesh.sync, (umesh.sync and not umesh.sync_valid))
+        return catcher(umesh.sync, (umesh.sync and not umesh.sync_valid), get_linked_crn_iter_fn(umesh, included=True))
 
 else:
 
     def vert_select_linked_full_func(umesh: "utypes.UMesh") -> typing.Callable[[BMLoop], None]:
-        def inner(uv, sync):
-            from . import linked_crn_to_vert_pair_with_seam_included
+        from . import get_linked_crn_iter_fn
+
+        def catcher(uv, sync, get_linked_it_inc_: typing.Callable[[BMLoop], typing.Generator]):
 
             if sync:
 
                 def select_set(crn):
                     crn.vert.select = True
-                    for l_crn in linked_crn_to_vert_pair_with_seam_included(crn, uv, True):
+                    for l_crn in get_linked_it_inc_(crn):
                         if not l_crn.face.select:
                             if all(v.select for v in l_crn.face.verts):
                                 l_crn.face.select = True
@@ -941,7 +942,7 @@ else:
             else:
 
                 def select_set(crn: BMLoop):
-                    linked = linked_crn_to_vert_pair_with_seam_included(crn, uv, False)
+                    linked = get_linked_it_inc_(crn)
                     for l_crn in linked:
                         l_crn[uv].select = True
                         next_crn = l_crn.link_loop_next[uv]
@@ -954,7 +955,7 @@ else:
 
             return select_set
 
-        return inner(umesh.uv, umesh.sync)
+        return catcher(umesh.uv, umesh.sync, get_linked_crn_iter_fn(umesh, included=True))
 
 
 def select_edge_processing(umesh, to_deselect, to_select):

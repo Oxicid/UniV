@@ -967,24 +967,16 @@ if utils.USE_GENERIC_UV_SYNC:
         def grow_select(self, umeshes):
             has_update = False
             sync = umeshes.sync
-            if self.clamp_on_seam:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair_with_seam
-            else:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair
 
             for umesh in umeshes:
-                uv = umesh.uv
+                get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
                 to_select = []
                 if self.is_sticky_off_in_face_mode(umeshes):
                     face_select_get = utils.face_select_get_func(umesh)
                     face_select_set = utils.face_select_set_func(umesh)
 
                     for f in utils.calc_unselected_uv_faces_iter(umesh):
-                        if any(
-                            face_select_get(l_crn.face)
-                            for crn in f.loops
-                            for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
-                        ):
+                        if any(face_select_get(l_crn.face) for crn in f.loops for l_crn in get_linked_it(crn)):
                             to_select.append(f)
                     if to_select:
                         for f in to_select:
@@ -1004,7 +996,7 @@ if utils.USE_GENERIC_UV_SYNC:
                             face_select_get(l_crn.face)
                             for crn in f.loops
                             if vert_select_get(crn)
-                            for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
+                            for l_crn in get_linked_it(crn)
                         ):
                             to_select.append(f)
                 else:
@@ -1025,7 +1017,7 @@ if utils.USE_GENERIC_UV_SYNC:
                             if not is_boundary(crn):
                                 # The face_select_set func select the 3D edge and vert, so it does not need to be selected.
                                 crn.link_loop_radial_prev.uv_select_edge = True
-                            for linked_crn in linked_crn_to_vert_pair(crn, uv, sync):
+                            for linked_crn in get_linked_it(crn):
                                 linked_crn.uv_select_vert = True
                                 linked_faces.add(linked_crn.face)
 
@@ -1045,13 +1037,11 @@ if utils.USE_GENERIC_UV_SYNC:
         def shrink(self, umeshes):
             has_update = False
             sync = umeshes.sync
-            if self.clamp_on_seam:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair_with_seam
-            else:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair
 
             for umesh in umeshes:
-                uv = umesh.uv
+                get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
+                get_linked = utils.get_linked_crn_fn(umesh, with_seam=self.clamp_on_seam)
+
                 to_deselect = set()
                 if self.is_sticky_off_in_face_mode(umeshes) or (
                     umesh.elem_mode == "FACE" and not umesh.sync_valid
@@ -1066,7 +1056,7 @@ if utils.USE_GENERIC_UV_SYNC:
                                 if crn.vert.select:
                                     selected_linked_faces = [
                                         l_crn.face
-                                        for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
+                                        for l_crn in get_linked_it(crn)
                                         if face_select_get(l_crn.face)
                                     ]
                                     if selected_linked_faces:
@@ -1079,7 +1069,7 @@ if utils.USE_GENERIC_UV_SYNC:
                     else:
                         for f in utils.calc_unselected_uv_faces_iter(umesh):
                             for crn in f.loops:
-                                linked_corners = linked_crn_to_vert_pair(crn, uv, sync)
+                                linked_corners = get_linked(crn)
                                 selected_linked_faces = [
                                     l_crn.face
                                     for l_crn in linked_corners
@@ -1113,7 +1103,7 @@ if utils.USE_GENERIC_UV_SYNC:
                         for crn in f.loops:
                             if vert_select_get(crn):
                                 to_deselect.add(f)
-                                for l_crn in linked_crn_to_vert_pair(crn, uv, sync):
+                                for l_crn in get_linked_it(crn):
                                     if vert_select_get(l_crn):
                                         to_deselect.add(l_crn.face)
                     if to_deselect:
@@ -1127,7 +1117,7 @@ if utils.USE_GENERIC_UV_SYNC:
                             for crn in f.loops:
                                 crn.uv_select_vert = any(
                                     l_crn.face.uv_select
-                                    for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
+                                    for l_crn in get_linked_it(crn)
                                 )
 
                             # Select edges.
@@ -1143,12 +1133,12 @@ if utils.USE_GENERIC_UV_SYNC:
                             continue
                         if not crn.face.uv_select:
                             to_deselect.add(crn)
-                            to_deselect.update(linked_crn_to_vert_pair(crn, uv, sync))
+                            to_deselect.update(get_linked_it(crn))
 
                         elif any(
                             not f.uv_select for f in crn.vert.link_faces
                         ):  # Avoid using linked_crn_to_vert_pair if all faces selected
-                            linked = linked_crn_to_vert_pair(crn, uv, sync)
+                            linked = get_linked(crn)
                             if not all(l_crn.face.uv_select for l_crn in linked):
                                 to_deselect.add(crn)
                                 to_deselect.update(linked)
@@ -1170,15 +1160,11 @@ if utils.USE_GENERIC_UV_SYNC:
                                 for crn_f in crn.face.loops:
                                     if not crn_f.uv_select_vert:
                                         continue
-                                    if (
-                                        not crn_f.uv_select_edge
-                                        and not crn_f.link_loop_prev.uv_select_edge
-                                    ):
-                                        linked = linked_crn_to_vert_pair(crn, uv, sync)
+                                    if not crn_f.uv_select_edge and not crn_f.link_loop_prev.uv_select_edge:
                                         if not any(
                                             l_crn.uv_select_edge
                                             or l_crn.link_loop_prev.uv_select_edge
-                                            for l_crn in linked
+                                            for l_crn in get_linked_it(crn)
                                         ):
                                             crn_f.uv_select_vert = False
                         if sync:
@@ -1220,12 +1206,9 @@ else:
 
         def grow_select(self, umeshes):
             sync = umeshes.sync
-            if self.clamp_on_seam:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair_with_seam
-            else:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair
 
             for umesh in umeshes:
+                get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
                 uv = umesh.uv
                 # TODO: Implement without island calc (use linked with pair iter and mark seam)
                 # Since the islands are filtered by partial selection, we use `visible` to speedup
@@ -1239,7 +1222,7 @@ else:
                         if any(
                             face_select_get(l_crn.face)
                             for crn in f.loops
-                            for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
+                            for l_crn in get_linked_it(crn)
                         ):
                             to_select.append(f)
                 else:
@@ -1312,12 +1295,9 @@ else:
 
         def shrink(self, umeshes):
             sync = umeshes.sync
-            if self.clamp_on_seam:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair_with_seam
-            else:
-                linked_crn_to_vert_pair = utils.linked_crn_to_vert_pair
 
             for umesh in umeshes:
+                get_linked_it = utils.get_linked_crn_iter_fn(umesh, with_seam=self.clamp_on_seam)
                 uv = umesh.uv
                 islands = Islands.calc_visible(umesh, with_seams=self.clamp_on_seam)
                 islands.indexing()
@@ -1330,7 +1310,7 @@ else:
                         if not all(
                             face_select_get(l_crn.face)
                             for crn in f.loops
-                            for l_crn in linked_crn_to_vert_pair(crn, uv, sync)
+                            for l_crn in get_linked_it(crn)
                         ):
                             to_deselect_append(f)
 
@@ -1865,9 +1845,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             self.report(
                 {"INFO"}, f'Edge Grow not work in "{umeshes.elem_mode}" mode, run grow instead'
             )
-            return bpy.ops.uv.univ_select_grow(
-                grow=self.grow, clamp_on_seam=self.clamp_on_seam
-            )  # noqa
+            return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         umeshes.filter_by_selected_uv_edges()
         umeshes.update_tag = False
@@ -2160,9 +2138,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
         umeshes = UMeshes.calc_with_no_uv(report=self.report, verify_uv=False)
 
         if umeshes.elem_mode not in ("VERT", "EDGE"):
-            return bpy.ops.mesh.univ_select_grow(
-                grow=self.grow, clamp_on_seam=self.clamp_on_seam
-            )  # noqa
+            return bpy.ops.mesh.univ_select_grow(grow=self.grow, clamp_on_seam=self.clamp_on_seam)  # noqa
 
         umeshes.set_sync()
         umeshes.sync_invalidate()
@@ -3344,7 +3320,7 @@ class UNIV_OT_SelectMode(Operator):
                             umesh.bm.uv_select_sync_from_mesh(sticky_select_mode="DISABLED")
                             umesh.bm.uv_select_flush_mode(flush_down=True)
 
-                        uv = umesh.uv
+                        get_linked = utils.get_linked_crn_fn(umesh)
                         unselected_faces_with_selected_corners = set()
                         for f in utils.calc_unselected_uv_faces_iter(umesh):
                             for crn in f.loops:
@@ -3352,7 +3328,7 @@ class UNIV_OT_SelectMode(Operator):
                                     continue
 
                                 # Get unselect verts, with selected links
-                                linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, True)
+                                linked = get_linked(crn)
                                 if any(l_crn.uv_select_vert for l_crn in linked):
                                     for ll_crn in reversed(linked):
                                         if ll_crn.uv_select_vert:
@@ -3426,7 +3402,7 @@ class UNIV_OT_SelectMode(Operator):
                                 umesh.bm.uv_select_sync_from_mesh(sticky_select_mode="DISABLED")
                                 umesh.bm.uv_select_flush_mode(flush_down=True)
 
-                            uv = umesh.uv
+                            get_linked = utils.get_linked_crn_fn(umesh)
                             unselected_faces_with_selected_corners = set()
                             for f in utils.calc_unselected_uv_faces_iter(umesh):
                                 for crn in f.loops:
@@ -3434,7 +3410,7 @@ class UNIV_OT_SelectMode(Operator):
                                         continue
 
                                     # Get unselect verts, with selected links
-                                    linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, True)
+                                    linked = get_linked(crn)
                                     if any(l_crn.uv_select_vert for l_crn in linked):
                                         for ll_crn in reversed(linked):
                                             if ll_crn.uv_select_vert:

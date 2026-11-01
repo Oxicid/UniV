@@ -2170,11 +2170,10 @@ class UNIV_OT_AlignBorderVerts(Operator):
             # fmt: off
             uv = umesh.uv
             sync = umesh.sync
+            get_linked_inc = utils.get_linked_crn_fn(umesh, included=True)
             for crn in h:
-                linked_corners_a = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)]
-                linked_corners_a.append(crn)
-                linked_corners_b = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn.link_loop_next, uv, sync)]
-                linked_corners_b.append(crn.link_loop_next)
+                linked_corners_a = [l_crn for l_crn in get_linked_inc(crn)]
+                linked_corners_b = [l_crn for l_crn in get_linked_inc(crn.link_loop_next)]
 
                 shared_crn = crn.link_loop_radial_prev
                 x = shared_crn[uv].uv.x
@@ -2187,10 +2186,8 @@ class UNIV_OT_AlignBorderVerts(Operator):
                     l_crn[uv].uv.x = x
 
             for crn in v:
-                linked_corners_a = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)]
-                linked_corners_a.append(crn)
-                linked_corners_b = [l_crn for l_crn in utils.linked_crn_to_vert_pair_with_seam(crn.link_loop_next, uv, sync)]
-                linked_corners_b.append(crn.link_loop_next)
+                linked_corners_a = [l_crn for l_crn in get_linked_inc(crn)]
+                linked_corners_b = [l_crn for l_crn in get_linked_inc(crn.link_loop_next)]
 
                 shared_crn = crn.link_loop_radial_prev
                 y = shared_crn[uv].uv.y

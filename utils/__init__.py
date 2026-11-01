@@ -401,9 +401,10 @@ class ViewBoxSyncBlock:
                 # If the number of all visible faces and the number of linked corners are the same,
                 # then they belong to the same island, and this is not a random selection.
                 count_visible_faces = sum(not f_.hide for f_ in crn_.vert.link_faces)
-                count_linked_corners = len(linked_crn_to_vert_pair_with_seam(crn_, uv, True)) + 1
+                count_linked_corners = len(get_linked(crn_)) + 1
                 return count_visible_faces == count_linked_corners
 
+            get_linked = get_linked_crn_fn(island.umesh)  # TODO: Replace with simple linked check (without pair)
             for f in island:
                 for crn in f.loops:
                     if vert_has_unpair_select(crn):
@@ -1188,3 +1189,8 @@ def list_discard(lst, elem):
     if idx != end:
         lst[idx] = lst[end]
     lst.pop()
+
+def list_rotate(seq: list, n: int):
+    if n:
+        n = -n % len(seq)
+        seq[:] = seq[n:] + seq[:n]

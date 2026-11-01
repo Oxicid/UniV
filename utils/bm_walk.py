@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy  # noqa
+import typing
 
 from bmesh.types import BMesh, BMLoop, BMLayerItem
 from .bm_tag import is_pair, is_invisible_func
@@ -153,64 +154,140 @@ def linked_crn_to_vert_pair(crn: BMLoop, uv, sync: bool):
     # assert len(linked) == len(set(linked))
     return linked
 
-
-def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
-    """Linked to arg corner (non-included)"""
-    is_invisible = is_invisible_func(sync)
-    first_vert = crn.vert
-
-    linked = []
-    bm_iter = crn
-    # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
-    iterated = False
-    while True:
-        prev_crn = bm_iter.link_loop_prev
-        pair_ccw = prev_crn.link_loop_radial_prev
-        if pair_ccw == crn and iterated:
-            break
-        iterated = True
-
-        # Finish CCW
-        if (
-            pair_ccw in (prev_crn, crn)
-            or (first_vert != pair_ccw.vert)
-            or pair_ccw.edge.seam
-            or is_invisible(pair_ccw.face)
-            or not is_pair(prev_crn, pair_ccw, uv)
-        ):
-            bm_iter = crn
-            linked_cw = []
+def get_linked_crn_fn(umesh, *, included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], list[BMLoop]]:  # fmt: skip
+    def catcher(is_boundary_, included_):
+        def get_linked(first_crn: BMLoop):
+            linked = [first_crn] if included_ else []
+            bm_iter = first_crn
+            # No ignore needed to realize that a full iteration has passed, and there is no need to calculate CW
+            no_ignore_check = False
             while True:
-                pair_cw = bm_iter.link_loop_radial_prev
-                # Skip flipped and boundary
-                if pair_cw == bm_iter:
+                # CCW
+                prev_crn = bm_iter.link_loop_prev
+                pair_ccw = prev_crn.link_loop_radial_prev
+                if pair_ccw == first_crn and no_ignore_check:  # End cycle or CW walking.
+                    # End cycle.
                     break
+                no_ignore_check = True
 
-                next_crn = pair_cw.link_loop_next
-                if next_crn == crn:
+                # CW
+                if is_boundary_(prev_crn):
+                    bm_iter = first_crn
+                    while True:
+                        if is_boundary_(bm_iter):
+                            break
+
+                        next_crn = bm_iter.link_loop_radial_prev.link_loop_next
+                        if next_crn == first_crn:  # End cycle.
+                            break
+
+                        bm_iter = next_crn
+                        linked.append(next_crn)
                     break
+                bm_iter = pair_ccw
+                linked.append(bm_iter)
+            return linked
+        return get_linked
+    from . import is_boundary_func
+    return catcher(is_boundary_func(umesh, with_seam=with_seam, invisible_check=invisible_check), included_=included)
 
-                if (
-                    (first_vert != next_crn.vert)
-                    or pair_cw.edge.seam
-                    or is_invisible(next_crn.face)
-                    or not is_pair(bm_iter, pair_cw, uv)
-                ):
+
+def get_linked_crn_iter_fn(umesh, *, included=False, with_seam=True, invisible_check=True) \
+        -> typing.Callable[[BMLoop], typing.Generator[BMLoop]]:  # fmt: skip
+    def catcher(is_boundary_, included_):
+        def get_linked(first_crn: BMLoop):
+            if included_:
+                yield first_crn
+            bm_iter = first_crn
+            # No ignore needed to realize that a full iteration has passed, and there is no need to calculate CW
+            no_ignore_check = False
+            while True:
+                # CCW
+                prev_crn = bm_iter.link_loop_prev
+                pair_ccw = prev_crn.link_loop_radial_prev
+                if pair_ccw == first_crn and no_ignore_check:  # End cycle or CW walking.
+                    # End cycle.
                     break
-                bm_iter = next_crn
-                linked_cw.append(next_crn)
-            linked.extend(linked_cw[::-1])
-            break
-        bm_iter = pair_ccw
-        linked.append(bm_iter)
-    # assert len(linked) == len(set(linked))
-    return linked
+                no_ignore_check = True
+
+                # CW
+                if is_boundary_(prev_crn):
+                    bm_iter = first_crn
+                    while True:
+                        if is_boundary_(bm_iter):
+                            break
+
+                        next_crn = bm_iter.link_loop_radial_prev.link_loop_next
+                        if next_crn == first_crn:  # End cycle.
+                            break
+
+                        bm_iter = next_crn
+                        yield next_crn
+                    break
+                bm_iter = pair_ccw
+                yield bm_iter
+        return get_linked
+    from . import is_boundary_func
+    return catcher(is_boundary_func(umesh, with_seam=with_seam, invisible_check=invisible_check), included_=included)
 
 
-def linked_crn_to_vert_pair_with_seam_included(crn: BMLoop, uv, sync: bool) -> list[BMLoop]:
-    linked = linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-    linked.insert(0, crn)
-    return linked
+# def linked_crn_to_vert_pair_with_seam(crn: BMLoop, uv, sync: bool):
+#     """Linked to arg corner (non-included)"""
+#     is_invisible = is_invisible_func(sync)
+#     first_vert = crn.vert
+#
+#     linked = []
+#     bm_iter = crn
+#     # Iterated is needed to realize that a full iteration has passed, and there is no need to calculate CW
+#     iterated = False
+#     while True:
+#         prev_crn = bm_iter.link_loop_prev
+#         pair_ccw = prev_crn.link_loop_radial_prev
+#         if pair_ccw == crn and iterated:
+#             break
+#         iterated = True
+#
+#         # Finish CCW
+#         if (
+#             pair_ccw in (prev_crn, crn)
+#             or (first_vert != pair_ccw.vert)
+#             or pair_ccw.edge.seam
+#             or is_invisible(pair_ccw.face)
+#             or not is_pair(prev_crn, pair_ccw, uv)
+#         ):
+#             bm_iter = crn
+#             linked_cw = []
+#             while True:
+#                 pair_cw = bm_iter.link_loop_radial_prev
+#                 # Skip flipped and boundary
+#                 if pair_cw == bm_iter:
+#                     break
+#
+#                 next_crn = pair_cw.link_loop_next
+#                 if next_crn == crn:
+#                     break
+#
+#                 if (
+#                     (first_vert != next_crn.vert)
+#                     or pair_cw.edge.seam
+#                     or is_invisible(next_crn.face)
+#                     or not is_pair(bm_iter, pair_cw, uv)
+#                 ):
+#                     break
+#                 bm_iter = next_crn
+#                 linked_cw.append(next_crn)
+#             linked.extend(linked_cw[::-1])
+#             break
+#         bm_iter = pair_ccw
+#         linked.append(bm_iter)
+#     # assert len(linked) == len(set(linked))
+#     return linked
+#
+#
+# def linked_crn_to_vert_pair_with_seam_included(crn: BMLoop, uv, sync: bool) -> list[BMLoop]:
+#     linked = linked_crn_to_vert_pair_with_seam(crn, uv, sync)
+#     linked.insert(0, crn)
+#     return linked
 
 
 def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop):
@@ -238,7 +315,6 @@ def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop
                     pair_ccw.face.hide
                 ):  # fmt: skip
             bm_iter = crn
-            linked_cw = []
             while True:
                 pair_cw = bm_iter.link_loop_radial_prev
                 # Skip flipped and boundary
@@ -255,8 +331,7 @@ def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop
                         ):  # fmt: skip
                     break
                 bm_iter = next_crn
-                linked_cw.append(next_crn)
-            linked.extend(linked_cw[::-1])
+                linked.append(next_crn)
             break
         bm_iter = pair_ccw
         linked.append(bm_iter)
@@ -308,7 +383,7 @@ def linked_crn_to_vert_pair_by_idx_with_seam(crn: BMLoop, uv):
                 ):
                     break
                 bm_iter = next_crn
-                linked_cw.append(next_crn)
+                linked.append(next_crn)
             linked.extend(linked_cw[::-1])
             break
         bm_iter = pair_ccw
@@ -640,18 +715,19 @@ class ShortPath:
         loops_prev: list[BMLoop | None],
         cost: list[float],
         umesh,
-        prioritize_corners,
-        bound_priority_factor,
-        visited,
-        include_corners,
+        prioritize_corners: set[BMLoop],
+        bound_priority_factor: float,
+        visited: set[BMLoop],
+        include_corners: set[BMLoop],
     ):
         import heapq
         uv = umesh.uv
         l_a_index = l_a.index
         uv_a = l_a[uv].uv
 
+        get_linked_inc = get_linked_crn_iter_fn(umesh, included=True)
         # Loop over faces of face, but do so by first looping over loops.
-        for l in linked_crn_to_vert_pair_with_seam_included(l_a, uv, umesh.sync):
+        for l in get_linked_inc(l_a):
             #  'l_a' is already tagged, tag all adjacent.
 
             visited.add(l)
@@ -704,8 +780,9 @@ class ShortPath:
         if exclude_corners:
             assert prev_size != len(include_corners)
 
-        include_corners.update(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync))
-        include_corners.update(linked_crn_to_vert_pair_with_seam_included(l_dst, umesh.uv, umesh.sync))
+        get_linked_inc = get_linked_crn_fn(umesh, included=True)
+        include_corners.update(get_linked_inc(l_src))
+        include_corners.update(get_linked_inc(l_dst))
 
         for idx, crn in enumerate(include_corners):
             crn.index = idx
@@ -737,8 +814,8 @@ class ShortPath:
                     heap, l, loops_prev, cost, umesh, prioritize_corners, bound_priority_factor, visited, include_corners
                 )
 
-        # assert bool(set(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync)) & set(path))
-        # assert bool(set(linked_crn_to_vert_pair_with_seam_included(l_src, umesh.uv, umesh.sync)) & set(path))
+        # assert bool(set(get_linked(l_src)) & set(path))
+        # assert bool(set(get_linked(l_src)) & set(path))
         return ShortPath._short_pat_to_segment(path, umesh)  # TODO: Fix that.
 
     @staticmethod
@@ -749,8 +826,11 @@ class ShortPath:
         uv = umesh.uv
         segment = []
         is_boundary = is_boundary_func(umesh)
+        get_linked_inc = get_linked_crn_fn(umesh, included=True)
+
         for i in range(len(path) - 1):
-            linked = linked_crn_to_vert_pair_with_seam_included(path[i], umesh.uv, umesh.sync)
+            linked = get_linked_inc(path[i])
+
             next_v = path[i+1].vert
             for curr_crn in linked:
                 if curr_crn.link_loop_next.vert == next_v:

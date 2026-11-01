@@ -246,9 +246,9 @@ class UNIV_OT_Pin(utypes.RayCastAndPick):
                     return {"CANCELLED"}
                 else:
                     uv = hit.umesh.uv
-                    linked = utils.linked_crn_to_vert_pair_with_seam_included(
-                        hit.crn, uv, hit.umesh.sync
-                    )
+
+                    get_linked_inc = utils.get_linked_crn_fn(hit.umesh, included=True)
+                    linked = get_linked_inc(hit.crn)
                     if all(crn[uv].pin_uv for crn in linked):
                         for crn in linked:
                             crn[uv].pin_uv = False

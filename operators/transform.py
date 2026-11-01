@@ -1317,30 +1317,25 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
     @staticmethod
     def get_unique_linked_corners_from_crn_vert(umesh, corners):
-        sync = umesh.sync
-        uv = umesh.uv
+        get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True)
         unique_linked_corners = set()
         for crn in corners:
             if crn not in unique_linked_corners:
-                unique_linked_corners.add(crn)
-                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync))
+                unique_linked_corners.update(get_linked_it_inc(crn))
         return unique_linked_corners
 
     @staticmethod
     def get_unique_linked_corners_from_crn_edge(umesh, corners):
-        sync = umesh.sync
-        uv = umesh.uv
+        get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True)
+
         unique_linked_corners = set()
         for crn in corners:
             if crn not in unique_linked_corners:
-                unique_linked_corners.add(crn)
-                unique_linked_corners.update(utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync))
+                unique_linked_corners.update(get_linked_it_inc(crn))
+
             next_crn = crn.link_loop_next
             if next_crn not in unique_linked_corners:
-                unique_linked_corners.add(next_crn)
-                unique_linked_corners.update(
-                    utils.linked_crn_to_vert_pair_with_seam(next_crn, uv, sync)
-                )
+                unique_linked_corners.update(get_linked_it_inc(crn))
         return unique_linked_corners
 
     def align_ex(self, umeshes: UMeshes, selected=True):

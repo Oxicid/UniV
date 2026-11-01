@@ -882,7 +882,9 @@ class UMeshes:
     def fix_context(self):
         """If umesh without polygons, then it is not in the list. Set the first umesh with polygons as active,
         so that the context of default operators (bpy.ops.uv) works correctly.
-        But it doesn't help when the operator is called via keymap."""
+        But it doesn't help when the operator is called via keymap.
+        NOTE: Use after `UMeshes.tag_update = False`
+        """
         if self.umeshes:
             active_obj = bpy.context.active_object
             for umesh in self.umeshes:
@@ -894,6 +896,7 @@ class UMeshes:
             for umesh in self.umeshes:
                 if umesh.total_corners:
                     bpy.context.view_layer.objects.active = umesh.obj
+                    umesh.update_tag = True
                     return True
         return False
 

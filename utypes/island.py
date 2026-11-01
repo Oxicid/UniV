@@ -10,6 +10,7 @@ import typing
 import itertools
 import numpy as np
 import collections
+import contextlib
 from collections import defaultdict
 
 from mathutils import Vector, Matrix
@@ -447,6 +448,12 @@ class AdvIsland:
     def reset_aspect_ratio(self):
         scale = Vector((1 / self.umesh.aspect, 1))
         return self.scale_simple(scale)
+
+    @contextlib.contextmanager
+    def temp_aspect(self):
+        self.apply_aspect_ratio()
+        yield
+        self.reset_aspect_ratio()
 
     def save_transform(self, flip_if_needed=False):
         return SaveTransform(self, flip_if_needed)

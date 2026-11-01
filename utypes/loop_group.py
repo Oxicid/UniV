@@ -135,23 +135,21 @@ class LoopGroup:
 
     def copy_coords_from_ref(self, ref, clean_seams):
         uv = self.umesh.uv
+        get_linked = utils.get_linked_crn_fn(self.umesh)
+
         for ref_crn, trans_crn in zip(ref, self):
             if clean_seams:
                 ref_crn.edge.seam = False
             ref_co = ref_crn[uv].uv
-            # TODO: Implement linked_crn_to_vert_by_idx_pair_with_seam
-            for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(
-                trans_crn, uv, self.umesh.sync
-            ):
+
+            for trans_crn_linked in get_linked(trans_crn):
                 trans_crn_linked[uv].uv = ref_co
             trans_crn[uv].uv = ref_co
 
         ref_co = ref[-1].link_loop_next[uv].uv
         end_crn = self[-1].link_loop_next if self.is_flipped_3d else self[-1].link_loop_prev
 
-        for trans_crn_linked in utils.linked_crn_to_vert_pair_with_seam(
-            end_crn, uv, self.umesh.sync
-        ):
+        for trans_crn_linked in get_linked(end_crn):
             trans_crn_linked[uv].uv = ref_co
         end_crn[uv].uv = ref_co
 
@@ -732,16 +730,13 @@ class Segment:
             adv_crn.orig_crn.edge.seam = True
 
     def calc_chain_linked_corners(self):
-        uv = self.umesh.uv
-        sync = self.umesh.sync
+        get_linked_inc = utils.get_linked_crn_fn(self.umesh, included=True)
         for adv_crn in self.seg:
             if adv_crn.invert:
                 crn = adv_crn.crn.link_loop_prev
             else:
                 crn = adv_crn.crn
-            linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-            linked.append(crn)
-            self.chain_linked_corners.append(linked)
+            self.chain_linked_corners.append(get_linked_inc(crn))
 
         if self.is_start_lock:
             del self.chain_linked_corners[0]
@@ -752,9 +747,7 @@ class Segment:
                 crn = last_adv_crn.crn
             else:
                 crn = last_adv_crn.next.crn
-            linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-            linked.append(crn)
-            self.chain_linked_corners.append(linked)
+            self.chain_linked_corners.append(get_linked_inc(crn))
 
     def reverse(self):
         self.seg = [crn.toggle_dir() for crn in reversed(self.seg)]
@@ -1023,7 +1016,8 @@ class Segments:
         is_boundary = utils.is_boundary_func(umesh)
         appended = set()
         segments = []
-        sync = umesh.sync
+
+        get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True)
 
         corners = set(corners)
         for crn in corners:
@@ -1056,9 +1050,7 @@ class Segments:
 
                 count = 0
                 filtered = []
-                linked = utils.linked_crn_to_vert_pair_with_seam(next_check, uv, sync)
-                linked.append(next_check)
-                for crn_l in linked:
+                for crn_l in get_linked_it_inc(next_check):
                     # Next grow
                     if crn_l in corners:
                         next_grow = AdvCorner(crn_l, uv)
@@ -1105,9 +1097,7 @@ class Segments:
 
                 count = 0
                 filtered = []
-                linked = utils.linked_crn_to_vert_pair_with_seam(next_check, uv, sync)
-                linked.append(next_check)
-                for crn_l in linked:
+                for crn_l in get_linked_it_inc(next_check):
                     # Next grow
                     if crn_l in corners:
                         count += 1

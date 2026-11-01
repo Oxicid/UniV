@@ -240,10 +240,11 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 full_selected_meshes.append(umesh)
 
             uv = umesh.uv
-            sync = umesh.sync
 
             crn_select_get = utils.vert_select_get_func(umesh)
             face_select_get = utils.face_select_get_func(umesh)
+            get_linked_it = utils.get_linked_crn_iter_fn(umesh)
+            get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True)
 
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
@@ -280,10 +281,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                                     if crn[uv].pin_uv:
                                         crn.tag = False
                                     else:
-                                        linked = utils.linked_crn_to_vert_pair_with_seam(
-                                            crn, uv, sync
-                                        )
-                                        crn.tag = any(crn_select_get(cc) for cc in linked)
+                                        crn.tag = any(crn_select_get(cc) for cc in get_linked_it(crn))
                     elif has_full_selected_uv_faces:
                         for crn in isl.corners_iter():
                             crn.tag = not crn[uv].pin_uv
@@ -342,11 +340,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
                                     if self.is_accidentally_selected_crn(crn):
                                         # If only the unlinked face is selected, then pin it.
-                                        linked = utils.linked_crn_to_vert_pair_with_seam(
-                                            crn, uv, True
-                                        )
-                                        linked.append(crn)
-                                        for l_crn in linked:
+                                        for l_crn in get_linked_it_inc(crn):
                                             crn_uv = l_crn[uv]
                                             if not crn_uv.pin_uv:
                                                 crn_uv.pin_uv = True
@@ -562,7 +556,8 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         to_select = []
         unpinned = []
         uv = isl.umesh.uv
-        sync = isl.umesh.sync
+        get_linked_it = utils.get_linked_crn_iter_fn(isl.umesh)
+
         for f in isl:
             if f.select:
                 continue
@@ -570,8 +565,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             has_selected_linked_faces = False
             temp_static = []
             for crn in f.loops:
-                linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-                if any(cc.face.select for cc in linked):
+                if any(cc.face.select for cc in get_linked_it(crn)):
                     has_selected_linked_faces = True
                 else:
                     temp_static.append(crn)
@@ -609,6 +603,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         for umesh in reversed(umeshes):
             umesh.value = umesh.check_uniform_scale(report=self.report)
             umesh.aspect = utils.get_aspect_ratio() if self.use_correct_aspect else 1.0
+            get_linked_it = utils.get_linked_crn_iter_fn(umesh)
 
             islands_extended = utypes.Islands.calc_extended(umesh)
             for isl in islands_extended:
@@ -624,7 +619,6 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 ##################################################
                 if self.use_constraints(isl):
                     uv = isl.umesh.uv
-                    sync = isl.umesh.sync
                     for f in isl:
                         if f.select:
                             for crn in f.loops:
@@ -634,8 +628,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                                 if crn[uv].pin_uv:
                                     crn.tag = False
                                 else:
-                                    linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-                                    crn.tag = any(cc.face.select for cc in linked)
+                                    crn.tag = any(cc.face.select for cc in get_linked_it(crn))
 
                     is_static = self.is_static_island_for_non_native_unwrap_by_tag(isl)
                     with utils.uv_parametrizer.unwrap_time_report(self.report):
@@ -713,6 +706,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
 
         for umesh in reversed(umeshes):
             uv = umesh.uv
+            get_linked_it = utils.get_linked_crn_iter_fn(umesh)
             face_select_get = utils.face_select_get_func(umesh)
             crn_select_get = utils.vert_select_get_func(umesh)
 
@@ -734,7 +728,6 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                 ##################################################
                 if self.use_constraints(isl):
                     uv = isl.umesh.uv
-                    sync = isl.umesh.sync
                     for f in isl:
                         if face_select_get(f):
                             for crn in f.loops:
@@ -744,8 +737,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                                 if crn[uv].pin_uv:
                                     crn.tag = False
                                 else:
-                                    linked = utils.linked_crn_to_vert_pair_with_seam(crn, uv, sync)
-                                    crn.tag = any(crn_select_get(cc) for cc in linked)
+                                    crn.tag = any(crn_select_get(cc) for cc in get_linked_it(crn))
 
                     is_static = self.is_static_island_for_non_native_unwrap_by_tag(isl)
 
@@ -781,10 +773,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                             for crn in f.loops:
                                 if crn_select_get(crn):
                                     continue
-                                linked = utils.linked_crn_to_vert_pair_with_seam(
-                                    crn, umesh.uv, umesh.sync
-                                )
-                                if any(crn_select_get(c) for c in linked):
+                                if any(crn_select_get(c) for c in get_linked_it(crn)):
                                     has_selected = True
                                     corners_to_select.add(crn)
                                 else:

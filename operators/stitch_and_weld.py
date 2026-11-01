@@ -1091,13 +1091,13 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                 return
             return
 
+        get_linked_inc = utils.get_linked_crn_fn(hit.umesh, included=True)
+
         # Fast calculate, if edge has non-manifold links
         if utils.is_flipped_3d(ref_crn):
             if ref_crn[uv].uv.to_tuple() == shared[uv].uv.to_tuple():  # check a
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
-                    shared_next, uv, sync
-                ):
+                for crn in get_linked_inc(shared_next):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv  # join b
                 e.seam = False
                 hit.umesh.update()
@@ -1105,23 +1105,21 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
             elif (
                 ref_crn.link_loop_next[uv].uv.to_tuple() == shared.link_loop_next[uv].uv.to_tuple()
             ):  # check b
-                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                for crn in get_linked_inc(shared):
                     crn[uv].uv = ref_crn[uv].uv  # join a
                 e.seam = False
                 hit.umesh.update()
                 return
         else:
             if ref_crn[uv].uv.to_tuple() == shared.link_loop_next[uv].uv.to_tuple():  # check a
-                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                for crn in get_linked_inc(shared):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv  # join b
                 e.seam = False
                 hit.umesh.update()
                 return
             elif ref_crn.link_loop_next[uv].uv.to_tuple() == shared[uv].uv.to_tuple():  # check b
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
-                    shared_next, uv, sync
-                ):
+                for crn in get_linked_inc(shared_next):
                     crn[uv].uv = ref_crn[uv].uv  # join a
                 e.seam = False
                 hit.umesh.update()
@@ -1137,24 +1135,20 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
         if shared.face in isl_set:
             if utils.is_flipped_3d(ref_crn):
-                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                for crn in get_linked_inc(shared):
                     crn[uv].uv = ref_crn[uv].uv
 
                 shared_next = shared.link_loop_next
-                for crn in [shared_next] + utils.linked_crn_to_vert_pair_with_seam(
-                    shared_next, uv, sync
-                ):
+                for crn in get_linked_inc(shared_next):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv
                 e.seam = False
                 hit.umesh.update()
             else:
                 shared_next_crn = shared.link_loop_next
-                for crn in [shared_next_crn] + utils.linked_crn_to_vert_pair_with_seam(
-                    shared_next_crn, uv, sync
-                ):
+                for crn in get_linked_inc(shared_next_crn):
                     crn[uv].uv = ref_crn[uv].uv
 
-                for crn in [shared] + utils.linked_crn_to_vert_pair_with_seam(shared, uv, sync):
+                for crn in get_linked_inc(shared):
                     crn[uv].uv = ref_crn.link_loop_next[uv].uv
                 e.seam = False
                 hit.umesh.update()

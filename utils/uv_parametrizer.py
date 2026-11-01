@@ -3364,7 +3364,7 @@ class ParamHandleSolve(ParamHandleConstruct):
                         v.uv.xy += delta
 
                     # Draw pin extrema.
-                    if chart.pin1:
+                    if chart.pin1:  # TODO: Skip drawing when aspect ratio != 1.
                         from ..draw import DotLinesDrawSimple
 
                         DotLinesDrawSimple.draw_register([chart.pin1.uv, chart.pin2.uv], color=(0.2, 1, 0, 0.15))
