@@ -51,13 +51,13 @@ class BBox:
 
     @classmethod
     def calc_bbox_with_extrema_corners(
-        cls, corners, uv: BMLayerItem
+        cls, corners: "typing.Iterable[BMLoop]", uv: BMLayerItem
     ) -> "tuple[BBox, tuple[BMLoop, ...]]":
         xmin = math.inf
         xmax = -math.inf
         ymin = math.inf
         ymax = -math.inf
-        xmin_crn = xmax_crn = ymin_crn = ymax_crn = corners[0]
+        xmin_crn = xmax_crn = ymin_crn = ymax_crn = None
         for crn in corners:
             x, y = crn[uv].uv
             if x < xmin:
@@ -72,6 +72,11 @@ class BBox:
             if y > ymax:
                 ymax = y
                 ymax_crn = crn
+
+        assert isinstance(xmin_crn, BMLoop)
+        assert isinstance(xmax_crn, BMLoop)
+        assert isinstance(ymin_crn, BMLoop)
+        assert isinstance(ymax_crn, BMLoop)
 
         return cls(xmin, xmax, ymin, ymax), (xmin_crn, xmax_crn, ymin_crn, ymax_crn)
 

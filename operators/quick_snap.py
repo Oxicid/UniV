@@ -95,7 +95,7 @@ class QuickSnap_KDMeshes:
 
         kdmeshes = []
         for umesh in self.umeshes:
-            groups = LoopGroup.calc_dirt_loop_groups_from_selected(umesh)
+            groups = utypes.LoopGroups.calc_dirt_loop_groups_from_selected(umesh)
             for lg in groups:
                 lg.set_tag()
             kdmesh = KDMesh(umesh, loop_groups=groups)

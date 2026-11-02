@@ -6,10 +6,9 @@ import typing
 import numpy as np
 
 from mathutils import Vector
-from collections import defaultdict, deque
+from collections import deque
 from itertools import chain
 from bmesh.types import BMLoop
-from ..utils import linked_crn_uv, vec_isclose_to_zero
 
 from math import pi
 from . import umesh as _umesh
@@ -27,20 +26,8 @@ class LoopGroup:
         self.tag = True
         self.value: typing.Any | utils.NoInit = utils.NoInit()
         self.dirt = False
-        self.is_shared = False
-        self.is_flipped_3d = False
-        self._length_uv: float | None = None
-        self._length_3d: float | None = None
         self.weights: list[float] | None = None
-        self.is_unpinned_exist_: bool | None = None
         self.chain_linked_corners: list[list[BMLoop]] = []
-        self.chain_linked_corners_mask: list[bool] = []
-
-    @property
-    def is_cyclic(self):
-        crn_a = self.corners[0]
-        crn_b = self.corners[-1].link_loop_next
-        return crn_a.vert == crn_b.vert and crn_a[self.umesh.uv].uv == crn_b[self.umesh.uv].uv
 
     @property
     def src(self):
@@ -52,165 +39,9 @@ class LoopGroup:
         """For search short path"""
         return self.chain_linked_corners[-1][0]
 
-    def calc_loop_group(self, crn):
-        crn.tag = False
-        group = [crn]
-        while True:
-            next_crn = self.next_walk_boundary(group[-1])
-            if next_crn:
-                group.append(next_crn)
-            else:
-                break
-        while True:
-            prev_crn = self.prev_walk_boundary(group[0])
-            if prev_crn:
-                group.insert(0, prev_crn)
-            else:
-                break
-        self.corners = group
-        return self
-
-    def next_walk_boundary(self, crn):
-        crn_next = crn.link_loop_next
-        if crn_next.tag:
-            crn_next.tag = False
-            return crn_next
-
-        uv = self.umesh.uv
-        bm_iter = crn_next
-        while True:
-            bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # prev disk
-            if bm_iter == crn_next:
-                break
-            if bm_iter.tag and crn_next[uv].uv == bm_iter[uv].uv:
-                bm_iter.tag = False
-                return bm_iter
-
-    def prev_walk_boundary(self, crn):
-        crn_prev = crn.link_loop_prev
-        if crn_prev.tag:
-            crn_prev.tag = False
-            return crn_prev
-
-        uv = self.umesh.uv
-        bm_iter = crn
-        while True:
-            bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # prev disk
-            if bm_iter == crn:
-                break
-            if bm_iter.link_loop_prev.tag and crn[uv].uv == bm_iter[uv].uv:
-                bm_iter.link_loop_prev.tag = False
-                return bm_iter.link_loop_prev
-
-    def calc_shared_group_for_stitch(self) -> "typing.Self":
-        shared_group = []
-        is_flipped = self._is_flipped_3d
-        if is_flipped:
-            for crn in self.corners:
-                shared_group.append(crn.link_loop_radial_prev)
-        else:
-            for crn in self.corners:
-                shared_group.append(crn.link_loop_radial_prev.link_loop_next)
-        lg = LoopGroup(self.umesh)
-        lg.is_shared = True
-        lg.is_flipped_3d = is_flipped
-        lg.corners = shared_group
-        return lg
-
-    def calc_begin_end_pt(self):
-        uv = self.umesh.uv
-        if self.is_shared:
-            if self.is_flipped_3d:
-                return self[0][uv].uv, self[-1].link_loop_next[uv].uv
-            else:
-                return self[0][uv].uv, self[-1].link_loop_prev[uv].uv
-        else:
-            return self[0][uv].uv, self[-1].link_loop_next[uv].uv
-
-    @property
-    def _is_flipped_3d(self):
-        assert not self.is_shared
-        pair = self[0].link_loop_radial_prev
-        return pair.vert == self[0].vert
-
-    def copy_coords_from_ref(self, ref, clean_seams):
-        uv = self.umesh.uv
-        get_linked = utils.get_linked_crn_fn(self.umesh)
-
-        for ref_crn, trans_crn in zip(ref, self):
-            if clean_seams:
-                ref_crn.edge.seam = False
-            ref_co = ref_crn[uv].uv
-
-            for trans_crn_linked in get_linked(trans_crn):
-                trans_crn_linked[uv].uv = ref_co
-            trans_crn[uv].uv = ref_co
-
-        ref_co = ref[-1].link_loop_next[uv].uv
-        end_crn = self[-1].link_loop_next if self.is_flipped_3d else self[-1].link_loop_prev
-
-        for trans_crn_linked in get_linked(end_crn):
-            trans_crn_linked[uv].uv = ref_co
-        end_crn[uv].uv = ref_co
-
-    @staticmethod
-    def calc_island_index_for_stitch(island) -> defaultdict[int, list[BMLoop]]:
-        islands_for_stitch = defaultdict(list)
-        for f in island:
-            for crn in f.loops:
-                if crn.tag:
-                    crn.tag = False
-                    shared_crn = crn.link_loop_radial_prev
-                    islands_for_stitch[shared_crn.face.index].append(crn)
-        return islands_for_stitch
-
-    def calc_signed_face_area(self):
-        uv = self.umesh.uv
-        # TODO: Report small areas in stitch
-        return sum(utils.calc_signed_face_area_uv(crn.face, uv) for crn in self)
-
-    def tagging(self, island: "AdvIsland"):
-        face_is_invisible = utils.is_invisible_func(island.umesh.sync)
-        get_edge_select = utils.edge_select_get_func(island.umesh)
-        is_pair = utils.is_pair
-
-        uv = self.umesh.uv
-        for f in island:
-            for crn in f.loops:
-                shared_crn = crn.link_loop_radial_prev
-                if shared_crn == crn:
-                    crn.tag = False
-                    continue
-                if not get_edge_select(crn):
-                    crn.tag = False
-                    continue
-                if face_is_invisible(shared_crn.face):  # Change
-                    crn.tag = False
-                    continue
-                crn.tag = not is_pair(crn, shared_crn, uv)
-
     def set_tag(self, state=True):
         for crn in self.corners:
             crn.tag = state
-
-    def has_non_sync_crn(self):
-        assert utils.sync()
-        count_non_shared = 0
-        uv = self.umesh.uv
-        for crn in self.corners:
-            shared_crn = crn.link_loop_radial_prev
-            if shared_crn == crn:
-                count_non_shared += 1
-                continue
-            if not shared_crn.tag:
-                count_non_shared += 1
-                continue
-            if (
-                crn[uv].uv == shared_crn.link_loop_next[uv].uv
-                and crn.link_loop_next[uv].uv == shared_crn[uv].uv
-            ):
-                return True
-        return count_non_shared == len(self.corners)
 
     def has_sync_crn(self):
         """Need tagging and indexing"""
@@ -229,7 +60,7 @@ class LoopGroup:
         return False
 
     def move(self, delta: Vector) -> bool:
-        if vec_isclose_to_zero(delta):
+        if utils.vec_isclose_to_zero(delta):
             return False
         uv = self.umesh.uv
         for loop in self.corners:
@@ -242,123 +73,11 @@ class LoopGroup:
     def calc_bbox(self):
         return bbox.BBox.calc_bbox_uv_corners(self.corners, self.umesh.uv)
 
-    def calc_length_uv(self):
-        uv = self.umesh.uv
-        aspect = self.umesh.aspect
-
-        length = 0.0
-        if aspect == 1.0:
-            for crn in self:
-                length += (crn[uv].uv - crn.link_loop_next[uv].uv).length
-        else:
-            for crn in self:
-                vec = crn[uv].uv - crn.link_loop_next[uv].uv
-                vec.x *= aspect
-                length += vec.length
-        self._length_uv = length
-        return length
-
-    def calc_length_3d(self):
-        length = 0.0
-        for crn in self:
-            length += crn.edge.calc_length()
-        self._length_3d = length
-        return length
-
-    @property
-    def length_uv(self):
-        if self._length_uv is None:
-            return self.calc_length_uv()
-        return self._length_uv
-
-    @length_uv.setter
-    def length_uv(self, v):
-        self._length_uv = v
-
-    @property
-    def length_3d(self):
-        if self._length_3d is None:
-            return self.calc_length_3d()
-        return self._length_3d
-
-    @length_3d.setter
-    def length_3d(self, v):
-        self._length_3d = v
-
-    def get_vector(self):
-        uv = self.umesh.uv
-        vec = self[-1].link_loop_next[uv].uv - self[0][uv].uv
-        if vec == Vector((0.0, 0.0)):
-            for crn in self:
-                vec = crn.link_loop_next[uv].uv - crn[uv].uv
-                if vec != Vector((0.0, 0.0)):
-                    return vec
-        return vec
-
-    def set_pins(self, state=True):
-        assert self.chain_linked_corners
-        uv = self.umesh.uv
-        for linked_groups in self.chain_linked_corners:
-            for crn in linked_groups:
-                crn[uv].pin_uv = state
-
-    def set_pins_by_mask(self):
-        assert self.chain_linked_corners
-        uv = self.umesh.uv
-        for linked_groups, state in zip(self.chain_linked_corners, self.chain_linked_corners_mask):
-            for crn in linked_groups:
-                crn[uv].pin_uv = state
-
     def calc_chain_linked_corners(self):
         get_linked_inc = utils.get_linked_crn_fn(self.umesh, included=True)  # TODO: Add with_seam ???
         for crn in chain(self, [self[-1].link_loop_next]):
             self.chain_linked_corners.append(get_linked_inc(crn))
 
-    def distribute(self, start, end):
-        assert self.chain_linked_corners
-        uv = self.umesh.uv
-        if self.weights is None:
-            self.weights = [crn.edge.calc_length() for crn in self]
-
-        points = utils.weighted_linear_space(start, end, self.weights)
-        for corners, co in zip(self.chain_linked_corners, points):
-            for l_crn in corners:
-                l_crn[uv].uv = co
-
-    @classmethod
-    def calc_dirt_loop_groups_from_selected(cls, umesh):
-        uv = umesh.uv
-        umesh.tag_selected_corners()
-        sel_corners = (crn for f in umesh.bm.faces for crn in f.loops if crn.tag)
-
-        groups: list[cls] = []
-        for crn_ in sel_corners:
-            group = []
-            temp_group = [crn_]
-            while True:
-                temp = []
-                for sel in temp_group:
-                    it1 = utils.linked_crn_uv_unordered_included_with_hidden(sel, uv)
-                    it2 = utils.linked_crn_uv_unordered_included_with_hidden(sel.link_loop_next, uv)
-                    for l in chain(it1, it2):
-                        if l.tag:
-                            l.tag = False
-                            temp.append(l)
-
-                        prev = l.link_loop_prev
-                        if prev.tag:
-                            prev.tag = False
-                            temp.append(prev)
-                if not temp:
-                    break
-
-                temp_group = temp
-                group.extend(temp)
-            lg = cls(umesh)
-            lg.corners = group
-            lg.dirt = True
-            groups.append(lg)
-        return LoopGroups(groups, umesh)
 
     def extend_from_linked(self):
         """That untag linked corners, for avoid duplicates."""
@@ -415,86 +134,39 @@ class LoopGroups:
         self.tag = True
 
     @classmethod
-    def calc_by_boundary_crn_tags(cls, isl):
-        """Warning: Need uninterrupted tagging by boundary loops"""
-        get_linked = utils.get_linked_crn_fn(isl.umesh, with_seam=True)
-        loop_groups = []
-        for crn in isl.iter_corners_by_tag():
-            crn.tag = False
-            group = [crn]
-            temp_crn: BMLoop | None = crn
-            while temp_crn:
-                next_crn = temp_crn.link_loop_next
-                if next_crn.tag:
-                    next_crn.tag = False
-                    temp_crn = next_crn
-                    group.append(next_crn)
-                    continue
+    def calc_dirt_loop_groups_from_selected(cls, umesh):
+        uv = umesh.uv
+        umesh.tag_selected_corners()
+        sel_corners = (crn for f in umesh.bm.faces for crn in f.loops if crn.tag)
 
+        groups: list[LoopGroup] = []
+        for crn_ in sel_corners:
+            group = []
+            temp_group = [crn_]
+            while True:
+                temp = []
+                for sel in temp_group:
+                    it1 = utils.linked_crn_uv_unordered_included_with_hidden(sel, uv)
+                    it2 = utils.linked_crn_uv_unordered_included_with_hidden(sel.link_loop_next, uv)
+                    for l in chain(it1, it2):
+                        if l.tag:
+                            l.tag = False
+                            temp.append(l)
 
-                for linked_crn in reversed(get_linked(next_crn)):  # TODO: Test without reverse.
-                    if linked_crn.tag:
-                        linked_crn.tag = False
-                        temp_crn = linked_crn
-                        group.append(linked_crn)
-                        break
-                else:
-                    temp_crn = None
+                        prev = l.link_loop_prev
+                        if prev.tag:
+                            prev.tag = False
+                            temp.append(prev)
+                if not temp:
+                    break
 
-            lg = LoopGroup(isl.umesh)
+                temp_group = temp
+                group.extend(temp)
+            lg = LoopGroup(umesh)
             lg.corners = group
-            loop_groups.append(lg)
-        return cls(loop_groups, isl.umesh)
-
-    @classmethod
-    def calc_by_boundary_crn_tags_v2(cls, isl):
-        """Warning: Need tagging by boundary loops"""
-        uv = isl.umesh.uv
-        loop_groups = []
-        for crn in isl.iter_corners_by_tag():
-            crn.tag = False
-            group = [crn]
-            temp_crn: BMLoop | None = crn
-            while temp_crn:  # forward
-                next_crn = temp_crn.link_loop_next
-                if next_crn.tag:
-                    next_crn.tag = False
-                    temp_crn = next_crn
-                    group.append(next_crn)
-                    continue
-
-                # TODO: Replace linked_crn_uv with linked_crn_to_vert_pair_iter to avoid non-manifold uv vert links
-                for linked_crn in reversed(linked_crn_uv(next_crn, uv)):
-                    if linked_crn.tag:
-                        linked_crn.tag = False
-                        temp_crn = linked_crn
-                        group.append(linked_crn)
-                        break
-                else:
-                    temp_crn = None
-
-            temp_crn = crn
-            while temp_crn:  # backward
-                if temp_crn.link_loop_prev.tag:
-                    temp_crn = temp_crn.link_loop_prev
-                    temp_crn.tag = False
-                    group.insert(0, temp_crn)
-                    continue
-
-                for linked_crn in reversed(linked_crn_uv(temp_crn, uv)):
-                    linked_crn_prev = linked_crn.link_loop_prev
-                    if linked_crn_prev.tag:
-                        temp_crn = linked_crn_prev
-                        temp_crn.tag = False
-                        group.insert(0, temp_crn)
-                        break
-                else:
-                    temp_crn = None
-
-            lg = LoopGroup(isl.umesh)
-            lg.corners = group
-            loop_groups.append(lg)
-        return cls(loop_groups, isl.umesh)
+            lg.dirt = True
+            groups.append(lg)
+        return cls(groups, umesh)
 
     def indexing(self, _=None):
         for f in self.umesh.bm.faces:
@@ -511,13 +183,7 @@ class LoopGroups:
     def move(self, delta: Vector):
         return bool(sum(lg.move(delta) for lg in self.loop_groups))
 
-    def set_pins(self, state=True):
-        for lg in self:
-            lg.set_pins(state)
 
-    def set_pins_by_mask(self):
-        for lg in self:
-            lg.set_pins_by_mask()
 
     def __iter__(self) -> typing.Iterator[LoopGroup]:
         return iter(self.loop_groups)
@@ -552,7 +218,6 @@ class AdvCorner:
     def orig_crn(self):
         """ Corner with invert correction."""
         return self.crn.link_loop_prev if self.invert else self.crn
-
 
     @property
     def vec(self):
@@ -596,6 +261,12 @@ class AdvCorner:
         if self.invert:
             return (self.crn[self.uv].uv - self.crn.link_loop_prev[self.uv].uv).length
         return (self.crn[self.uv].uv - self.crn.link_loop_next[self.uv].uv).length
+
+    @property
+    def length_3d(self):
+        if self.invert:
+            return (self.crn.vert.co - self.crn.link_loop_prev.vert.co).length
+        return (self.crn.vert.co - self.crn.link_loop_next.vert.co).length
 
     @property
     def angle_from_cardinal(self):
@@ -676,16 +347,19 @@ class Segment:
         self.chain_linked_corners: list[list[BMLoop]] = []
 
         self._length_uv: float | utils.NoInit = utils.NoInit()
+        self._length_3d: float | utils.NoInit = utils.NoInit()
         self._weight_angle: float | utils.NoInit = utils.NoInit()
         self.value: float | utils.NoInit = utils.NoInit()
 
         self.is_start_lock: bool = False
         self.is_end_lock: bool = False
+        self.is_shared = False
+        self.is_flipped_3d = False
 
     def to_corners(self):
         return [(adv_crn.crn.link_loop_prev if adv_crn.invert else adv_crn.crn) for adv_crn in self]
 
-    def get_corners_iter(self):
+    def get_corners_iter(self, included):
         """Get original corners from start to end."""
         for adv_crn in self:
             if adv_crn.invert:
@@ -693,7 +367,8 @@ class Segment:
             else:
                 yield adv_crn.crn
 
-        yield self.end_orig_crn
+        if included:
+            yield self.end_orig_crn
 
     def mark_seam(self):
         for adv_crn in self:
@@ -772,13 +447,24 @@ class Segment:
     def length_uv(self):
         if isinstance(self._length_uv, utils.NoInit):
             if not self.lengths_seq:
-                self.calc_lengths_uv()
+                self.calc_lengths_uv()  # TODO: Simplify (use straight from AdvCorner)
             self._length_uv = sum(self.lengths_seq)
         return self._length_uv
 
     @length_uv.setter
     def length_uv(self, value: float):
         self._length_uv = value
+
+    @property
+    def length_3d(self):
+        if isinstance(self._length_uv, utils.NoInit):
+            self._length_uv = sum(adv_crn.length_3d for adv_crn in self)
+        return self._length_uv
+
+    def calc_signed_face_area(self):
+        uv = self.umesh.uv
+        # TODO: Report small areas in stitch
+        return sum(utils.calc_signed_face_area_uv(adv_crn.crn.face, uv) for adv_crn in self)
 
     @property
     def weight_angle(self):
@@ -913,6 +599,61 @@ class Segment:
                         seg.is_end_lock = True
 
         return Segments(slices, self.umesh)
+
+    @property
+    def _is_flipped_3d(self):
+        assert not self.is_shared
+        orig_crn = self.start_orig_crn
+        return orig_crn.link_loop_radial_prev.vert == orig_crn.vert
+
+    def calc_shared_group_for_stitch(self) -> "Segment":
+        shared_group = []
+        is_flipped = self._is_flipped_3d
+
+        assert not any(a.invert for a in self)  # TODO: Add to force debug (add force_debug_fn(fn: callable)).
+        uv = self.umesh.uv
+        if is_flipped:
+            for adv_crn in self.seg:
+                new_adv_crn = adv_crn.orig_crn.link_loop_radial_prev
+                shared_group.append(AdvCorner(new_adv_crn, uv, is_pair=False))
+        else:
+            for adv_crn in self.seg:
+                new_adv_crn = adv_crn.orig_crn.link_loop_radial_prev.link_loop_next
+                shared_group.append(AdvCorner(new_adv_crn, uv, False, invert=True,))
+
+        seg = Segment(shared_group, self.umesh)
+
+        seg.is_shared = True
+        seg.is_flipped_3d = is_flipped  # TODO: Delete this ???
+        seg.corners = shared_group
+        return seg
+
+    def copy_coords_from_ref(self, ref: "Segment", clean_seams):
+        uv = self.umesh.uv
+        get_linked_inc = utils.get_linked_crn_fn(self.umesh, included=True)
+
+        assert len(self) == len(ref)
+
+        for ref_crn, trans_crn in zip(ref, self):
+            ref_co = ref_crn.curr_pt
+
+            for trans_crn_linked in get_linked_inc(trans_crn.crn):
+                trans_crn_linked[uv].uv = ref_co
+
+        if clean_seams:
+            for trans_crn in self:
+                trans_crn.edge.seam = False
+
+
+        ref_end_orig_crn = ref.end_orig_crn
+        self_end_orig_crn = self.end_orig_crn
+        assert ref_end_orig_crn.vert == self_end_orig_crn.vert
+
+        ref_co = ref_end_orig_crn[uv].uv
+
+        for trans_crn_linked in get_linked_inc(self_end_orig_crn):
+            trans_crn_linked[uv].uv = ref_co
+
 
     def deepcopy(self):
         return Segment([adv_crn.copy() for adv_crn in self.seg], self.umesh)

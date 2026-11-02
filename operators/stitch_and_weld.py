@@ -14,8 +14,8 @@ from bpy.props import *
 from .. import draw
 from .. import utils
 from .. import utypes
-from ..utypes import BBox, UMeshes, Islands, AdvIsland, LoopGroup, LoopGroups
-from ..preferences import prefs, univ_settings
+from ..utypes import BBox, UMeshes, Islands, AdvIsland, Segment, Segments, AdvCorner
+from ..preferences import prefs
 
 
 def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv):
@@ -111,41 +111,42 @@ class Stitch:
                 # TODO: Need adapt to flipped
                 self.set_selected_boundary_tag_with_exclude_face_idx(ref_isl, temp_exclude_indexes)
 
-                loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(ref_isl)
-                filtered = self.split_lg_for_stitch(loop_groups)
-                filtered.sort(
-                    key=lambda lg_: lg_.length_uv, reverse=True
-                )  # Prioritize multi-stitch by length
+                # TODO: remove tags ???
+                loop_groups = utypes.Segments.from_corners(ref_isl.iter_corners_by_tag(), umesh)
+                filtered = self.split_seg_for_stitch(loop_groups)
+
+                # Prioritize multi-stitch by length
+                filtered.sort(key=lambda seg_: seg_.length_uv, reverse=True)
 
                 if filtered:
                     # An island may not have any selected edges, but it can still be a reoriented island.
-                    # Therefore, we add it to the exclude list, making sure an LG exists.
+                    # Therefore, we add it to the exclude list, making sure an `Segment` exists.
                     exclude_indexes.add(ref_isl[0].index)
 
-                for ref_lg in filtered:
-                    trans_lg = ref_lg.calc_shared_group_for_stitch()
-                    trans_isl_index = trans_lg[0].face.index
+                for ref_seg in filtered:
+                    trans_seg = ref_seg.calc_shared_group_for_stitch()
+                    trans_isl_index = trans_seg.start_orig_crn.face.index
                     exclude_indexes.add(trans_isl_index)
 
                     trans_isl = islands[trans_isl_index]
                     if trans_isl.select_state:
-                        trans_isl.area_3d = ref_lg.length_3d
+                        trans_isl.area_3d = ref_seg.length_3d
                         balanced_target_islands.append(trans_isl)
 
                     if self.padding:
                         self.reorient_to_target_with_padding(
                             ref_isl,
                             trans_isl,
-                            ref_lg,
-                            trans_lg,
+                            ref_seg,
+                            trans_seg,
                             correct_flip=getattr(self, "correct_flip", True),
                         )
                     else:
                         self.reorient_to_target(
                             ref_isl,
                             trans_isl,
-                            ref_lg,
-                            trans_lg,
+                            ref_seg,
+                            trans_seg,
                             correct_flip=getattr(self, "correct_flip", True),
                         )
                     umesh.update_tag = True
@@ -154,33 +155,33 @@ class Stitch:
                     stack = []
                     for balance_isl in balanced_target_islands:
                         if balance_isl.tag:
-                            lg = self.balancing_filter_for_lgs(balance_isl, exclude_indexes)
-                            if lg:
-                                trans_lg = lg.calc_shared_group_for_stitch()
-                                trans_isl_index = trans_lg[0].face.index
+                            seg = self.balancing_filter_for_segments(balance_isl, exclude_indexes)
+                            if seg:
+                                trans_seg = seg.calc_shared_group_for_stitch()
+                                trans_isl_index = trans_seg.start_orig_crn.face.index
                                 exclude_indexes.add(trans_isl_index)
 
                                 trans_isl = islands[trans_isl_index]
                                 if trans_isl.select_state:
-                                    trans_isl.area_3d = lg.length_3d
+                                    trans_isl.area_3d = seg.length_3d
                                     stack.append(trans_isl)
 
                                 if self.padding:
-                                    # NOTE: ref_isl is not the island from which ref_lg(lg) is derived
+                                    # NOTE: ref_isl is not the island from which ref_seg(seg) is derived
                                     # TODO: Check to pass balance_isl
                                     self.reorient_to_target_with_padding(
                                         ref_isl,
                                         trans_isl,
-                                        lg,
-                                        trans_lg,
+                                        seg,
+                                        trans_seg,
                                         correct_flip=getattr(self, "correct_flip", True),
                                     )
                                 else:
                                     self.reorient_to_target(
                                         ref_isl,
                                         trans_isl,
-                                        lg,
-                                        trans_lg,
+                                        seg,
+                                        trans_seg,
                                         correct_flip=getattr(self, "correct_flip", True),
                                     )
 
@@ -208,24 +209,25 @@ class Stitch:
         self,
         ref_isl: AdvIsland,
         trans: AdvIsland,
-        ref_lg: LoopGroup,
-        trans_lg: LoopGroup,
+        ref_seg: Segment,
+        trans_seg: Segment,
         correct_flip=True,
     ):
         uv = ref_isl.umesh.uv
 
         is_flipped_3d = False
         if correct_flip:
-            is_flipped_3d = trans_lg.is_flipped_3d
+            is_flipped_3d = trans_seg.is_flipped_3d
             self.flipped_3d_count += is_flipped_3d
             if is_flipped_3d:
-                if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                if (ref_seg.calc_signed_face_area() < 0) == (trans_seg.calc_signed_face_area() < 0):
                     trans.scale_simple(Vector((1, -1)))
-            elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
+            elif (ref_seg.calc_signed_face_area() < 0) != (trans_seg.calc_signed_face_area() < 0):
                 trans.scale_simple(Vector((1, -1)))
 
-        if ref_lg.is_cyclic:
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
+        if ref_seg.is_circular:
+            corners_it_inc = ref_seg.get_corners_iter(included=False)
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(corners_it_inc, uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
 
             if bbox.width > bbox.height:
@@ -257,8 +259,8 @@ class Stitch:
             trans.rotate_simple(rotate_angle, ref_isl.umesh.aspect)
 
             # Move
-            center_ref = ref_lg.calc_bbox().center
-            center_trans = trans_lg.calc_bbox().center
+            center_ref = ref_seg.calc_bbox().center
+            center_trans = trans_seg.calc_bbox().center
             trans.set_position(center_ref, center_trans)
 
             # Scale
@@ -271,11 +273,14 @@ class Stitch:
                 scale = length_a / length_b
                 trans.scale(Vector((scale, scale)), center_ref)
 
-            trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
+            trans_seg.copy_coords_from_ref(ref_seg, clean_seams=self.update_seams)
 
         else:
-            pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
-            pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
+            pt_a1 = ref_seg.start_co
+            pt_a2 = ref_seg.end_co
+
+            pt_b1 = trans_seg.start_co
+            pt_b2 = trans_seg.end_co
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -298,20 +303,20 @@ class Stitch:
 
             # Move
             trans.set_position(pt_a1, pt_b1)
-            trans_lg.copy_coords_from_ref(ref_lg, clean_seams=self.update_seams)
+            trans_seg.copy_coords_from_ref(ref_seg, clean_seams=self.update_seams)
 
         # Select shared edges.
         if bpy.context.scene.tool_settings.uv_sticky_select_mode != "DISABLED":
-            set_select_edge = utils.edge_select_linked_set_func(trans_lg.umesh)
-            for crn in ref_lg:
-                set_select_edge(crn.link_loop_radial_prev, True)
+            set_select_edge = utils.edge_select_linked_set_func(trans_seg.umesh)
+            for crn in ref_seg:
+                set_select_edge(crn.orig_crn.link_loop_radial_prev, True)
 
     def reorient_to_target_with_padding(
         self,
         ref_isl: AdvIsland,
         trans: AdvIsland,
-        ref_lg: LoopGroup,
-        trans_lg: LoopGroup,
+        ref_seg: Segment,
+        trans_seg: Segment,
         correct_flip=True,
     ):
         uv = ref_isl.umesh.uv
@@ -321,22 +326,22 @@ class Stitch:
         is_flipped_3d = False
 
         if correct_flip:
-            is_flipped_3d = trans_lg.is_flipped_3d
-            if trans_lg.is_flipped_3d:
-                ref_is_flipped = ref_lg.calc_signed_face_area() < 0
-                trans_is_flipped = trans_lg.calc_signed_face_area() < 0
+            is_flipped_3d = trans_seg.is_flipped_3d
+            if trans_seg.is_flipped_3d:
+                ref_is_flipped = ref_seg.calc_signed_face_area() < 0
+                trans_is_flipped = trans_seg.calc_signed_face_area() < 0
                 if ref_is_flipped == trans_is_flipped:
                     # trans_is_flipped ^= 1
                     trans.scale_simple(Vector((1, -1)))
             else:
-                ref_is_flipped = ref_lg.calc_signed_face_area() < 0
-                trans_is_flipped = trans_lg.calc_signed_face_area() < 0
+                ref_is_flipped = ref_seg.calc_signed_face_area() < 0
+                trans_is_flipped = trans_seg.calc_signed_face_area() < 0
                 if ref_is_flipped != trans_is_flipped:
                     # trans_is_flipped ^= 1
                     trans.scale_simple(Vector((1, -1)))
 
-        if ref_lg.is_cyclic:
-            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_lg, uv)
+        if ref_seg.is_circular:
+            bbox, bbox_margin_corners = BBox.calc_bbox_with_extrema_corners(ref_seg, uv)
             xmin_crn, xmax_crn, ymin_crn, ymax_crn = bbox_margin_corners
 
             if bbox.width > bbox.height:
@@ -368,8 +373,8 @@ class Stitch:
             trans.rotate_simple(rotate_angle, ref_isl.umesh.aspect)
 
             # Move
-            center_ref = ref_lg.calc_bbox().center
-            center_trans = trans_lg.calc_bbox().center
+            center_ref = ref_seg.calc_bbox().center
+            center_trans = trans_seg.calc_bbox().center
             trans.set_position(center_ref, center_trans)
 
             # Scale
@@ -390,30 +395,36 @@ class Stitch:
                     min_length = length_a
                 pad_scale = bl_math.clamp((min_length - self.padding * 2) / min_length, 0.5, 1.5)
 
-                # Check if trans_lg is the basic boundary, if so, then scaling should be negative (inner)
+                # Check if trans_seg is the basic boundary, if so, then scaling should be negative (inner)
                 trans.set_boundary_tag(match_idx=True)
-                loop_groups = LoopGroups.calc_by_boundary_crn_tags(trans)
+                loop_groups = utypes.Segments.from_corners(trans.iter_corners_by_tag(), trans.umesh)
+
                 if loop_groups:
-                    trans_lg_is_basic_boundary = False
+                    trans_seg_is_basic_boundary = False
                     if len(loop_groups) != 1:
-                        longest_border_lg = max(loop_groups, key=lambda lg: lg.length_uv)
-                        vert = longest_border_lg[0].vert
-                        if len(longest_border_lg) == len(trans_lg) and any(
-                            trans_crn.vert == vert for trans_crn in trans_lg
+                        loop_groups.rotate_longest_to_first()
+                        longest_border_seg = loop_groups[0]
+
+                        vert = longest_border_seg.start_orig_crn.vert
+                        if len(longest_border_seg) == len(trans_seg) and any(
+                            trans_crn.vert == vert for trans_crn in trans_seg
                         ):
-                            trans_lg_is_basic_boundary = True
+                            trans_seg_is_basic_boundary = True
 
                     else:
-                        trans_lg_is_basic_boundary = True
-                    if not trans_lg_is_basic_boundary:
+                        trans_seg_is_basic_boundary = True
+                    if not trans_seg_is_basic_boundary:
                         pad_scale = 1 / pad_scale  # scale negative (inner)
 
                 scale *= pad_scale
                 trans.scale(Vector((scale, scale)), center_ref)
 
         else:
-            pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
-            pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
+            pt_a1 = ref_seg.start_co
+            pt_a2 = ref_seg.end_co
+
+            pt_b1 = trans_seg.start_co
+            pt_b2 = trans_seg.end_co
 
             # Rotate
             normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -455,13 +466,13 @@ class Stitch:
                 delta = (pt_a1 - pt_b1) + orto
             trans.move(delta)
 
-    def balancing_filter_for_lgs(self, balance_isl, exclude_indexes):
+    def balancing_filter_for_segments(self, balance_isl: AdvIsland, exclude_indexes: set[int]):
         """Enhances multi-stitching steps for a more even distribution"""
         if not balance_isl.sequence:
             self.set_selected_boundary_tag_with_exclude_face_idx(balance_isl, exclude_indexes)
-            loop_groups = LoopGroups.calc_by_boundary_crn_tags_v2(balance_isl)
+            loop_groups = utypes.Segments.from_corners(balance_isl.iter_corners_by_tag(), balance_isl.umesh)
             if loop_groups:
-                filtered = self.split_lg_for_stitch(loop_groups)
+                filtered = self.split_seg_for_stitch(loop_groups)
                 if len(filtered) == 1:
                     balance_isl.tag = False
                     return filtered[0]
@@ -472,67 +483,64 @@ class Stitch:
 
         # Selects an island for stitching based on a similar length to the one that was reoriented
         min_diff = float("inf")
-        min_lg = None
-        for lg in balance_isl.sequence:
-            idx = lg[0].link_loop_radial_prev.face.index
+        min_seg = None
+        seg: Segment
+        for seg in balance_isl.sequence:
+            idx = seg.start_orig_crn.link_loop_radial_prev.face.index
             if idx not in exclude_indexes:
-                diff = abs(lg.length_3d - balance_isl.area_3d)
+                diff = abs(seg.length_3d - balance_isl.area_3d)
                 if diff < min_diff:
-                    min_lg = lg
+                    min_seg = seg
                     min_diff = diff
-        if not min_lg:
+        if not min_seg:
             balance_isl.tag = False
-        return min_lg
+        return min_seg
 
     @staticmethod
-    def split_lg_for_stitch(lgs: LoopGroups) -> list[LoopGroup]:
+    def split_seg_for_stitch(segments: Segments) -> list[Segment]:
         # TODO: Segment has a similar feature that groups data by indices. Use it, when refactor the LoopGroup to Segments.
-        filtered_lg = []
-        uv = lgs.umesh.uv
+        filtered_segments = []
+        uv = segments.umesh.uv
 
-        def get_shared_face_idx(crn_):
-            return crn_.link_loop_radial_prev.face.index
+        # adv_crn_: AdvCorner
+        get_shared_face_idx = lambda adv_crn_: adv_crn_.orig_crn.link_loop_radial_prev.face.index
 
-        for lg in lgs:
-            if utils.all_equal(lg, key=get_shared_face_idx):
-                filtered_lg.append(lg)
+        for seg in segments:
+            split_segments: list[Segment] = [
+                Segment(split_seg, segments.umesh)
+                for split_seg in utils.split_by_similarity(seg, get_shared_face_idx)
+            ]
+            if len(split_segments) == 1:
+                filtered_segments.append(seg)
             else:
-                split_lgs: list[list[BMLoop]] = utils.split_by_similarity(lg, get_shared_face_idx)
+                # Join segment by same index. Case when border loop circular but with different indexes
+                start_crn = split_segments[0].start_orig_crn
+                end_next_crn = split_segments[-1].end_orig_crn
 
-                # # Join same index LG, case when border loop circular but with different indexes
-                start_crn = split_lgs[0][0]
-                end_next_crn = split_lgs[-1][-1].link_loop_next
                 # Circular case
-                is_cyclic = (
-                    start_crn.vert == end_next_crn.vert and start_crn[uv].uv == end_next_crn[uv].uv
-                )
+                is_cyclic = (start_crn.vert == end_next_crn.vert and start_crn[uv].uv == end_next_crn[uv].uv)
                 if is_cyclic:
                     # Join, if cyclic similar index.
-                    crn_from_last_group = split_lgs[-1][-1]
-                    if get_shared_face_idx(start_crn) == get_shared_face_idx(crn_from_last_group):
-                        lg_start = split_lgs.pop()
-                        lg_end = split_lgs[0]
-                        del split_lgs[0]
+                    adv_crn_from_first_group: AdvCorner = split_segments[0][0]
+                    adv_crn_from_last_group: AdvCorner = split_segments[-1][-1]
+                    if get_shared_face_idx(adv_crn_from_first_group) == get_shared_face_idx(adv_crn_from_last_group):
+                        seg_start = split_segments.pop()
+                        seg_end = split_segments.pop(0)
 
-                        lg_start.extend(lg_end)
-                        lg_combined = LoopGroup(lgs.umesh)
-                        lg_combined.corners = lg_start
-                        filtered_lg.append(lg_combined)
+                        seg_start.seg.extend(seg_end.seg)
+                        filtered_segments.append(seg_start)
 
-                # Convert to LoopGroup.
-                for sub_lg in split_lgs:
-                    lg_combined = LoopGroup(lgs.umesh)
-                    lg_combined.corners = sub_lg
-                    filtered_lg.append(lg_combined)
+                filtered_segments.extend(split_segments)
 
         # There can be multiple shared segments between islands.
         # Here we remove redundant segments using indices taken from the shared face.
         groups = collections.defaultdict(list)
-        for lg in filtered_lg:
-            groups[get_shared_face_idx(lg[0])].append(lg)
-        return [
-            max(g, key=lambda lg_: lg_.length_uv) for g in groups.values()
-        ]  # Remove duplicates by length uv
+        for seg in filtered_segments:
+            groups[get_shared_face_idx(seg[0])].append(seg)
+
+        # TODO: Add test for this.
+        # Remove duplicates by length uv
+        return [max(g, key=lambda seg_: seg_.length_uv) for g in groups.values()]
 
     def set_selected_boundary_tag_with_exclude_face_idx(self, isl, exclude_idx: set):
         """Sets tags for the segments that will be used for stitching. Islands that have already been stitched are ignored."""
@@ -563,21 +571,24 @@ class Stitch:
         self,
         ref_isl: AdvIsland,
         trans: AdvIsland,
-        ref_lg: LoopGroup,
-        trans_lg: LoopGroup,
+        ref_seg: Segment,
+        trans_seg: Segment,
         correct_flip=True,
     ):
 
         if correct_flip:
-            is_flipped = trans_lg.is_flipped_3d
+            is_flipped = trans_seg.is_flipped_3d
             if is_flipped:
-                if (ref_lg.calc_signed_face_area() < 0) == (trans_lg.calc_signed_face_area() < 0):
+                if (ref_seg.calc_signed_face_area() < 0) == (trans_seg.calc_signed_face_area() < 0):
                     trans.scale_simple(Vector((1, -1)))
-            elif (ref_lg.calc_signed_face_area() < 0) != (trans_lg.calc_signed_face_area() < 0):
+            elif (ref_seg.calc_signed_face_area() < 0) != (trans_seg.calc_signed_face_area() < 0):
                 trans.scale_simple(Vector((1, -1)))
 
-        pt_a1, pt_a2 = ref_lg.calc_begin_end_pt()
-        pt_b1, pt_b2 = trans_lg.calc_begin_end_pt()
+        pt_a1 = ref_seg.start_co
+        pt_a2 = ref_seg.end_co
+
+        pt_b1 = trans_seg.start_co
+        pt_b2 = trans_seg.end_co
 
         # Rotate
         normal_a_with_aspect = (pt_a1 - pt_a2) * Vector((ref_isl.umesh.aspect, 1.0))
@@ -616,7 +627,7 @@ class Stitch:
             trans.move(delta)
         else:
             trans.move(pt_a1 - pt_b1)
-            trans_lg.copy_coords_from_ref(ref_lg, self.update_seams)
+            trans_seg.copy_coords_from_ref(ref_seg, self.update_seams)
 
     @staticmethod
     def sort_by_dist_to_mouse_or_sel_edge_length(target_islands, umesh, mouse_position):
@@ -1180,13 +1191,12 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                 e.seam = False
                 hit.umesh.update()
         else:
-            ref_lg = LoopGroup(hit.umesh)
-            ref_lg.corners = [hit.crn]
-            trans_lg = ref_lg.calc_shared_group_for_stitch()
+            ref_seg = Segments.from_corners([hit.crn], hit.umesh)[0]
+            trans_seg = ref_seg.calc_shared_group_for_stitch()
 
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg)
+            self.pick_reorient(ref_isl, trans_isl, ref_seg, trans_seg)
             hit.umesh.update()
         return
 
@@ -1327,8 +1337,7 @@ class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
         layout.prop(self, "update_seams")
         layout.prop(self, "use_aspect")
         layout.prop(self, "correct_flip")
-        if not self.between:
-            self.draw_padding()
+        self.draw_padding()
 
     def invoke(self, context, event):
         if self.store_mouse_pose_on_uv_and_max_distance_if_allowed(event):
@@ -1417,13 +1426,12 @@ class UNIV_OT_Stitch(utypes.RayCastAndPick, Stitch, utils.PaddingHelper):
                 {"WARNING"}, "It is not possible to use Stitch on itself, use Weld operator"
             )
         else:
-            ref_lg = LoopGroup(hit.umesh)
-            ref_lg.corners = [hit.crn]
-            trans_lg = ref_lg.calc_shared_group_for_stitch()
+            ref_seg = Segments.from_corners([hit.crn], hit.umesh)[0]
+            trans_seg = ref_seg.calc_shared_group_for_stitch()
 
             hit.crn = shared
             trans_isl, _ = hit.calc_island_with_seam()
-            self.pick_reorient(ref_isl, trans_isl, ref_lg, trans_lg, correct_flip=self.correct_flip)
+            self.pick_reorient(ref_isl, trans_isl, ref_seg, trans_seg, correct_flip=self.correct_flip)
             hit.umesh.update()
 
 
@@ -1450,9 +1458,9 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
         for umesh in umeshes:
             umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
-        settings = univ_settings()
-        self.padding = int(settings.padding * self.padding_multiplayer) / min(
-            int(settings.size_x), int(settings.size_y)
+        pref = prefs()
+        self.padding = int(pref.padding * self.padding_multiplayer) / min(
+            int(pref.size_x), int(pref.size_y)
         )
 
         if self.between:
@@ -1474,7 +1482,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
         umeshes.umeshes.extend(without_uv.umeshes.copy())
 
     def stitch_by_edge(self, umeshes):
-        settings = univ_settings()
+        pref = prefs()
         selected_umeshes, visible_umeshes = umeshes.filtered_by_selected_and_visible_uv_edges()
         umeshes = selected_umeshes if selected_umeshes else visible_umeshes
 
@@ -1484,7 +1492,7 @@ class UNIV_OT_Stitch_VIEW3D(UNIV_OT_Stitch):
             if self.padding:
                 img_size = utils.get_active_image_size()
                 if img_size:  # TODO: Get active image size from material id
-                    if min(int(settings.size_x), int(settings.size_y)) != min(img_size):
+                    if min(int(pref.size_x), int(pref.size_y)) != min(img_size):
                         self.report(
                             {"WARNING"},
                             "Global and Active texture sizes have different values, "

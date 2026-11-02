@@ -452,7 +452,10 @@ class AdvIsland:
     @contextlib.contextmanager
     def temp_aspect(self):
         self.apply_aspect_ratio()
+        prev_aspect = self.umesh.aspect
+        self.umesh.aspect = 1.0
         yield
+        self.umesh.aspect = prev_aspect
         self.reset_aspect_ratio()
 
     def save_transform(self, flip_if_needed=False):
