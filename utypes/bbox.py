@@ -314,6 +314,7 @@ class BBox:
         if xy[1] > self.ymax:
             self.ymax = xy[1]
 
+    # TODO: Remove `*.add` method.
     def add(self, co):
         x, y = co
         if self.xmin > x:

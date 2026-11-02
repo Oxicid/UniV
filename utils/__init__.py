@@ -328,11 +328,13 @@ class ViewBoxSyncBlock:
         return False
 
     @staticmethod
-    def _lg_has_inner_elem(lg: "utypes.LoopGroup"):
-        uv = lg.umesh.uv
+    def _segment_has_inner_elem(seg: "utypes.Segment"):
+        uv = seg.umesh.uv
+        if any(adv_crn.is_pair for adv_crn in seg):
+            return True
 
-        if lg.umesh.elem_mode == "VERT":
-            for crn in lg:
+        if seg.umesh.elem_mode == "VERT":
+            for crn in seg:
                 assert crn.vert.select
                 uv_co = crn[uv].uv
                 for l_crn in crn.vert.link_loops:
@@ -343,44 +345,33 @@ class ViewBoxSyncBlock:
                 else:
                     return True
 
-        else:
-            for crn in lg:
-                if not crn.edge.select:
-                    continue
-                pair = crn.link_loop_radial_prev
-                if pair == crn or pair.face.hide:
-                    # If there is no pair crn, or it is hidden, then this edge is chosen deliberately.
-                    return True
-
-                if (
-                    crn.link_loop_next[uv].uv == pair[uv].uv
-                    or crn[uv].uv == pair.link_loop_next[uv].uv
-                ):
-                    return True
         return False
 
-    def isect_lg(self, lg):
+    # TODO: Test view_box on old versions (Individual Align OT)
+    def isect_segment(self, seg):
+        # TODO: Skip blocking when segment one.
         from ..utypes import BBox
 
         if self.skip:
             return True
 
         view: BBox = self.view_box
-        lg_bbox: BBox = lg.calc_bbox()
+        seg_bbox: BBox = seg.calc_bbox()
 
-        if not view.isect(lg_bbox):
-            if self._lg_has_inner_elem(lg):
+        if not view.isect(seg_bbox):
+            if self._segment_has_inner_elem(seg):
                 return True
             self.has_blocked = True
             return False
-        elif view.isect_x(lg_bbox.xmin) and view.isect_x(lg_bbox.xmax):
+        elif view.isect_x(seg_bbox.xmin) and view.isect_x(seg_bbox.xmax):
             return True
-        elif view.isect_y(lg_bbox.ymin) and view.isect_y(lg_bbox.ymax):
-            return True
-
-        if self._lg_has_inner_elem(lg):
+        elif view.isect_y(seg_bbox.ymin) and view.isect_y(seg_bbox.ymax):
             return True
 
+        if self._segment_has_inner_elem(seg):
+            return True
+
+        # TODO: Add checking by containing in view box.
         self.has_blocked = True
         return False
 

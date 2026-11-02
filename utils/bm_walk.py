@@ -193,7 +193,7 @@ def get_linked_crn_fn(umesh, *, included=False, with_seam=True, invisible_check=
 
 
 def get_linked_crn_iter_fn(umesh, *, included=False, with_seam=True, invisible_check=True) \
-        -> typing.Callable[[BMLoop], typing.Generator[BMLoop]]:  # fmt: skip
+        -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
     def catcher(is_boundary_, included_):
         def get_linked(first_crn: BMLoop):
             if included_:

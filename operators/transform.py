@@ -29,7 +29,6 @@ from ..utypes import (
     UnionIslands,
     Segment,
     Segments,
-    LoopGroup,
     IslandHit,
 )
 from ..preferences import prefs, univ_settings
@@ -1437,14 +1436,14 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 view_box_sync_block.skip_from_param(umesh, select=True)
 
                 uv = umesh.uv
-                lgs = LoopGroup.calc_dirt_loop_groups(umesh)
-                if lgs:
-                    umesh.tag_visible_corners()  # TODO: Delete, use pair linked with ms for extend from linked
-                    for lg in lgs:
-                        if view_box_sync_block.isect_lg(lg):
+                segments = utypes.Segments.from_corners(utils.calc_selected_uv_edge(umesh), umesh)
+                if segments:
+                    for seg in segments:
+                        if view_box_sync_block.isect_segment(seg):
 
-                            lg.extend_from_linked()
-                            self.align_corners(((lg, uv),), lg.calc_bbox())
+                            seg.calc_chain_linked_corners()
+                            flatted_linked_corners = (crn for linked in seg.chain_linked_corners for crn in linked)
+                            self.align_corners([[flatted_linked_corners, uv]], seg.calc_bbox())
                             umesh.update_tag = True
 
         view_box_sync_block.draw_if_blocked()

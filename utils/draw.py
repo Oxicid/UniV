@@ -153,10 +153,13 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
 
     def test_invoke(self, _event):
         from .. import utypes
+        from .. import utils
 
         umesh = self.umeshes[0]
-        groups = utypes.LoopGroup.calc_dirt_loop_groups(umesh)
-        self.calc_from_corners(groups, umesh.uv)
+
+        selected_edges = utils.calc_selected_uv_edge(umesh)
+        groups = utypes.Segments.from_corners(selected_edges, umesh)
+        self.calc_from_segments(groups)
 
     def test(self, event):
         pt = self.get_mouse_pos(event)

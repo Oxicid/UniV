@@ -190,8 +190,8 @@ class LoopGroup:
                 crn.tag = not is_pair(crn, shared_crn, uv)
 
     def set_tag(self, state=True):
-        for g in self.corners:
-            g.tag = state
+        for crn in self.corners:
+            crn.tag = state
 
     def has_non_sync_crn(self):
         assert utils.sync()
@@ -326,7 +326,7 @@ class LoopGroup:
                 l_crn[uv].uv = co
 
     @classmethod
-    def calc_dirt_loop_groups(cls, umesh):
+    def calc_dirt_loop_groups_from_selected(cls, umesh):
         uv = umesh.uv
         umesh.tag_selected_corners()
         sel_corners = (crn for f in umesh.bm.faces for crn in f.loops if crn.tag)
@@ -683,6 +683,16 @@ class Segment:
     def to_corners(self):
         return [(adv_crn.crn.link_loop_prev if adv_crn.invert else adv_crn.crn) for adv_crn in self]
 
+    def get_corners_iter(self):
+        """Get original corners from start to end."""
+        for adv_crn in self:
+            if adv_crn.invert:
+                yield adv_crn.crn.link_loop_prev
+            else:
+                yield adv_crn.crn
+
+        yield self.end_orig_crn
+
     def mark_seam(self):
         for adv_crn in self:
             adv_crn.orig_crn.edge.seam = True
@@ -939,6 +949,11 @@ class Segment:
             if adv_crn.is_pair:
                 yield adv_crn.crn.link_loop_radial_prev
 
+    def calc_bbox(self):
+        bb = bbox.BBox.calc_bbox_uv_corners((adv_crn.orig_crn for adv_crn in self), self.umesh.uv)
+        bb.update([self.end_co])
+        return bb
+
     def __iter__(self):
         return iter(self.seg)
 
@@ -977,7 +992,7 @@ class Segments:
 
         get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True)
 
-        corners = set(corners)
+        corners = corners if isinstance(corners, set) else set(corners)
         for crn in corners:
             seg = deque()
             first_crn = AdvCorner(crn, uv, is_pair=not is_boundary(crn))

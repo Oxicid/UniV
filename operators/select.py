@@ -2554,35 +2554,36 @@ class UNIV_OT_SelectTexelDensity(UNIV_OT_SelectTexelDensity_VIEW3D):
 
 
 class UNIV_OT_Tests(utils.UNIV_OT_Draw_Test):
-    def test_invoke(self, _event):
-
-        # from .. import univ_pro
-        umesh = self.umeshes[0]
-        # uv = umesh.uv
-
-        islands = Islands.calc_visible(umesh)
-
-        is_boundary = utils.is_boundary_func(umesh)
-        get_edge_select = utils.edge_select_get_func(umesh)
-        get_face_select = utils.face_select_get_func(umesh)
-
-        for isl in islands:
-            to_segmenting_corners = []
-            for crn in isl.corners_iter():
-                pair_face = crn.link_loop_radial_prev.face
-
-                if not get_edge_select(crn):
-                    continue
-                if get_face_select(crn.face):
-                    continue
-                if not is_boundary(crn) and get_face_select(pair_face):
-                    continue
-                else:
-                    to_segmenting_corners.append(crn)
-            if to_segmenting_corners:
-                segments = utypes.Segments.from_corners(to_segmenting_corners, umesh)
-                self.calc_from_segments(segments)
-            break
+    ...
+    # def test_invoke(self, _event):
+    #
+    #     # from .. import univ_pro
+    #     umesh = self.umeshes[0]
+    #     # uv = umesh.uv
+    #
+    #     islands = Islands.calc_visible(umesh)
+    #
+    #     is_boundary = utils.is_boundary_func(umesh)
+    #     get_edge_select = utils.edge_select_get_func(umesh)
+    #     get_face_select = utils.face_select_get_func(umesh)
+    #
+    #     for isl in islands:
+    #         to_segmenting_corners = []
+    #         for crn in isl.corners_iter():
+    #             pair_face = crn.link_loop_radial_prev.face
+    #
+    #             if not get_edge_select(crn):
+    #                 continue
+    #             if get_face_select(crn.face):
+    #                 continue
+    #             if not is_boundary(crn) and get_face_select(pair_face):
+    #                 continue
+    #             else:
+    #                 to_segmenting_corners.append(crn)
+    #         if to_segmenting_corners:
+    #             segments = utypes.Segments.from_corners(to_segmenting_corners, umesh)
+    #             self.calc_from_segments(segments)
+    #         break
 
 
 # noinspection PyTypeHints
