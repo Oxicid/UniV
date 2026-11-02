@@ -18,6 +18,37 @@ from ..utypes import BBox, UMeshes, Islands, AdvIsland, LoopGroup, LoopGroups
 from ..preferences import prefs, univ_settings
 
 
+def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv):
+    """For Weld OT"""
+    coords_sum_a = Vector((0.0, 0.0))
+
+    corners = []
+    corners_append = corners.append
+
+    first_co = crn[uv].uv
+    for crn_a in crn.vert.link_loops:
+        if crn_a.face.index == idx:
+            crn_a_uv = crn_a[uv]
+            crn_a_co = crn_a_uv.uv
+            if crn_a_co == first_co:
+                coords_sum_a += crn_a_co
+                corners_append(crn_a_uv)
+
+    second_co = crn_pair[uv].uv
+    for crn_b in crn_pair.vert.link_loops:
+        if crn_b.face.index == idx:
+            crn_b_uv = crn_b[uv]
+            crn_b_co = crn_b_uv.uv
+            if crn_b_co == second_co:
+                coords_sum_a += crn_b_co
+                corners_append(crn_b_uv)
+
+    avg_co_a = coords_sum_a / len(corners)
+
+    for crn_ in corners:
+        crn_.uv = avg_co_a
+
+
 class Stitch:
     def __init__(self):
         self.padding = 0.0
@@ -682,10 +713,10 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
     bl_idname = "uv.univ_weld"
     bl_label = "Weld"
     bl_description = (
-        "Weld selected UV vertices\n\n"
-        "If there are paired and unpaired selections with no connections \nat the same time in the off sync mode, \n"
+        "Weld selected UV edges.\n\n"
+        "If there are paired and unpaired selections \nwith no connections at the same time, \n"
         "the paired connection is given priority, but when you press again, \nthe unpaired selections are also connected.\n"
-        "This prevents unwanted connections.\n"
+        "This prevents unwanted connections.\n\n"
         "Works like Stitch if everything is welded in the island.\n\n"
         "Context keymaps on button:\n"
         "Default - Weld\n"
@@ -803,13 +834,12 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
         return {"FINISHED"}
 
     def weld(self, umeshes):
-        from ..utils import weld_crn_edge_by_idx
-
         # Weld by index pair select edges
         islands_of_mesh = []
         for umesh in umeshes:
             uv = umesh.uv
             update_tag = False
+            # TODO: Use corners groups for avoid calculate islands (without broke non-manifolds welding).
             islands = Islands.calc_extended_any_edge_non_manifold(umesh, with_seams=False)
             if islands:
                 umesh.set_corners_tag(False)
@@ -872,9 +902,6 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
         # Weld unpair selected edges
         if not umeshes.sync or any(u.sync_valid for u in umeshes):
-            from ..utils import linked_crn_uv_by_idx_unordered_included_v2
-            from ..utils import is_pair
-
             for islands in islands_of_mesh:
                 umesh = islands.umesh
                 # There can be cases where one mesh has valid UVs and another does not, so we filter out such cases accordingly.
@@ -884,7 +911,9 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
 
                 update_tag = False
                 uv = umesh.uv
+
                 edge_linked_select_set = utils.edge_select_linked_set_func(umesh)
+                get_linked = utils.get_linked_crn_fn(umesh)
 
                 for isl in islands:
                     single_selected_inner_edges = isl.sequence
@@ -896,14 +925,12 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
                             # Weld verts
                             next_crn_co = crn.link_loop_next[uv].uv
                             shared = crn.link_loop_radial_prev
-                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included_v2(shared, uv):
+                            for shared_l_crn in get_linked(shared):
                                 shared_l_crn[uv].uv = next_crn_co
 
                             crn_co = crn[uv].uv
                             shared_next = shared.link_loop_next
-                            for shared_l_crn in linked_crn_uv_by_idx_unordered_included_v2(
-                                shared_next, uv
-                            ):
+                            for shared_l_crn in get_linked(shared_next):
                                 shared_l_crn[uv].uv = crn_co
 
                             # TODO: Check selection on flipped faces

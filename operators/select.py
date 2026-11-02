@@ -1889,11 +1889,12 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
                     # Select linked faces.
                     if umesh.elem_mode == "VERT":
+                        get_linked_it_inc = utils.get_linked_crn_iter_fn(
+                            umesh, included=True, with_seam=self.clamp_on_seam
+                        )
                         set_face_select = utils.face_select_set_func(umesh)
                         for grew_crn in grew:
-                            for l_crn in utils.linked_crn_uv_by_idx_unordered_included_v2(
-                                grew_crn, uv
-                            ):
+                            for l_crn in get_linked_it_inc(grew_crn):
                                 f = l_crn.face
                                 if not f.uv_select:
                                     if all(crn_f.uv_select_vert for crn_f in f.loops):

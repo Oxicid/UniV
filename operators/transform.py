@@ -1265,7 +1265,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 if selected and not umesh.sync_valid:
                     if umesh.elem_mode == "VERT":
                         corners = utils.calc_selected_uv_vert(umesh)
-                        corners = view_box_sync_block.filter_verts(corners, umesh.uv)
+                        corners = view_box_sync_block.filter_verts(corners, umesh)
                         corners = self.get_unique_linked_corners_from_crn_vert(umesh, corners)
                     elif umesh.elem_mode == "EDGE":
                         corners = utils.calc_selected_uv_edge(umesh)
@@ -1373,7 +1373,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                     view_box_sync_block.skip_from_param(umesh, selected)
                     if umesh.elem_mode == "VERT":
                         corners = utils.calc_selected_uv_vert(umesh)
-                        corners = view_box_sync_block.filter_verts(corners, umesh.uv)
+                        corners = view_box_sync_block.filter_verts(corners, umesh)
                     else:
                         corners = utils.calc_selected_uv_edge(umesh)
                         corners = view_box_sync_block.filter_edges(corners, umesh)

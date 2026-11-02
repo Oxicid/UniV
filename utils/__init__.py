@@ -420,10 +420,12 @@ class ViewBoxSyncBlock:
                         return True
         return False
 
-    def filter_verts(self, corners, uv):
+    def filter_verts(self, corners, umesh):
         if self.skip:
             return corners
 
+        get_linked_it_inc = get_linked_crn_iter_fn(umesh, included=True, with_seam=False)
+        uv = umesh.uv
         xmin = self.view_box.xmin
         xmax = self.view_box.xmax
         ymin = self.view_box.ymin
@@ -436,8 +438,7 @@ class ViewBoxSyncBlock:
 
             x, y = crn[uv].uv
             if xmin <= x <= xmax and ymin <= y <= ymax:
-                filtered_corners.add(crn)
-                filtered_corners.update(linked_crn_to_vert_pair_iter(crn, uv, True))
+                filtered_corners.update(get_linked_it_inc(crn))
                 continue
 
             # Add outside unpair vertices

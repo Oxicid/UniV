@@ -661,15 +661,15 @@ class UNIV_OT_Hide(utypes.RayCastAndPick):
             for crn in f.loops:
                 crn_vert = crn.vert
                 if crn_vert.select:
-                    if all(not f__.select for f__ in crn_vert.link_faces):
+                    if all(not lf.select for lf in crn_vert.link_faces):
                         return True
-                    for crn__ in utils.linked_crn_to_vert_pair_iter(crn, uv, True):
-                        if crn__.face.select:
+                    for l_crn in get_linked_it(crn):
+                        if l_crn.face.select:
                             return True
             return False
 
         for umesh in umeshes:
-            uv = umesh.uv
+            get_linked_it = utils.get_linked_crn_iter_fn(umesh)
             visible_faces = utils.calc_visible_uv_faces(umesh)
             for f in visible_faces:
                 # Skip selected and unselected face

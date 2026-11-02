@@ -361,6 +361,8 @@ class LoopGroup:
         return LoopGroups(groups, umesh)
 
     def extend_from_linked(self):
+        """That untag linked corners, for avoid duplicates."""
+
         self.set_tag(False)
 
         if utils.sync():
@@ -368,7 +370,7 @@ class LoopGroup:
             move_corners = []
             uv = self.umesh.uv
             for crn in self:
-                move_corners.extend(utils.linked_crn_vert_uv_for_transform(crn, uv))
+                move_corners.extend(utils.linked_crn_vert_uv_by_tag_with_untagging_for_transform(crn, uv))
             self.corners.extend(move_corners)
         else:
             move_corners = []
@@ -1003,12 +1005,13 @@ class Segments:
             seg.append(first_crn)
 
             if first_crn.is_pair:
-                pair = AdvCorner(crn.link_loop_radial_prev, uv, is_pair=True)
-                appended.add(pair)
+                # Avoid adding a pair edge.
+                appended.add(AdvCorner(crn.link_loop_radial_prev, uv, is_pair=True))
             else:
                 # Set invert for compare convention.
-                boundary = AdvCorner(crn.link_loop_next, uv, is_pair=False, invert=True)
-                appended.add(boundary)
+                # Artificially inverted boundary edges are not included in the final segment.
+                # They are needed to prevent reusing the current edge in the opposite direction during a `Backward Grow`.
+                appended.add(AdvCorner(crn.link_loop_next, uv, is_pair=False, invert=True))
 
             # Forward Grow
             while True:

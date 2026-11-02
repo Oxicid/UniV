@@ -217,37 +217,6 @@ def calc_max_length_uv_crn_with_dist(corners, uv):
     return max_length, v1.copy(), v2.copy()
 
 
-def weld_crn_edge_by_idx(crn: BMLoop, crn_pair, idx, uv: BMLayerItem):
-    """For Weld OT"""
-    coords_sum_a = Vector((0.0, 0.0))
-
-    corners = []
-    corners_append = corners.append
-
-    first_co = crn[uv].uv
-    for crn_a in crn.vert.link_loops:
-        if crn_a.face.index == idx:
-            crn_a_uv = crn_a[uv]
-            crn_a_co = crn_a_uv.uv
-            if crn_a_co == first_co:
-                coords_sum_a += crn_a_co
-                corners_append(crn_a_uv)
-
-    second_co = crn_pair[uv].uv
-    for crn_b in crn_pair.vert.link_loops:
-        if crn_b.face.index == idx:
-            crn_b_uv = crn_b[uv]
-            crn_b_co = crn_b_uv.uv
-            if crn_b_co == second_co:
-                coords_sum_a += crn_b_co
-                corners_append(crn_b_uv)
-
-    avg_co_a = coords_sum_a / len(corners)
-
-    for crn_ in corners:
-        crn_.uv = avg_co_a
-
-
 def is_flipped_uv(f, uv) -> bool:
     """NOTE: The algorithm is resistant to very small faces."""
     area = 0.0

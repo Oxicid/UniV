@@ -68,15 +68,13 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
 
         for umesh in umeshes:
             uv = umesh.uv
+            get_linked = utils.get_linked_crn_fn(umesh, with_seam=False)
             faces = utils.calc_visible_uv_faces(umesh)
             if not isinstance(faces, list):
                 faces = list(faces)
 
             tree = kdtree.KDTree(len(faces))
-            for (
-                idx,
-                f,
-            ) in enumerate(faces):
+            for idx, f in enumerate(faces):
                 tree.insert(f.calc_center_median(), idx)
             tree.balance()
 
@@ -157,8 +155,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
                             dst_crn = dst_f.loops[target_crn_idx]
                             uv_co = crn[uv].uv * uv_mirror_scale + scale_diff
                             if not self.unlink:
-                                dst_linked_loops = utils.linked_crn_to_vert_pair(dst_crn, uv, umesh.sync)
-                                for l_crn in dst_linked_loops:
+                                for l_crn in get_linked(dst_crn):
                                     l_crn[uv].uv = uv_co
                             dst_crn[uv].uv = uv_co
 

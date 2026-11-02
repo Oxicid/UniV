@@ -241,7 +241,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
     def legacy_sync_relax_faces(self, umeshes: UMeshes):
         assert umeshes.elem_mode == "FACE"
-        from ..utils import linked_crn_uv_unordered_included_with_hidden, shared_is_linked
+        from ..utils import shared_is_linked
 
         relax_data: list[RelaxData] = []
         for umesh in umeshes:
@@ -254,9 +254,10 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
             to_select = set()
             border_corners = set()
             # Find border from selection corners
+            # TODO: Use generic functions.
             for f in utils.calc_selected_uv_faces(umesh):
                 for crn in f.loops:
-                    linked_crn = linked_crn_uv_unordered_included_with_hidden(crn, uv)
+                    linked_crn = utils.linked_crn_uv_unordered_included_with_hidden(crn, uv)
                     border = False
                     for l_crn in linked_crn:
                         if l_crn.face.hide:
@@ -278,7 +279,7 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
                             to_select.add(pair_crn.face)
                         border = True
                     if border:
-                        border_corners.update(linked_crn)
+                        border_corners.update(linked_crn)  # TODO: Remove hidden???
 
             for f in to_select:
                 f.select = True
@@ -329,17 +330,14 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
     def legacy_relax_non_sync(self, umeshes: UMeshes):
         from ..utils import (
-            linked_crn_uv_unordered,
             is_boundary_func,
-            vert_select_get_func,
-            is_visible_func,
+            vert_select_get_func
         )
 
         relax_data: list[RelaxData] = []
         for umesh in umeshes:
             is_boundary = is_boundary_func(umesh)
             is_vert_select = vert_select_get_func(umesh)
-            is_visible = is_visible_func(umesh.sync)
             uv = umesh.uv
             islands = Islands.calc_extended_any_elem(umesh, with_seams=False)
 
@@ -348,13 +346,11 @@ class UNIV_OT_Relax(unwrap.UNIV_OT_Unwrap):
 
             border_corners_for_unwrap = set()
 
+            get_linked_it_inc = utils.get_linked_crn_iter_fn(umesh, included=True, with_seam=False)
             for f in utils.calc_selected_uv_faces(umesh):
                 for crn in f.loops:
                     if is_vert_select(crn) and is_boundary(crn):
-                        border_corners_for_unwrap.add(crn)
-                        for l_crn in linked_crn_uv_unordered(crn, uv):
-                            if is_visible(l_crn.face):
-                                border_corners_for_unwrap.add(l_crn)
+                        border_corners_for_unwrap.update(get_linked_it_inc(crn))
 
             for f in umesh.bm.faces:
                 for crn in f.loops:
