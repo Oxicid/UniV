@@ -192,9 +192,8 @@ def is_boundary_func(
             return catcher(umesh.uv, is_boundary_no_invisible_check)
 
 
-def is_boundary_3d_func(
-    _, with_seam=True, with_flipped_check=True, invisible_check=True
-) -> typing.Callable[[BMLoop], bool]:
+def is_boundary_3d_func(_umesh=None, with_seam=True, with_contiguous_check=True, invisible_check=True
+                        ) -> typing.Callable[[BMLoop], bool]:
     """
     with_seam - check seams
 
@@ -204,7 +203,7 @@ def is_boundary_3d_func(
     """
     if with_seam:
         if invisible_check:
-            if with_flipped_check:
+            if with_contiguous_check:
 
                 def is_boundary(crn: BMLoop):
                     e = crn.edge
@@ -221,7 +220,7 @@ def is_boundary_3d_func(
                     return crn.link_loop_radial_prev.face.hide
 
         else:
-            if with_flipped_check:
+            if with_contiguous_check:
 
                 def is_boundary(crn: BMLoop):
                     e = crn.edge
@@ -237,7 +236,7 @@ def is_boundary_3d_func(
 
     # Without seam.
     if invisible_check:
-        if with_flipped_check:
+        if with_contiguous_check:
 
             def is_boundary(crn: BMLoop):
                 if not crn.edge.is_contiguous:
@@ -250,7 +249,7 @@ def is_boundary_3d_func(
                 return crn.edge.is_boundary or crn.link_loop_radial_prev.face.hide
 
     else:
-        if with_flipped_check:
+        if with_contiguous_check:
 
             def is_boundary(crn: BMLoop):
                 return not crn.edge.is_contiguous

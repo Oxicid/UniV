@@ -182,7 +182,6 @@ def linked_crn_to_vert_without_coord_check_with_seam_for_sync_unwrap(crn: BMLoop
     return linked
 
 
-
 def linked_crn_uv_unordered_included_with_hidden(first: BMLoop, uv: BMLayerItem):
     # This need for skip checking hidden untagged edges/faces.
     first_co = first[uv].uv
@@ -310,61 +309,39 @@ def linked_crn_to_vert_by_idx_3d(crn: BMLoop):
     return linked
 
 
-def linked_crn_to_vert_3d_iter(crn: BMLoop):
-    """Linked to arg corner by visible faces"""
-    first_vert = crn.vert
-    bm_iter = crn
 
-    while True:
-        bm_iter_prev = bm_iter.link_loop_prev
-        bm_iter = bm_iter_prev.link_loop_radial_prev  # get ccw corner
-        if first_vert != bm_iter.vert or bm_iter.face.hide:  # Skip boundary or flipped
+def linked_crn_to_vert_3d_iter_fn(included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
+    # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).  # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)  # fmt: skip
+
+    def catcher(is_boundary_3d_, included_):
+        def linked_crn_to_vert_3d_iter_(crn: BMLoop):
+            """Linked to arg corner by visible faces"""
+            if included_:
+                yield crn
+
             bm_iter = crn
             while True:
-                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
-                # Skip boundary or flipped or seam clamp or hide clamp
-                if first_vert != bm_iter.vert or bm_iter.face.hide:
-                    break
+                bm_iter_prev = bm_iter.link_loop_prev
+                if is_boundary_3d_(bm_iter_prev):  # Skip boundary.
+                    bm_iter = crn
+                    while True:
+                        if is_boundary_3d_(bm_iter):  # clamp by seam
+                            return
 
+                        bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
+                        if bm_iter == crn:
+                            return
+                        yield bm_iter
+
+                bm_iter = bm_iter_prev.link_loop_radial_prev
                 if bm_iter == crn:
-                    break
+                    return
+
                 yield bm_iter
-            break  # break first loop
-        if bm_iter == crn:
-            break
-        yield bm_iter
+        return linked_crn_to_vert_3d_iter_
 
-
-def linked_crn_to_vert_with_seam_3d_iter(crn: BMLoop):
-    """Linked to arg corner by visible faces"""
-    # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).
-    # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)
-
-    first_vert = crn.vert
-    bm_iter = crn
-
-    while True:
-        bm_iter_prev = bm_iter.link_loop_prev
-        bm_iter = bm_iter_prev.link_loop_radial_prev  # get ccw corner
-        if (
-            first_vert != bm_iter.vert or bm_iter_prev.edge.seam or bm_iter.face.hide
-        ):  # Skip boundary or flipped
-            bm_iter = crn
-            while True:
-                if bm_iter.edge.seam:  # clamp by seam
-                    break
-                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
-                # Skip boundary or flipped or clamp by hide
-                if first_vert != bm_iter.vert or bm_iter.face.hide:
-                    break
-
-                if bm_iter == crn:
-                    break
-                yield bm_iter
-            break  # break first loop
-        if bm_iter == crn:
-            break
-        yield bm_iter
+    from . import is_boundary_3d_func
+    return catcher(is_boundary_3d_=is_boundary_3d_func(with_seam=with_seam, invisible_check=invisible_check), included_=included)
 
 
 def linked_crn_to_vert_by_idx_without_co_check_unordered(crn):

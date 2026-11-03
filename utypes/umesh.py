@@ -755,6 +755,7 @@ class UMeshes:
                 utils.set_select_mode_uv(mode)
             for umesh in self.umeshes:
                 umesh.elem_mode = mode
+                umesh.update_tag = True
 
     def _elem_mode_init(self):
         mode = utils.get_select_mode_mesh() if self.sync else utils.get_select_mode_uv()

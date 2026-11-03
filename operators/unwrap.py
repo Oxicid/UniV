@@ -1100,6 +1100,9 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     def unwrap_selected_faces_preprocess_vert_edge_mode(umesh):
         assert umesh.total_face_sel
         assert umesh.elem_mode in ("VERT", "EDGE")
+
+        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
+
         mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
         pinned = []
@@ -1129,10 +1132,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
 
                     if crn.vert.select:
                         # If linked faces are selected, then crn should unwrap as well
-                        if any(
-                            crn_.face.select
-                            for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)
-                        ):
+                        if any(crn_.face.select for crn_ in linked_crn_to_vert_it(crn)):
                             continue
                     crn_uv.pin_uv = True
                     pinned.append(crn_uv)
@@ -1220,6 +1220,8 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     def unwrap_selected_edges_preprocess(umesh):
         assert not umesh.total_face_sel
         assert umesh.elem_mode == "EDGE"
+        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
+
         mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
         pinned = []
@@ -1261,10 +1263,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
                         continue
 
                     if crn.vert.select:
-                        if any(
-                            crn_.edge.select
-                            for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)
-                        ):
+                        if any(crn_.edge.select for crn_ in linked_crn_to_vert_it(crn)):
                             continue
                         # Over check after linked_crn_to_vert_with_seam_3d_iter,
                         # because it returns nothing for vertices without linked faces (see note).
@@ -1297,6 +1296,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     @staticmethod
     def unwrap_selected_faces_preprocess(umesh):
         assert umesh.total_face_sel
+        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
         mesh_islands = utypes.MeshIslands.calc_extended(umesh)
         unique_number = 0
         pinned = []
@@ -1322,10 +1322,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
 
                     if crn.vert.select:
                         # If linked faces are selected, then crn should unwrap as well
-                        if any(
-                            crn_.face.select
-                            for crn_ in utils.linked_crn_to_vert_with_seam_3d_iter(crn)
-                        ):
+                        if any(crn_.face.select for crn_ in linked_crn_to_vert_it(crn)):
                             continue
                     crn_uv.pin_uv = True
                     pinned.append(crn_uv)

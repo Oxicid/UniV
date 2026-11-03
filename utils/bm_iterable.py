@@ -126,6 +126,14 @@ def calc_selected_3d_edges(umesh: "utypes.UMesh") -> list[BMEdge] | typing.Any:
     return [e for e in umesh.bm.edges if e.select]
 
 
+def calc_selected_3d_verts_iter(umesh: "utypes.UMesh") -> typing.Iterable[BMVert]:
+    if umesh.is_full_vert_deselected:
+        return []
+    if umesh.is_full_vert_selected:
+        return umesh.bm.verts
+    return (v for v in umesh.bm.verts if v.select)
+
+
 def calc_selected_edges_iter(umesh: "utypes.UMesh") -> list[BMEdge] | typing.Any:
     if umesh.is_full_edge_deselected:
         return []
