@@ -547,10 +547,9 @@ if USE_GENERIC_UV_SYNC:
         """
         from . import get_linked_crn_iter_fn, is_boundary_func
 
-
-        def catcher(uv, sync, sync_invalid, is_boundary, get_linked_it_inc_):
+        def catcher(sync, sync_invalid, is_boundary_, get_linked_it_inc_):
             if sync_invalid:
-
+                # TODO: Split logic to VERT and EDGE elem mode, and add assert for face mode
                 def select_set(crn):
                     crn.edge.select = True
                     f = crn.face
@@ -558,7 +557,7 @@ if USE_GENERIC_UV_SYNC:
                         if all(e.select for e in f.edges):
                             f.select = True
 
-                    if not is_boundary(crn):
+                    if not is_boundary_(crn):
                         pair_face = crn.link_loop_radial_prev.face
                         if not pair_face.select:
                             if all(e.select for e in pair_face.edges):
@@ -566,58 +565,79 @@ if USE_GENERIC_UV_SYNC:
 
             else:
                 if sync:
+                    if umesh.elem_mode == "EDGE":
+                        def select_set(crn: BMLoop):
+                            crn.edge.select = True
+                            crn.uv_select_edge = True
 
-                    def select_set(crn: BMLoop):
-                        crn.edge.select = True
-                        crn.uv_select_edge = True
-
-                        # Select Face.
-                        f = crn.face
-                        if not f.uv_select:
-                            if all(f_crn.uv_select_edge for f_crn in f.loops):
-                                f.select = True
-                                f.uv_select = True
-
-                        if not is_boundary(crn):
-                            pair = crn.link_loop_radial_prev
-                            pair.uv_select_edge = True
-                            f = pair.face
+                            # Select Face.
+                            f = crn.face
                             if not f.uv_select:
                                 if all(f_crn.uv_select_edge for f_crn in f.loops):
                                     f.select = True
                                     f.uv_select = True
 
-                        linked = get_linked_it_inc_(crn)
-                        for l_crn in linked:
-                            l_crn.uv_select_vert = True
+                            if not is_boundary_(crn):
+                                pair = crn.link_loop_radial_prev
+                                pair.uv_select_edge = True
+                                f = pair.face
+                                if not f.uv_select:
+                                    if all(f_crn.uv_select_edge for f_crn in f.loops):
+                                        f.select = True
+                                        f.uv_select = True
 
-                        linked = get_linked_it_inc_(crn.link_loop_next)
-                        for l_crn in linked:
-                            l_crn.uv_select_vert = True
+                            linked = get_linked_it_inc_(crn)
+                            for l_crn in linked:
+                                l_crn.uv_select_vert = True
+
+                            linked = get_linked_it_inc_(crn.link_loop_next)
+                            for l_crn in linked:
+                                l_crn.uv_select_vert = True
+                    else:
+
+                        def select_set(crn: BMLoop):
+                            crn.edge.select = True
+                            crn.uv_select_edge = True
+                            if not is_boundary_(crn):
+                                crn.link_loop_radial_prev.uv_select_edge = True
+
+                            linked_faces = set()
+                            for l_crn in get_linked_it_inc_(crn):
+                                l_crn.uv_select_vert = True
+                                linked_faces.add(l_crn.face)
+
+                            for l_crn in get_linked_it_inc_(crn.link_loop_next):
+                                l_crn.uv_select_vert = True
+                                linked_faces.add(l_crn.face)
+
+                            # Select Face.
+                            for f in linked_faces:
+                                if not f.uv_select:
+                                    if all(f_crn.uv_select_vert for f_crn in f.loops):
+                                        f.select = True
+                                        f.uv_select = True
+                                for crn in f.loops:
+                                    if not crn.uv_select_edge:
+                                        if crn.uv_select_vert and crn.link_loop_next.uv_select_vert:
+                                            crn.uv_select_edge = True
 
                 else:
-
                     def select_set(crn: BMLoop):
-                        crn[uv].select_edge = True
+                        crn.uv_select_edge = True
 
-                        if not is_boundary(crn):
+                        if not is_boundary_(crn):
                             pair = crn.link_loop_radial_prev
-                            pair[uv].select_edge = True
+                            pair.uv_select_edge = True
 
-                        linked = get_linked_it_inc_(crn, uv, True)
-                        for l_crn in linked:
-                            l_crn[uv].select = True
+                        for l_crn in get_linked_it_inc_(crn):
+                            l_crn.uv_select_vert = True
 
-                        linked = get_linked_it_inc_(
-                            crn.link_loop_next, uv, True
-                        )
-                        for l_crn in linked:
-                            l_crn[uv].select = True
+                        for l_crn in get_linked_it_inc_(crn.link_loop_next):
+                            l_crn.uv_select_vert = True
 
             return select_set
 
         return catcher(
-            umesh.uv,
             umesh.sync,
             (umesh.sync and not umesh.sync_valid),
             is_boundary_func(umesh, with_seam=with_seam),
@@ -627,11 +647,12 @@ if USE_GENERIC_UV_SYNC:
 else:
 
     def edge_select_linked_full_func(umesh: "utypes.UMesh", with_seam=True) -> typing.Callable[[BMLoop], None]:
+
         from . import get_linked_crn_iter_fn, is_boundary_func
 
-        def catcher(uv, sync, is_boundary, get_linked_it_inc_):
+        def catcher(uv, sync, is_boundary_, get_linked_it_inc_):
             if sync:
-
+                # TODO: Split logic to VERT and EDGE elem mode, and add assert for face mode
                 def select_set(crn):
                     crn.edge.select = True
 
@@ -640,24 +661,45 @@ else:
                         if all(e.select for e in f.edges):
                             f.select = True
 
-                    if not is_boundary(crn):
+                    if not is_boundary_(crn):
                         pair_face = crn.link_loop_radial_prev.face
                         if not pair_face.select:
                             if all(e.select for e in pair_face.edges):
                                 pair_face.select = True
 
             else:
-                def select_set(crn: BMLoop):
-                    linked = get_linked_it_inc_(crn)
-                    for l_crn in linked:
-                        l_crn[uv].select = True
-                        next_crn = l_crn.link_loop_next[uv]
-                        if not next_crn.select_edge and next_crn.select:
-                            next_crn.select = True
+                if umesh.elem_mode == "EDGE":
+                    def select_set(crn: BMLoop):
+                        crn[uv].select_edge = True
+                        if not is_boundary_(crn):
+                            crn.link_loop_radial_prev[uv].select_edge = True
 
-                        prev_crn = l_crn.link_loop_next[uv]
-                        if not prev_crn.select_edge and prev_crn.select:
-                            prev_crn.select_edge = True
+                        for l_crn in get_linked_it_inc_(crn):
+                            l_crn[uv].select = True
+                        for l_crn in get_linked_it_inc_(crn.link_loop_next):
+                            l_crn[uv].select = True
+                else:
+
+                    def select_set(crn: BMLoop):
+                        crn[uv].select_edge = True
+                        if not is_boundary_(crn):
+                            crn.link_loop_radial_prev[uv].select_edge = True
+
+                        linked_faces = set()
+                        for l_crn in get_linked_it_inc_(crn):
+                            l_crn[uv].select = True
+                            linked_faces.add(l_crn.face)
+
+                        for l_crn in get_linked_it_inc_(crn.link_loop_next):
+                            l_crn[uv].select = True
+                            linked_faces.add(l_crn.face)
+
+                        for f in linked_faces:
+                            for crn in f.loops:
+                                crn_uv = crn[uv]
+                                if not crn_uv.select_edge:
+                                    if crn_uv.select and crn.link_loop_next[uv].select:
+                                        crn_uv.select_edge = True
 
             return select_set
 
