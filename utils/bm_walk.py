@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bpy  # noqa
+import heapq
 import typing
 
 from bmesh.types import BMesh, BMLoop, BMLayerItem
 
 USE_GENERIC_UV_SYNC = hasattr(BMesh, "uv_select_sync_valid")
-
 
 
 # TODO: Implement get_linked_crn_left_right_fn with `is_cyclic` state return.
@@ -264,7 +264,6 @@ def linked_crn_to_vert_by_idx_3d(crn: BMLoop):
     return linked
 
 
-
 def get_linked_crn_3d_iter_fn(*, included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
     # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).  # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)  # fmt: skip
 
@@ -307,75 +306,85 @@ def linked_crn_to_vert_by_idx_without_co_check_unordered(crn):
 
 class ShortPath:
     @staticmethod
-    def vert_tag_add_adjacent_uv(
-        heap,
-        l_a: BMLoop,
-        loops_prev: list[BMLoop | None],
-        cost: list[float],
+    def vert_tag_add_adjacent_uv_fn(
         umesh,
-        prioritize_corners: set[BMLoop],
-        bound_priority_factor: float,
-        visited: set[BMLoop],
-        include_corners: set[BMLoop],
-    ):
-        import heapq
-        uv = umesh.uv
-        l_a_index = l_a.index
-        uv_a = l_a[uv].uv
+        heap_: list[tuple[float, int, BMLoop]],
+        loops_prev_: list[BMLoop | None],
+        cost_: list[float],
+        prioritize_corners_: set[BMLoop],
+        bound_priority_factor_: float,
+        include_corners_: set[BMLoop],
+        get_linked_inc_,
+    ) -> typing.Callable[[BMLoop], None]:
+        def catcher(uv,
+                    heap,
+                    loops_prev,
+                    cost,
+                    prioritize_corners,
+                    bound_priority_factor,
+                    include_corners,
+                    get_linked_inc
+                    ):
+            def vert_tag_add_adjacent_uv(crn_a: BMLoop):
+                l_a_index = crn_a.index
+                uv_a = crn_a[uv].uv
 
-        get_linked_inc = get_linked_crn_iter_fn(umesh, included=True)
-        # Loop over faces of face, but do so by first looping over loops.
-        for l in get_linked_inc(l_a):
-            #  'l_a' is already tagged, tag all adjacent.
+                # get_linked_inc = get_linked_crn_iter_fn(umesh, included=True)
+                # Loop over faces of face, but do so by first looping over loops.
+                for l_crn in get_linked_inc(crn_a):
+                    #  'l_a' is already tagged, tag all adjacent.
+                    l_crn.tag = False
 
-            visited.add(l)
-            l_b = l.link_loop_next
+                    for crn_b in (l_crn.link_loop_next, l_crn.link_loop_prev):
+                        if crn_b.tag:
+                            if crn_b in include_corners:
+                                uv_b = crn_b[uv].uv
+                                # We know 'crn_b' is not visited, check it out!
+                                l_b_index = crn_b.index
+                                cost_cut = (uv_a - uv_b).length
 
-            while True:
-                if l_b in include_corners and l_b not in visited:
-                    uv_b = l_b[uv].uv
-                    # We know 'l_b' is not visited, check it out!
-                    l_b_index = l_b.index
-                    cost_cut = (uv_a - uv_b).length
-                    if l_b in prioritize_corners:
-                        cost_cut *= bound_priority_factor
-                    cost_new = cost[l_a_index] + cost_cut
+                                # Prioritize.
+                                if crn_b in prioritize_corners:
+                                    cost_cut *= bound_priority_factor
 
-                    if cost[l_b_index] > cost_new:
-                        cost[l_b_index] = cost_new
-                        loops_prev[l_b_index] = l_a
-                        heapq.heappush(heap, (cost_new, id(l_b), l_b))
+                                new_cost = cost[l_a_index] + cost_cut
+                                if new_cost < cost[l_b_index]:
+                                    cost[l_b_index] = new_cost
+                                    loops_prev[l_b_index] = crn_a
+                                    heapq.heappush(heap, (new_cost, id(crn_b), crn_b))
 
-                # This means we only step onto `l->prev` & `l->next`.
-                if l_b == l.link_loop_next:
-                    l_b = l.link_loop_prev.link_loop_prev
+            return vert_tag_add_adjacent_uv
+        return catcher(umesh.uv,
+                       heap_,
+                       loops_prev_,
+                       cost_,
+                       prioritize_corners_,
+                       bound_priority_factor_,
+                       include_corners_,
+                       get_linked_inc_)
 
-                l_b = l_b.link_loop_next
-                if l_b == l:
-                    break
-
-    @staticmethod
+    @classmethod
     def calc_path_uv_vert(
+        cls,
         l_src: BMLoop,
         l_dst: BMLoop,
         umesh,
-        include_corners: set[BMLoop],
+        include_corners: set[BMLoop],  # NOTE: `set` and `id(crn)` get random priority by session.
         exclude_corners: set[BMLoop],
         prioritize_corners: set[BMLoop] | tuple = (),
         bound_priority_factor=0.9,
     ):
-        import heapq
+        from heapq import heappop
         from collections import deque
         uv = umesh.uv
-        path = deque()
-        # BM_ELEM_TAG flag is used to store visited edges
-        heap: list[tuple[float, int, BMLoop]] = []
 
         # NOTE: would pass BM_EDGE except we are looping over all faces anyway.
         # BM_mesh_elem_index_ensure(bm, BM_LOOP); NOTE: not needed for face tag.
         prev_size = len(include_corners)
         include_corners = include_corners - exclude_corners
+
         if exclude_corners:
+            # An unlikely case. However, in the case of non-contiguous edges, this possibility cannot be ruled out.
             assert prev_size != len(include_corners)
 
         get_linked_inc = get_linked_crn_fn(umesh, included=True)
@@ -383,38 +392,43 @@ class ShortPath:
         include_corners.update(get_linked_inc(l_dst))
 
         for idx, crn in enumerate(include_corners):
+            # Index is used for `cost` indexing and for unique number for heapq.
             crn.index = idx
+            # Tag flag is used to store visited edges (untagged is visited).
+            crn.tag = True
 
-        visited = set()
         # Allocate.
         loops_prev: list[BMLoop | None] = [None] * len(include_corners)
-        cost = [1e100] * len(include_corners)
 
         # Regular dijkstra the shortest path, but over UV loops instead of vertices.
+        heap: list[tuple[float, int, BMLoop]] = []
         heapq.heappush(heap, (0.0, l_src.index, l_src))
+
+        cost = [1e100] * len(include_corners)
         cost[l_src.index] = 0.0
 
+        vert_tag_add_adjacent_uv = cls.vert_tag_add_adjacent_uv_fn(
+            umesh, heap, loops_prev, cost, prioritize_corners, bound_priority_factor, include_corners, get_linked_inc)
+
+        path = deque()
         while heap:
-            l = heapq.heappop(heap)[2]
-            if (l.vert == l_dst.vert) and l[uv].uv == l_dst[uv].uv:
-                # assert l.face.index == l_dst.face.index
+            crn = heappop(heap)[2]
+            if (crn.vert == l_dst.vert) and crn[uv].uv == l_dst[uv].uv:
                 while True:
-                    path.appendleft(l)
-                    l = loops_prev[l.index]
-                    if not l:
+                    path.appendleft(crn)
+                    crn = loops_prev[crn.index]
+                    if not crn:
                         break
                 break
 
-            if l not in visited:
+            if crn.tag:
                 #  Adjacent loops are tagged while stepping to avoid 2x loops.
-                visited.add(l)
-                ShortPath.vert_tag_add_adjacent_uv(
-                    heap, l, loops_prev, cost, umesh, prioritize_corners, bound_priority_factor, visited, include_corners
-                )
+                crn.tag = False
+                vert_tag_add_adjacent_uv(crn)
 
         # assert bool(set(get_linked(l_src)) & set(path))
         # assert bool(set(get_linked(l_src)) & set(path))
-        return ShortPath._short_path_to_segment(path, umesh)  # TODO: Fix that.
+        return cls._short_path_to_segment(path, umesh)
 
     @staticmethod
     def _short_path_to_segment(path, umesh):
@@ -425,16 +439,18 @@ class ShortPath:
         is_boundary = is_boundary_func(umesh)
         get_linked_inc = get_linked_crn_fn(umesh, included=True)
 
+        # TODO: Add `splitshift` function.
         for i in range(len(path) - 1):
-            linked = get_linked_inc(path[i])
-
             next_v = path[i+1].vert
+
+            linked = get_linked_inc(path[i])
             for curr_crn in linked:
                 if curr_crn.link_loop_next.vert == next_v:
                     new_adv_crn = AdvCorner(curr_crn, umesh, is_pair=not is_boundary(curr_crn))
                     segment.append(new_adv_crn)
                     break
             else:
+                # A likely case. Do not replace `get_linked` with `get_linked_iter`.
                 for curr_crn in linked:
                     prev_crn = curr_crn.link_loop_prev
                     if prev_crn.vert == next_v:
