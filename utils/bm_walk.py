@@ -9,53 +9,8 @@ from bmesh.types import BMesh, BMLoop, BMLayerItem
 USE_GENERIC_UV_SYNC = hasattr(BMesh, "uv_select_sync_valid")
 
 
-def shared_linked_crn_by_idx(crn: BMLoop, uv) -> BMLoop | None:
-    shared = crn.link_loop_radial_prev
-    if shared != crn and crn.face.index == shared.face.index:
-        if (
-            crn.link_loop_next[uv].uv == shared[uv].uv
-            and crn[uv].uv == shared.link_loop_next[uv].uv
-        ):
-            return shared
-    return None
 
-
-def shared_linked_crn_to_edge_by_idx(crn: BMLoop) -> BMLoop | None:
-    shared = crn.link_loop_radial_prev
-    if shared != crn and crn.face.index == shared.face.index:
-        return shared
-    return None
-
-
-def linked_crn_uv(first: BMLoop, uv: BMLayerItem):
-    first_vert = first.vert
-    first_co = first[uv].uv
-    linked = []
-    bm_iter = first
-
-    while True:
-        bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # get ccw corner
-        if first_vert != bm_iter.vert:  # Skip boundary or flipped
-            bm_iter = first
-            linked_cw = []
-            while True:
-                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
-                if first_vert != bm_iter.vert:  # Skip boundary or flipped
-                    break
-
-                if bm_iter == first:
-                    break
-                if first_co == bm_iter[uv].uv:
-                    linked_cw.append(bm_iter)
-            linked.extend(linked_cw[::-1])
-            break
-        if bm_iter == first:
-            break
-        if first_co == bm_iter[uv].uv:
-            linked.append(bm_iter)
-    return linked
-
-
+# TODO: Implement get_linked_crn_left_right_fn with `is_cyclic` state return.
 def get_linked_crn_fn(umesh, *, included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], list[BMLoop]]:  # fmt: skip
     def catcher(is_boundary_, included_):
         def get_linked(first_crn: BMLoop):
@@ -310,7 +265,7 @@ def linked_crn_to_vert_by_idx_3d(crn: BMLoop):
 
 
 
-def linked_crn_to_vert_3d_iter_fn(included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
+def get_linked_crn_3d_iter_fn(*, included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
     # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).  # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)  # fmt: skip
 
     def catcher(is_boundary_3d_, included_):
@@ -459,14 +414,13 @@ class ShortPath:
 
         # assert bool(set(get_linked(l_src)) & set(path))
         # assert bool(set(get_linked(l_src)) & set(path))
-        return ShortPath._short_pat_to_segment(path, umesh)  # TODO: Fix that.
+        return ShortPath._short_path_to_segment(path, umesh)  # TODO: Fix that.
 
     @staticmethod
-    def _short_pat_to_segment(path, umesh):
+    def _short_path_to_segment(path, umesh):
         from . import is_boundary_func
         from ..utypes import AdvCorner, Segment
 
-        uv = umesh.uv
         segment = []
         is_boundary = is_boundary_func(umesh)
         get_linked_inc = get_linked_crn_fn(umesh, included=True)
@@ -477,7 +431,7 @@ class ShortPath:
             next_v = path[i+1].vert
             for curr_crn in linked:
                 if curr_crn.link_loop_next.vert == next_v:
-                    new_adv_crn = AdvCorner(curr_crn, uv, is_pair = not is_boundary(curr_crn))
+                    new_adv_crn = AdvCorner(curr_crn, umesh, is_pair=not is_boundary(curr_crn))
                     segment.append(new_adv_crn)
                     break
             else:
@@ -486,12 +440,12 @@ class ShortPath:
                     if prev_crn.vert == next_v:
                         if is_boundary(prev_crn):
                             # Set invert for compare convention.
-                            boundary = AdvCorner(curr_crn, uv, is_pair=False, invert=True)
+                            boundary = AdvCorner(curr_crn, umesh, is_pair=False, invert=True)
                             boundary.is_pair = False
                             segment.append(boundary)
                             break
                         else:
-                            pair = AdvCorner(prev_crn.link_loop_radial_prev, uv, is_pair=True)
+                            pair = AdvCorner(prev_crn.link_loop_radial_prev, umesh, is_pair=True)
                             pair.is_pair = True
                             segment.append(pair)
                             break

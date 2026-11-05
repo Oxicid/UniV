@@ -192,7 +192,7 @@ def is_boundary_func(
             return catcher(umesh.uv, is_boundary_no_invisible_check)
 
 
-def is_boundary_3d_func(_umesh=None, with_seam=True, with_contiguous_check=True, invisible_check=True
+def is_boundary_3d_func(_umesh=None, *, with_seam=True, with_contiguous_check=True, invisible_check=True
                         ) -> typing.Callable[[BMLoop], bool]:
     """
     with_seam - check seams

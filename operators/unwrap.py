@@ -1101,7 +1101,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
         assert umesh.total_face_sel
         assert umesh.elem_mode in ("VERT", "EDGE")
 
-        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
+        linked_crn_to_vert_it = utils.get_linked_crn_3d_iter_fn()
 
         mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
@@ -1220,7 +1220,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     def unwrap_selected_edges_preprocess(umesh):
         assert not umesh.total_face_sel
         assert umesh.elem_mode == "EDGE"
-        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
+        linked_crn_to_vert_it = utils.get_linked_crn_3d_iter_fn()
 
         mesh_islands = utypes.MeshIslands.calc_visible(umesh)
         unique_number = 0
@@ -1296,7 +1296,7 @@ class UNIV_OT_Unwrap_VIEW3D(utypes.RayCastAndPick):
     @staticmethod
     def unwrap_selected_faces_preprocess(umesh):
         assert umesh.total_face_sel
-        linked_crn_to_vert_it = utils.linked_crn_to_vert_3d_iter_fn()
+        linked_crn_to_vert_it = utils.get_linked_crn_3d_iter_fn()
         mesh_islands = utypes.MeshIslands.calc_extended(umesh)
         unique_number = 0
         pinned = []
