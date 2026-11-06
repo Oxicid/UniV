@@ -115,6 +115,9 @@ def get_select_mode_mesh() -> T_mesh_select_modes:
 def set_select_mode_mesh(mode: T_mesh_select_modes):
     if get_select_mode_mesh() == mode:
         return
+    if bpy.app.version < (5, 3, 0):
+        bpy.ops.mesh.select_mode(use_extend=False, use_expand=False, type=mode, action="TOGGLE")
+        return
     if mode == "VERT":
         bpy.context.tool_settings.mesh_select_mode[:] = True, False, False
     elif mode == "EDGE":
