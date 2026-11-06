@@ -15,7 +15,7 @@ from bmesh.types import BMLoop, BMFace
 from .. import utils
 from .. import utypes
 from ..preferences import prefs, univ_settings
-from ..utypes import Islands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands, AdvCorner3D
+from ..utypes import Islands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands, AdvCorner3D, AdvCorner
 
 from ..utils import face_centroid_uv
 
@@ -1760,21 +1760,29 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
         layout.prop(self, "ignore_seams")
         layout.prop(self, "max_angle")
         layout.prop(self, "grow")
+        if hasattr(self, "use_aspect"):
+            layout.prop(self, "use_aspect")
 
 
 class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = "uv.univ_select_edge_grow"
 
+    # noinspection PyTypeHints
+    use_aspect: BoolProperty(name="Correct Aspect", default=True)
+
     def execute(self, context):
         umeshes = UMeshes(report=self.report)
 
         if umeshes.elem_mode not in ("VERT", "EDGE"):
-            self.report(
-                {"INFO"}, f'Edge Grow not work in "{umeshes.elem_mode}" mode, run grow instead'
-            )
+            # self.report(
+            #     {"INFO"}, f'Edge Grow not work in "{umeshes.elem_mode}" mode, run grow instead'
+            # )
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=not self.ignore_seams)  # noqa
 
+        if self.use_aspect:
+            umeshes.calc_aspect_ratio(from_mesh=False)
         self.edge_grow_or_shrink(umeshes, grow=self.grow)
+
         if self.grow:
             umeshes.update(info="Not found edges for grow select")
         else:
@@ -1787,15 +1795,15 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         for umesh in umeshes:
             if not umesh.has_partial_selected_uv_edges():
                 continue
+
             is_boundary_by_context = utils.is_boundary_func(umesh, with_seam=not self.ignore_seams)
             is_boundary_with_seam = utils.is_boundary_func(umesh, with_seam=True)
             is_boundary_no_seam = utils.is_boundary_func(umesh, with_seam=False)
-
             get_face_select = utils.face_select_get_func(umesh)
+
 
             corners: list[AdvCorner3D] = []
             visited: set[BMLoop] = set()
-
             for crn in utils.calc_selected_uv_edge_iter(umesh):
                 if crn in visited:
                     continue
@@ -1815,7 +1823,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                     is_boundary = is_boundary_no_seam
                 else:
                     is_boundary = is_boundary_with_seam
-                crn = utypes.AdvCorner3D(crn, umesh, not is_boundary(crn))
+                crn = utypes.AdvCorner(crn, umesh, not is_boundary(crn))
 
                 for _ in range(2):
                     grow_prev_crn = self.edge_grow_backward(crn, self.max_angle, no_check_seams, is_boundary_no_seam)  # fmt: skip
@@ -1841,7 +1849,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
                 umesh.update_tag = True
 
-    def edge_grow_backward(self, adv_crn: AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner3D | None:
+    def edge_grow_backward(self, adv_crn: AdvCorner | AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner | AdvCorner3D | None:
 
         left, right, is_cycle = adv_crn.linked_crn_iter(is_boundary_no_seam)
         linked = left + right[::-1]

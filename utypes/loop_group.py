@@ -223,7 +223,7 @@ class _AdvCorner_Base:
                 _vec = self.crn.link_loop_prev[uv].uv - self.crn[uv].uv
             else:
                 _vec = self.crn.link_loop_next[uv].uv - self.crn[uv].uv
-            _vec *= Vector((1.0, self.umesh.aspect))
+            _vec *= Vector((self.umesh.aspect, 1.0))
             _vec.normalize()
             self._vec = _vec
             return _vec
