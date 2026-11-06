@@ -1774,229 +1774,130 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             )
             return bpy.ops.uv.univ_select_grow(grow=self.grow, clamp_on_seam=not self.ignore_seams)  # noqa
 
-        umeshes.update_tag = False
+        self.edge_grow_or_shrink(umeshes, grow=self.grow)
         if self.grow:
-            self.grow_or_shrink(umeshes, grow=True)
             umeshes.update(info="Not found edges for grow select")
         else:
-            self.grow_or_shrink(umeshes, grow=False)
             # TODO: Deselect (initially selected by user) single vert in VERTEX mode when repeat press (2-4 pass) operator (when prev deselect failed)
             umeshes.update(info="Not found edges for shrink select")
         return {"FINISHED"}
 
-    def grow_or_shrink(self, umeshes: UMeshes, grow: bool):
+    def edge_grow_or_shrink(self, umeshes: utypes.UMeshes, grow: bool):
         umeshes.update_tag = False
         for umesh in umeshes:
             if not umesh.has_partial_selected_uv_edges():
                 continue
-
-            get_face_select = utils.face_select_get_func(umesh)
-            get_linked = utils.get_linked_crn_fn(umesh, with_seam=not self.ignore_seams)
-            is_clamped_with_seam = self.is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp=True)
-            is_clamped_no_seam = self.is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp=False)
-
+            is_boundary_by_context = utils.is_boundary_func(umesh, with_seam=not self.ignore_seams)
             is_boundary_with_seam = utils.is_boundary_func(umesh, with_seam=True)
             is_boundary_no_seam = utils.is_boundary_func(umesh, with_seam=False)
 
-            edges = []
-            uv = umesh.uv
+            get_face_select = utils.face_select_get_func(umesh)
+
+            corners: list[AdvCorner3D] = []
+            visited: set[BMLoop] = set()
+
             for crn in utils.calc_selected_uv_edge_iter(umesh):
-                # Slightly improve performance.
-                if get_face_select(crn.face):
+                if crn in visited:
                     continue
-                if not is_boundary_with_seam(crn):
-                    if get_face_select(crn.link_loop_radial_prev.face):
+
+                visited.add(crn)
+                if is_boundary_by_context(crn):
+                    if get_face_select(crn.face):
+                        continue
+                else:
+                    visited.add(crn.link_loop_radial_prev)
+                    if get_face_select(crn.face) or get_face_select(crn.link_loop_radial_prev.face):
                         continue
 
-                check_seam = not (self.ignore_seams or crn.edge.seam)
-                if check_seam:
-                    is_clamped = is_clamped_with_seam
-                    is_boundary = is_boundary_with_seam
-                else:
-                    is_clamped = is_clamped_no_seam
+                no_check_seams = True if self.ignore_seams else crn.edge.seam
+
+                if no_check_seams:
                     is_boundary = is_boundary_no_seam
+                else:
+                    is_boundary = is_boundary_with_seam
+                crn = utypes.AdvCorner3D(crn, umesh, not is_boundary(crn))
 
-                selected_dir = crn.link_loop_next[uv].uv - crn[uv].uv
-
-                grow_prev_crn = self.grow_prev(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked, is_boundary)  # fmt: skip
-                if grow_prev_crn:
-                    if not (check_seam and grow_prev_crn.edge.seam):
+                for _ in range(2):
+                    grow_prev_crn = self.edge_grow_backward(crn, self.max_angle, no_check_seams, is_boundary_no_seam)  # fmt: skip
+                    if grow_prev_crn:
+                        assert not grow_prev_crn.edge.select
                         if grow:
-                            edges.append(grow_prev_crn)  # diff
+                            corners.append(grow_prev_crn)
                         else:
-                            edges.append(crn)
-                            continue
+                            corners.append(crn.copy())
+                            break
+                    crn.toggle_dir()
 
-                grow_next_crn = self.grow_next(crn, selected_dir, uv, self.max_angle, is_clamped, get_linked, is_boundary)  # fmt: skip
-                if grow_next_crn:
-                    if not (check_seam and grow_next_crn.edge.seam):
-                        edges.append(grow_next_crn if grow else crn)
-
-            if edges:
+            if corners:
                 if grow:
                     set_uv_edge_select = utils.edge_select_linked_full_func(umesh, with_seam=not self.ignore_seams)
-                    for grew_crn in edges:
-                        set_uv_edge_select(grew_crn)
+                    for grew_crn in corners:
+                        set_uv_edge_select(grew_crn.orig_crn)
                 else:
                     # TODO: Don't forget to use use clam_by_seams
-                    utils.deselect_uv_edges_with_preserve_around_edges(umesh, edges)
+                    utils.deselect_uv_edges_with_preserve_around_edges(umesh, [adv_crn.orig_crn for adv_crn in corners])
                     if umesh.sync:
                         umesh.bm.select_history.validate()  # Active elem validate
 
                 umesh.update_tag = True
 
-    def grow_prev(self, crn, selected_dir, uv, max_angle, is_clamped, get_linked_, is_boundary_) -> BMLoop | None:
-        prev_crn = crn.link_loop_prev
-        shared: bool | BMLoop = None if is_boundary_(crn) else crn.link_loop_radial_prev
-        cur_linked_corners = get_linked_(crn)
+    def edge_grow_backward(self, adv_crn: AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner3D | None:
 
-        if is_clamped(cur_linked_corners, shared, prev_crn):
-            return None
+        left, right, is_cycle = adv_crn.linked_crn_iter(is_boundary_no_seam)
+        linked = left + right[::-1]
 
-        # Border case.
-        if not len(cur_linked_corners):
-            if selected_dir.angle(crn[uv].uv - prev_crn[uv].uv, max_angle) <= max_angle:
-                return prev_crn
-            return None
+        assert adv_crn not in left
+        assert adv_crn not in right
 
-        # Get corner without check (quad case)
+        adv_crn = adv_crn.copy()
+        adv_crn.vec.negate()  # Invert Vector direction for angles check.
 
-        # TODO: Add left_and_right_linked_crn function for avoid potentially unordered CW corners.
-        if len(cur_linked_corners) == 3 and len(crn.vert.link_loops) == 4 and shared:
-            return cur_linked_corners[1]
+        assert adv_crn not in left
+        assert adv_crn not in right
+
+        if no_check_seams:
+            if any(a.edge.select for a in linked):
+                return None
+        else:
+            for a in linked:
+                e = a.edge
+                if e.select or e.seam:
+                    return None
+
+        # Inner quad case
+        if len(linked) == 3:
+            if is_cycle:
+                return linked[1]
+
+        # TODO: Implement border and border with quad
+        # if not shared and len(cur_linked_corners) == 1:
+        # shared_prev_crn = utils.shared_linked_crn_to_edge_by_idx(prev_crn)
+        #     if shared_prev_crn: pass
+
+        # TODO: Implement angles by normal projection
+
+        # TODO: Clamp if first crn has >= 65 and others has (and second pass grow by them) (check with concave and convex).
+        #  Might be 2 and more sharp f-edge. Need following
+
+        # TODO: Add follow by boundary (or rings)
 
         min_crn = None
         angle = max_angle * 1.0001
-        for crn_ in cur_linked_corners:
-            angle_ = selected_dir.angle(crn_[uv].uv - crn_.link_loop_next[uv].uv, max_angle)
-
+        for crn_ in linked:
+            angle_ = adv_crn.angle(crn_, max_angle)
             if self.prioritize_sharps:
-                if not crn.edge.smooth and angle_ <= max_angle:
+                if not crn_.edge.smooth and angle_ <= max_angle:
                     angle_ *= 0.65
 
             if angle_ < angle:
                 if self.boundary_by_boundary:
-                    if is_boundary_(crn) is is_boundary_(crn_):
+                    if adv_crn.is_pair is crn_.is_pair:
                         angle = angle_
                         min_crn = crn_
                 else:
                     angle = angle_
                     min_crn = crn_
-
-            prev_crn_ = crn_.link_loop_prev
-            if prev_crn_ != shared:
-                angle_ = selected_dir.angle(crn_[uv].uv - prev_crn_[uv].uv, max_angle)
-
-                if self.prioritize_sharps:
-                    if not prev_crn_.edge.smooth and angle_ <= max_angle:
-                        angle_ *= 0.65
-
-                if angle_ < angle:
-                    if self.boundary_by_boundary:
-                        if is_boundary_(crn) is is_boundary_(prev_crn_):
-                            angle = angle_
-                            min_crn = prev_crn_
-                    else:
-                        angle = angle_
-                        min_crn = prev_crn_
-
         return min_crn
-
-    def grow_next(self, crn, selected_dir, uv, max_angle, is_clamped, get_linked_, is_boundary_) -> "BMLoop | None":
-        next_crn = crn.link_loop_next
-        shared: bool | BMLoop = None if is_boundary_(crn) else crn.link_loop_radial_prev
-        next_linked_corners = get_linked_(crn.link_loop_next)
-
-        if is_clamped(next_linked_corners, shared, next_crn):
-            return None
-
-        # Vertex Border case.
-        if not len(next_linked_corners):
-            if (
-                selected_dir.angle(next_crn.link_loop_next[uv].uv - next_crn[uv].uv, max_angle)
-                <= max_angle
-            ):
-                return next_crn
-            return None
-
-        # Quad case
-        # TODO: Add left_and_right_linked_crn function for avoid potentially unordered CW corners.
-        if len(next_linked_corners) == 3 and len(next_crn.vert.link_loops) == 4 and shared:
-            return next_linked_corners[1].link_loop_prev
-
-        min_crn = None
-        angle = max_angle * 1.0001
-        for crn_ in next_linked_corners:
-            angle_ = selected_dir.angle(crn_.link_loop_next[uv].uv - crn_[uv].uv, max_angle)
-
-            if self.prioritize_sharps:
-                if not crn.edge.smooth and angle_ <= max_angle:
-                    angle_ *= 0.65
-
-            if angle_ < angle:
-                if self.boundary_by_boundary:
-                    if is_boundary_(crn) is is_boundary_(crn_):
-                        angle = angle_
-                        min_crn = crn_
-                else:
-                    angle = angle_
-                    min_crn = crn_
-
-            prev_crn_ = crn_.link_loop_prev
-            if prev_crn_ != shared:
-                angle_ = selected_dir.angle(prev_crn_[uv].uv - crn_[uv].uv, max_angle)
-
-                if self.prioritize_sharps:
-                    if not prev_crn_.edge.smooth and angle_ <= max_angle:
-                        angle_ *= 0.65
-
-                if angle_ < angle:
-                    if self.boundary_by_boundary:
-                        if is_boundary_(crn) is is_boundary_(prev_crn_):
-                            angle = angle_
-                            min_crn = prev_crn_
-                    else:
-                        angle = angle_
-                        min_crn = prev_crn_
-        return min_crn
-
-    @staticmethod
-    def is_clamped_by_selected_and_seams_func(umesh, with_seam_clamp: bool):
-        """Skip if selected or with seam"""
-
-        def catcher(get_edge_select, with_seam_clamp_: bool):
-            if with_seam_clamp_:
-                def fn(linked_corners, shared, next_or_prev_crn):
-                    if get_edge_select(next_or_prev_crn):
-                        return True
-
-                    if next_or_prev_crn.edge.seam:
-                        return True
-                    for crn in linked_corners:
-                        if get_edge_select(crn) or crn.edge.seam:
-                            return True
-                        prev_crn = crn.link_loop_prev
-                        if prev_crn != shared:
-                            if prev_crn.edge.seam or get_edge_select(prev_crn):
-                                return True
-                    return False
-            else:
-                def fn(linked_corners, shared, next_or_prev_crn):
-                    if get_edge_select(next_or_prev_crn):
-                        return True
-
-                    for crn in linked_corners:
-                        if get_edge_select(crn):
-                            return True
-                        prev_crn = crn.link_loop_prev
-                        if prev_crn != shared:
-                            if get_edge_select(prev_crn):
-                                return True
-                    return False
-
-            return fn
-
-        return catcher(utils.edge_select_get_func(umesh), with_seam_clamp)
 
 
 class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
@@ -2096,9 +1997,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                 elif not linked[1].face.hide:
                     yield linked[1]
 
-    def edge_grow_backward(self, adv_crn: "AdvCorner3D", max_angle, no_check_seams, is_boundary_no_seam) -> "AdvCorner3D | None":
+    def edge_grow_backward(self, adv_crn: AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner3D | None:
 
-        left, right, is_cycle = utypes.linked_crn_to_vert_3d_iter_(adv_crn, is_boundary_no_seam)
+        left, right, is_cycle = adv_crn.linked_crn_iter(is_boundary_no_seam)
         linked = left + right[::-1]
 
         assert adv_crn not in left

@@ -205,8 +205,7 @@ class UnionLoopGroup(LoopGroups):
     def __init__(self, loop_groups: list[LoopGroup]):
         super().__init__(loop_groups, None)
 
-
-class AdvCorner:
+class _AdvCorner_Base:
     def __init__(self, crn: BMLoop, umesh: "_umesh.UMesh", is_pair: bool, invert: bool=False):
         self.crn: BMLoop = crn
         self.invert: bool = invert
@@ -214,11 +213,6 @@ class AdvCorner:
         # self.uv = uv
         self._vec: Vector | None = None
         self.is_pair: bool = is_pair
-
-    @property
-    def orig_crn(self):
-        """ Corner with invert correction."""
-        return self.crn.link_loop_prev if self.invert else self.crn
 
     @property
     def vec(self):
@@ -238,6 +232,12 @@ class AdvCorner:
     @vec.setter
     def vec(self, v: Vector):
         self._vec = v
+
+    @property
+    def length_3d(self):
+        if self.invert:
+            return (self.crn.vert.co - self.crn.link_loop_prev.vert.co).length
+        return (self.crn.vert.co - self.crn.link_loop_next.vert.co).length
 
     def angle(self, other: "AdvCorner", max_angle: float):
         return self.vec.angle(other.vec, max_angle)  # noqa
@@ -261,17 +261,16 @@ class AdvCorner:
         return (self.crn[uv].uv - self.crn.link_loop_next[uv].uv).length
 
     @property
-    def length_3d(self):
-        if self.invert:
-            return (self.crn.vert.co - self.crn.link_loop_prev.vert.co).length
-        return (self.crn.vert.co - self.crn.link_loop_next.vert.co).length
-
-    @property
     def angle_from_cardinal(self):
         vec = self.vec
         card_vec = utils.vec_to_cardinal(vec)
         angle = vec.angle(card_vec, 0)
         return min(angle, pi - angle)
+
+    @property
+    def orig_crn(self):
+        """ Corner with invert correction."""
+        return self.crn.link_loop_prev if self.invert else self.crn
 
     def toggle_dir(self):
         if self.is_pair:
@@ -296,8 +295,100 @@ class AdvCorner:
                 self.invert = False
                 self.crn = self.crn.link_loop_prev
 
+    def copy(self):
+        adv_crn = type(self)(self.crn, self.umesh, self.is_pair, self.invert)
+        if self._vec:
+            adv_crn._vec = self._vec.copy()
+        else:
+            adv_crn._vec = None
+        return adv_crn
+
+    def linked_crn_iter(self, is_boundary_) -> tuple[list["AdvCorner | AdvCorner3D"], list["AdvCorner | AdvCorner3D"], bool]:
+        """NOTE: For clamp by selected edges need `is_boundary_` for get all edges."""
+
+        T = type(self)
+        umesh = self.umesh
+        left = []  # CCW
+        right = []  # CW
+
+        if self.invert:
+            crn = self.crn
+            bm_iter = crn
+            while True:
+                bm_iter_prev = bm_iter.link_loop_prev
+                if is_boundary_(bm_iter_prev):  # Skip boundary.
+                    if bm_iter_prev.link_loop_next != crn:
+                        left.append(T(bm_iter_prev.link_loop_next, umesh, is_pair=False, invert=True))  # Store inverted boundary.
+
+                    # Right. CW.
+                    bm_iter = crn
+                    while True:
+                        if is_boundary_(bm_iter):  # clamp by seam
+                            right.append(T(bm_iter, umesh, is_pair=False))
+                            return left, right, False
+
+                        right.append(T(bm_iter, umesh, is_pair=True))
+
+                        bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # Get CW corner.
+
+                        # In CW, you also need to check for the initial corner,
+                        # since in CCW, the break could have been caused by a seam case.
+                        assert bm_iter != crn
+                        if bm_iter == crn:
+                            return left, right, False
+
+                bm_iter = bm_iter_prev.link_loop_radial_prev  # Wheel CCW.
+                left.append(T(bm_iter, umesh, is_pair=True))
+                if bm_iter == crn:
+                    return left, right, True
+
+        else:
+            crn = self.crn
+            bm_iter = crn
+            while True:
+                bm_iter_prev = bm_iter.link_loop_prev
+                if is_boundary_(bm_iter_prev):  # Skip boundary.
+                    left.append(T(bm_iter, umesh, is_pair=False, invert=True))  # Store inverted boundary.
+
+                    # Right. CW.
+                    bm_iter = crn
+                    while True:
+                        if is_boundary_(bm_iter):  # clamp by seam
+                            if bm_iter != crn:  # Clamp on first iter case.
+                                right.append(T(bm_iter, umesh, is_pair=False))
+                            return left, right, False
+
+                        prev_pair = bm_iter
+                        bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # Get CW corner.
+
+                        # In CW, you also need to check for the initial corner,
+                        # since in CCW, the break could have been caused by a seam case.
+                        if bm_iter == crn:
+                            return left, right, False
+
+                        if prev_pair != crn: # Skip first iteration
+                            right.append(T(prev_pair, umesh, is_pair=True))
+                        else:
+                            assert not right
+
+                bm_iter = bm_iter_prev.link_loop_radial_prev  # Wheel CCW.
+                if bm_iter == crn:
+                    return left, right, True
+
+                left.append(T(bm_iter, umesh, is_pair=True))
+
+    def __hash__(self):
+        # NOTE: Don't use *.is_pair in this.
+        return hash(self.crn)
+
+    def __eq__(self, other):
+        return self.crn == other.crn and self.invert == other.invert
+
+
+
+class AdvCorner(_AdvCorner_Base):
     @property
-    def curr_pt(self):
+    def curr_pt(self):  # TODO: Replace with curr_uv_pt
         return self.crn[self.umesh.uv].uv
 
     @property
@@ -319,31 +410,9 @@ class AdvCorner:
     #             return True
     #     return False
 
-    def copy(self):
-        adv_crn = AdvCorner(self.crn, self.umesh, self.is_pair, self.invert)
-        if self._vec:
-            adv_crn._vec = self._vec.copy()
-        else:
-            adv_crn._vec = None
-        return adv_crn
-
-    def __hash__(self):
-        # NOTE: Don't use *.is_pair in this.
-        return hash(self.crn)
-
-    def __eq__(self, other):
-        return self.crn == other.crn and self.invert == other.invert
 
 
-class AdvCorner3D:
-    def __init__(self, crn: BMLoop, umesh: "_umesh.UMesh", is_pair: bool, invert: bool=False):
-        self.crn: BMLoop = crn
-        self.invert: bool = invert
-        self.umesh: "_umesh.UMesh" = umesh
-        # self.uv = uv
-        self._vec: Vector | None = None
-        self.is_pair: bool = is_pair
-
+class AdvCorner3D(_AdvCorner_Base):
     @property
     def vec(self):
         """NOTE: Don't forget to sanitize zero-length edges, depending on the context!!!"""
@@ -361,61 +430,6 @@ class AdvCorner3D:
     def vec(self, v):
         self._vec = v
 
-    @property
-    def length_3d(self):
-        if self.invert:
-            return (self.crn.vert.co - self.crn.link_loop_prev.vert.co).length
-        return (self.crn.vert.co - self.crn.link_loop_next.vert.co).length
-
-    def angle(self, other: "typing.Self", max_angle: float):
-        return self.vec.angle(other.vec, max_angle)  # noqa
-
-    def copy(self):
-        adv_crn = AdvCorner3D(self.crn, self.umesh, self.is_pair, self.invert)
-        if self._vec:
-            adv_crn._vec = self._vec.copy()
-        else:
-            adv_crn._vec = None
-        return adv_crn
-
-    @property
-    def orig_crn(self):
-        """Corner with invert correction."""
-        return self.crn.link_loop_prev if self.invert else self.crn
-
-    @property
-    def vert(self):
-        return self.crn.vert
-
-    @property
-    def edge(self):
-        if self.invert:
-            return self.crn.link_loop_prev.edge
-        else:
-            return self.crn.edge
-
-    def toggle_dir(self):
-        if self.is_pair:
-            self.crn = self.crn.link_loop_radial_prev
-        else:
-            if self.invert:
-                self.invert = False
-                self.crn = self.crn.link_loop_prev
-            else:
-                self.invert = True
-                self.crn = self.crn.link_loop_next
-
-        if self._vec is not None:
-            self._vec.negate()
-        return self
-
-    def __hash__(self):
-        # NOTE: Don't use *.is_pair in this.
-        return hash(self.crn)
-
-    def __eq__(self, other):
-        return self.crn == other.crn and self.invert == other.invert
-
     def __str__(self):
         txt =  f"AdvCorner3D. ID: {id(self.crn)!r} Is Pair: {self.is_pair}."
         if self.invert:
@@ -424,77 +438,7 @@ class AdvCorner3D:
     def __repr__(self):
         return self.__str__()
 
-def linked_crn_to_vert_3d_iter_(adv_crn: AdvCorner3D, is_boundary_) -> tuple[list["AdvCorner3D"], list["AdvCorner3D"], bool]:
-    """NOTE: For clamp by selected edges need `is_boundary_` for get all edges."""
-    umesh = adv_crn.umesh
-    left = []  # CCW
-    right = []  # CW
 
-    if adv_crn.invert:
-        crn = adv_crn.crn
-        bm_iter = crn
-        while True:
-            bm_iter_prev = bm_iter.link_loop_prev
-            if is_boundary_(bm_iter_prev):  # Skip boundary.
-                if bm_iter_prev.link_loop_next != crn:
-                    left.append(AdvCorner3D(bm_iter_prev.link_loop_next, umesh, is_pair=False, invert=True))  # Store inverted boundary.
-
-                # Right. CW.
-                bm_iter = crn
-                while True:
-                    if is_boundary_(bm_iter):  # clamp by seam
-                        right.append(AdvCorner3D(bm_iter, umesh, is_pair=False))
-                        return left, right, False
-
-                    right.append(AdvCorner3D(bm_iter, umesh, is_pair=True))
-
-                    bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # Get CW corner.
-
-                    # In CW, you also need to check for the initial corner,
-                    # since in CCW, the break could have been caused by a seam case.
-                    assert bm_iter != crn
-                    if bm_iter == crn:
-                        return left, right, False
-
-            bm_iter = bm_iter_prev.link_loop_radial_prev  # Wheel CCW.
-            left.append(AdvCorner3D(bm_iter, umesh, is_pair=True))
-            if bm_iter == crn:
-                return left, right, True
-
-    else:
-        crn = adv_crn.crn
-        bm_iter = crn
-        while True:
-            bm_iter_prev = bm_iter.link_loop_prev
-            if is_boundary_(bm_iter_prev):  # Skip boundary.
-                left.append(AdvCorner3D(bm_iter, umesh, is_pair=False, invert=True))  # Store inverted boundary.
-
-                # Right. CW.
-                bm_iter = crn
-                while True:
-                    if is_boundary_(bm_iter):  # clamp by seam
-                        if bm_iter != crn:  # Clamp on first iter case.
-                            right.append(AdvCorner3D(bm_iter, umesh, is_pair=False))
-                        return left, right, False
-
-                    prev_pair = bm_iter
-                    bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # Get CW corner.
-
-                    # In CW, you also need to check for the initial corner,
-                    # since in CCW, the break could have been caused by a seam case.
-                    if bm_iter == crn:
-                        return left, right, False
-
-                    if prev_pair != crn: # Skip first iteration
-                        right.append(AdvCorner3D(prev_pair, umesh, is_pair=True))
-                    else:
-                        assert not right
-
-            bm_iter = bm_iter_prev.link_loop_radial_prev  # Wheel CCW.
-            if bm_iter == crn:
-                return left, right, True
-
-            left.append(AdvCorner3D(bm_iter, umesh, is_pair=True))
 
 
 class Segment:
