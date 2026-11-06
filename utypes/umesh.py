@@ -706,6 +706,7 @@ class UMeshes:
             self.umeshes: list[UMesh] = umeshes
         self.report_obj = report
         self.sync: bool = utils.sync()
+        # TODO: Remove `Island Mode` and replace with `Face`, for avoid confusions.
         self._elem_mode: typing.Literal["VERT", "EDGE", "FACE", "ISLAND"] = self._elem_mode_init()
         self.is_edit_mode = bpy.context.mode == "EDIT_MESH"
 

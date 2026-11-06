@@ -512,8 +512,10 @@ class Segment:
         self._weight_angle: float | utils.NoInit = utils.NoInit()
         self.value: float | utils.NoInit = utils.NoInit()
 
+        self.has_intervals = False
         self.is_start_lock: bool = False
         self.is_end_lock: bool = False
+
         self.is_shared = False
         self.is_flipped_3d = False
 
@@ -531,9 +533,14 @@ class Segment:
         if included:
             yield self.end_orig_crn
 
-    def mark_seam(self):
-        for adv_crn in self:
-            adv_crn.orig_crn.edge.seam = True
+    def mark_seam(self, rewrite_pair_status):
+        if rewrite_pair_status:
+            for adv_crn in self:
+                adv_crn.is_pair = False
+                adv_crn.orig_crn.edge.seam = True
+        else:
+            for adv_crn in self:
+                adv_crn.orig_crn.edge.seam = True
 
     def calc_chain_linked_corners(self):
         get_linked_inc = utils.get_linked_crn_fn(self.umesh, included=True)
@@ -696,12 +703,11 @@ class Segment:
     def is_circular(self):
         return self.start_vert == self.end_vert and self.start_co == self.end_co
 
-    @property
-    def is_horizontal_by_bbox(self):
+    def is_horizontal_by_bbox(self, aspect_y):
         from . import BBox
         bb = BBox.calc_bbox(adv.curr_pt for adv in self)
         bb.update([self.start_co, self.end_co])
-        return bool(bb.width > bb.height)
+        return bool(bb.width > bb.height*aspect_y)
 
     @staticmethod
     def fix_zero_vec(seg):
@@ -805,7 +811,6 @@ class Segment:
             for trans_crn in self:
                 trans_crn.edge.seam = False
 
-
         ref_end_orig_crn = ref.end_orig_crn
         self_end_orig_crn = self.end_orig_crn
         assert ref_end_orig_crn.vert == self_end_orig_crn.vert
@@ -814,7 +819,6 @@ class Segment:
 
         for trans_crn_linked in get_linked_inc(self_end_orig_crn):
             trans_crn_linked[uv].uv = ref_co
-
 
     def deepcopy(self):
         return Segment([adv_crn.copy() for adv_crn in self.seg], self.umesh)
@@ -875,6 +879,34 @@ class Segment:
         if self.is_start_lock or self.is_end_lock:
             txt += f" Start Lock: {self.is_start_lock}. End Lock: {self.is_end_lock}"
         return txt
+
+    def split_left_and_right(self):
+        assert not self.is_start_lock
+        assert not self.is_end_lock
+        has_intervals_left = False
+        has_intervals_right = False
+        left = []
+        right = []
+        umesh = self.umesh
+        for adv_crn in self:
+            if adv_crn.is_pair:
+                assert not adv_crn.invert
+                left.append(AdvCorner(adv_crn.crn, umesh, is_pair=False))
+                right.append(AdvCorner(adv_crn.crn.link_loop_radial_prev.link_loop_next, umesh, is_pair=False, invert=True))
+            else:
+                if adv_crn.invert:
+                    right.append(adv_crn.copy())
+                    has_intervals_left = True
+                else:
+                    left.append(adv_crn.copy())
+                    has_intervals_right = True
+
+        left_seg = Segment(left, umesh)
+        right_seg = Segment(right, umesh)
+        left_seg.has_intervals = has_intervals_left
+        right_seg.has_intervals = has_intervals_right
+
+        return left_seg, right_seg
 
 
 class Segments:

@@ -265,6 +265,33 @@ def groups_by_mask(lst, mask):
         yield new_group
 
 
+def strip_by(seq, *, key):
+    """
+    x = []
+    mask = []  # -> []
+
+    x = [1]
+    mask = [0]  # -> [-]
+    mask = [1]  # -> [1]
+
+    x =    [0,1,3,4]
+    mask = [1,0,0,1]  # -> [0,1,3,4]
+    mask = [1,0,0,0]  # -> [0,1,-,-]
+    mask = [0,0,1,0]  # -> [-,-,3,-]
+    mask = [0,0,0,0]  # -> [-,-,-,-]
+    """
+    for start, v in enumerate(seq):
+        if key(v):
+            end = -1
+            for end in range(len(seq) - 1, start - 1, -1):
+                if key(seq[end]):
+                    end += 1
+                    break
+            return seq[start:end]
+    else:
+        return []
+
+
 def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
     return list(zip(*[iter(lst)] * 2))  # noqa
 
