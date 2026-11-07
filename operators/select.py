@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Oxicid
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-
 import bpy
 import math
+import typing  # noqa
 
 from math import sqrt, isclose
 from bl_math import lerp
@@ -13,9 +13,12 @@ from bpy.types import Operator
 from bmesh.types import BMLoop, BMFace, BMEdge
 
 from .. import utils
+from ..preferences import prefs
+
 from .. import utypes
-from ..preferences import prefs, univ_settings
-from ..utypes import Islands, AdvIsland, BBox, UMeshes, MeshIslands, UnionIslands, AdvCorner3D, AdvCorner
+from ..utypes import UMeshes
+from ..utypes import AdvCorner3D, AdvCorner, AdvEdge3D
+from ..utypes import Islands, AdvIsland, MeshIslands, UnionIslands
 
 from ..utils import face_centroid_uv
 
@@ -27,7 +30,7 @@ class UNIV_OT_SelectLinked(Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     # noinspection PyTypeHints
-    deselect: bpy.props.BoolProperty(name="Deselect", default=False)
+    deselect: BoolProperty(name="Deselect", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -125,7 +128,7 @@ class UNIV_OT_Select_By_Cursor(Operator):
             return {"CANCELLED"}
 
         tile_co = utils.get_tile_from_cursor()
-        view_rect = BBox.init_from_minmax(tile_co, tile_co + Vector((1, 1)))
+        view_rect = utypes.BBox.init_from_minmax(tile_co, tile_co + Vector((1, 1)))
 
         if utils.is_pro_version_support():
             if prefs().use_trims:
@@ -1763,6 +1766,38 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
         if hasattr(self, "use_aspect"):
             layout.prop(self, "use_aspect")
 
+    def get_start_growable_edges(self, selected_edges: typing.Iterable[BMEdge]) -> list[AdvEdge3D]:
+        stack = []
+        for e in selected_edges:
+            for v in e.verts:
+                adv_crn = AdvEdge3D(e, v)
+                if e.is_wire:
+                    linked = adv_crn.get_linked_wire()
+                elif not self.boundary_by_boundary:
+                    linked = adv_crn.get_linked_non_wire()
+                elif e.is_boundary or sum(not f.hide for f in e.link_faces) == 1:
+                    linked = adv_crn.get_linked_bound_by_bound()
+                else:  # contiguous
+                    linked = adv_crn.get_linked_contiguous()
+
+                if linked and all(not l_e.select for l_e in linked):
+                    stack.append(adv_crn)
+        return stack
+
+    def get_grow_by_angle_edge_3d(self, eg: AdvEdge3D, linked: list[AdvEdge3D], max_angle: float):
+        min_eg = None
+        min_angle = max_angle
+        for next_edge in linked:
+            angle = eg.angle(next_edge, max_angle)
+            if angle <= max_angle:
+                if self.prioritize_sharps and not next_edge.smooth:
+                    angle *= 0.65
+                if angle < min_angle:
+                    min_eg = next_edge
+                    min_angle = angle
+        return min_eg
+
+
 
 class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
     bl_idname = "uv.univ_select_edge_grow"
@@ -2111,7 +2146,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         layout.row(align=True).prop(self, "compare_type", expand=True)
 
     def invoke(self, context, event):
-        self.target_texel = univ_settings().texel_density
+        self.target_texel = prefs().texel_density
 
         if event.value == "PRESS":
             return self.execute(context)
@@ -2130,7 +2165,7 @@ class UNIV_OT_SelectTexelDensity_VIEW3D(Operator):
         return context.mode == "EDIT_MESH"
 
     def execute(self, context):
-        texture_size = (int(univ_settings().size_x) + int(univ_settings().size_y)) / 2
+        texture_size = (int(prefs().size_x) + int(prefs().size_y)) / 2
         umeshes = UMeshes()
         umeshes.update_tag = False
         need_sync_validation_check = False
@@ -2473,9 +2508,7 @@ class UNIV_OT_Stacked(Operator):
         ),
     )
 
-    threshold: bpy.props.FloatProperty(
-        name="Distance", default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999
-    )
+    threshold: FloatProperty(name="Distance", default=0.001, min=0.0, soft_min=0.00005, soft_max=0.00999)
 
     def draw(self, context):
         layout = self.layout

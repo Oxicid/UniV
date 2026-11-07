@@ -472,36 +472,37 @@ class AdvEdge3D:
 
     def get_linked_wire(self):
         v = self.head_v
+        e_ = self.e
         return [AdvEdge3D(e, e.other_vert(v)) for e in v.link_edges
-                if not e.hide and e.is_wire and e != self.e]
+                if not e.hide and e.is_wire and e != e_]
 
     def get_linked_non_wire(self):
         v = self.head_v
+        e_ = self.e
         return [AdvEdge3D(e, e.other_vert(v)) for e in v.link_edges
-                if e != self.e and not e.hide and not e.is_wire]
+                if e != e_ and not e.hide and not e.is_wire]
 
     def get_linked_contiguous(self):
         v = self.head_v
+        e_ = self.e
         return [
             AdvEdge3D(e, e.other_vert(v))
             for e in v.link_edges
-            if e != self.e
+            if e != e_
             and not e.hide
             and e.is_contiguous
             and all(not f.hide for f in self.e.link_faces)
         ]
 
     def get_linked_bound_by_bound(self):
-        edges = []
-        for e in self.head_v.link_edges:
-            if e != self.e:
-                if not e.hide:
-                    if e.is_boundary:
-                        edges.append(AdvEdge3D(e, e.other_vert(self.head_v)))
-                    elif sum(not f.hide for f in e.link_faces) == 1:
-                        edges.append(AdvEdge3D(e, e.other_vert(self.head_v)))
-        return edges
+        v = self.head_v
+        e_ = self.e
+        # assert (e_.is_boundary or sum(not f.hide for f in e_.link_faces) == 1)
 
+        return [AdvEdge3D(e, e.other_vert(v)) for e in self.head_v.link_edges
+                if e != e_
+                and not e.hide
+                and (e.is_boundary or sum(not f.hide for f in e.link_faces) == 1)]
 
     def linked_edges(self):
         if self.is_wire:
