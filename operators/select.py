@@ -10,7 +10,7 @@ from bl_math import lerp
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
-from bmesh.types import BMLoop, BMFace
+from bmesh.types import BMLoop, BMFace, BMEdge
 
 from .. import utils
 from .. import utypes
@@ -1949,8 +1949,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
             is_boundary_3d_with_seam = utils.is_boundary_3d_func(umesh, with_seam=True)
             is_boundary_3d_no_seam = utils.is_boundary_3d_func(umesh, with_seam=False)
 
+            wire_edges: list[BMEdge] = []
             corners: list[AdvCorner3D] = []
-            for crn in self.get_unique_selected_corners_without_selected_faces_3d_iter(umesh):
+            for crn in self.get_unique_selected_corners_without_selected_faces_and_get_wire_3d_iter(umesh, wire_edges):
                 no_check_seams = True if self.ignore_seams else crn.edge.seam
 
                 if no_check_seams:
@@ -1988,10 +1989,13 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                 umesh.update_tag = True
 
     @staticmethod
-    def get_unique_selected_corners_without_selected_faces_3d_iter(umesh):
+    def get_unique_selected_corners_without_selected_faces_and_get_wire_3d_iter(umesh, wire_edges: list[BMEdge]):
         for e in utils.calc_selected_3d_edges(umesh):
-            linked = getattr(e, "link_loops", ())
+            if e.is_wire:
+                wire_edges.append(e)
+                continue
 
+            linked = e.link_loops
             if any(crn.face.select for crn in linked):
                 continue
 

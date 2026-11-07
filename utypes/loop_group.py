@@ -3,6 +3,7 @@
 
 
 import typing
+import bmesh
 import numpy as np
 
 from mathutils import Vector
@@ -385,7 +386,6 @@ class _AdvCorner_Base:
         return self.crn == other.crn and self.invert == other.invert
 
 
-
 class AdvCorner(_AdvCorner_Base):
     @property
     def curr_pt(self):  # TODO: Replace with curr_uv_pt
@@ -409,7 +409,6 @@ class AdvCorner(_AdvCorner_Base):
     #             self.crn = self.crn.link_loop_radial_prev
     #             return True
     #     return False
-
 
 
 class AdvCorner3D(_AdvCorner_Base):
@@ -439,6 +438,107 @@ class AdvCorner3D(_AdvCorner_Base):
         return self.__str__()
 
 
+class AdvEdge3D:
+    def __init__(self, e, head_v):
+        self.e: bmesh.types.BMEdge = e
+        self.head_v: bmesh.types.BMVert = head_v
+        self._vec: Vector | None = None
+
+    @property
+    def vec(self):
+        if not self._vec:
+            tail_v = self.e.other_vert(self.head_v)
+            self._vec = self.head_v.co - tail_v.co
+        return self._vec
+
+    @vec.setter
+    def vec(self, v):
+        self._vec = v
+
+    @property
+    def seam(self):
+        return self.e.seam
+
+    @property
+    def select(self):
+        return self.e.select
+
+    @property
+    def smooth(self):
+        return self.e.smooth
+
+    def angle(self, other: "typing.Self", max_angle: float):
+        return self.vec.angle(other.vec, max_angle)  # noqa
+
+    def get_linked_wire(self):
+        v = self.head_v
+        return [AdvEdge3D(e, e.other_vert(v)) for e in v.link_edges
+                if not e.hide and e.is_wire and e != self.e]
+
+    def get_linked_non_wire(self):
+        v = self.head_v
+        return [AdvEdge3D(e, e.other_vert(v)) for e in v.link_edges
+                if e != self.e and not e.hide and not e.is_wire]
+
+    def get_linked_contiguous(self):
+        v = self.head_v
+        return [
+            AdvEdge3D(e, e.other_vert(v))
+            for e in v.link_edges
+            if e != self.e
+            and not e.hide
+            and e.is_contiguous
+            and all(not f.hide for f in self.e.link_faces)
+        ]
+
+    def get_linked_bound_by_bound(self):
+        edges = []
+        for e in self.head_v.link_edges:
+            if e != self.e:
+                if not e.hide:
+                    if e.is_boundary:
+                        edges.append(AdvEdge3D(e, e.other_vert(self.head_v)))
+                    elif sum(not f.hide for f in e.link_faces) == 1:
+                        edges.append(AdvEdge3D(e, e.other_vert(self.head_v)))
+        return edges
+
+
+    def linked_edges(self):
+        if self.is_wire:
+            return self.get_linked_wire()
+        if self.is_contiguous:
+            return self.get_linked_contiguous()
+        return self.get_linked_bound_by_bound()
+
+    @property
+    def is_wire(self):
+        return self.e.is_wire
+
+    @property
+    def is_boundary(self):
+        return self.e.is_boundary or sum(not f.hide for f in self.e.link_faces) == 1
+
+    @property
+    def is_contiguous(self):
+        if self.e.is_contiguous:
+            return all(not f.hide for f in self.e.link_faces)
+        return False
+
+    def toggled(self):
+        """Create new advanced edge with other direction."""
+        new_adv_edge = AdvEdge3D(self.e, self.e.other_vert(self.head_v))
+
+        if self._vec:
+            new_vec = self._vec.copy()
+            new_vec.negate()
+            new_adv_edge._vec = new_vec
+        return new_adv_edge
+
+    def __hash__(self):
+        return hash(self.e)
+
+    def __eq__(self, other):
+        return self.e == other.e and self.head_v == other.head_v
 
 
 class Segment:
