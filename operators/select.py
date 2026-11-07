@@ -2006,7 +2006,19 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                             break
                     crn.toggle_dir()
 
-            if corners:
+            # Edge grow by wire edge.
+            edges_3d: list[AdvEdge3D] = []
+            for eg in self.get_start_growable_edges(wire_edges):
+                linked = eg.get_linked_wire()
+                min_angle_edge = self.get_grow_by_angle_edge_3d(eg, linked, self.max_angle)
+                if min_angle_edge:
+                    if grow:
+                        edges_3d.append(min_angle_edge)
+                    else:
+                        edges_3d.append(eg)
+
+            # Select or deselect.
+            if corners or edges_3d:
                 if grow:
                     for grew_crn in corners:
                         grew_crn.edge.select = True
@@ -2014,12 +2026,34 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                     # TODO: Improve behavior, if uv space exist - no invalidate.
                     if corners:
                         umesh.sync_valid = False
-                else:
-                    umesh.sync_valid = False
-                    edge_deselect = utils.edge_deselect_safe_3d_func(umesh)
 
-                    for adv_crn in corners:
-                        edge_deselect(adv_crn.orig_crn)
+                    for adv_edge_3d in edges_3d:
+                        adv_edge_3d.e.select = True
+
+                else:
+                    if edges_3d:
+                        if umesh.elem_mode == "EDGE":
+                            for adv_edge_3d in edges_3d:
+                                adv_edge_3d.e.select = False
+                        else:
+                            for adv_edge_3d in edges_3d:
+                                v = adv_edge_3d.head_v
+                                assert v.is_wire
+                                v.select = False
+
+                                v = adv_edge_3d.e.other_vert(v)
+                                # if v.is_wire:
+                                v.select = False
+                                # TODO: Implement batch_wire_edge_deselect_safe_3d
+                                #  (and use e.select_set for avoid deselecting vertex with linked selection elem)
+                                adv_edge_3d.e.select = False
+
+                    if corners:
+                        umesh.sync_valid = False
+                        edge_deselect = utils.edge_deselect_safe_3d_func(umesh)
+
+                        for adv_crn in corners:
+                            edge_deselect(adv_crn.orig_crn)
                     umesh.bm.select_history.validate()
                 umesh.update_tag = True
 
