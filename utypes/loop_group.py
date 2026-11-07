@@ -491,7 +491,7 @@ class AdvEdge3D:
             if e != e_
             and not e.hide
             and e.is_contiguous
-            and all(not f.hide for f in self.e.link_faces)
+            and all(not f.hide for f in e.link_faces)
         ]
 
     def get_linked_bound_by_bound(self):
