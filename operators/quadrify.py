@@ -68,6 +68,8 @@ class UNIV_OT_Quadrify(utypes.RayCastAndPick):
             return {"CANCELLED"}
 
         umeshes = utypes.UMeshes(report=self.report)
+        if self.use_aspect:
+            umeshes.calc_aspect_ratio(from_mesh=False)
 
         selected_umeshes, unselected_umeshes = umeshes.filtered_by_selected_and_visible_uv_faces()
         if selected_umeshes:
@@ -90,7 +92,6 @@ class UNIV_OT_Quadrify(utypes.RayCastAndPick):
                 uv = umesh.uv
 
                 umesh.value = umesh.check_uniform_scale(report=self.report)
-                umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
                 edge_lengths = []
                 for d_island in dirt_islands:
@@ -219,7 +220,6 @@ class UNIV_OT_Quadrify(utypes.RayCastAndPick):
         umesh = hit.island.umesh
         uv = umesh.uv
         umesh.value = umesh.check_uniform_scale(report=self.report)
-        umesh.aspect = utils.get_aspect_ratio(umesh) if self.use_aspect else 1.0
 
         for isl in quad_islands:
             utils.set_global_texel(isl)
