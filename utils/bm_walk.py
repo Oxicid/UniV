@@ -234,35 +234,6 @@ def linked_crn_uv_by_face_tag_unordered_included(crn, uv) -> list[BMLoop]:
     return [l_crn for l_crn in crn.vert.link_loops if l_crn.face.tag and l_crn[uv].uv == first_co]
 
 
-def linked_crn_to_vert_by_idx_3d(crn: BMLoop):
-    """Linked to arg corner by island index with arg corner"""
-    first_vert = crn.vert
-    idx = crn.face.index
-    linked = []
-    bm_iter = crn
-
-    while True:
-        bm_iter = bm_iter.link_loop_prev.link_loop_radial_prev  # get ccw corner
-        if first_vert != bm_iter.vert:  # Skip boundary or flipped
-            bm_iter = crn
-            linked_cw = []
-            while True:
-                bm_iter = bm_iter.link_loop_radial_next.link_loop_next  # get cw corner
-                if first_vert != bm_iter.vert:  # Skip boundary or flipped
-                    break
-
-                if bm_iter == crn:
-                    break
-                if bm_iter.face.index == idx:
-                    linked_cw.append(bm_iter)
-            linked.extend(linked_cw[::-1])
-            break
-        if bm_iter == crn:
-            break
-        if bm_iter.face.index == idx:
-            linked.append(bm_iter)
-    return linked
-
 
 def get_linked_crn_3d_iter_fn(*, included=False, with_seam=True, invisible_check=True) -> typing.Callable[[BMLoop], "typing.Generator[BMLoop]"]:  # fmt: skip
     # NOTE: It may return nothing for vertices that have only two edges (vertex with single linked face).  # TODO: Check this (for 3D edge unwrap, this was not the desired behavior.)  # fmt: skip

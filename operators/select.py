@@ -10,7 +10,7 @@ from bl_math import lerp
 from mathutils import Vector
 from bpy.props import *
 from bpy.types import Operator
-from bmesh.types import BMLoop, BMFace, BMEdge
+from bmesh.types import BMLoop, BMVert, BMEdge, BMFace
 
 from .. import utils
 from ..preferences import prefs
@@ -1404,7 +1404,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
         else:
             return self.shrink(umeshes)
 
-    def grow_select(self, umeshes):
+    def grow_select(self, umeshes: UMeshes):
         has_updates = False
         linked_crn_to_vert_3d_it = utils.get_linked_crn_3d_iter_fn(with_seam=self.clamp_on_seam)
         if umeshes.elem_mode == "VERT":
@@ -1575,7 +1575,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
             self.report({"INFO"}, "Not found faces for grow select")
         return {"FINISHED"}
 
-    def shrink(self, umeshes):
+    def shrink(self, umeshes: UMeshes):
         has_updates = False
 
         linked_crn_to_vert_it = utils.get_linked_crn_3d_iter_fn(with_seam=self.clamp_on_seam)
@@ -1586,7 +1586,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                 if umesh.is_full_vert_selected:
                     continue
 
-                to_deselect = set()
+                to_deselect: set[BMVert] = set()
                 for v in umesh.bm.verts:
                     if not v.select:
                         continue
@@ -1632,7 +1632,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                 if umesh.is_full_edge_selected:
                     continue
 
-                to_deselect = set()
+                to_deselect: set[BMEdge] = set()
                 for e in umesh.bm.edges:
                     if not e.select:
                         continue
@@ -1690,7 +1690,7 @@ class UNIV_OT_Select_Grow_VIEW3D(UNIV_OT_Select_Grow_Base):
                 if umesh.is_full_face_selected:
                     continue
 
-                to_deselect = set()
+                to_deselect: set[BMFace] = set()
                 for f in utils.calc_selected_uv_faces(umesh):
                     for crn in f.loops:
                         if all(ff.select for ff in crn.vert.link_faces):  # x2.5 performance
@@ -1877,7 +1877,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             umeshes.update(info="Not found edges for shrink select")
         return {"FINISHED"}
 
-    def edge_grow_or_shrink(self, umeshes: utypes.UMeshes, grow: bool):
+    def edge_grow_or_shrink(self, umeshes: UMeshes, grow: bool):
         umeshes.update_tag = False
         max_angle = math.nextafter(self.max_angle, float("inf"))
         for umesh in umeshes:
@@ -2026,7 +2026,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
             umeshes.update(info="Not found edges for shrink select")
         return {"FINISHED"}
 
-    def edge_grow_or_shrink(self, umeshes: utypes.UMeshes, grow: bool):
+    def edge_grow_or_shrink(self, umeshes: UMeshes, grow: bool):
 
         umeshes.set_sync(True)
         umeshes.sync_invalidate()

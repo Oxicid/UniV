@@ -528,12 +528,6 @@ class AdvEdge3D:
                 and not e.hide
                 and (e.is_boundary or sum(not f.hide for f in e.link_faces) == 1)]
 
-    def linked_edges(self):
-        if self.is_wire:
-            return self.get_linked_wire()
-        if self.is_contiguous:
-            return self.get_linked_contiguous()
-        return self.get_linked_bound_by_bound()
 
     @property
     def is_wire(self):
@@ -548,16 +542,6 @@ class AdvEdge3D:
         if self.e.is_contiguous:
             return all(not f.hide for f in self.e.link_faces)
         return False
-
-    def toggled(self):
-        """Create new advanced edge with other direction."""
-        new_adv_edge = AdvEdge3D(self.e, self.e.other_vert(self.head_v))
-
-        if self._vec:
-            new_vec = self._vec.copy()
-            new_vec.negate()
-            new_adv_edge._vec = new_vec
-        return new_adv_edge
 
     def __hash__(self):
         return hash(self.e)

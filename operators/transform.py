@@ -173,7 +173,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
             umeshes.free()
             utils.update_area_by_type("VIEW_3D")
 
-    def crop_default(self, umeshes, inplace, offset=Vector((0, 0))):
+    def crop_default(self, umeshes: UMeshes, inplace, offset=Vector((0, 0))):
         islands_of_mesh = []
 
         general_bbox = BBox()
@@ -190,7 +190,7 @@ class UNIV_OT_Fit(Operator, utils.PaddingHelper):
 
         self.crop_ex(general_bbox, tar_box, islands_of_mesh)
 
-    def crop_individual(self, umeshes, inplace, offset=Vector((0, 0))):
+    def crop_individual(self, umeshes: UMeshes, inplace, offset=Vector((0, 0))):
         for umesh in umeshes:
             for island in self.calc_island_method(umesh, with_seams=not self.ignore_seams):
                 cur_bbox = island.calc_bbox()
@@ -1210,7 +1210,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                 utils.update_area_by_type("VIEW_3D")
         return {"FINISHED"}
 
-    def align_by_trim_ex(self, umeshes, selected=True):
+    def align_by_trim_ex(self, umeshes: UMeshes, selected=True):
         tar_bb = utils.get_active_trim().to_bbox()
 
         for umesh in umeshes:
@@ -1236,7 +1236,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
                         {"WARNING"}, "No islands were found that intersected to the active trim."
                     )
 
-    def move_to_cursor_ex(self, umeshes, cursor_loc, selected=True):
+    def move_to_cursor_ex(self, umeshes: UMeshes, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         general_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         view_box_sync_block = utils.ViewBoxSyncBlock.from_area(bpy.context.area)
@@ -1289,7 +1289,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
 
         view_box_sync_block.draw_if_blocked()
 
-    def move_to_cursor_union_ex(self, umeshes, cursor_loc, selected=True):
+    def move_to_cursor_union_ex(self, umeshes: UMeshes, cursor_loc, selected=True):
         all_groups = []  # islands, bboxes, uv or corners, uv
         target_bbox = BBox.init_from_minmax(cursor_loc, cursor_loc)
         general_bbox = BBox()
@@ -3943,7 +3943,7 @@ class UNIV_OT_Gravity_VIEW2D(Operator):
 
         return {"FINISHED"}
 
-    def world_orient(self, umeshes: UMeshes, extended):
+    def world_orient(self, umeshes: UMeshes, extended: bool):
         self.skip_count = 0
         self.skip_zero = 0
         self.count_flipped = 0
