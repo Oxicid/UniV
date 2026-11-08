@@ -1766,7 +1766,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
         if hasattr(self, "use_aspect"):
             layout.prop(self, "use_aspect")
 
-    def get_start_growable_edges(self, selected_edges: typing.Iterable[BMEdge]) -> list[AdvEdge3D]:
+    def get_start_growable_edges_3d(self, selected_edges: typing.Iterable[BMEdge]) -> list[AdvEdge3D]:
         stack = []
         for e in selected_edges:
             for v in e.verts:
@@ -1784,7 +1784,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                     stack.append(adv_crn)
         return stack
 
-    def get_grow_by_angle_edge_3d(self, eg: AdvEdge3D, linked: list[AdvEdge3D], max_angle: float):
+    def get_grow_by_angle_edge(self, eg: AdvEdge3D, linked: list[AdvEdge3D], max_angle: float):
         min_eg = None
         min_angle = max_angle
         for next_edge in linked:
@@ -1796,6 +1796,58 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                     min_eg = next_edge
                     min_angle = angle
         return min_eg
+
+    def get_grow_by_angle_crn(self, eg: AdvCorner, linked: list[AdvCorner], max_angle: float):
+        min_crn = None
+        min_angle = max_angle
+
+        for next_edge in linked:
+            angle = eg.angle(next_edge, max_angle)
+            if angle < max_angle:
+                if self.prioritize_sharps and not next_edge.smooth:  # TODO: Remove `.edge.smooth` in other places
+                    angle *= 0.65
+                if angle < min_angle:
+                    if self.boundary_by_boundary:
+                        if next_edge.is_pair is eg.is_pair:
+                            min_crn = next_edge
+                            min_angle = angle
+                    else:
+                        min_crn = next_edge
+                        min_angle = angle
+        return min_crn
+
+    @staticmethod
+    def get_unique_selected_uv_corners_without_selected_faces_iter(umesh):
+        visited: set[BMLoop] = set()
+        get_face_select = utils.face_select_get_func(umesh)
+        is_boundary_without_seam_check = utils.is_boundary_func(umesh, with_seam=False)
+
+        for crn in utils.calc_selected_uv_edge_iter(umesh):
+            if crn in visited:
+                continue
+
+            if is_boundary_without_seam_check(crn):
+                if get_face_select(crn.face):
+                    visited.update(crn.face.loops)
+                    continue
+                visited.add(crn)
+                yield AdvCorner(crn, umesh, is_pair=False)
+                yield AdvCorner(crn.link_loop_next, umesh, is_pair=False, invert=True)
+            else:
+                pair_crn = crn.link_loop_radial_prev
+                if get_face_select(crn.face):
+                    visited.add(pair_crn)
+                    visited.update(crn.face.loops)
+                    continue
+
+                if get_face_select(pair_crn.face):
+                    visited.update(pair_crn.face.loops)
+                    continue
+
+                visited.add(crn)
+                visited.add(pair_crn)
+                yield AdvCorner(crn, umesh, is_pair=True)
+                yield AdvCorner(pair_crn, umesh, is_pair=True)
 
 
 
@@ -1827,6 +1879,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
     def edge_grow_or_shrink(self, umeshes: utypes.UMeshes, grow: bool):
         umeshes.update_tag = False
+        max_angle = math.nextafter(self.max_angle, float("inf"))
         for umesh in umeshes:
             if not umesh.has_partial_selected_uv_edges():
                 continue
@@ -1836,8 +1889,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
             is_boundary_no_seam = utils.is_boundary_func(umesh, with_seam=False)
             get_face_select = utils.face_select_get_func(umesh)
 
-
-            corners: list[AdvCorner3D] = []
+            corners: list[AdvCorner] = []
             visited: set[BMLoop] = set()
             for crn in utils.calc_selected_uv_edge_iter(umesh):
                 if crn in visited:
@@ -1858,10 +1910,10 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
                     is_boundary = is_boundary_no_seam
                 else:
                     is_boundary = is_boundary_with_seam
-                crn = utypes.AdvCorner(crn, umesh, not is_boundary(crn))
+                crn = AdvCorner(crn, umesh, not is_boundary(crn))
 
                 for _ in range(2):
-                    grow_prev_crn = self.edge_grow_backward(crn, self.max_angle, no_check_seams, is_boundary_no_seam)  # fmt: skip
+                    grow_prev_crn = self.edge_grow_backward(crn, max_angle, no_check_seams, is_boundary_no_seam)  # fmt: skip
                     if grow_prev_crn:
                         assert not grow_prev_crn.edge.select
                         if grow:
@@ -1886,7 +1938,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
     def edge_grow_backward(self, adv_crn: AdvCorner | AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner | AdvCorner3D | None:
 
-        left, right, is_cycle = adv_crn.linked_crn_iter(is_boundary_no_seam)
+        left, right, is_cycle = adv_crn.get_linked_left_right_and_get_cyclic_status(is_boundary_no_seam)
         linked = left + right[::-1]
 
         assert adv_crn not in left
@@ -1925,7 +1977,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
         # TODO: Add follow by boundary (or rings)
 
         min_crn = None
-        angle = max_angle * 1.0001
+        angle = max_angle
         for crn_ in linked:
             angle_ = adv_crn.angle(crn_, max_angle)
             if self.prioritize_sharps:
@@ -2008,9 +2060,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
             # Edge grow by wire edge.
             edges_3d: list[AdvEdge3D] = []
-            for eg in self.get_start_growable_edges(wire_edges):
+            for eg in self.get_start_growable_edges_3d(wire_edges):
                 linked = eg.get_linked_wire()
-                min_angle_edge = self.get_grow_by_angle_edge_3d(eg, linked, self.max_angle)
+                min_angle_edge = self.get_grow_by_angle_edge(eg, linked, self.max_angle)
                 if min_angle_edge:
                     if grow:
                         edges_3d.append(min_angle_edge)
@@ -2080,7 +2132,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
     def edge_grow_backward(self, adv_crn: AdvCorner3D, max_angle, no_check_seams, is_boundary_no_seam) -> AdvCorner3D | None:
 
-        left, right, is_cycle = adv_crn.linked_crn_iter(is_boundary_no_seam)
+        left, right, is_cycle = adv_crn.get_linked_left_right_and_get_cyclic_status(is_boundary_no_seam)
         linked = left + right[::-1]
 
         assert adv_crn not in left

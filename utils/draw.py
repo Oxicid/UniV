@@ -201,14 +201,7 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
                 self.shader_smooth_color_vert, "POINTS", {"pos": offset_lines[::2], "color": color[::2]}
             )
 
-    def calc_from_segments(
-        self,
-        groups: (  # noqa
-            typing.Sequence[typing.Sequence["CrnEdgeGrow"]]  # noqa
-            | typing.Sequence["utypes.CrnEdgeGrow"]  # noqa
-            | "utypes.CrnEdgeGrow"  # noqa
-        ),
-    ):
+    def calc_from_segments(self, groups: typing.Sequence):
         from gpu_extras.batch import batch_for_shader
 
         if not groups:
@@ -216,10 +209,6 @@ class UNIV_OT_Draw_Test(bpy.types.Operator):
             self.texts = []
             return
 
-        if type(groups).__name__ == "CrnEdgeGrow":
-            groups = [[groups]]
-        elif type(groups[0]).__name__ == "CrnEdgeGrow":
-            groups = [groups]
 
         offset_lines = self.uv_segments_to_lines_with_offset(groups)
         color = color_for_groups(groups)

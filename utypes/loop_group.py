@@ -241,6 +241,19 @@ class _AdvCorner_Base:
         return (self.crn.vert.co - self.crn.link_loop_next.vert.co).length
 
     def angle(self, other: "AdvCorner", max_angle: float):
+        # TODO: Use extrapolate vector
+        # 2D
+        # a = Vector((0.34202, 0.939693))
+        # b = Vector((0.642788, 0.766044))
+        # extrapolate_vector = b @ Matrix.Rotation(a.angle_signed(b), 2)
+
+        # 3D
+        # # Rotate around axis (axis is the normal to the plane A and B)
+        # axis = a.cross(b).normalized()
+        # theta = a.angle(b)
+        #
+        # rotation_matrix = mathutils.Matrix.Rotation(theta, 4, axis)
+        # v_rotated = rotation_matrix @ b
         return self.vec.angle(other.vec, max_angle)  # noqa
 
     @property
@@ -253,6 +266,17 @@ class _AdvCorner_Base:
             return self.crn.link_loop_prev.edge
         else:
             return self.crn.edge
+
+    @property
+    def face(self):
+        return self.crn.face
+
+    @property
+    def smooth(self):
+        if self.invert:
+            return self.crn.link_loop_prev.edge.smooth
+        else:
+            return self.crn.edge.smooth
 
     @property
     def length_uv(self):
@@ -304,7 +328,7 @@ class _AdvCorner_Base:
             adv_crn._vec = None
         return adv_crn
 
-    def linked_crn_iter(self, is_boundary_) -> tuple[list["AdvCorner | AdvCorner3D"], list["AdvCorner | AdvCorner3D"], bool]:
+    def get_linked_left_right_and_get_cyclic_status(self, is_boundary_) -> tuple[list["AdvCorner | AdvCorner3D"], list["AdvCorner | AdvCorner3D"], bool]:
         """NOTE: For clamp by selected edges need `is_boundary_` for get all edges."""
 
         T = type(self)

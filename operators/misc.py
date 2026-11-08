@@ -2169,7 +2169,6 @@ class UNIV_OT_AlignBorderVerts(Operator):
 
             # fmt: off
             uv = umesh.uv
-            sync = umesh.sync
             get_linked_inc = utils.get_linked_crn_fn(umesh, included=True)
             for crn in h:
                 linked_corners_a = [l_crn for l_crn in get_linked_inc(crn)]
