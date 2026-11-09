@@ -165,6 +165,8 @@ class UKeymap:
 
         if univ_pro_exist:
             km.new("uv.univ_select_loop", "WHEELUPMOUSE", alt=True)
+            km.new("uv.univ_select_loop_pick", "LEFTMOUSE", "DOUBLE_CLICK")
+            km.new("uv.univ_select_loop_pick", "LEFTMOUSE", "DOUBLE_CLICK", shift=True)
             km.new("uv.univ_select_similar", "G", shift=True)
 
         # Select Mode.

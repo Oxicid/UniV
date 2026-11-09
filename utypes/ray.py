@@ -536,9 +536,7 @@ class CrnEdgeHit:
             self.min_dist = min_dist
 
             radial_prev = self.crn.link_loop_radial_prev
-            if utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and utils.is_visible_func(
-                umesh.sync
-            )(radial_prev.face):
+            if utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and utils.is_visible_func(umesh.sync)(radial_prev.face):  # fmt: skip
                 if point_inside_face(pt, radial_prev.face, uv):
                     self.crn = radial_prev
             else:
@@ -548,6 +546,56 @@ class CrnEdgeHit:
                     self.min_dist = nextafter(min_dist, -inf)
                 else:
                     self.min_dist = nextafter(min_dist, inf)
+
+            self.umesh = umesh
+            return True
+        return False
+
+    def find_nearest_crn_by_corners_from_pick(self, umesh, corners):
+        # from .. import utils
+        from math import nextafter, inf
+        from ..utils import intersect_point_line_segment
+
+        assert self.point is not None
+        pt = self.point
+        min_dist = self.min_dist
+        min_crn = None
+
+        uv = umesh.uv
+
+        for crn in corners:
+            _, dist = intersect_point_line_segment(pt, crn[uv].uv, crn.link_loop_next[uv].uv)
+            # TODO: Prioritize flipped face
+            if dist < min_dist:
+                # If the point is inside the face, we add it immediately,
+                # otherwise, we do nextafter and check again for nearest.
+                if point_inside_face(pt, crn.face, uv):
+                    min_crn = crn
+                    min_dist = dist
+                    # TODO: Add scal from View2D
+                else:
+                    # Adding dist after nextafter is necessary for the next for_each loop
+                    # to “hook” another edge (thus avoiding float point errors).
+                    dist = nextafter(dist, inf)
+                    if dist < min_dist:
+                        min_crn = crn
+                        min_dist = dist
+
+        if min_crn:
+            self.crn = min_crn
+            self.min_dist = min_dist
+
+            # radial_prev = self.crn.link_loop_radial_prev
+            # if utils.is_pair_with_flip(self.crn, radial_prev, umesh.uv) and utils.is_visible_func(umesh.sync)(radial_prev.face):  # fmt: skip
+            #     if point_inside_face(pt, radial_prev.face, uv):
+            #         self.crn = radial_prev
+            # else:
+            #     # Prioritize boundary edges where the point is inside the face,
+            #     # otherwise lower the priority to find other boundary edges with the point inside the face.
+            #     if point_inside_face(pt, self.crn.face, uv):
+            #         self.min_dist = nextafter(min_dist, -inf)
+            #     else:
+            #         self.min_dist = nextafter(min_dist, inf)
 
             self.umesh = umesh
             return True
@@ -879,7 +927,7 @@ class RayCastAndPick(bpy.types.Operator):
         return None
 
     def store_mouse_pose_on_uv_and_max_distance_if_allowed(self, event):
-        if event.value == "PRESS":
+        if event.value in ("PRESS", "DOUBLE_CLICK"):
             if self.bl_idname.startswith("UV"):
                 if bpy.context.area.ui_type == "UV":
                     from .. import preferences
