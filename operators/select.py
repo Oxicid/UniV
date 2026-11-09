@@ -1730,7 +1730,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
     grow: BoolProperty(name="Select", default=True, description="Grow/Shrink toggle")
     max_angle: FloatProperty(
         name="Angle",
-        default=math.radians(20),
+        default=math.radians(25),
         min=math.radians(1),
         soft_min=math.radians(5),
         max=math.radians(90),
@@ -1784,7 +1784,7 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                     stack.append(adv_crn)
         return stack
 
-    def get_grow_by_angle_edge(self, eg: AdvEdge3D, linked: list[AdvEdge3D], max_angle: float):
+    def get_grow_by_angle_edge(self, eg: AdvEdge3D | AdvCorner3D, linked: list[AdvEdge3D | AdvCorner3D], max_angle: float):
         min_eg = None
         min_angle = max_angle
         for next_edge in linked:
@@ -1848,7 +1848,6 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                 visited.add(pair_crn)
                 yield AdvCorner(crn, umesh, is_pair=True)
                 yield AdvCorner(pair_crn, umesh, is_pair=True)
-
 
 
 class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
@@ -1976,23 +1975,8 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
         # TODO: Add follow by boundary (or rings)
 
-        min_crn = None
-        angle = max_angle
-        for crn_ in linked:
-            angle_ = adv_crn.angle(crn_, max_angle)
-            if self.prioritize_sharps:
-                if not crn_.edge.smooth and angle_ <= max_angle:
-                    angle_ *= 0.65
-
-            if angle_ < angle:
-                if self.boundary_by_boundary:
-                    if adv_crn.is_pair is crn_.is_pair:
-                        angle = angle_
-                        min_crn = crn_
-                else:
-                    angle = angle_
-                    min_crn = crn_
-        return min_crn
+        min_angle_adv_crn = self.get_grow_by_angle_crn(adv_crn, linked, max_angle)
+        return min_angle_adv_crn
 
 
 class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
@@ -2031,6 +2015,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
         umeshes.set_sync(True)
         umeshes.sync_invalidate()
         umeshes.update_tag = False
+        max_angle = math.nextafter(self.max_angle, float("inf"))
 
         for umesh in umeshes:
             is_boundary_3d_with_seam = utils.is_boundary_3d_func(umesh, with_seam=True)
@@ -2047,8 +2032,9 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
                     is_boundary = is_boundary_3d_with_seam
                 crn = utypes.AdvCorner3D(crn, umesh, not is_boundary(crn))
 
+                # Contiguous grow.
                 for _ in range(2):
-                    grow_prev_crn = self.edge_grow_backward(crn, self.max_angle, no_check_seams, is_boundary_3d_no_seam)  # fmt: skip
+                    grow_prev_crn = self.edge_grow_backward(crn, max_angle, no_check_seams, is_boundary_3d_no_seam)  # fmt: skip
                     if grow_prev_crn:
                         assert not grow_prev_crn.edge.select
                         if grow:
@@ -2062,7 +2048,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
             edges_3d: list[AdvEdge3D] = []
             for eg in self.get_start_growable_edges_3d(wire_edges):
                 linked = eg.get_linked_wire()
-                min_angle_edge = self.get_grow_by_angle_edge(eg, linked, self.max_angle)
+                min_angle_edge = self.get_grow_by_angle_edge(eg, linked, max_angle)
                 if min_angle_edge:
                     if grow:
                         edges_3d.append(min_angle_edge)
@@ -2170,22 +2156,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW3D(UNIV_OT_Select_Edge_Grow_Base):
 
         # TODO: Add follow by boundary (or rings)
 
-        min_crn = None
-        angle = max_angle * 1.0001
-        for crn_ in linked:
-            angle_ = adv_crn.angle(crn_, max_angle)
-            if self.prioritize_sharps:
-                if not crn_.edge.smooth and angle_ <= max_angle:
-                    angle_ *= 0.65
-
-            if angle_ < angle:
-                if self.boundary_by_boundary:
-                    if adv_crn.is_pair is crn_.is_pair:
-                        angle = angle_
-                        min_crn = crn_
-                else:
-                    angle = angle_
-                    min_crn = crn_
+        min_crn = self.get_grow_by_angle_edge(adv_crn, linked, max_angle)
         return min_crn
 
 

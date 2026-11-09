@@ -293,6 +293,10 @@ class _AdvCorner_Base:
         return min(angle, pi - angle)
 
     @property
+    def pair_face(self):
+        return self.orig_crn.link_loop_radial_prev.face
+
+    @property
     def orig_crn(self):
         """ Corner with invert correction."""
         return self.crn.link_loop_prev if self.invert else self.crn
