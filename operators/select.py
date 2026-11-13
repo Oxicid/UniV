@@ -1797,17 +1797,18 @@ class UNIV_OT_Select_Edge_Grow_Base(Operator):
                     min_angle = angle
         return min_eg
 
-    def get_grow_by_angle_crn(self, eg: AdvCorner, linked: list[AdvCorner], max_angle: float):
+    @staticmethod
+    def get_grow_by_angle_crn(eg: AdvCorner, linked: list[AdvCorner], max_angle: float, prioritize_sharps: bool, boundary_by_boundary: bool):
         min_crn = None
         min_angle = max_angle
 
         for next_edge in linked:
             angle = eg.angle(next_edge, max_angle)
             if angle < max_angle:
-                if self.prioritize_sharps and not next_edge.smooth:  # TODO: Remove `.edge.smooth` in other places
+                if prioritize_sharps and not next_edge.smooth:  # TODO: Remove `.edge.smooth` in other places
                     angle *= 0.65
                 if angle < min_angle:
-                    if self.boundary_by_boundary:
+                    if boundary_by_boundary:
                         if next_edge.is_pair is eg.is_pair:
                             min_crn = next_edge
                             min_angle = angle
@@ -1975,7 +1976,7 @@ class UNIV_OT_Select_Edge_Grow_VIEW2D(UNIV_OT_Select_Edge_Grow_Base):
 
         # TODO: Add follow by boundary (or rings)
 
-        min_angle_adv_crn = self.get_grow_by_angle_crn(adv_crn, linked, max_angle)
+        min_angle_adv_crn = self.get_grow_by_angle_crn(adv_crn, linked, max_angle, self.prioritize_sharps, self.boundary_by_boundary)
         return min_angle_adv_crn
 
 

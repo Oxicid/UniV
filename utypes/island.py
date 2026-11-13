@@ -1754,7 +1754,7 @@ class IslandsBase(IslandsBaseTagFilterPre, IslandsBaseTagFilterPost):
         return cls(islands, umesh)
 
     @classmethod
-    def calc_extended(cls, umesh: _umesh.UMesh, *, with_seams: bool = True):
+    def calc_extended(cls, umesh: _umesh.UMesh, *, with_seams: bool = True) -> "IslandsBase | Islands":
         if umesh.is_full_face_deselected:
             return cls()
         cls.tag_filter_visible(umesh)

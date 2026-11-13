@@ -2,17 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
-import typing
 
 import bpy
 import math
 import bmesh
+import typing
+import mathutils
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+
 import numpy as np
 from math import inf, isclose
 from bmesh.types import BMFace, BMLoop
-from mathutils import Vector
-from mathutils.kdtree import KDTree
-from mathutils.bvhtree import BVHTree
+
 from itertools import chain
 from bpy_extras import view3d_utils
 
@@ -70,9 +72,9 @@ class KDMesh:
         self.corners_vert: list[BMLoop] = []
         self.corners_center: list[BMLoop] = []
         self.faces: list[BMFace] = []
-        self.kdtree_crn_points: KDTree | None = None
-        self.kdtree_crn_center_points: KDTree | None = None
-        self.kdtree_face_points: KDTree | None = None
+        self.kdtree_crn_points: mathutils.kdtree.KDTree | None = None
+        self.kdtree_crn_center_points: mathutils.kdtree.KDTree | None = None
+        self.kdtree_face_points: mathutils.kdtree.KDTree | None = None
 
         self.min_res = [Vector((inf, inf, inf)), inf, inf]
 
@@ -85,9 +87,9 @@ class KDMesh:
             corners_size = self.umesh.total_corners
         else:
             corners_size = sum(len(f.loops) for f in self.faces)
-        self.kdtree_crn_points = KDTree(corners_size)
-        self.kdtree_crn_center_points = KDTree(corners_size)
-        self.kdtree_face_points = KDTree(len(self.faces))
+        self.kdtree_crn_points = mathutils.kdtree.KDTree(corners_size)
+        self.kdtree_crn_center_points = mathutils.kdtree.KDTree(corners_size)
+        self.kdtree_face_points = mathutils.kdtree.KDTree(len(self.faces))
 
         kd_f_pt_insert = self.kdtree_face_points.insert
         kd_crn_pt_insert = self.kdtree_crn_points.insert
@@ -134,7 +136,7 @@ class KDMesh:
             if full_tagged:
                 faces_append(f)
 
-        self.kdtree_face_points = KDTree(len(self.faces))
+        self.kdtree_face_points = mathutils.kdtree.KDTree(len(self.faces))
         kd_f_pt_insert = self.kdtree_face_points.insert
         for idx, f in enumerate(self.faces):
             sum_crn = Vector((0.0, 0.0))
@@ -143,13 +145,13 @@ class KDMesh:
             kd_f_pt_insert((sum_crn / len(f.loops)).to_3d(), idx)
         self.kdtree_face_points.balance()
 
-        self.kdtree_crn_points = KDTree(len(self.corners_vert))
+        self.kdtree_crn_points = mathutils.kdtree.KDTree(len(self.corners_vert))
         kd_crn_pt_insert = self.kdtree_crn_points.insert
         for idx, crn in enumerate(self.corners_vert):
             kd_crn_pt_insert(crn[uv].uv.to_3d(), idx)
         self.kdtree_crn_points.balance()
 
-        self.kdtree_crn_center_points = KDTree(len(self.corners_center))
+        self.kdtree_crn_center_points = mathutils.kdtree.KDTree(len(self.corners_center))
         kd_crn_center_pt_insert = self.kdtree_crn_center_points.insert
         for idx, crn in enumerate(self.corners_center):
             kd_crn_center_pt_insert(((crn[uv].uv + crn.link_loop_next[uv].uv) / 2).to_3d(), idx)
@@ -167,9 +169,9 @@ class KDMesh:
 
         uv = self.loop_groups.umesh.uv
 
-        self.kdtree_crn_points = KDTree(len(self.corners_center) * 2)
-        self.kdtree_crn_center_points = KDTree(len(self.corners_center))
-        self.kdtree_face_points = KDTree(len(self.faces))
+        self.kdtree_crn_points = mathutils.kdtree.KDTree(len(self.corners_center) * 2)
+        self.kdtree_crn_center_points = mathutils.kdtree.KDTree(len(self.corners_center))
+        self.kdtree_face_points = mathutils.kdtree.KDTree(len(self.faces))
 
         kd_crn_center_pt_insert = self.kdtree_crn_center_points.insert
         kd_crn_pt_insert = self.kdtree_crn_points.insert
@@ -205,7 +207,7 @@ class KDMesh:
         for isl in self.islands:
             self.faces.extend(isl)
 
-        self.kdtree_face_points = KDTree(len(self.faces))
+        self.kdtree_face_points = mathutils.kdtree.KDTree(len(self.faces))
         kd_f_pt_insert = self.kdtree_face_points.insert
 
         uv = self.umesh.uv
@@ -310,7 +312,7 @@ class TrimKDTree:
     def __init__(self):
         from ..operators.quick_snap import eSnapPointMode
 
-        self.kdtree = KDTree(0)
+        self.kdtree = mathutils.kdtree.KDTree(0)
         self.kdtree.balance()
         self.elem_flag: eSnapPointMode = eSnapPointMode.NONE
 
@@ -326,7 +328,7 @@ class TrimKDTree:
             coords.append(bb.center.to_3d())
             coords.extend((bb.left.to_3d(), bb.right.to_3d(), bb.upper.to_3d(), bb.bottom.to_3d()))
 
-        self.kdtree = KDTree(len(coords))
+        self.kdtree = mathutils.kdtree.KDTree(len(coords))
 
         insert = self.kdtree.insert
         for i, co in enumerate(coords):
@@ -942,3 +944,46 @@ class RayCastAndPick(bpy.types.Operator):
                     )
                     return True
         return False
+
+
+class KDTree:  # For 2D.
+    def __init__(self, size):
+        self.kdtree2d = mathutils.kdtree.KDTree(size)
+
+    def find(self, co) -> tuple[Vector, int, float] | tuple[None, None, None]:
+        res = self.kdtree2d.find(co.to_3d())
+        find_co = res[0]
+        if find_co:
+            return find_co.to_2d(), res[1], res[2]
+        return res
+
+    def find_range(self, co: Vector, radius: float) -> list[tuple[Vector, int, float]]:
+        return [(res[0].to_2d(), res[1], res[2]) for res in self.kdtree2d.find_range(co.to_3d(), radius)]
+
+
+    def find_n(self, co: Vector, n: int) -> list[tuple[Vector, int, float]]:
+        return [(res[0].to_2d(), res[1], res[2]) for res in self.kdtree2d.find_n(co.to_3d(), n)]
+
+
+def KDTree_from_coords(coords: typing.Sequence[Vector], dimension: int=3) -> mathutils.kdtree.KDTree:
+
+    if dimension == 3:
+        kdtree = mathutils.kdtree.KDTree(len(coords))
+    elif bpy.app.version >= (5, 3, 0):
+        kdtree = mathutils.kdtree.KDTree(len(coords), dimension=dimension)  # noqa
+    else:
+        assert dimension == 2
+        u_kdtree = KDTree(len(coords))
+        kdtree = u_kdtree.kdtree2d
+
+        kdtree_insert = kdtree.insert
+        for i, co in enumerate(coords):
+            kdtree_insert(co.to_3d(), i)
+        kdtree.balance()
+        return u_kdtree
+
+    kdtree_insert = kdtree.insert
+    for i, co in enumerate(coords):
+        kdtree_insert(co, i)
+    kdtree.balance()
+    return kdtree
