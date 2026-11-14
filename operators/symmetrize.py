@@ -7,7 +7,7 @@ import math
 
 from .. import utils
 from .. import utypes
-from mathutils import Vector, kdtree
+from mathutils import Vector
 
 
 # noinspection PyTypeHints
@@ -73,10 +73,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
             if not isinstance(faces, list):
                 faces = list(faces)
 
-            tree = kdtree.KDTree(len(faces))
-            for idx, f in enumerate(faces):
-                tree.insert(f.calc_center_median(), idx)
-            tree.balance()
+            tree = utils.KDTree_from_coords([f.calc_center_median() for f in faces])
 
             # Islands are sorted by their bounding box to determine which one is the source and which is the destination.
             islands = utypes.Islands.calc_selected(umesh)
@@ -141,10 +138,7 @@ class UNIV_OT_Symmetrize(bpy.types.Operator):
                         if self.axis_uv_flip and dst_f.index == src_f.index:
                             src_f, dst_f = dst_f, src_f
 
-                        f_tree = kdtree.KDTree(size)
-                        for idx_, v in enumerate(dst_f.verts):
-                            f_tree.insert(v.co, idx_)
-                        f_tree.balance()
+                        f_tree = utils.KDTree_from_coords([v.co for v in dst_f.verts])
 
                         round_pivot = isl.value
                         scale_diff = round_pivot - round_pivot * uv_mirror_scale

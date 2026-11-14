@@ -9,7 +9,6 @@ import mathutils
 import typing
 import itertools
 import numpy as np
-import collections
 import contextlib
 from collections import defaultdict
 
@@ -2269,12 +2268,32 @@ class UnionIslands(Islands):
         islands_group = []
         union_islands = []
         single_islands = []
-        if threshold is not None:
-            if threshold == 0:
-                threshold_to_precision = 20
-            else:
-                threshold_to_precision = max(0, int(-math.log10(threshold)))
 
+        # Overlap any parts.
+        if threshold is None:
+            for island_first in adv_islands:
+                if not island_first.tag:
+                    continue
+                island_first.tag = False
+
+                union_islands.append(island_first)
+                compare_index = 0
+                while True:
+                    if compare_index > len(union_islands) - 1:
+                        islands_group.append(UnionIslands(union_islands))
+                        union_islands = []
+                        break
+
+                    for isl in adv_islands:
+                        if not isl.tag:
+                            continue
+                        if union_islands[compare_index].is_overlap(isl):
+                            isl.tag = False
+                            union_islands.append(isl)
+                    compare_index += 1
+
+        # Exact overlap, by threshold.
+        else:
             class ExactOverlap:
                 def __init__(self, island):
                     from mathutils.kdtree import KDTree
@@ -2284,15 +2303,9 @@ class UnionIslands(Islands):
                     self.kdtree: KDTree | None = None
 
                 def calc_data(self):
-                    from mathutils.kdtree import KDTree
-
                     uv = self.island.umesh.uv
-                    self.coords = [crn[uv].uv.to_3d() for f in self.island for crn in f.loops]
-                    k = KDTree(len(self.coords))
-                    for i, co in enumerate(self.coords):
-                        k.insert(co, i)
-                    k.balance()
-                    self.kdtree = k
+                    self.coords = [crn[uv].uv for f in self.island for crn in f.loops]
+                    self.kdtree = utils.KDTree_from_coords(self.coords, dimensions=2)
 
                 def compare(self, other, threshold_):
                     if self.coords is None:
@@ -2312,7 +2325,7 @@ class UnionIslands(Islands):
 
                     return True
 
-            # reduce islands by len
+            # Reduce islands by len.
             islands_by_len: defaultdict[int, list[AdvIsland]] = defaultdict(list)
             for isl in adv_islands:
                 islands_by_len[len(isl)].append(isl)
@@ -2323,75 +2336,8 @@ class UnionIslands(Islands):
                     single_island = islands_by_len_.pop(size)[0]
                     single_islands.append(single_island)
 
-            # reduce islands by bbox
-            islands_by_bbox: defaultdict[tuple[float | int, ...], list[AdvIsland]] = defaultdict(
-                list
-            )
-            for size, list_of_isl in islands_by_len_.items():
-                for isl in list_of_isl:
-                    bbox = isl.bbox
-                    bbox_key: list[float | int] = list(
-                        (
-                            round(minmax, threshold_to_precision)
-                            for minmax in (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax)
-                        )
-                    )
-                    bbox_key.append(size)
-                    islands_by_bbox[tuple(bbox_key)].append(isl)
-
-            islands_by_bbox_ = islands_by_bbox.copy()
-            for size, list_of_isl in islands_by_bbox.items():
-                if len(list_of_isl) == 1:
-                    single_island = islands_by_bbox_.pop(size)[0]
-                    single_islands.append(single_island)
-            islands_by_len_ = islands_by_bbox_
-
-            # reduce by area_uv
-            islands_by_ngons: defaultdict[typing.Any, list[AdvIsland]] = defaultdict(list)
-            if adv_islands[0].area_uv != -1.0:
-                for list_of_isl in islands_by_len_.values():
-                    islands_by_area_uv: defaultdict[float, list[AdvIsland]] = defaultdict(list)
-                    for isl in list_of_isl:
-                        islands_by_area_uv[round(isl.area_uv, threshold_to_precision)].append(isl)
-
-                    islands_by_area_uv_ = islands_by_area_uv.copy()
-                    for area, list_of_isl_by_area in islands_by_area_uv_.items():
-                        if len(list_of_isl_by_area) == 1:
-                            single_island = islands_by_area_uv_.pop(area)[0]
-                            single_islands.append(single_island)
-                        else:
-                            # reduce by ngons
-                            for isl__ in list_of_isl_by_area:
-                                ngons_sizes: collections.Counter = collections.Counter(
-                                    len(f.loops) for f in isl__
-                                )
-                                ngons_sizes: list[tuple[int, int] | float] = sorted(
-                                    ngons_sizes.items(), key=lambda a: a[0]
-                                )
-                                ngons_sizes.sort(key=lambda a: a[0])
-                                ngons_sizes.append(area)
-                                islands_by_ngons[tuple(ngons_sizes)].append(isl__)
-            else:
-                # reduce by ngons
-                for size, list_of_isl_by_size in islands_by_len_.items():
-                    for isl__ in list_of_isl_by_size:
-                        ngons_sizes: collections.Counter = collections.Counter(
-                            len(f.loops) for f in isl__
-                        )
-                        ngons_sizes: list[tuple[int, int] | int] = sorted(
-                            ngons_sizes.items(), key=lambda a: a[0]
-                        )
-                        # PyCharm Moment...
-                        ngons_sizes.append(size)  # noqa
-                        islands_by_ngons[tuple(ngons_sizes)].append(isl__)
-
-            islands_by_ngons_ = islands_by_ngons.copy()
-            for key, list_of_isl in islands_by_ngons.items():
-                if len(list_of_isl) == 1:
-                    single_island = islands_by_ngons_.pop(key)[0]
-                    single_islands.append(single_island)
-
-            for finished_reduced_islands in islands_by_ngons_.values():
+            # Reduce by KDTree.
+            for finished_reduced_islands in islands_by_len_.values():
                 exact_islands: list[ExactOverlap] = []
                 for fin_isl in finished_reduced_islands:
                     exact_isl = ExactOverlap(fin_isl)
@@ -2422,28 +2368,6 @@ class UnionIslands(Islands):
                                 isl.island.tag = False
                                 union_islands.append(isl)
                         compare_index += 1
-
-        else:
-            for island_first in adv_islands:
-                if not island_first.tag:
-                    continue
-                island_first.tag = False
-
-                union_islands.append(island_first)
-                compare_index = 0
-                while True:
-                    if compare_index > len(union_islands) - 1:
-                        islands_group.append(UnionIslands(union_islands))
-                        union_islands = []
-                        break
-
-                    for isl in adv_islands:
-                        if not isl.tag:
-                            continue
-                        if union_islands[compare_index].is_overlap(isl):
-                            isl.tag = False
-                            union_islands.append(isl)
-                    compare_index += 1
         islands_group.extend(single_islands)
         return islands_group
 

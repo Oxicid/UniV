@@ -110,6 +110,7 @@ def is_boundary_with_flip_check_non_sync(crn: BMLoop, uv: BMLayerItem):
 
 def is_boundary_with_flip_check_sync(crn: BMLoop, uv: BMLayerItem):
     # assert(not l.face.hide)
+    # TODO: Add check with is_contiguous instead two check
     pair = crn.link_loop_radial_prev
     if pair == crn:
         return True

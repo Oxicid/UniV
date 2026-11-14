@@ -189,11 +189,10 @@ class QuickSnap_KDMeshes:
         r_kdmesh: KDMesh | None = None
 
         r = self.radius
-        co = self.mouse_position.to_3d()
 
         for kdmesh in self.kdmeshes:
             if self.snap_points_mode & eSnapPointMode.VERTEX:
-                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_points.find(co)
+                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_points.find(self.mouse_position)
                 if find_pt:
                     if find_dist <= r and find_dist < min_dist:
                         min_pt = find_pt
@@ -203,7 +202,7 @@ class QuickSnap_KDMeshes:
                         r_kdmesh = kdmesh
 
             if self.snap_points_mode & eSnapPointMode.EDGE:
-                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_center_points.find(co)
+                find_pt, find_idx, find_dist = kdmesh.kdtree_crn_center_points.find(self.mouse_position)
                 if find_pt:
                     if find_dist <= r and find_dist < min_dist:
                         min_pt = find_pt
@@ -213,7 +212,7 @@ class QuickSnap_KDMeshes:
                         r_kdmesh = kdmesh
 
             if self.snap_points_mode & eSnapPointMode.FACE:
-                find_pt, find_idx, find_dist = kdmesh.kdtree_face_points.find(co)
+                find_pt, find_idx, find_dist = kdmesh.kdtree_face_points.find(self.mouse_position)
                 if find_pt:
                     if find_dist <= r and find_dist < min_dist:
                         min_pt = find_pt
@@ -227,23 +226,21 @@ class QuickSnap_KDMeshes:
     def find_nearest_target_pt(self):
         kd_data = self.find()
 
-        m_pos = self.mouse_position.to_2d()
-
         if GlobalSnapFlags.grid_snap:
             from .. import btypes
 
             zoom = btypes.View2D.get_zoom(self.view)
             divider = 1 / 8 if zoom <= 1600 else 1 / 64
             divider = divider if zoom <= 12800 else 1 / 64 / 8
-            pos = Vector(utils.round_threshold(v, divider) for v in m_pos)
-            dist_to_grid = (pos - m_pos).length
+            pos = Vector(utils.round_threshold(v, divider) for v in self.mouse_position)
+            dist_to_grid = (pos - self.mouse_position).length
 
             if dist_to_grid <= self.radius and dist_to_grid < kd_data.distance:
                 kd_data.found = (pos, 0, dist_to_grid)
                 kd_data.kdmesh = True  # for __bool__
 
         cursor_loc = utils.get_cursor_location()
-        dist_to_cursor = (cursor_loc - m_pos).length
+        dist_to_cursor = (cursor_loc - self.mouse_position).length
         if dist_to_cursor <= self.radius and dist_to_cursor < kd_data.distance:
             kd_data.found = (cursor_loc, 0, dist_to_cursor)
             kd_data.kdmesh = True  # for __bool__
@@ -251,7 +248,7 @@ class QuickSnap_KDMeshes:
         if self.trim_kdtree and prefs().use_trims:
             if self.trim_kdtree.elem_flag != self.snap_points_mode:
                 self.trim_kdtree.calc(self.snap_points_mode)
-            find_pt, find_idx, dist_to_trim = self.trim_kdtree.kdtree.find(m_pos.to_3d())
+            find_pt, find_idx, dist_to_trim = self.trim_kdtree.kdtree.find(self.mouse_position)
             if find_pt:
                 if dist_to_trim <= self.radius and dist_to_trim < kd_data.distance:
                     kd_data.found = (find_pt, 0, dist_to_trim)
@@ -421,7 +418,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             self.area.tag_redraw()
 
         if self.dragged:
-            if self.mouse_position == self.prev_elem_position.to_3d():
+            if self.mouse_position == self.prev_elem_position:
                 if not axis_sliding_event:
                     return {"RUNNING_MODAL"}
 
@@ -436,10 +433,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
 
             if is_snapped:
                 self.nearest_point[0] = kd_data.pt
-                pos = kd_data.pt.to_2d()
+                pos = kd_data.pt.copy()  # TODO: Remove copy?
             else:
                 self.nearest_point[0] = self.mouse_position
-                pos = self.mouse_position.to_2d()
+                pos = self.mouse_position.copy()  # TODO: Remove copy?
 
             # Sliding by axis
             if self.axis == "X":
@@ -496,10 +493,10 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
             else:
                 self.pick_drag_object(kd_data)
 
-            self.move_object.set_position(self.mouse_position.to_2d(), kd_data.pt.to_2d())
-            self.prev_elem_position = self.mouse_position.to_2d()
+            self.move_object.set_position(self.mouse_position, kd_data.pt)
+            self.prev_elem_position = self.mouse_position.copy()  # TODO: Remove copy ?
 
-            self.first_pick_co = kd_data.pt.to_2d()
+            self.first_pick_co = kd_data.pt.copy()  # TODO: Remove copy ?
             self.calc_update_meshes()
             self.umeshes.silent_update()
             self.area.tag_redraw()
@@ -764,7 +761,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         )
         dist = prefs().max_pick_distance // 2 if self.dragged else prefs().max_pick_distance
         self.radius = utils.get_max_distance_from_px(dist, self.view)
-        self.mouse_position = mouse_position.to_3d()
+        self.mouse_position = mouse_position
 
     def register_draw(self):
         self.handler_ui = bpy.types.SpaceImageEditor.draw_handler_add(
@@ -786,7 +783,7 @@ class UNIV_OT_QuickSnap(bpy.types.Operator, SnapMode, QuickSnap_KDMeshes):
         self.shader.uniform_float("color", (1, 1, 0, 0.5))
         self.batch.draw(self.shader)
 
-        self.nearest_point[0] = self.nearest_point[0].to_3d()
+        self.nearest_point[0] = self.nearest_point[0].copy()
         batch_nearest = batch_for_shader(self.shader, "POINTS", {"pos": self.nearest_point})
         self.shader.uniform_float("color", (1, 0.2, 0, 1))
         batch_nearest.draw(self.shader)

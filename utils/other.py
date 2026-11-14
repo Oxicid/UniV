@@ -298,6 +298,20 @@ def strip_by(seq, *, key):
 def reshape_to_pair(lst: list[Vector]) -> list[tuple[Vector, Vector]]:
     return list(zip(*[iter(lst)] * 2))  # noqa
 
+def splitshift(seq, circular=True):
+    it = iter(seq)
+    try:
+        start_elem = curr_elem = next(it)
+        next_elem = next(it)
+    except StopIteration:
+        return
+
+    yield curr_elem, next_elem
+    for next_elem in it:
+        yield curr_elem, next_elem
+
+    if circular:
+        yield next_elem, start_elem
 
 def load_lib(
     lib_name: str,

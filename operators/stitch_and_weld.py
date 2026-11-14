@@ -1167,9 +1167,9 @@ class UNIV_OT_Weld(utypes.RayCastAndPick, Stitch):
             self.report({"WARNING"}, "Edge has 3D flipped face, need recalculate normals")
 
         if utils.is_flipped_3d(ref_crn):
-            ref_isl, isl_set = hit.calc_island_non_manifold_with_flip()
+            ref_isl, isl_set = hit.calc_island_non_manifold_with_flip_3d_correction_and_ignore_seams()
         else:
-            ref_isl, isl_set = hit.calc_island_non_manifold()
+            ref_isl, isl_set = hit.calc_island_non_manifold_ignore_seams()
 
         if shared.face in isl_set:
             if utils.is_flipped_3d(ref_crn):

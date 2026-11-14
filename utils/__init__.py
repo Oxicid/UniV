@@ -679,6 +679,50 @@ class SVG:
         bboxes_with_color_and_mtx.append((bb, color))
 
 
+class KDTree:  # For 2D.
+    def __init__(self, size):
+        self.kdtree2d = mathutils.kdtree.KDTree(size)
+
+    def find(self, co) -> tuple[Vector, int, float] | tuple[None, None, None]:
+        res = self.kdtree2d.find(co.to_3d())
+        find_co = res[0]
+        if find_co:
+            return find_co.to_2d(), res[1], res[2]
+        return res
+
+    def find_range(self, co: Vector, radius: float) -> list[tuple[Vector, int, float]]:
+        return [(res[0].to_2d(), res[1], res[2]) for res in self.kdtree2d.find_range(co.to_3d(), radius)]
+
+
+    def find_n(self, co: Vector, n: int) -> list[tuple[Vector, int, float]]:
+        return [(res[0].to_2d(), res[1], res[2]) for res in self.kdtree2d.find_n(co.to_3d(), n)]
+
+
+
+def KDTree_from_coords(coords: typing.Sequence[Vector], dimensions: int=3) -> mathutils.kdtree.KDTree:
+
+    if dimensions == 3:
+        kdtree = mathutils.kdtree.KDTree(len(coords))
+    elif bpy.app.version >= (5, 3, 0):
+        kdtree = mathutils.kdtree.KDTree(len(coords), dimensions=dimensions)  # noqa
+    else:
+        assert dimensions == 2
+        u_kdtree = KDTree(len(coords))
+        kdtree = u_kdtree.kdtree2d
+
+        kdtree_insert = kdtree.insert
+        for i, co in enumerate(coords):
+            kdtree_insert(co.to_3d(), i)
+        kdtree.balance()
+        return u_kdtree
+
+    kdtree_insert = kdtree.insert
+    for i, co in enumerate(coords):
+        kdtree_insert(co, i)
+    kdtree.balance()
+    return kdtree
+
+
 store_for_avoid_gc: list[list[tuple[str, ...] | None]] = []
 
 

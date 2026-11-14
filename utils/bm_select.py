@@ -1006,7 +1006,7 @@ def batch_select_faces(umesh, faces: typing.Sequence[BMFace], select_linked: boo
         def simple_select_(faces_):
             for f_ in faces_:
                 f_.uv_select = True
-                for crn_ in f.loops:
+                for crn_ in f_.loops:
                     crn_.uv_select_vert = True
                     crn_.uv_select_edge = True
 
