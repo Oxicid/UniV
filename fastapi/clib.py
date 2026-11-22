@@ -19,7 +19,7 @@ class FastAPI:
 
     @classmethod
     def load(cls):
-        cls.lib = utils.load_lib("univ_fastapi", expected_version=EXPECTED_FASTAPI_VERSION)
+        cls.lib = utils.load_lib("univ_fastapi", expected_version=EXPECTED_FASTAPI_VERSION, load_from_tmp=True)
         if cls.lib.version() != EXPECTED_FASTAPI_VERSION:
             cls.failed_version = cls.lib.version()
             cls.close()

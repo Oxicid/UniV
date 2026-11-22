@@ -318,6 +318,7 @@ def load_lib(
     expected_version,
     root_path=None,
     lib_ext: typing.Literal["dll", "so", "dylib"] | None = None,
+    load_from_tmp=True
 ):
     import glob
     import time
@@ -360,23 +361,24 @@ def load_lib(
     start_name = f"{lib_prefix}{lib_name}"
     lib_filename = f"{start_name}.{lib_ext}"
 
-    # Get lib from tempfile first.
-    tmpdir = Path(tempfile.gettempdir())
-    tmp_pattern = str(tmpdir / start_name) + f"_*.{lib_ext}"
+    if load_from_tmp:
+        # Get lib from tempfile first.
+        tmpdir = Path(tempfile.gettempdir())
+        tmp_pattern = str(tmpdir / start_name) + f"_*.{lib_ext}"
 
-    for tmp_candidate in glob.glob(tmp_pattern):
-        try:
-            lib = CDLL(str(tmp_candidate))
-            if not hasattr(lib, "version"):
-                continue
+        for tmp_candidate in glob.glob(tmp_pattern):
+            try:
+                lib = CDLL(str(tmp_candidate))
+                if not hasattr(lib, "version"):
+                    continue
 
-            if lib.version() != expected_version:
-                continue
+                if lib.version() != expected_version:
+                    continue
 
-            # print(f"UniV: Load Lib: Load from temp dir: {tmp_candidate!r}")
-            return lib
-        except:  # noqa
-            pass
+                # print(f"UniV: Load Lib: Load from temp dir: {tmp_candidate!r}")
+                return lib
+            except:  # noqa
+                pass
 
     candidates = list(univ_dir.rglob(lib_filename))
 
@@ -386,22 +388,23 @@ def load_lib(
     for i, upath in enumerate(candidates):
         orig_upath = upath
         try:
-            # Store library to tempfile, to avoid remove/reinstall lock.
-            current_time = time.strftime("%Y%m%d-%H%M%S")
-            if i:
-                current_time += f"_{i}"  # For avoid additional conflicts.
+            if load_from_tmp:
+                # Store library to tempfile, to avoid remove/reinstall lock.
+                current_time = time.strftime("%Y%m%d-%H%M%S")
+                if i:
+                    current_time += f"_{i}"  # For avoid additional conflicts.
 
-            temp_lib_filename = f"{start_name}_{current_time}.{lib_ext}"
-            tmp = tmpdir / temp_lib_filename
-            try:
-                shutil.copy2(upath, tmp)
-                upath = tmp  # Replace with temp file, other else load from addon directory.
-            except:  # noqa
-                print(
-                    f"UniV: Load Lib: Cant copy {lib_name!r} library to temp folder, "
-                    f"for avoid locking when reload/remove addon."
-                )
-                traceback.print_exc()
+                temp_lib_filename = f"{start_name}_{current_time}.{lib_ext}"
+                tmp = tmpdir / temp_lib_filename  # noqa
+                try:
+                    shutil.copy2(upath, tmp)
+                    upath = tmp  # Replace with temp file, other else load from addon directory.
+                except:  # noqa
+                    print(
+                        f"UniV: Load Lib: Cant copy {lib_name!r} library to temp folder, "
+                        f"for avoid locking when reload/remove addon."
+                    )
+                    traceback.print_exc()
 
             # Load Lib.
             lib = CDLL(str(upath))

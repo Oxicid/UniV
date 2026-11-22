@@ -453,7 +453,12 @@ class DrawCallFlipped2D:
     @classmethod
     def init(cls, umesh: UMesh) -> "DrawCallFlipped2D | None":
         if fastapi.FastAPI.lib:
-            tris = fastapi.ExtractData.extract_flipped_2d_data(umesh)  # fmt: skip
+            try:
+                tris = fastapi.ExtractData.extract_flipped_2d_data(umesh)  # fmt: skip
+            except OSError:
+                # TODO: BLI_memarena_new handles mutexes incorrectly on the first call in Blender 5.0 and earlier.
+                #  This needs to be fixed, or a custom arena implementation should be created.
+                tris = cls.extract_data(umesh)
         else:
             tris = cls.extract_data(umesh)
 
