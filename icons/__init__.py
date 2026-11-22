@@ -45,6 +45,7 @@ class icons:
     crop = 0
     cursor = 0
     cut = 0
+    d_align = 0
     distribute = 0
     edge_grow = 0
     fill = 0

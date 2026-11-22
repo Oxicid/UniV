@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "BLI_sys_types.h"
+#include "BLI_sys_types.hh"
 #include "BLI_vector.hh"
 #include "BLI_string_ref.hh"
 

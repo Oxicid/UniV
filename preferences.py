@@ -431,7 +431,9 @@ Some operators, can interact with trims:
     overlay_2d_uv_edge_v_constraints_color: FloatVectorProperty(name="V-Constr", default=(0.1, 0.1, 0.8, 0.35),
         min=0.0, max=1.0, size=4, subtype="COLOR"
     )
-
+    overlay_2d_uv_edge_d_constraints_color: FloatVectorProperty(name="D-Constr", default=(0.0, 0.9, 0.1, 0.45),
+        min=0.0, max=1.0, size=4, subtype="COLOR"
+    )
     overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.0, 0.0, 0.25),
         min=0.0, max=1.0, size=4, subtype="COLOR"
     )

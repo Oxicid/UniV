@@ -7,35 +7,35 @@
 /**##################
    Min solver requirements **/
 #include "eigen_capi.h"
-#include "BLI_math_vector.h"
+#include "BLI_math_vector.hh"
 /* ################## */
 
 
 #include <algorithm>
 #include <stdio.h>
 #include <iostream>
-#include "BLI_compiler_attrs.h"
 
-#include "BLI_utildefines.h"
+#include "BLI_utildefines.hh"
 
 
-#include "BLI_alloca.h"
-#include "BLI_linklist.h"
+#include "BLI_alloca.hh"
+#include "BLI_linklist.hh"
 #include "BLI_math_base.hh"
-#include "BLI_math_inline.h"
-#include "BLI_math_geom.h"
-#include "BLI_math_matrix.h"
-#include "BLI_memarena.h"
-#include "BLI_polyfill_2d.h"
-#include "BLI_polyfill_2d_beautify.h"
+#include "BLI_math_inline.hh"
+#include "BLI_math_geom.hh"
+#include "BLI_math_matrix.hh"
+#include "BLI_memarena.hh"
+#include "BLI_polyfill_2d.hh"
+#include "BLI_polyfill_2d_beautify.hh"
 
 #include "bmesh.hh"
 
 using namespace blender;
 
 /* This counter should only be changed when new features are added or critical changes are made. */
-#define FASTAPI_VERSION 4
+#define FASTAPI_VERSION 5
 
+# define DIAGONAL_CONSTR 1
 # define VERTICAL_CONSTR 2
 # define HORIZONTAL_CONSTR 3
 
@@ -83,15 +83,20 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
     const int uv_offset,
     const int constr_offset,
     const bool sync,
-    float *r_array,
+    float *r_array_hv,
+    float *r_array_d,
     int *r_tot_v,
-    int *r_tot_h)
+    int *r_tot_h,
+    int *r_tot_d
+    )
 {
     int total_vlines = 0;
     int total_hlines = 0;
+    int total_dlines = 0;
 
-    float *vptr = r_array;
-    float *hptr = r_array + (bm->totloop * 4);
+    float *dptr = r_array_d;
+    float *vptr = r_array_hv;
+    float *hptr = r_array_hv + (bm->totloop * 4);
 
     if (uv_offset == -1) {
       std::cout << "UniV: FastAPI: UniV_extract_data_constraints2d: Can't get uv layer index\n";
@@ -147,13 +152,18 @@ DLL_EXPORT void UniV_extract_data_constraints2d(
                 write_uv_line(hptr, l, uv_offset);
                 total_hlines++;
             }
-
+            else if (bits == DIAGONAL_CONSTR) {
+                write_uv_line(dptr, l, uv_offset);
+                dptr += 4;
+                total_dlines++;
+            }
         	edge_idx >>= 2;
         }
     }
 
     *r_tot_v = total_vlines * 2;
     *r_tot_h = total_hlines * 2;
+    *r_tot_d = total_dlines * 2;
 }
 
 DLL_EXPORT int UniV_extract_data_seams2d(
@@ -247,7 +257,7 @@ DLL_EXPORT void solver_matrix_add(LinearSolver* solver, int row, int col, double
     EIG_linear_solver_matrix_add(solver, row, col, value);
 }
 
-DLL_EXPORT void solver_matrix_add_angles(LinearSolver* solver, int row, double a1, double a2, double a3, int v1_id, int v2_id, int v3_id)
+DLL_EXPORT void solver_matrix_add_angles(LinearSolver* solver, int row, double a1, double a2, double a3, int v1_id, int v2_id, int v3_id, double w)
 {
     double sina1 = sin(a1);
     double sina2 = sin(a2);
@@ -273,18 +283,18 @@ DLL_EXPORT void solver_matrix_add_angles(LinearSolver* solver, int row, double a
     const double cosine = cos(a1) * ratio;
     const double sine = sina1 * ratio;
 
-    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id, cosine - 1.0f);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id + 1, -sine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id, -cosine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id + 1, sine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v3_id, 1.0);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id, (cosine - 1.0) * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id + 1, -sine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id, -cosine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id + 1, sine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v3_id, 1.0 * w);
     row++;
 
-    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id, sine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id + 1, cosine - 1.0f);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id, -sine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id + 1, -cosine);
-    EIG_linear_solver_matrix_add(solver, row, 2 * v3_id + 1, 1.0);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id, sine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v1_id + 1, (cosine - 1.0) * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id, -sine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v2_id + 1, -cosine * w);
+    EIG_linear_solver_matrix_add(solver, row, 2 * v3_id + 1, 1.0 * w);
 }
 
 DLL_EXPORT void solver_right_hand_side_add(LinearSolver* solver, int index, double value)

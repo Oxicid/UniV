@@ -343,17 +343,15 @@ class UNIV_PT_General(Panel):
             row.operator("uv.univ_pin", icon_value=icons.pin)
 
             if univ_pro_exist:
-                row = col_align.row(align=True)
-                row.scale_y = 1.35
-                row.operator(
-                    "uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c
-                ).is_vertical = False
-                row.menu(UNIV_MT_ConstraintsH.__name__, icon="DOWNARROW_HLT")
+                split = col_align.split(align=True)
+                split.scale_y = 1.35
 
-                row.operator(
-                    "uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b
-                ).is_vertical = True
-                row.menu(UNIV_MT_ConstraintsV.__name__, icon="DOWNARROW_HLT")
+                split.operator("uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c).constraints_type = "HORIZONTAL"  # fmt: skip
+                row = split.row(align=True)
+                row.operator("uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b).constraints_type = "VERTICAL"  # fmt: skip
+                row.operator("uv.univ_mark_constraints", text="", icon_value=icons.d_align).constraints_type = "DIAGONAL"  # fmt: skip
+
+                row.menu(UNIV_MT_ConstraintsHVD.__name__, icon="DOWNARROW_HLT")
 
         # Misc
         panel = draw_panel(layout, "Misc")
@@ -429,23 +427,13 @@ class UNIV_PT_General(Panel):
             col_align.separator(factor=0.25)
 
             grid = col_align.grid_flow(row_major=True, columns=3, align=True)
-            grid.operator("uv.univ_select_square_island", icon_value=icons.square).shape = "SQUARE"
-            grid.operator(
-                "uv.univ_select_square_island", text="H-Rect", icon_value=icons.horizontal_a
-            ).shape = "HORIZONTAL"
-            grid.operator(
-                "uv.univ_select_square_island", text="V-Rect", icon_value=icons.vertical_a
-            ).shape = "VERTICAL"
+            grid.operator("uv.univ_select_square_island", icon_value=icons.square).shape = "SQUARE"  #  fmt: skip
+            grid.operator("uv.univ_select_square_island", text="H-Rect", icon_value=icons.horizontal_a).shape = "HORIZONTAL"  #  fmt: skip
+            grid.operator("uv.univ_select_square_island", text="V-Rect", icon_value=icons.vertical_a).shape = "VERTICAL"  #  fmt: skip
 
-            grid.operator(
-                "uv.univ_select_by_area", text="Small", icon_value=icons.small
-            ).size_mode = "SMALL"
-            grid.operator(
-                "uv.univ_select_by_area", text="Medium", icon_value=icons.medium
-            ).size_mode = "MEDIUM"
-            grid.operator(
-                "uv.univ_select_by_area", text="Large", icon_value=icons.large
-            ).size_mode = "LARGE"
+            grid.operator("uv.univ_select_by_area", text="Small", icon_value=icons.small).size_mode = "SMALL"  # fmt: skip
+            grid.operator("uv.univ_select_by_area", text="Medium", icon_value=icons.medium).size_mode = "MEDIUM"  # fmt: skip
+            grid.operator("uv.univ_select_by_area", text="Large", icon_value=icons.large).size_mode = "LARGE"  # fmt: skip
 
             col_align.operator("uv.univ_local_invert_selection", icon_value=icons.local_invert)
 
@@ -681,6 +669,7 @@ class UNIV_PT_GlobalSettings(Panel):
                 col.prop(pref, "overlay_2d_uv_edge_seam_color")
                 col.prop(pref, "overlay_2d_uv_edge_h_constraints_color")
                 col.prop(pref, "overlay_2d_uv_edge_v_constraints_color")
+                col.prop(pref, "overlay_2d_uv_edge_d_constraints_color")
 
                 col.separator()
                 col.prop(pref, "overlay_2d_uv_seam_edge_pixelize")
@@ -1829,39 +1818,31 @@ class IMAGE_MT_PIE_univ_inspect(Menu):
         pie.operator("uv.univ_check_flipped", icon_value=icons.flipped)
 
 
-class UNIV_MT_ConstraintsH(bpy.types.Menu):
+class UNIV_MT_ConstraintsHVD(bpy.types.Menu):
     bl_label = ""
     bl_space_type = "IMAGE_EDITOR"
     bl_region_type = "UI"
     bl_category = "UniV"
 
     def draw(self, context):
-        self.draw_constraints_hv(False)
-
-    def draw_constraints_hv(self, is_vertical: bool):
+        constr_types = ("HORIZONTAL", "VERTICAL", "DIAGONAL")
         layout = self.layout
-        if is_vertical:
-            text = "V-Constr"
-            constraint_type = "VERTICAL"
-        else:
-            text = "H-Constr"
-            constraint_type = "HORIZONTAL"
 
-        layout.operator(
-            "uv.univ_select_constraints", text=text, icon_value=icons.arrow
-        ).constraint_type = constraint_type
-        layout.operator(
-            "uv.univ_mark_constraints_by_angle", text=text, icon="EVENT_A"
-        ).is_vertical = is_vertical
-        layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").is_vertical = (
-            is_vertical
-        )
+        for constr in constr_types:
+            text = f"{constr[0]}-Constr"
+            layout.operator("uv.univ_select_constraints", text=text, icon_value=icons.arrow).constraints_type = constr  # fmt: skip
+        layout.separator()
 
+        for constr in constr_types:
+            if constr != "DIAGONAL":
+                text = f"{constr[0]}-Constr"
+                layout.operator("uv.univ_mark_constraints_by_angle", text=text, icon="EVENT_A").constraints_type = constr  # fmt: skip
+        layout.separator()
 
-class UNIV_MT_ConstraintsV(UNIV_MT_ConstraintsH):
+        for constr in constr_types:
+            text = f"{constr[0]}-Constr"
+            layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").constraints_type = constr  # fmt: skip
 
-    def draw(self, context):
-        self.draw_constraints_hv(True)
 
 
 class IMAGE_MT_PIE_constraints(Menu):
@@ -1874,14 +1855,10 @@ class IMAGE_MT_PIE_constraints(Menu):
         pie = layout.menu_pie()
 
         # Left
-        pie.operator(
-            "uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c
-        ).is_vertical = False
+        pie.operator("uv.univ_mark_constraints", text="H-Constr", icon_value=icons.horizontal_c).constraints_type = "HORIZONTAL"  # fmt: skip
 
         # Right
-        pie.operator(
-            "uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b
-        ).is_vertical = True
+        pie.operator("uv.univ_mark_constraints", text="V-Constr", icon_value=icons.vertical_b).constraints_type = "VERTICAL"  # fmt: skip
 
         # Bottom
         split = pie.split()
@@ -1891,33 +1868,23 @@ class IMAGE_MT_PIE_constraints(Menu):
         col.scale_x = 2
         col.scale_y = 2
         row = col.row(align=True)
-        row.operator(
-            "uv.univ_select_constraints", text="H-Constr", icon_value=icons.arrow
-        ).constraint_type = "HORIZONTAL"
-        row.operator(
-            "uv.univ_select_constraints", text="V-Constr", icon_value=icons.arrow
-        ).constraint_type = "VERTICAL"
+        row.operator("uv.univ_select_constraints", text="H-Constr", icon_value=icons.arrow).constraints_type = "HORIZONTAL"  # fmt: skip
+        row.operator("uv.univ_select_constraints", text="V-Constr", icon_value=icons.arrow).constraints_type = "VERTICAL"  # fmt: skip
+        row.operator("uv.univ_select_constraints", text="D-Constr", icon_value=icons.arrow).constraints_type = "DIAGONAL"  # fmt: skip
 
         row = col.row(align=True)
-        row.operator(
-            "uv.univ_mark_constraints_by_angle", text="H-Constr", icon="EVENT_A"
-        ).is_vertical = False
-        row.operator(
-            "uv.univ_mark_constraints_by_angle", text="V-Constr", icon="EVENT_A"
-        ).is_vertical = True
+        row.operator("uv.univ_mark_constraints_by_angle", text="H-Constr", icon="EVENT_A").constraints_type = "HORIZONTAL"  # fmt: skip
+        row.operator("uv.univ_mark_constraints_by_angle", text="V-Constr", icon="EVENT_A").constraints_type = "VERTICAL"  # fmt: skip
 
         row = col.row(align=True)
-        row.operator(
-            "uv.univ_clear_constraints", text="H-Constr", icon="PANEL_CLOSE"
-        ).is_vertical = False
-        row.operator(
-            "uv.univ_clear_constraints", text="V-Constr", icon="PANEL_CLOSE"
-        ).is_vertical = True
+        row.operator("uv.univ_clear_constraints", text="H-Constr", icon="PANEL_CLOSE").constraints_type = "HORIZONTAL"  # fmt: skip
+        row.operator("uv.univ_clear_constraints", text="V-Constr", icon="PANEL_CLOSE").constraints_type = "VERTICAL"  # fmt: skip
+        row.operator("uv.univ_clear_constraints", text="D-Constr", icon="PANEL_CLOSE").constraints_type = "DIAGONAL"  # fmt: skip
 
         # Upper
         pie.operator("uv.univ_straight", icon_value=icons.straight)
         # Left Upper
-        pie.split()
+        pie.operator("uv.univ_mark_constraints", text="D-Constr", icon_value=icons.d_align).constraints_type = "DIAGONAL"  # fmt: skip
         # pie.operator('uv.univ_check_over', icon_value=icons.over)
         # Right Upper
         pie.operator("uv.univ_unwrap", icon_value=icons.unwrap)

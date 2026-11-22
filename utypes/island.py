@@ -1120,9 +1120,7 @@ class AdvIsland:
 
                             shift = i * 2
                             bits = (edge_bits >> shift) & 3
-                            if bits == 2:  # vertical
-                                return True
-                            elif bits == 3:  # horizontal
+                            if bits in (2, 3, 1):  # Diagonal/Vertical/Horizontal.
                                 return True
                             break
         return False

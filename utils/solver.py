@@ -118,7 +118,7 @@ class LinearSolver:
                 raise IndexError(f"Invalid indices: {row=}, {col=}")
             self.M_triplets.append((r, c, value))
 
-    def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int):
+    def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int, w: float):  # fmt: skip
         from math import sin, cos
 
         v1_id *= 2
@@ -146,18 +146,18 @@ class LinearSolver:
         cosine: float = cos(a1) * ratio
         sine: float = sina1 * ratio
 
-        self.matrix_add(row, v1_id, cosine - 1.0)
-        self.matrix_add(row, v1_id + 1, -sine)
-        self.matrix_add(row, v2_id, -cosine)
-        self.matrix_add(row, v2_id + 1, sine)
-        self.matrix_add(row, v3_id, 1.0)
+        self.matrix_add(row, v1_id, (cosine - 1.0) * w)
+        self.matrix_add(row, v1_id + 1, -sine * w)
+        self.matrix_add(row, v2_id, -cosine * w)
+        self.matrix_add(row, v2_id + 1, sine * w)
+        self.matrix_add(row, v3_id, 1.0 * w)
 
         row += 1
-        self.matrix_add(row, v1_id, sine)
-        self.matrix_add(row, v1_id + 1, cosine - 1.0)
-        self.matrix_add(row, v2_id, -sine)
-        self.matrix_add(row, v2_id + 1, -cosine)
-        self.matrix_add(row, v3_id + 1, 1.0)
+        self.matrix_add(row, v1_id, sine * w)
+        self.matrix_add(row, v1_id + 1, (cosine - 1.0) * w)
+        self.matrix_add(row, v2_id, -sine * w)
+        self.matrix_add(row, v2_id + 1, -cosine * w)
+        self.matrix_add(row, v3_id + 1, 1.0 * w)
 
     def right_hand_side_add(self, index: int, value: float):
         if self.least_squares:

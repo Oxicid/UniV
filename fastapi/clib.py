@@ -10,7 +10,7 @@ from .. import utypes
 from .. import utils
 from ctypes import c_int, c_float, c_double, c_void_p, c_bool, POINTER, byref
 
-EXPECTED_FASTAPI_VERSION = 4
+EXPECTED_FASTAPI_VERSION = 5
 
 
 class FastAPI:
@@ -95,6 +95,7 @@ class FastAPI:
             c_int,
             c_int,
             c_int,
+            c_double,
         )
         lib.solver_matrix_add_angles.restype = None
 
@@ -127,15 +128,19 @@ class FastAPI:
         #     const int uv_offset,
         #     const int constr_offset,
         #     const bool sync,
-        #     float *arr,
+        #     float *arr_hv,
+        #     float *arr_d,
         #     int *r_tot_v,
         #     int *r_tot_h)
+        #     int *r_tot_d)
         lib.UniV_extract_data_constraints2d.argtypes = (
             POINTER(btypes.CBMesh),
             c_int,
             c_int,
             c_bool,
             POINTER(c_float),
+            POINTER(c_float),
+            POINTER(c_int),
             POINTER(c_int),
             POINTER(c_int),
         )
@@ -166,21 +171,31 @@ class ExtractData:
         constr_offset = ExtractData.get_constr_offset(umesh, attr)
 
         max_data_shape = (c_bm.contents.totloop * 2, 2)
-        arr = np.empty(max_data_shape, np.float32)
+        arr_hv = np.empty(max_data_shape, np.float32)
+        arr_d = np.empty(max_data_shape, np.float32)
 
         tot_v_coords = c_int()
         tot_h_coords = c_int()
+        tot_d_coords = c_int()
 
         FastAPI.lib.UniV_extract_data_constraints2d(
             c_bm,
             uv_offset,
             constr_offset,
             umesh.sync,
-            arr.ctypes.data_as(POINTER(c_float)),
+            arr_hv.ctypes.data_as(POINTER(c_float)),
+            arr_d.ctypes.data_as(POINTER(c_float)),
             byref(tot_v_coords),
             byref(tot_h_coords),
+            byref(tot_d_coords),
         )
-        return arr[: tot_v_coords.value], arr[-tot_h_coords.value :] if tot_h_coords else []
+
+        return (
+            arr_hv[: tot_v_coords.value] if tot_v_coords else [],
+            # NOTE: Without a zero check, this type of slice retrieves all values from the array (horizontal).
+            arr_hv[-tot_h_coords.value :] if tot_h_coords else [],
+            arr_d[: tot_d_coords.value] if tot_d_coords else [],
+        )
 
     @staticmethod
     def extract_seams_data(umesh: "utypes.UMesh"):
@@ -275,10 +290,8 @@ class LinearSolver:
     def matrix_add(self, row: int, col: int, value: float) -> None:
         FastAPI.lib.solver_matrix_add(self._handle, row, col, value)
 
-    def matrix_add_angles(
-        self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int
-    ) -> None:
-        FastAPI.lib.solver_matrix_add_angles(self._handle, row, a1, a2, a3, v1_id, v2_id, v3_id)
+    def matrix_add_angles(self, row: int, a1: float, a2: float, a3: float, v1_id: int, v2_id: int, v3_id: int, w: float) -> None:  # fmt: skip
+        FastAPI.lib.solver_matrix_add_angles(self._handle, row, a1, a2, a3, v1_id, v2_id, v3_id, w)
 
     def right_hand_side_add(self, index: int, value: float) -> None:
         FastAPI.lib.solver_right_hand_side_add(self._handle, index, value)
@@ -363,18 +376,18 @@ class TestExtractData(unittest.TestCase):
 
         V = "10"
         H = "11"
-        ERR = "01"
+        D = "01"
 
         atr = bm.edges.layers.int.new("univ_constraints")
         f1.edges[0][atr] = int(H + V, 2)
         f1.edges[1][atr] = int(H + H, 2)
-        f1.edges[2][atr] = int(ERR, 2)
+        f1.edges[2][atr] = int(D, 2)
         f1.edges[1].seam = True
 
-        f2.edges[1][atr] = int(ERR + H + H, 2)
+        f2.edges[1][atr] = int(D + H + H, 2)
         f2.edges[1].seam = True
 
-        f3.edges[1][atr] = int(ERR + V, 2)
+        f3.edges[1][atr] = int(D + V, 2)
         f3.edges[1].seam = True
 
         f4.edges[1][atr] = int(H + V + V, 2)
@@ -392,16 +405,18 @@ class TestExtractData(unittest.TestCase):
     def test_extract_data_constraints(self):
 
         umesh, attr = self.get_umesh_with_constraints_and_seams()
-        varray, harray = ExtractData.extract_constraints_data(umesh, attr)
+        varray, harray, darray = ExtractData.extract_constraints_data(umesh, attr)
 
         self.assertEqual(len(varray), 6)
         self.assertEqual(len(harray), 8)
 
         expect_varray = [[-1, 0], [0, 0], [0, 0], [0, -1], [2, 0], [2, 1]]
         expect_harray = [[0, 0], [1, 0], [1, 0], [2, 0], [0, 0], [0, 1], [0, 1], [0, 0]]
+        expect_darray = [[0, 1], [-1, 0], [1, 0], [0, 0]]
 
         self.assertEqual(varray.tolist(), expect_varray)
         self.assertEqual(harray.tolist(), expect_harray)
+        self.assertEqual(darray.tolist(), expect_darray)
 
         umesh.free()
 

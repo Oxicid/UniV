@@ -5,7 +5,7 @@ bl_info = {
     "name": "UniV",
     "description": "Smart UV tools",
     "author": "Oxicid",
-    "version": (4, 2, 8, "experimental"),
+    "version": (4, 3, 0, "experimental"),
     "blender": (3, 2, 0),
     "category": "UV",
     "location": "N-panel in 2D and 3D view",
@@ -231,8 +231,7 @@ def load_register_types():
                     ui.UNIV_PT_TrimManager,
                     ui.UNIV_PT_CheckerSettings,
                     ui.UNIV_PT_CheckerTextures,
-                    ui.UNIV_MT_ConstraintsV,
-                    ui.UNIV_MT_ConstraintsH,
+                    ui.UNIV_MT_ConstraintsHVD,
                     ui.IMAGE_MT_PIE_constraints,
                     # Checker System
                     univ_pro.checker.UNIV_OT_Checker,

@@ -128,7 +128,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
         ##################################################
 
         if self.use_constraints(isl):
-            self.pick_unwrap_by_constraints(isl)
+            self.pick_unwrap_by_constraints_ex(isl)
             return {"FINISHED"}
         ##################################################
 
@@ -144,23 +144,19 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             for f in accidentally_selected_faces:
                 f.hide = True
 
-        isl.apply_aspect_ratio()
-        save_t = isl.save_transform(flip_if_needed=True)
-        save_t.save_coords(self.blend_factor)
+        with isl.temp_aspect():
+            save_t = isl.save_transform(flip_if_needed=True)
+            save_t.save_coords(self.blend_factor)
 
-        if self.mark_seams_only_with_other_islands:
-            isl.mark_seams_only_with_other_islands()
-        else:
-            isl.mark_seam(additional=True)
+            if self.mark_seams_only_with_other_islands:
+                isl.mark_seams_only_with_other_islands()
+            else:
+                isl.mark_seam(additional=True)
 
-        bpy.ops.uv.unwrap(
-            method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs
-        )
+            bpy.ops.uv.unwrap(method=self.unwrap, fill_holes=self.fill_holes, correct_aspect=False, **unwrap_kwargs)  # fmt: skip
 
-        save_t.inplace(flip_if_needed=False)
-        save_t.apply_saved_coords(self.blend_factor, flip_if_needed=True)
-
-        isl.reset_aspect_ratio()
+            save_t.inplace(flip_if_needed=False)
+            save_t.apply_saved_coords(self.blend_factor, flip_if_needed=True)
 
         if save_t.rotate:
             utils.set_global_texel(save_t.island)
@@ -186,7 +182,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
             and isl.has_constraints_edge(selected=selected)
         )
 
-    def pick_unwrap_by_constraints(self, isl):
+    def pick_unwrap_by_constraints_ex(self, isl):
         raise
 
     @staticmethod
@@ -310,6 +306,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                             fill_holes=self.fill_holes,
                             constraints_factor=self.constr_weight * 100,
                             constr_correction_weight=getattr(self, "constr_correction_weight", 1.0),
+                            constr_d_edge_factor=getattr(self, "constr_d_edge_factor", 0.05),
                         )
                     isl.reset_aspect_ratio()
                     if not is_static:
@@ -641,6 +638,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                             fill_holes=self.fill_holes,
                             constraints_factor=self.constr_weight * 100,
                             constr_correction_weight=getattr(self, "constr_correction_weight", 1.0),
+                            constr_d_edge_factor=getattr(self, "constr_d_edge_factor", 0.05),
                         )
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()
@@ -751,6 +749,7 @@ class UNIV_OT_Unwrap(utypes.RayCastAndPick):
                             fill_holes=self.fill_holes,
                             constraints_factor=self.constr_weight * 100,
                             constr_correction_weight=getattr(self, "constr_correction_weight", 1.0),
+                            constr_d_edge_factor=getattr(self, "constr_d_edge_factor", 0.05),
                         )
                     hidden_constraints_islands.append(isl)
                     isl.reset_aspect_ratio()

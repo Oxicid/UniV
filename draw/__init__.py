@@ -282,13 +282,18 @@ class DrawCallSeams2D:
 
 
 class DrawCallConstraints2D:
-    def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None):
+    def __init__(self, batch_h: gpu.types.GPUBatch | None, batch_v: gpu.types.GPUBatch | None, batch_d: gpu.types.GPUBatch | None):
         self.shader = shaders.POLYLINE_UNIFORM_COLOR_2D
-        self.color_h = prefs().overlay_2d_uv_edge_h_constraints_color
-        self.color_v = prefs().overlay_2d_uv_edge_v_constraints_color
+        # NOTE: The original `color` block is referenced directly,
+        #  so color changes are reflected automatically without requiring an explicit `update` call.
+        pref = prefs()
+        self.color_h = pref.overlay_2d_uv_edge_h_constraints_color
+        self.color_v = pref.overlay_2d_uv_edge_v_constraints_color
+        self.color_d = pref.overlay_2d_uv_edge_d_constraints_color
 
         self.batch_h = batch_h
         self.batch_v = batch_v
+        self.batch_d = batch_d
 
     def __call__(self):
         shaders.blend_set_alpha()
@@ -306,6 +311,10 @@ class DrawCallConstraints2D:
             self.shader.uniform_float("color", self.color_v)
             self.batch_v.draw(self.shader)
 
+        if self.batch_d:
+            self.shader.uniform_float("color", self.color_d)
+            self.batch_d.draw(self.shader)
+
         shaders.set_line_width(1)
         shaders.depth_test_set_none()
         shaders.blend_set_none()
@@ -317,16 +326,16 @@ class DrawCallConstraints2D:
             return None
 
         if fastapi.FastAPI.lib:
-            v_coords, h_coords = fastapi.ExtractData.extract_constraints_data(
-                umesh, constraints_attr
-            )
+            v_coords, h_coords, d_coords = fastapi.ExtractData.extract_constraints_data(umesh, constraints_attr)  # fmt: skip
         else:
-            v_coords, h_coords = cls.extract_data(umesh, constraints_attr)
-        if not (len(h_coords) or len(v_coords)):
+            v_coords, h_coords, d_coords = cls.extract_data(umesh, constraints_attr)
+
+        if not (len(h_coords) or len(v_coords) or len(d_coords)):
             return None
 
         h_batch = None
         v_batch = None
+        d_batch = None
 
         if len(h_coords):
             h_batch = batch_for_shader(
@@ -336,8 +345,11 @@ class DrawCallConstraints2D:
             v_batch = batch_for_shader(
                 shaders.POLYLINE_UNIFORM_COLOR_2D, "LINES", {"pos": v_coords}
             )
-
-        return cls(h_batch, v_batch)
+        if len(d_coords):
+            d_batch = batch_for_shader(
+                shaders.POLYLINE_UNIFORM_COLOR_2D, "LINES", {"pos": d_coords}
+            )
+        return cls(h_batch, v_batch, d_batch)
 
     @staticmethod
     def is_enable():
@@ -353,8 +365,10 @@ class DrawCallConstraints2D:
         """"""
         v_coords = []
         h_coords = []
+        d_coords = []
         v_coords_append = v_coords.append
         h_coords_append = h_coords.append
+        d_coords_append = d_coords.append
 
         uv = umesh.uv
         if umesh.is_full_face_selected:
@@ -370,7 +384,9 @@ class DrawCallConstraints2D:
                         elif bits == 3:  # horizontal
                             h_coords_append(crn[uv].uv)
                             h_coords_append(crn.link_loop_next[uv].uv)
-
+                        elif bits == 1:  # diagonal
+                            d_coords_append(crn[uv].uv)
+                            d_coords_append(crn.link_loop_next[uv].uv)
                         edge_idx >>= 2
         else:
             if umesh.sync:
@@ -387,6 +403,9 @@ class DrawCallConstraints2D:
                                 elif bits == 3:  # horizontal
                                     h_coords_append(crn[uv].uv)
                                     h_coords_append(crn.link_loop_next[uv].uv)
+                                elif bits == 1:  # diagonal
+                                    d_coords_append(crn[uv].uv)
+                                    d_coords_append(crn.link_loop_next[uv].uv)
                             edge_idx >>= 2
             else:
                 if umesh.is_full_face_deselected:
@@ -404,9 +423,12 @@ class DrawCallConstraints2D:
                                 elif bits == 3:  # horizontal
                                     h_coords_append(crn[uv].uv)
                                     h_coords_append(crn.link_loop_next[uv].uv)
+                                elif bits == 1:  # diagonal
+                                    d_coords_append(crn[uv].uv)
+                                    d_coords_append(crn.link_loop_next[uv].uv)
                             edge_idx >>= 2
 
-        return v_coords, h_coords
+        return v_coords, h_coords, d_coords
 
 
 class DrawCall3D:
@@ -759,9 +781,7 @@ class Drawer2D:
             cls.dirt = True
             return
 
-        unique_objects_with_uv = [
-            obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers
-        ]
+        unique_objects_with_uv = [obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers]  # fmt: skip
         for obj in unique_objects_with_uv:
             obj_id = obj.name
             if obj_id not in draw_objects:

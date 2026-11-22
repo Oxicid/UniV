@@ -114,7 +114,7 @@ target_include_directories(univ_fastapi PRIVATE
 	${BLENLIB}
 	##########
 	
-	
+	${BLENDER_ROOT}/intern/profile
 	${BLENDER_ROOT}/source/blender/blenkernel
 	
 	${BLENDER_ROOT}/source/blender/makesdna
