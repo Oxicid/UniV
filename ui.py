@@ -666,12 +666,30 @@ class UNIV_PT_GlobalSettings(Panel):
                 col = split.column()
                 col.active = pref.overlay_2d_enable
 
-                col.prop(pref, "overlay_2d_uv_edge_seam_color")
-                col.prop(pref, "overlay_2d_uv_edge_h_constraints_color")
-                col.prop(pref, "overlay_2d_uv_edge_v_constraints_color")
-                col.prop(pref, "overlay_2d_uv_edge_d_constraints_color")
+                row = col.row(align=True)
+                row.prop(pref, "overlay_2d_show_uv_edge_seam", text="")
+                row.prop(pref, "overlay_2d_uv_edge_seam_color")
+
+                row = col.row(align=True)
+                row.prop(pref, "overlay_2d_show_uv_constraints", text="")
+                row.prop(pref, "overlay_2d_uv_edge_h_constraints_color")
+
+                row = col.row(align=True)
+                row.prop(pref, "overlay_2d_show_uv_constraints", text="")
+                row.prop(pref, "overlay_2d_uv_edge_v_constraints_color")
+
+                row = col.row(align=True)
+                row.prop(pref, "overlay_2d_show_uv_constraints", text="")
+                row.prop(pref, "overlay_2d_uv_edge_d_constraints_color")
 
                 col.separator()
+
+                row = col.row(align=True)
+                row.prop(pref, "overlay_2d_show_uv_flipped_face", text="")
+                row.prop(pref, "overlay_2d_uv_flipped_face_color")
+
+                col.separator()
+
                 col.prop(pref, "overlay_2d_uv_seam_edge_pixelize")
 
             panel = draw_panel_with_pref_checkbox(layout, "overlay_3d_enable")

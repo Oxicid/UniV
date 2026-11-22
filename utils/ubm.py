@@ -10,6 +10,11 @@ from mathutils import Vector
 from mathutils.geometry import area_tri, intersect_point_tri_2d
 
 
+def poly_to_tri_count(poly_count: int, corner_count: int) -> int:
+    assert (not poly_count or corner_count > poly_count * 2)
+    return corner_count - (poly_count * 2)
+
+
 def face_centroid_uv(f: BMFace, uv: BMLayerItem):
     value = Vector((0, 0))
     loops = f.loops

@@ -431,6 +431,80 @@ class DrawCallConstraints2D:
         return v_coords, h_coords, d_coords
 
 
+class DrawCallFlipped2D:
+    def __init__(self, batch: gpu.types.GPUBatch):
+        self.shader = shaders.UNIFORM_COLOR_2D
+        # NOTE: The original `color` block is referenced directly,
+        #  so color changes are reflected automatically without requiring an explicit `update` call.
+        self.color = prefs().overlay_2d_uv_flipped_face_color
+        self.batch = batch
+
+    def __call__(self):
+        shaders.blend_set_alpha()
+        shaders.depth_test_set_less()
+
+        self.shader.bind()
+        self.shader.uniform_float("color", self.color)
+        self.batch.draw(self.shader)
+
+        shaders.depth_test_set_none()
+        shaders.blend_set_none()
+
+    @classmethod
+    def init(cls, umesh: UMesh) -> "DrawCallFlipped2D | None":
+        if fastapi.FastAPI.lib:
+            tris = fastapi.ExtractData.extract_flipped_2d_data(umesh)  # fmt: skip
+        else:
+            tris = cls.extract_data(umesh)
+
+        if not len(tris):
+            return None
+
+        batch_tris = batch_for_shader(shaders.UNIFORM_COLOR_2D, "TRIS", {"pos": tris})
+        return cls(batch_tris)
+
+    @staticmethod
+    def is_enable():
+        try:
+            from .. import univ_pro
+
+            return univ_settings().overlay_2d_enable
+        except ImportError:
+            return False
+
+    @staticmethod
+    def extract_data(umesh: UMesh):
+        """"""
+        tris = []
+        tris_append = tris.append
+
+        from ..utils import calc_signed_face_area_uv, calc_visible_uv_faces_iter
+        uv = umesh.uv
+
+        for f in calc_visible_uv_faces_iter(umesh):
+            if calc_signed_face_area_uv(f, uv) < 0.0:
+                corners = [crn[uv].uv for crn in f.loops]
+                n = len(corners)
+                if n == 4:
+                    l1, l2, l3, l4 = corners
+                    tris_append(l1)
+                    tris_append(l2)
+                    tris_append(l3)
+                    tris_append(l3)
+                    tris_append(l4)
+                    tris_append(l1)
+                elif n == 3:
+                    tris.extend(corners)
+                else:
+                    first_crn = corners[0]
+                    for i in range(1, n - 1):
+                        tris_append(first_crn)
+                        tris_append(corners[i])
+                        tris_append(corners[i + 1])
+
+        return tris
+
+
 class DrawCall3D:
     def __init__(self, draw_fn, shader, color, batch, world_matrix):
         self.draw_fn = draw_fn
@@ -749,11 +823,15 @@ class Drawer2D:
     @classmethod
     def update_drawer_data(cls):
         drawers = []
-        if True:  # if constraints
+        pref = prefs()
+        if pref.overlay_2d_show_uv_constraints:
             drawers.append(DrawCallConstraints2D)
 
-        if True:  # if seam
+        if pref.overlay_2d_show_uv_edge_seam:
             drawers.append(DrawCallSeams2D)
+
+        if pref.overlay_2d_show_uv_flipped_face:
+            drawers.append(DrawCallFlipped2D)
 
         cls.dirt = True
         cls.draw_objects.clear()
@@ -976,9 +1054,7 @@ class Drawer3D:
         if not cls.dirt:
             return
 
-        unique_objects_with_uv = [
-            obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers
-        ]
+        unique_objects_with_uv = [obj for obj in bpy.context.objects_in_mode_unique_data if obj.data.uv_layers]
         for obj in unique_objects_with_uv:
             obj_id = obj.name
             if obj_id not in draw_objects:

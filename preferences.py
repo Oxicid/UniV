@@ -425,6 +425,10 @@ Some operators, can interact with trims:
     overlay_3d_enable: BoolProperty(name="Overlay 3D", default=True, update=_update_drawer_3d_enable)
 
     # Colors 2D
+    overlay_2d_show_uv_flipped_face: BoolProperty(name="Show Flipped Faces", default=True, update=_update_drawer_2d_enable)
+    overlay_2d_show_uv_edge_seam: BoolProperty(name="Show Seams", default=True, update=_update_drawer_2d_enable)
+    overlay_2d_show_uv_constraints: BoolProperty(name="Show Constraints", default=True, update=_update_drawer_2d_enable)
+
     overlay_2d_uv_edge_h_constraints_color: FloatVectorProperty(name="H-Constr", default=(0.85, 1.0, 0.0, 0.15),
         min=0.0, max=1.0, size=4, subtype="COLOR"
     )
@@ -437,6 +441,11 @@ Some operators, can interact with trims:
     overlay_2d_uv_edge_seam_color: FloatVectorProperty(name="Edge Seam", default=(0.8, 0.0, 0.0, 0.25),
         min=0.0, max=1.0, size=4, subtype="COLOR"
     )
+
+    overlay_2d_uv_flipped_face_color: FloatVectorProperty(name="Flipped Face", default=(1.0, 0.0, 0.0, 0.1),
+        min=0.0, max=1.0, size=4, subtype="COLOR"
+    )
+
 
     overlay_2d_uv_seam_edge_pixelize: BoolProperty(name="Pixelate Edge Seam", default=False, update=_update_drawer_2d_enable,
         description="Render UV seams lines as aliased, so only perfectly axis-aligned edges stay crisp. "

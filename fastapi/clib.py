@@ -10,7 +10,7 @@ from .. import utypes
 from .. import utils
 from ctypes import c_int, c_float, c_double, c_void_p, c_bool, POINTER, byref
 
-EXPECTED_FASTAPI_VERSION = 5
+EXPECTED_FASTAPI_VERSION = 6
 
 
 class FastAPI:
@@ -160,6 +160,20 @@ class FastAPI:
         )
         lib.UniV_extract_data_seams2d.restype = c_int
 
+        # int UniV_extract_data_flipped2d(
+        #     BMesh *bm,
+        #     const int uv_offset,
+        #     const bool sync,
+        #     float *r_array)
+
+        lib.UniV_extract_data_flipped2d.argtypes = (
+            POINTER(btypes.CBMesh),
+            c_int,
+            c_bool,
+            POINTER(c_float),
+        )
+        lib.UniV_extract_data_flipped2d.restype = c_int
+
 
 class ExtractData:
     @staticmethod
@@ -196,6 +210,18 @@ class ExtractData:
             arr_hv[-tot_h_coords.value :] if tot_h_coords else [],
             arr_d[: tot_d_coords.value] if tot_d_coords else [],
         )
+
+    @staticmethod
+    def extract_flipped_2d_data(umesh: "utypes.UMesh"):
+        c_bm: btypes.CBMesh = btypes.PyBMesh.get_fields_from_pyobj(umesh.bm).bm
+        total_tris = utils.poly_to_tri_count(len(umesh.bm.faces), umesh.total_corners)
+        uv_offset = ExtractData.get_uv_offset(umesh.uv)
+        arr = np.empty((total_tris*3, 2), np.float32)
+
+
+        tot_tris = FastAPI.lib.UniV_extract_data_flipped2d(c_bm, uv_offset, umesh.sync, arr.ctypes.data_as(POINTER(c_float)) )
+
+        return arr[: tot_tris*3] if tot_tris else []
 
     @staticmethod
     def extract_seams_data(umesh: "utypes.UMesh"):
