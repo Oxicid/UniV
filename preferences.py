@@ -360,9 +360,13 @@ class UNIV_UV_Layers(bpy.types.PropertyGroup):
 class ExcludedOperator(bpy.types.PropertyGroup):
     idname: StringProperty()
 
+# fmt: off
+# noinspection PyTypeHints
+class UNIV_OperatorsSettings(bpy.types.PropertyGroup):
+    Align_use_trims: BoolProperty(name="Use trim for Align", default=True,
+                                  description="Allows ignoring the Trim System for the `Align` operator.")
 
-# class UNIV_OperatorsSettings(bpy.types.PropertyGroup):
-#     pass
+# fmt: on
 
 # fmt: off
 # noinspection PyTypeHints
@@ -649,6 +653,7 @@ Some operators, can interact with trims:
                                    )
 
     excluded_operators_for_overlay: CollectionProperty(name="Excluder Operators for Overlay", type=ExcludedOperator)
+    ot: PointerProperty(name="Operators Settings", type=UNIV_OperatorsSettings)
 
 
     @property

@@ -44,6 +44,7 @@ def load_register_types():
                 preferences.UNIV_TrimPresetsSlot,
                 preferences.UNIV_TexelPreset,
                 preferences.ExcludedOperator,
+                preferences.UNIV_OperatorsSettings,
                 preferences.UNIV_AddonPreferences,
                 preferences.UNIV_OT_ShowAddonPreferences,
                 keymaps.UNIV_RestoreKeymaps,

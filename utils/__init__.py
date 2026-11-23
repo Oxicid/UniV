@@ -1063,6 +1063,8 @@ def has_visible_active_trim(report=None):
     pref = preferences.prefs()
 
     if not pref.trims_presets_slots:
+        if report:
+            report({"WARNING"}, "Trims slots is empty")
         return False
 
     trim_slot = pref.get_active_trim_slot()

@@ -1312,8 +1312,7 @@ class IMAGE_MT_PIE_univ_align(Menu):
         pref = prefs()
 
         from . import utils
-
-        is_trim_used = utils.is_pro_version_support() and pref.use_trims
+        is_trim_used = utils.is_pro_version_support() and pref.use_trims and pref.ot.Align_use_trims
         is_active_center = True
         is_active_hv = True
         is_active_arrows = True
@@ -1351,7 +1350,9 @@ class IMAGE_MT_PIE_univ_align(Menu):
             pie.split()
 
         if is_trim_used:
-            pie.prop(pref, "use_trims", expand=True, icon="EVENT_T")
+            row = pie.row(align=True)
+            row.prop(pref.ot, "Align_use_trims", expand=True, text="")
+            row.prop(pref, "use_trims", expand=True, icon="EVENT_T")
         else:
             col = pie.column()
             col.scale_x = 1.2
@@ -1371,6 +1372,8 @@ class IMAGE_MT_PIE_univ_align(Menu):
                 row.prop(pref, "align_island_mode", expand=True, icon_only=True)
                 if utils.is_pro_version_support():
                     row.separator()
+                    if pref.use_trims:
+                        row.prop(pref.ot, "Align_use_trims", expand=True, text="")
                     row.prop(pref, "use_trims", expand=True, icon="EVENT_T", icon_only=True)
 
         if is_active_center:
@@ -1860,7 +1863,6 @@ class UNIV_MT_ConstraintsHVD(bpy.types.Menu):
         for constr in constr_types:
             text = f"{constr[0]}-Constr"
             layout.operator("uv.univ_clear_constraints", text=text, icon="PANEL_CLOSE").constraints_type = constr  # fmt: skip
-
 
 
 class IMAGE_MT_PIE_constraints(Menu):

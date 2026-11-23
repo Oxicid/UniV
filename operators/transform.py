@@ -1010,46 +1010,47 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
     def draw(self, context):
         pref = prefs()
         is_pro = utils.is_pro_version_support()
-        is_trim = is_pro and pref.use_trims
-
+        is_trim = is_pro and pref.use_trims and pref.ot.Align_use_trims
+        layout = self.layout
         if not is_trim:
             if self.mode == "COLLECT":
                 self.draw_overlap()
-                self.layout.separator()
+                layout.separator()
             elif self.mode == "ALIGN_BY_ANGLE":
-                self.layout.prop(self, "angle", slider=True)
-                self.layout.separator()
+                layout.prop(self, "angle", slider=True)
+                layout.separator()
 
         if self.mode != "COLLECT":
             if self.mode == "ALIGN_BY_ANGLE" and not is_trim:
-                row = self.layout.row(align=True)
+                row = layout.row(align=True)
                 row.prop_enum(self, "direction", "HORIZONTAL")
                 row.prop_enum(self, "direction", "VERTICAL")
             else:
                 self.draw_align_buttons(self.layout)
 
         if not is_trim:
-            if context.mode == "EDIT_MESH" and self.mode not in (
-                "COLLECT",
-                "ALIGN_BY_ANGLE",
-                "MOVE",
-            ):
-                self.layout.separator()
+            if (context.mode == "EDIT_MESH"
+                    and self.mode not in ("COLLECT", "ALIGN_BY_ANGLE", "MOVE")):
+                layout.separator()
                 row = self.layout.row(align=True)
                 # TODO: Add support Individual and Union for trims
                 row.prop(pref, "align_island_mode", expand=True)
 
-            self.layout.separator()
-            self.layout.column(align=True).prop(pref, "align_mode", expand=True)
+            layout.separator()
+            layout.column(align=True).prop(pref, "align_mode", expand=True)
 
         if self.mode != "ALIGN_BY_ANGLE":
-            self.layout.separator()
-            self.layout.prop(self, "ignore_seams")
+            layout.separator()
+            layout.prop(self, "ignore_seams")
 
         if is_pro:
             if self.mode == "ALIGN_BY_ANGLE":
-                self.layout.separator()
-            self.layout.prop(pref, "use_trims")
+                layout.separator()
+
+            row = layout.row(align=True)
+            if pref.use_trims:
+                row.prop(pref.ot, "Align_use_trims", text="")
+            row.prop(pref, "use_trims")
 
     def draw_align_buttons(self, where):
         def ly_wide_icon_op(layer, direct, icon):
@@ -1095,7 +1096,7 @@ class UNIV_OT_Align_pie(Operator, Collect, Align_by_Angle):
         self.mode = prefs().align_mode  # noqa
         self.is_island_mode = self.get_is_island_mode()
 
-        if utils.is_pro_version_support() and prefs().use_trims:
+        if utils.is_pro_version_support() and prefs().use_trims and prefs().ot.Align_use_trims:
             if self.mode != "ALIGN":
                 self.mode = "ALIGN"  # noqa
                 prefs().align_mode = "ALIGN"
@@ -1656,7 +1657,7 @@ class UNIV_OT_Align(UNIV_OT_Align_pie):
         self.is_island_mode = self.get_is_island_mode()
 
         self.mode = settings.align_mode
-        if utils.is_pro_version_support() and prefs().use_trims:
+        if utils.is_pro_version_support() and prefs().use_trims and prefs().ot.Align_use_trims:
             if self.mode != "ALIGN":
                 self.mode = "ALIGN"
                 prefs().align_mode = "ALIGN"
